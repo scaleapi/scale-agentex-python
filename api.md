@@ -32,6 +32,7 @@ Methods:
 
 - <code title="get /agents/name/{agent_name}">client.agents.name.<a href="./src/agentex_sdk/resources/agents/name.py">retrieve</a>(agent_name) -> <a href="./src/agentex_sdk/types/agent.py">Agent</a></code>
 - <code title="delete /agents/name/{agent_name}">client.agents.name.<a href="./src/agentex_sdk/resources/agents/name.py">delete</a>(agent_name) -> <a href="./src/agentex_sdk/types/agent.py">Agent</a></code>
+- <code title="post /agents/name/{agent_name}/rpc">client.agents.name.<a href="./src/agentex_sdk/resources/agents/name.py">handle_rpc</a>(agent_name, \*\*<a href="src/agentex_sdk/types/agents/name_handle_rpc_params.py">params</a>) -> JSONLDecoder[object]</code>
 
 # Tasks
 
