@@ -13,6 +13,7 @@ from .task_message import TaskMessage as TaskMessage
 from .text_content import TextContent as TextContent
 from .message_style import MessageStyle as MessageStyle
 from .message_author import MessageAuthor as MessageAuthor
+from .agent_rpc_params import AgentRpcParams as AgentRpcParams
 from .echo_send_params import EchoSendParams as EchoSendParams
 from .span_list_params import SpanListParams as SpanListParams
 from .streaming_status import StreamingStatus as StreamingStatus

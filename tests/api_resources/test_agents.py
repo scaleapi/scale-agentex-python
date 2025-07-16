@@ -9,7 +9,10 @@ import pytest
 
 from agentex_sdk import AgentexSDK, AsyncAgentexSDK
 from tests.utils import assert_matches_type
-from agentex_sdk.types import Agent, AgentListResponse
+from agentex_sdk.types import (
+    Agent,
+    AgentListResponse,
+)
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 
@@ -192,6 +195,71 @@ class TestAgents:
 
         assert cast(Any, response.is_closed) is True
 
+    @pytest.mark.skip()
+    @parametrize
+    def test_method_rpc(self, client: AgentexSDK) -> None:
+        agent = client.agents.rpc(
+            agent_id="agent_id",
+            method="event/send",
+            params={},
+        )
+        assert_matches_type(object, agent, path=["response"])
+
+    @pytest.mark.skip()
+    @parametrize
+    def test_method_rpc_with_all_params(self, client: AgentexSDK) -> None:
+        agent = client.agents.rpc(
+            agent_id="agent_id",
+            method="event/send",
+            params={
+                "name": "name",
+                "params": {"foo": "bar"},
+            },
+            id=0,
+            jsonrpc="2.0",
+        )
+        assert_matches_type(object, agent, path=["response"])
+
+    @pytest.mark.skip()
+    @parametrize
+    def test_raw_response_rpc(self, client: AgentexSDK) -> None:
+        response = client.agents.with_raw_response.rpc(
+            agent_id="agent_id",
+            method="event/send",
+            params={},
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        agent = response.parse()
+        assert_matches_type(object, agent, path=["response"])
+
+    @pytest.mark.skip()
+    @parametrize
+    def test_streaming_response_rpc(self, client: AgentexSDK) -> None:
+        with client.agents.with_streaming_response.rpc(
+            agent_id="agent_id",
+            method="event/send",
+            params={},
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            agent = response.parse()
+            assert_matches_type(object, agent, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip()
+    @parametrize
+    def test_path_params_rpc(self, client: AgentexSDK) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            client.agents.with_raw_response.rpc(
+                agent_id="",
+                method="event/send",
+                params={},
+            )
+
 
 class TestAsyncAgents:
     parametrize = pytest.mark.parametrize(
@@ -372,3 +440,68 @@ class TestAsyncAgents:
             assert_matches_type(Agent, agent, path=["response"])
 
         assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip()
+    @parametrize
+    async def test_method_rpc(self, async_client: AsyncAgentexSDK) -> None:
+        agent = await async_client.agents.rpc(
+            agent_id="agent_id",
+            method="event/send",
+            params={},
+        )
+        assert_matches_type(object, agent, path=["response"])
+
+    @pytest.mark.skip()
+    @parametrize
+    async def test_method_rpc_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+        agent = await async_client.agents.rpc(
+            agent_id="agent_id",
+            method="event/send",
+            params={
+                "name": "name",
+                "params": {"foo": "bar"},
+            },
+            id=0,
+            jsonrpc="2.0",
+        )
+        assert_matches_type(object, agent, path=["response"])
+
+    @pytest.mark.skip()
+    @parametrize
+    async def test_raw_response_rpc(self, async_client: AsyncAgentexSDK) -> None:
+        response = await async_client.agents.with_raw_response.rpc(
+            agent_id="agent_id",
+            method="event/send",
+            params={},
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        agent = await response.parse()
+        assert_matches_type(object, agent, path=["response"])
+
+    @pytest.mark.skip()
+    @parametrize
+    async def test_streaming_response_rpc(self, async_client: AsyncAgentexSDK) -> None:
+        async with async_client.agents.with_streaming_response.rpc(
+            agent_id="agent_id",
+            method="event/send",
+            params={},
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            agent = await response.parse()
+            assert_matches_type(object, agent, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip()
+    @parametrize
+    async def test_path_params_rpc(self, async_client: AsyncAgentexSDK) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            await async_client.agents.with_raw_response.rpc(
+                agent_id="",
+                method="event/send",
+                params={},
+            )
