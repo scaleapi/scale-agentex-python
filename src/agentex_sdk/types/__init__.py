@@ -13,6 +13,7 @@ from .task_message import TaskMessage as TaskMessage
 from .text_content import TextContent as TextContent
 from .message_style import MessageStyle as MessageStyle
 from .message_author import MessageAuthor as MessageAuthor
+from .agent_rpc_params import AgentRpcParams as AgentRpcParams
 from .echo_send_params import EchoSendParams as EchoSendParams
 from .span_list_params import SpanListParams as SpanListParams
 from .streaming_status import StreamingStatus as StreamingStatus
@@ -41,6 +42,5 @@ from .message_update_params import MessageUpdateParams as MessageUpdateParams
 from .tool_response_content import ToolResponseContent as ToolResponseContent
 from .tracker_list_response import TrackerListResponse as TrackerListResponse
 from .tracker_update_params import TrackerUpdateParams as TrackerUpdateParams
-from .agent_handle_rpc_params import AgentHandleRpcParams as AgentHandleRpcParams
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
 from .tool_response_content_param import ToolResponseContentParam as ToolResponseContentParam

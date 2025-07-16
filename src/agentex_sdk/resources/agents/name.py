@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from typing import Union
-from typing_extensions import Literal, overload
+from typing_extensions import Literal
 
 import httpx
 
 from ..._types import NOT_GIVEN, Body, Query, Headers, NotGiven
-from ..._utils import required_args, maybe_transform, async_maybe_transform
+from ..._utils import maybe_transform, async_maybe_transform
 from ..._compat import cached_property
 from ..._resource import SyncAPIResource, AsyncAPIResource
 from ..._response import (
@@ -19,8 +19,7 @@ from ..._response import (
 )
 from ...types.agent import Agent
 from ..._base_client import make_request_options
-from ...types.agents import name_handle_rpc_params
-from ..._decoders.jsonl import JSONLDecoder, AsyncJSONLDecoder
+from ...types.agents import name_rpc_params
 
 __all__ = ["NameResource", "AsyncNameResource"]
 
@@ -111,13 +110,12 @@ class NameResource(SyncAPIResource):
             cast_to=Agent,
         )
 
-    @overload
-    def handle_rpc(
+    def rpc(
         self,
         agent_name: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: name_handle_rpc_params.Params,
+        params: name_rpc_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -126,7 +124,7 @@ class NameResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> JSONLDecoder[object]:
+    ) -> object:
         """
         Handle JSON-RPC requests for an agent by its unique name.
 
@@ -139,54 +137,6 @@ class NameResource(SyncAPIResource):
 
           timeout: Override the client-level default timeout for this request, in seconds
         """
-        ...
-
-    @overload
-    def handle_rpc(
-        self,
-        agent_name: str,
-        *,
-        method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: name_handle_rpc_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> JSONLDecoder[object]:
-        """
-        Handle JSON-RPC requests for an agent by its unique name.
-
-        Args:
-          extra_headers: Send extra headers
-
-          extra_query: Add additional query parameters to the request
-
-          extra_body: Add additional JSON properties to the request
-
-          timeout: Override the client-level default timeout for this request, in seconds
-        """
-        ...
-
-    @required_args(["method", "params"])
-    def handle_rpc(
-        self,
-        agent_name: str,
-        *,
-        method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: name_handle_rpc_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> JSONLDecoder[object] | JSONLDecoder[object]:
         if not agent_name:
             raise ValueError(f"Expected a non-empty value for `agent_name` but received {agent_name!r}")
         return self._post(
@@ -198,13 +148,12 @@ class NameResource(SyncAPIResource):
                     "id": id,
                     "jsonrpc": jsonrpc,
                 },
-                name_handle_rpc_params.NameHandleRpcParams,
+                name_rpc_params.NameRpcParams,
             ),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=JSONLDecoder[object],
-            stream=todo_unsupported or False,
+            cast_to=object,
         )
 
 
@@ -294,13 +243,12 @@ class AsyncNameResource(AsyncAPIResource):
             cast_to=Agent,
         )
 
-    @overload
-    async def handle_rpc(
+    async def rpc(
         self,
         agent_name: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: name_handle_rpc_params.Params,
+        params: name_rpc_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -309,7 +257,7 @@ class AsyncNameResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AsyncJSONLDecoder[object]:
+    ) -> object:
         """
         Handle JSON-RPC requests for an agent by its unique name.
 
@@ -322,54 +270,6 @@ class AsyncNameResource(AsyncAPIResource):
 
           timeout: Override the client-level default timeout for this request, in seconds
         """
-        ...
-
-    @overload
-    async def handle_rpc(
-        self,
-        agent_name: str,
-        *,
-        method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: name_handle_rpc_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AsyncJSONLDecoder[object]:
-        """
-        Handle JSON-RPC requests for an agent by its unique name.
-
-        Args:
-          extra_headers: Send extra headers
-
-          extra_query: Add additional query parameters to the request
-
-          extra_body: Add additional JSON properties to the request
-
-          timeout: Override the client-level default timeout for this request, in seconds
-        """
-        ...
-
-    @required_args(["method", "params"])
-    async def handle_rpc(
-        self,
-        agent_name: str,
-        *,
-        method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: name_handle_rpc_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AsyncJSONLDecoder[object] | AsyncJSONLDecoder[object]:
         if not agent_name:
             raise ValueError(f"Expected a non-empty value for `agent_name` but received {agent_name!r}")
         return await self._post(
@@ -381,13 +281,12 @@ class AsyncNameResource(AsyncAPIResource):
                     "id": id,
                     "jsonrpc": jsonrpc,
                 },
-                name_handle_rpc_params.NameHandleRpcParams,
+                name_rpc_params.NameRpcParams,
             ),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AsyncJSONLDecoder[object],
-            stream=todo_unsupported or False,
+            cast_to=object,
         )
 
 
@@ -401,8 +300,8 @@ class NameResourceWithRawResponse:
         self.delete = to_raw_response_wrapper(
             name.delete,
         )
-        self.handle_rpc = to_raw_response_wrapper(
-            name.handle_rpc,
+        self.rpc = to_raw_response_wrapper(
+            name.rpc,
         )
 
 
@@ -416,8 +315,8 @@ class AsyncNameResourceWithRawResponse:
         self.delete = async_to_raw_response_wrapper(
             name.delete,
         )
-        self.handle_rpc = async_to_raw_response_wrapper(
-            name.handle_rpc,
+        self.rpc = async_to_raw_response_wrapper(
+            name.rpc,
         )
 
 
@@ -431,8 +330,8 @@ class NameResourceWithStreamingResponse:
         self.delete = to_streamed_response_wrapper(
             name.delete,
         )
-        self.handle_rpc = to_streamed_response_wrapper(
-            name.handle_rpc,
+        self.rpc = to_streamed_response_wrapper(
+            name.rpc,
         )
 
 
@@ -446,6 +345,6 @@ class AsyncNameResourceWithStreamingResponse:
         self.delete = async_to_streamed_response_wrapper(
             name.delete,
         )
-        self.handle_rpc = async_to_streamed_response_wrapper(
-            name.handle_rpc,
+        self.rpc = async_to_streamed_response_wrapper(
+            name.rpc,
         )

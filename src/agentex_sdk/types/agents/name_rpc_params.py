@@ -11,7 +11,7 @@ from ..tool_request_content_param import ToolRequestContentParam
 from ..tool_response_content_param import ToolResponseContentParam
 
 __all__ = [
-    "NameHandleRpcParamsBase",
+    "NameRpcParams",
     "Params",
     "ParamsCreateTaskRequest",
     "ParamsCancelTaskRequest",
@@ -19,11 +19,10 @@ __all__ = [
     "ParamsSendMessageRequestContent",
     "ParamsSendEventRequest",
     "ParamsSendEventRequestContent",
-    "NameHandleRpcParamsNonStreaming",
 ]
 
 
-class NameHandleRpcParamsBase(TypedDict, total=False):
+class NameRpcParams(TypedDict, total=False):
     method: Required[Literal["event/send", "task/create", "message/send", "task/cancel"]]
 
     params: Required[Params]
@@ -84,14 +83,3 @@ class ParamsSendEventRequest(TypedDict, total=False):
 Params: TypeAlias = Union[
     ParamsCreateTaskRequest, ParamsCancelTaskRequest, ParamsSendMessageRequest, ParamsSendEventRequest
 ]
-
-
-class NameHandleRpcParamsNonStreaming(NameHandleRpcParamsBase, total=False):
-    pass
-
-
-class NameHandleRpcParamsNonStreaming(NameHandleRpcParamsBase, total=False):
-    pass
-
-
-NameHandleRpcParams = Union[NameHandleRpcParamsNonStreaming, NameHandleRpcParamsNonStreaming]

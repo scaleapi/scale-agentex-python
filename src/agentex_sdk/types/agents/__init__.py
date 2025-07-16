@@ -2,4 +2,4 @@
 
 from __future__ import annotations
 
-from .name_handle_rpc_params import NameHandleRpcParams as NameHandleRpcParams
+from .name_rpc_params import NameRpcParams as NameRpcParams

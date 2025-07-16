@@ -23,8 +23,8 @@ Methods:
 - <code title="get /agents/{agent_id}">client.agents.<a href="./src/agentex_sdk/resources/agents/agents.py">retrieve</a>(agent_id) -> <a href="./src/agentex_sdk/types/agent.py">Agent</a></code>
 - <code title="get /agents">client.agents.<a href="./src/agentex_sdk/resources/agents/agents.py">list</a>(\*\*<a href="src/agentex_sdk/types/agent_list_params.py">params</a>) -> <a href="./src/agentex_sdk/types/agent_list_response.py">AgentListResponse</a></code>
 - <code title="delete /agents/{agent_id}">client.agents.<a href="./src/agentex_sdk/resources/agents/agents.py">delete</a>(agent_id) -> <a href="./src/agentex_sdk/types/agent.py">Agent</a></code>
-- <code title="post /agents/{agent_id}/rpc">client.agents.<a href="./src/agentex_sdk/resources/agents/agents.py">handle_rpc</a>(agent_id, \*\*<a href="src/agentex_sdk/types/agent_handle_rpc_params.py">params</a>) -> JSONLDecoder[object]</code>
 - <code title="post /agents/register">client.agents.<a href="./src/agentex_sdk/resources/agents/agents.py">register</a>(\*\*<a href="src/agentex_sdk/types/agent_register_params.py">params</a>) -> <a href="./src/agentex_sdk/types/agent.py">Agent</a></code>
+- <code title="post /agents/{agent_id}/rpc">client.agents.<a href="./src/agentex_sdk/resources/agents/agents.py">rpc</a>(agent_id, \*\*<a href="src/agentex_sdk/types/agent_rpc_params.py">params</a>) -> object</code>
 
 ## Name
 
@@ -32,7 +32,7 @@ Methods:
 
 - <code title="get /agents/name/{agent_name}">client.agents.name.<a href="./src/agentex_sdk/resources/agents/name.py">retrieve</a>(agent_name) -> <a href="./src/agentex_sdk/types/agent.py">Agent</a></code>
 - <code title="delete /agents/name/{agent_name}">client.agents.name.<a href="./src/agentex_sdk/resources/agents/name.py">delete</a>(agent_name) -> <a href="./src/agentex_sdk/types/agent.py">Agent</a></code>
-- <code title="post /agents/name/{agent_name}/rpc">client.agents.name.<a href="./src/agentex_sdk/resources/agents/name.py">handle_rpc</a>(agent_name, \*\*<a href="src/agentex_sdk/types/agents/name_handle_rpc_params.py">params</a>) -> JSONLDecoder[object]</code>
+- <code title="post /agents/name/{agent_name}/rpc">client.agents.name.<a href="./src/agentex_sdk/resources/agents/name.py">rpc</a>(agent_name, \*\*<a href="src/agentex_sdk/types/agents/name_rpc_params.py">params</a>) -> object</code>
 
 # Tasks
 
