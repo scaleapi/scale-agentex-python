@@ -35,7 +35,6 @@ from .state_list_response import StateListResponse as StateListResponse
 from .state_update_params import StateUpdateParams as StateUpdateParams
 from .tracker_list_params import TrackerListParams as TrackerListParams
 from .tool_request_content import ToolRequestContent as ToolRequestContent
-from .agent_register_params import AgentRegisterParams as AgentRegisterParams
 from .message_create_params import MessageCreateParams as MessageCreateParams
 from .message_list_response import MessageListResponse as MessageListResponse
 from .message_update_params import MessageUpdateParams as MessageUpdateParams

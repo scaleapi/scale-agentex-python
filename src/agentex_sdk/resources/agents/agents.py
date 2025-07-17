@@ -15,7 +15,7 @@ from .name import (
     NameResourceWithStreamingResponse,
     AsyncNameResourceWithStreamingResponse,
 )
-from ...types import AcpType, agent_rpc_params, agent_list_params, agent_register_params
+from ...types import agent_rpc_params, agent_list_params
 from ..._types import NOT_GIVEN, Body, Query, Headers, NotGiven
 from ..._utils import maybe_transform, async_maybe_transform
 from ..._compat import cached_property
@@ -28,7 +28,6 @@ from ..._response import (
 )
 from ...types.agent import Agent
 from ..._base_client import make_request_options
-from ...types.acp_type import AcpType
 from ...types.agent_list_response import AgentListResponse
 
 __all__ = ["AgentsResource", "AsyncAgentsResource"]
@@ -155,61 +154,6 @@ class AgentsResource(SyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
         return self._delete(
             f"/agents/{agent_id}",
-            options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
-            ),
-            cast_to=Agent,
-        )
-
-    def register(
-        self,
-        *,
-        acp_type: AcpType,
-        acp_url: str,
-        description: str,
-        name: str,
-        agent_id: Optional[str] | NotGiven = NOT_GIVEN,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> Agent:
-        """
-        Register a new agent or update an existing one.
-
-        Args:
-          acp_type: The type of ACP to use for the agent.
-
-          acp_url: The URL of the ACP server for the agent.
-
-          description: The description of the agent.
-
-          name: The unique name of the agent.
-
-          agent_id: Optional agent ID if the agent already exists and needs to be updated.
-
-          extra_headers: Send extra headers
-
-          extra_query: Add additional query parameters to the request
-
-          extra_body: Add additional JSON properties to the request
-
-          timeout: Override the client-level default timeout for this request, in seconds
-        """
-        return self._post(
-            "/agents/register",
-            body=maybe_transform(
-                {
-                    "acp_type": acp_type,
-                    "acp_url": acp_url,
-                    "description": description,
-                    "name": name,
-                    "agent_id": agent_id,
-                },
-                agent_register_params.AgentRegisterParams,
-            ),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -390,61 +334,6 @@ class AsyncAgentsResource(AsyncAPIResource):
             cast_to=Agent,
         )
 
-    async def register(
-        self,
-        *,
-        acp_type: AcpType,
-        acp_url: str,
-        description: str,
-        name: str,
-        agent_id: Optional[str] | NotGiven = NOT_GIVEN,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> Agent:
-        """
-        Register a new agent or update an existing one.
-
-        Args:
-          acp_type: The type of ACP to use for the agent.
-
-          acp_url: The URL of the ACP server for the agent.
-
-          description: The description of the agent.
-
-          name: The unique name of the agent.
-
-          agent_id: Optional agent ID if the agent already exists and needs to be updated.
-
-          extra_headers: Send extra headers
-
-          extra_query: Add additional query parameters to the request
-
-          extra_body: Add additional JSON properties to the request
-
-          timeout: Override the client-level default timeout for this request, in seconds
-        """
-        return await self._post(
-            "/agents/register",
-            body=await async_maybe_transform(
-                {
-                    "acp_type": acp_type,
-                    "acp_url": acp_url,
-                    "description": description,
-                    "name": name,
-                    "agent_id": agent_id,
-                },
-                agent_register_params.AgentRegisterParams,
-            ),
-            options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
-            ),
-            cast_to=Agent,
-        )
-
     async def rpc(
         self,
         agent_id: str,
@@ -505,9 +394,6 @@ class AgentsResourceWithRawResponse:
         self.delete = to_raw_response_wrapper(
             agents.delete,
         )
-        self.register = to_raw_response_wrapper(
-            agents.register,
-        )
         self.rpc = to_raw_response_wrapper(
             agents.rpc,
         )
@@ -529,9 +415,6 @@ class AsyncAgentsResourceWithRawResponse:
         )
         self.delete = async_to_raw_response_wrapper(
             agents.delete,
-        )
-        self.register = async_to_raw_response_wrapper(
-            agents.register,
         )
         self.rpc = async_to_raw_response_wrapper(
             agents.rpc,
@@ -555,9 +438,6 @@ class AgentsResourceWithStreamingResponse:
         self.delete = to_streamed_response_wrapper(
             agents.delete,
         )
-        self.register = to_streamed_response_wrapper(
-            agents.register,
-        )
         self.rpc = to_streamed_response_wrapper(
             agents.rpc,
         )
@@ -579,9 +459,6 @@ class AsyncAgentsResourceWithStreamingResponse:
         )
         self.delete = async_to_streamed_response_wrapper(
             agents.delete,
-        )
-        self.register = async_to_streamed_response_wrapper(
-            agents.register,
         )
         self.rpc = async_to_streamed_response_wrapper(
             agents.rpc,
