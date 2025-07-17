@@ -5,8 +5,8 @@ from typing import Iterator, AsyncIterator
 import httpx
 import pytest
 
-from agentex_sdk import AgentexSDK, AsyncAgentexSDK
-from agentex_sdk._streaming import Stream, AsyncStream, ServerSentEvent
+from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex._streaming import Stream, AsyncStream, ServerSentEvent
 
 
 @pytest.mark.asyncio

@@ -7,9 +7,9 @@ from typing import Any, cast
 
 import pytest
 
-from agentex_sdk import AgentexSDK, AsyncAgentexSDK
+from agentex import AgentexSDK, AsyncAgentexSDK
 from tests.utils import assert_matches_type
-from agentex_sdk.types import (
+from agentex.types import (
     TaskMessage,
     MessageListResponse,
 )

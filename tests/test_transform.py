@@ -8,15 +8,15 @@ from typing_extensions import Required, Annotated, TypedDict
 
 import pytest
 
-from agentex_sdk._types import NOT_GIVEN, Base64FileInput
-from agentex_sdk._utils import (
+from agentex._types import NOT_GIVEN, Base64FileInput
+from agentex._utils import (
     PropertyInfo,
     transform as _transform,
     parse_datetime,
     async_transform as _async_transform,
 )
-from agentex_sdk._compat import PYDANTIC_V2
-from agentex_sdk._models import BaseModel
+from agentex._compat import PYDANTIC_V2
+from agentex._models import BaseModel
 
 _T = TypeVar("_T")
 

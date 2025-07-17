@@ -1,5 +1,5 @@
 [project]
-name = "agentex_sdk"
+name = "agentex"
 version = "0.0.1-alpha.0"
 description = "The official Python library for the agentex-sdk API"
 dynamic = ["readme"]
@@ -79,14 +79,14 @@ format = { chain = [
 "check:ruff" = "ruff check ."
 "fix:ruff" = "ruff check --fix ."
 
-"check:importable" = "python -c 'import agentex_sdk'"
+"check:importable" = "python -c 'import agentex'"
 
 typecheck = { chain = [
   "typecheck:pyright",
   "typecheck:mypy"
 ]}
 "typecheck:pyright" = "pyright"
-"typecheck:verify-types" = "pyright --verifytypes agentex_sdk --ignoreexternal"
+"typecheck:verify-types" = "pyright --verifytypes agentex --ignoreexternal"
 "typecheck:mypy" = "mypy ."
 
 [build-system]
@@ -99,7 +99,7 @@ include = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agentex_sdk"]
+packages = ["src/agentex"]
 
 [tool.hatch.build.targets.sdist]
 # Basically everything except hidden files/directories (such as .github, .devcontainers, .python-version, etc)
@@ -202,7 +202,7 @@ length-sort = true
 length-sort-straight = true
 combine-as-imports = true
 extra-standard-library = ["typing_extensions"]
-known-first-party = ["agentex_sdk", "tests"]
+known-first-party = ["agentex", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
 "bin/**.py" = ["T201", "T203"]

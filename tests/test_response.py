@@ -6,8 +6,8 @@ import httpx
 import pytest
 import pydantic
 
-from agentex_sdk import BaseModel, AgentexSDK, AsyncAgentexSDK
-from agentex_sdk._response import (
+from agentex import BaseModel, AgentexSDK, AsyncAgentexSDK
+from agentex._response import (
     APIResponse,
     BaseAPIResponse,
     AsyncAPIResponse,
@@ -15,8 +15,8 @@ from agentex_sdk._response import (
     AsyncBinaryAPIResponse,
     extract_response_type,
 )
-from agentex_sdk._streaming import Stream
-from agentex_sdk._base_client import FinalRequestOptions
+from agentex._streaming import Stream
+from agentex._base_client import FinalRequestOptions
 
 
 class ConcreteBaseAPIResponse(APIResponse[bytes]): ...
@@ -37,7 +37,7 @@ def test_extract_response_type_direct_classes() -> None:
 def test_extract_response_type_direct_class_missing_type_arg() -> None:
     with pytest.raises(
         RuntimeError,
-        match="Expected type <class 'agentex_sdk._response.AsyncAPIResponse'> to have a type argument at index 0 but it did not",
+        match="Expected type <class 'agentex._response.AsyncAPIResponse'> to have a type argument at index 0 but it did not",
     ):
         extract_response_type(AsyncAPIResponse)
 
@@ -68,7 +68,7 @@ def test_response_parse_mismatched_basemodel(client: AgentexSDK) -> None:
 
     with pytest.raises(
         TypeError,
-        match="Pydantic models must subclass our base model type, e.g. `from agentex_sdk import BaseModel`",
+        match="Pydantic models must subclass our base model type, e.g. `from agentex import BaseModel`",
     ):
         response.parse(to=PydanticModel)
 
@@ -86,7 +86,7 @@ async def test_async_response_parse_mismatched_basemodel(async_client: AsyncAgen
 
     with pytest.raises(
         TypeError,
-        match="Pydantic models must subclass our base model type, e.g. `from agentex_sdk import BaseModel`",
+        match="Pydantic models must subclass our base model type, e.g. `from agentex import BaseModel`",
     ):
         await response.parse(to=PydanticModel)
 
