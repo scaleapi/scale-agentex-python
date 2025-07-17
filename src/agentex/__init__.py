@@ -5,28 +5,18 @@ import typing as _t
 from . import types
 from ._types import NOT_GIVEN, Omit, NoneType, NotGiven, Transport, ProxiesTypes
 from ._utils import file_from_path
-from ._client import (
-    Client,
-    Stream,
-    Timeout,
-    Transport,
-    AgentexSDK,
-    AsyncClient,
-    AsyncStream,
-    RequestOptions,
-    AsyncAgentexSDK,
-)
+from ._client import Client, Stream, Agentex, Timeout, Transport, AsyncClient, AsyncStream, AsyncAgentex, RequestOptions
 from ._models import BaseModel
 from ._version import __title__, __version__
 from ._response import APIResponse as APIResponse, AsyncAPIResponse as AsyncAPIResponse
 from ._constants import DEFAULT_TIMEOUT, DEFAULT_MAX_RETRIES, DEFAULT_CONNECTION_LIMITS
 from ._exceptions import (
     APIError,
+    AgentexError,
     ConflictError,
     NotFoundError,
     APIStatusError,
     RateLimitError,
-    AgentexSDKError,
     APITimeoutError,
     BadRequestError,
     APIConnectionError,
@@ -49,7 +39,7 @@ __all__ = [
     "NotGiven",
     "NOT_GIVEN",
     "Omit",
-    "AgentexSDKError",
+    "AgentexError",
     "APIError",
     "APIStatusError",
     "APITimeoutError",
@@ -69,8 +59,8 @@ __all__ = [
     "AsyncClient",
     "Stream",
     "AsyncStream",
-    "AgentexSDK",
-    "AsyncAgentexSDK",
+    "Agentex",
+    "AsyncAgentex",
     "file_from_path",
     "BaseModel",
     "DEFAULT_TIMEOUT",

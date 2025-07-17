@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
 from agentex.types import Agent, AgentListResponse
 
@@ -19,7 +19,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_retrieve(self, client: AgentexSDK) -> None:
+    def test_method_retrieve(self, client: Agentex) -> None:
         agent = client.agents.retrieve(
             "agent_id",
         )
@@ -27,7 +27,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_raw_response_retrieve(self, client: Agentex) -> None:
         response = client.agents.with_raw_response.retrieve(
             "agent_id",
         )
@@ -39,7 +39,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_streaming_response_retrieve(self, client: Agentex) -> None:
         with client.agents.with_streaming_response.retrieve(
             "agent_id",
         ) as response:
@@ -53,7 +53,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_retrieve(self, client: AgentexSDK) -> None:
+    def test_path_params_retrieve(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
             client.agents.with_raw_response.retrieve(
                 "",
@@ -61,13 +61,13 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list(self, client: AgentexSDK) -> None:
+    def test_method_list(self, client: Agentex) -> None:
         agent = client.agents.list()
         assert_matches_type(AgentListResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_list_with_all_params(self, client: Agentex) -> None:
         agent = client.agents.list(
             task_id="task_id",
         )
@@ -75,7 +75,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_list(self, client: AgentexSDK) -> None:
+    def test_raw_response_list(self, client: Agentex) -> None:
         response = client.agents.with_raw_response.list()
 
         assert response.is_closed is True
@@ -85,7 +85,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_list(self, client: AgentexSDK) -> None:
+    def test_streaming_response_list(self, client: Agentex) -> None:
         with client.agents.with_streaming_response.list() as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -97,7 +97,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_delete(self, client: AgentexSDK) -> None:
+    def test_method_delete(self, client: Agentex) -> None:
         agent = client.agents.delete(
             "agent_id",
         )
@@ -105,7 +105,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_delete(self, client: AgentexSDK) -> None:
+    def test_raw_response_delete(self, client: Agentex) -> None:
         response = client.agents.with_raw_response.delete(
             "agent_id",
         )
@@ -117,7 +117,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_delete(self, client: AgentexSDK) -> None:
+    def test_streaming_response_delete(self, client: Agentex) -> None:
         with client.agents.with_streaming_response.delete(
             "agent_id",
         ) as response:
@@ -131,7 +131,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_delete(self, client: AgentexSDK) -> None:
+    def test_path_params_delete(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
             client.agents.with_raw_response.delete(
                 "",
@@ -139,7 +139,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_rpc(self, client: AgentexSDK) -> None:
+    def test_method_rpc(self, client: Agentex) -> None:
         agent = client.agents.rpc(
             agent_id="agent_id",
             method="event/send",
@@ -149,7 +149,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_rpc_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_rpc_with_all_params(self, client: Agentex) -> None:
         agent = client.agents.rpc(
             agent_id="agent_id",
             method="event/send",
@@ -164,7 +164,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_rpc(self, client: AgentexSDK) -> None:
+    def test_raw_response_rpc(self, client: Agentex) -> None:
         response = client.agents.with_raw_response.rpc(
             agent_id="agent_id",
             method="event/send",
@@ -178,7 +178,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_rpc(self, client: AgentexSDK) -> None:
+    def test_streaming_response_rpc(self, client: Agentex) -> None:
         with client.agents.with_streaming_response.rpc(
             agent_id="agent_id",
             method="event/send",
@@ -194,7 +194,7 @@ class TestAgents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_rpc(self, client: AgentexSDK) -> None:
+    def test_path_params_rpc(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
             client.agents.with_raw_response.rpc(
                 agent_id="",
@@ -210,7 +210,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
         agent = await async_client.agents.retrieve(
             "agent_id",
         )
@@ -218,7 +218,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
         response = await async_client.agents.with_raw_response.retrieve(
             "agent_id",
         )
@@ -230,7 +230,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
         async with async_client.agents.with_streaming_response.retrieve(
             "agent_id",
         ) as response:
@@ -244,7 +244,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
             await async_client.agents.with_raw_response.retrieve(
                 "",
@@ -252,13 +252,13 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list(self, async_client: AsyncAgentex) -> None:
         agent = await async_client.agents.list()
         assert_matches_type(AgentListResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         agent = await async_client.agents.list(
             task_id="task_id",
         )
@@ -266,7 +266,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_list(self, async_client: AsyncAgentex) -> None:
         response = await async_client.agents.with_raw_response.list()
 
         assert response.is_closed is True
@@ -276,7 +276,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_list(self, async_client: AsyncAgentex) -> None:
         async with async_client.agents.with_streaming_response.list() as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -288,7 +288,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_delete(self, async_client: AsyncAgentex) -> None:
         agent = await async_client.agents.delete(
             "agent_id",
         )
@@ -296,7 +296,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_delete(self, async_client: AsyncAgentex) -> None:
         response = await async_client.agents.with_raw_response.delete(
             "agent_id",
         )
@@ -308,7 +308,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_delete(self, async_client: AsyncAgentex) -> None:
         async with async_client.agents.with_streaming_response.delete(
             "agent_id",
         ) as response:
@@ -322,7 +322,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_delete(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
             await async_client.agents.with_raw_response.delete(
                 "",
@@ -330,7 +330,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_rpc(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_rpc(self, async_client: AsyncAgentex) -> None:
         agent = await async_client.agents.rpc(
             agent_id="agent_id",
             method="event/send",
@@ -340,7 +340,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_rpc_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_rpc_with_all_params(self, async_client: AsyncAgentex) -> None:
         agent = await async_client.agents.rpc(
             agent_id="agent_id",
             method="event/send",
@@ -355,7 +355,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_rpc(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_rpc(self, async_client: AsyncAgentex) -> None:
         response = await async_client.agents.with_raw_response.rpc(
             agent_id="agent_id",
             method="event/send",
@@ -369,7 +369,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_rpc(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_rpc(self, async_client: AsyncAgentex) -> None:
         async with async_client.agents.with_streaming_response.rpc(
             agent_id="agent_id",
             method="event/send",
@@ -385,7 +385,7 @@ class TestAsyncAgents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_rpc(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_rpc(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
             await async_client.agents.with_raw_response.rpc(
                 agent_id="",

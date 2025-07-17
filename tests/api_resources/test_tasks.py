@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
 from agentex.types import Task, TaskListResponse
 
@@ -19,7 +19,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_retrieve(self, client: AgentexSDK) -> None:
+    def test_method_retrieve(self, client: Agentex) -> None:
         task = client.tasks.retrieve(
             "task_id",
         )
@@ -27,7 +27,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_raw_response_retrieve(self, client: Agentex) -> None:
         response = client.tasks.with_raw_response.retrieve(
             "task_id",
         )
@@ -39,7 +39,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_streaming_response_retrieve(self, client: Agentex) -> None:
         with client.tasks.with_streaming_response.retrieve(
             "task_id",
         ) as response:
@@ -53,7 +53,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_retrieve(self, client: AgentexSDK) -> None:
+    def test_path_params_retrieve(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             client.tasks.with_raw_response.retrieve(
                 "",
@@ -61,13 +61,13 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list(self, client: AgentexSDK) -> None:
+    def test_method_list(self, client: Agentex) -> None:
         task = client.tasks.list()
         assert_matches_type(TaskListResponse, task, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_list(self, client: AgentexSDK) -> None:
+    def test_raw_response_list(self, client: Agentex) -> None:
         response = client.tasks.with_raw_response.list()
 
         assert response.is_closed is True
@@ -77,7 +77,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_list(self, client: AgentexSDK) -> None:
+    def test_streaming_response_list(self, client: Agentex) -> None:
         with client.tasks.with_streaming_response.list() as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -89,7 +89,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_delete(self, client: AgentexSDK) -> None:
+    def test_method_delete(self, client: Agentex) -> None:
         task = client.tasks.delete(
             "task_id",
         )
@@ -97,7 +97,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_delete(self, client: AgentexSDK) -> None:
+    def test_raw_response_delete(self, client: Agentex) -> None:
         response = client.tasks.with_raw_response.delete(
             "task_id",
         )
@@ -109,7 +109,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_delete(self, client: AgentexSDK) -> None:
+    def test_streaming_response_delete(self, client: Agentex) -> None:
         with client.tasks.with_streaming_response.delete(
             "task_id",
         ) as response:
@@ -123,7 +123,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_delete(self, client: AgentexSDK) -> None:
+    def test_path_params_delete(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             client.tasks.with_raw_response.delete(
                 "",
@@ -131,7 +131,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_stream_events(self, client: AgentexSDK) -> None:
+    def test_method_stream_events(self, client: Agentex) -> None:
         task_stream = client.tasks.stream_events(
             "task_id",
         )
@@ -139,7 +139,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_stream_events(self, client: AgentexSDK) -> None:
+    def test_raw_response_stream_events(self, client: Agentex) -> None:
         response = client.tasks.with_raw_response.stream_events(
             "task_id",
         )
@@ -150,7 +150,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_stream_events(self, client: AgentexSDK) -> None:
+    def test_streaming_response_stream_events(self, client: Agentex) -> None:
         with client.tasks.with_streaming_response.stream_events(
             "task_id",
         ) as response:
@@ -164,7 +164,7 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_stream_events(self, client: AgentexSDK) -> None:
+    def test_path_params_stream_events(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             client.tasks.with_raw_response.stream_events(
                 "",
@@ -178,7 +178,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
         task = await async_client.tasks.retrieve(
             "task_id",
         )
@@ -186,7 +186,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tasks.with_raw_response.retrieve(
             "task_id",
         )
@@ -198,7 +198,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
         async with async_client.tasks.with_streaming_response.retrieve(
             "task_id",
         ) as response:
@@ -212,7 +212,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             await async_client.tasks.with_raw_response.retrieve(
                 "",
@@ -220,13 +220,13 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list(self, async_client: AsyncAgentex) -> None:
         task = await async_client.tasks.list()
         assert_matches_type(TaskListResponse, task, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_list(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tasks.with_raw_response.list()
 
         assert response.is_closed is True
@@ -236,7 +236,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_list(self, async_client: AsyncAgentex) -> None:
         async with async_client.tasks.with_streaming_response.list() as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -248,7 +248,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_delete(self, async_client: AsyncAgentex) -> None:
         task = await async_client.tasks.delete(
             "task_id",
         )
@@ -256,7 +256,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_delete(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tasks.with_raw_response.delete(
             "task_id",
         )
@@ -268,7 +268,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_delete(self, async_client: AsyncAgentex) -> None:
         async with async_client.tasks.with_streaming_response.delete(
             "task_id",
         ) as response:
@@ -282,7 +282,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_delete(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             await async_client.tasks.with_raw_response.delete(
                 "",
@@ -290,7 +290,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_stream_events(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_stream_events(self, async_client: AsyncAgentex) -> None:
         task_stream = await async_client.tasks.stream_events(
             "task_id",
         )
@@ -298,7 +298,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_stream_events(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_stream_events(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tasks.with_raw_response.stream_events(
             "task_id",
         )
@@ -309,7 +309,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_stream_events(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_stream_events(self, async_client: AsyncAgentex) -> None:
         async with async_client.tasks.with_streaming_response.stream_events(
             "task_id",
         ) as response:
@@ -323,7 +323,7 @@ class TestAsyncTasks:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_stream_events(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_stream_events(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             await async_client.tasks.with_raw_response.stream_events(
                 "",

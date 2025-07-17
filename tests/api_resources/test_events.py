@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
 from agentex.types import Event, EventListResponse
 
@@ -19,7 +19,7 @@ class TestEvents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_retrieve(self, client: AgentexSDK) -> None:
+    def test_method_retrieve(self, client: Agentex) -> None:
         event = client.events.retrieve(
             "event_id",
         )
@@ -27,7 +27,7 @@ class TestEvents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_raw_response_retrieve(self, client: Agentex) -> None:
         response = client.events.with_raw_response.retrieve(
             "event_id",
         )
@@ -39,7 +39,7 @@ class TestEvents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_streaming_response_retrieve(self, client: Agentex) -> None:
         with client.events.with_streaming_response.retrieve(
             "event_id",
         ) as response:
@@ -53,7 +53,7 @@ class TestEvents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_retrieve(self, client: AgentexSDK) -> None:
+    def test_path_params_retrieve(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `event_id` but received ''"):
             client.events.with_raw_response.retrieve(
                 "",
@@ -61,7 +61,7 @@ class TestEvents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list(self, client: AgentexSDK) -> None:
+    def test_method_list(self, client: Agentex) -> None:
         event = client.events.list(
             agent_id="agent_id",
             task_id="task_id",
@@ -70,7 +70,7 @@ class TestEvents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_list_with_all_params(self, client: Agentex) -> None:
         event = client.events.list(
             agent_id="agent_id",
             task_id="task_id",
@@ -81,7 +81,7 @@ class TestEvents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_list(self, client: AgentexSDK) -> None:
+    def test_raw_response_list(self, client: Agentex) -> None:
         response = client.events.with_raw_response.list(
             agent_id="agent_id",
             task_id="task_id",
@@ -94,7 +94,7 @@ class TestEvents:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_list(self, client: AgentexSDK) -> None:
+    def test_streaming_response_list(self, client: Agentex) -> None:
         with client.events.with_streaming_response.list(
             agent_id="agent_id",
             task_id="task_id",
@@ -115,7 +115,7 @@ class TestAsyncEvents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
         event = await async_client.events.retrieve(
             "event_id",
         )
@@ -123,7 +123,7 @@ class TestAsyncEvents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
         response = await async_client.events.with_raw_response.retrieve(
             "event_id",
         )
@@ -135,7 +135,7 @@ class TestAsyncEvents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
         async with async_client.events.with_streaming_response.retrieve(
             "event_id",
         ) as response:
@@ -149,7 +149,7 @@ class TestAsyncEvents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `event_id` but received ''"):
             await async_client.events.with_raw_response.retrieve(
                 "",
@@ -157,7 +157,7 @@ class TestAsyncEvents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list(self, async_client: AsyncAgentex) -> None:
         event = await async_client.events.list(
             agent_id="agent_id",
             task_id="task_id",
@@ -166,7 +166,7 @@ class TestAsyncEvents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         event = await async_client.events.list(
             agent_id="agent_id",
             task_id="task_id",
@@ -177,7 +177,7 @@ class TestAsyncEvents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_list(self, async_client: AsyncAgentex) -> None:
         response = await async_client.events.with_raw_response.list(
             agent_id="agent_id",
             task_id="task_id",
@@ -190,7 +190,7 @@ class TestAsyncEvents:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_list(self, async_client: AsyncAgentex) -> None:
         async with async_client.events.with_streaming_response.list(
             agent_id="agent_id",
             task_id="task_id",

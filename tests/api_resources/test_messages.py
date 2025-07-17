@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
 from agentex.types import (
     TaskMessage,
@@ -22,7 +22,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_create(self, client: AgentexSDK) -> None:
+    def test_method_create(self, client: Agentex) -> None:
         message = client.messages.create(
             content={
                 "author": "user",
@@ -35,7 +35,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_create_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_create_with_all_params(self, client: Agentex) -> None:
         message = client.messages.create(
             content={
                 "author": "user",
@@ -59,7 +59,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_create(self, client: AgentexSDK) -> None:
+    def test_raw_response_create(self, client: Agentex) -> None:
         response = client.messages.with_raw_response.create(
             content={
                 "author": "user",
@@ -76,7 +76,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_create(self, client: AgentexSDK) -> None:
+    def test_streaming_response_create(self, client: Agentex) -> None:
         with client.messages.with_streaming_response.create(
             content={
                 "author": "user",
@@ -95,7 +95,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_retrieve(self, client: AgentexSDK) -> None:
+    def test_method_retrieve(self, client: Agentex) -> None:
         message = client.messages.retrieve(
             "message_id",
         )
@@ -103,7 +103,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_raw_response_retrieve(self, client: Agentex) -> None:
         response = client.messages.with_raw_response.retrieve(
             "message_id",
         )
@@ -115,7 +115,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_streaming_response_retrieve(self, client: Agentex) -> None:
         with client.messages.with_streaming_response.retrieve(
             "message_id",
         ) as response:
@@ -129,7 +129,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_retrieve(self, client: AgentexSDK) -> None:
+    def test_path_params_retrieve(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `message_id` but received ''"):
             client.messages.with_raw_response.retrieve(
                 "",
@@ -137,7 +137,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_update(self, client: AgentexSDK) -> None:
+    def test_method_update(self, client: Agentex) -> None:
         message = client.messages.update(
             message_id="message_id",
             content={
@@ -151,7 +151,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_update_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_update_with_all_params(self, client: Agentex) -> None:
         message = client.messages.update(
             message_id="message_id",
             content={
@@ -176,7 +176,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_update(self, client: AgentexSDK) -> None:
+    def test_raw_response_update(self, client: Agentex) -> None:
         response = client.messages.with_raw_response.update(
             message_id="message_id",
             content={
@@ -194,7 +194,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_update(self, client: AgentexSDK) -> None:
+    def test_streaming_response_update(self, client: Agentex) -> None:
         with client.messages.with_streaming_response.update(
             message_id="message_id",
             content={
@@ -214,7 +214,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_update(self, client: AgentexSDK) -> None:
+    def test_path_params_update(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `message_id` but received ''"):
             client.messages.with_raw_response.update(
                 message_id="",
@@ -228,7 +228,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list(self, client: AgentexSDK) -> None:
+    def test_method_list(self, client: Agentex) -> None:
         message = client.messages.list(
             task_id="task_id",
         )
@@ -236,7 +236,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_list_with_all_params(self, client: Agentex) -> None:
         message = client.messages.list(
             task_id="task_id",
             limit=0,
@@ -245,7 +245,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_list(self, client: AgentexSDK) -> None:
+    def test_raw_response_list(self, client: Agentex) -> None:
         response = client.messages.with_raw_response.list(
             task_id="task_id",
         )
@@ -257,7 +257,7 @@ class TestMessages:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_list(self, client: AgentexSDK) -> None:
+    def test_streaming_response_list(self, client: Agentex) -> None:
         with client.messages.with_streaming_response.list(
             task_id="task_id",
         ) as response:
@@ -277,7 +277,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_create(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.create(
             content={
                 "author": "user",
@@ -290,7 +290,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_create_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_create_with_all_params(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.create(
             content={
                 "author": "user",
@@ -314,7 +314,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_create(self, async_client: AsyncAgentex) -> None:
         response = await async_client.messages.with_raw_response.create(
             content={
                 "author": "user",
@@ -331,7 +331,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_create(self, async_client: AsyncAgentex) -> None:
         async with async_client.messages.with_streaming_response.create(
             content={
                 "author": "user",
@@ -350,7 +350,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.retrieve(
             "message_id",
         )
@@ -358,7 +358,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
         response = await async_client.messages.with_raw_response.retrieve(
             "message_id",
         )
@@ -370,7 +370,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
         async with async_client.messages.with_streaming_response.retrieve(
             "message_id",
         ) as response:
@@ -384,7 +384,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `message_id` but received ''"):
             await async_client.messages.with_raw_response.retrieve(
                 "",
@@ -392,7 +392,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_update(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.update(
             message_id="message_id",
             content={
@@ -406,7 +406,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_update_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_update_with_all_params(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.update(
             message_id="message_id",
             content={
@@ -431,7 +431,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_update(self, async_client: AsyncAgentex) -> None:
         response = await async_client.messages.with_raw_response.update(
             message_id="message_id",
             content={
@@ -449,7 +449,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_update(self, async_client: AsyncAgentex) -> None:
         async with async_client.messages.with_streaming_response.update(
             message_id="message_id",
             content={
@@ -469,7 +469,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_update(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `message_id` but received ''"):
             await async_client.messages.with_raw_response.update(
                 message_id="",
@@ -483,7 +483,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.list(
             task_id="task_id",
         )
@@ -491,7 +491,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.list(
             task_id="task_id",
             limit=0,
@@ -500,7 +500,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_list(self, async_client: AsyncAgentex) -> None:
         response = await async_client.messages.with_raw_response.list(
             task_id="task_id",
         )
@@ -512,7 +512,7 @@ class TestAsyncMessages:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_list(self, async_client: AsyncAgentex) -> None:
         async with async_client.messages.with_streaming_response.list(
             task_id="task_id",
         ) as response:

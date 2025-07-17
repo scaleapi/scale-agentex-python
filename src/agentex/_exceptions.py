@@ -18,11 +18,11 @@ __all__ = [
 ]
 
 
-class AgentexSDKError(Exception):
+class AgentexError(Exception):
     pass
 
 
-class APIError(AgentexSDKError):
+class APIError(AgentexError):
     message: str
     request: httpx.Request
 

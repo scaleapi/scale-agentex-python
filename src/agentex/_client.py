@@ -43,19 +43,10 @@ from .resources.tasks import tasks
 from .resources.agents import agents
 from .resources.messages import messages
 
-__all__ = [
-    "Timeout",
-    "Transport",
-    "ProxiesTypes",
-    "RequestOptions",
-    "AgentexSDK",
-    "AsyncAgentexSDK",
-    "Client",
-    "AsyncClient",
-]
+__all__ = ["Timeout", "Transport", "ProxiesTypes", "RequestOptions", "Agentex", "AsyncAgentex", "Client", "AsyncClient"]
 
 
-class AgentexSDK(SyncAPIClient):
+class Agentex(SyncAPIClient):
     echo: echo.EchoResource
     agents: agents.AgentsResource
     tasks: tasks.TasksResource
@@ -64,8 +55,8 @@ class AgentexSDK(SyncAPIClient):
     states: states.StatesResource
     events: events.EventsResource
     tracker: tracker.TrackerResource
-    with_raw_response: AgentexSDKWithRawResponse
-    with_streaming_response: AgentexSDKWithStreamedResponse
+    with_raw_response: AgentexWithRawResponse
+    with_streaming_response: AgentexWithStreamedResponse
 
     # client options
     api_key: str | None
@@ -93,7 +84,7 @@ class AgentexSDK(SyncAPIClient):
         # part of our public interface in the future.
         _strict_response_validation: bool = False,
     ) -> None:
-        """Construct a new synchronous AgentexSDK client instance.
+        """Construct a new synchronous Agentex client instance.
 
         This automatically infers the `api_key` argument from the `AGENTEX_SDK_API_KEY` environment variable if it is not provided.
         """
@@ -102,7 +93,7 @@ class AgentexSDK(SyncAPIClient):
         self.api_key = api_key
 
         if base_url is None:
-            base_url = os.environ.get("AGENTEX_SDK_BASE_URL")
+            base_url = os.environ.get("AGENTEX_BASE_URL")
         if base_url is None:
             base_url = f"https://api.example.com"
 
@@ -125,8 +116,8 @@ class AgentexSDK(SyncAPIClient):
         self.states = states.StatesResource(self)
         self.events = events.EventsResource(self)
         self.tracker = tracker.TrackerResource(self)
-        self.with_raw_response = AgentexSDKWithRawResponse(self)
-        self.with_streaming_response = AgentexSDKWithStreamedResponse(self)
+        self.with_raw_response = AgentexWithRawResponse(self)
+        self.with_streaming_response = AgentexWithStreamedResponse(self)
 
     @property
     @override
@@ -265,7 +256,7 @@ class AgentexSDK(SyncAPIClient):
         return APIStatusError(err_msg, response=response, body=body)
 
 
-class AsyncAgentexSDK(AsyncAPIClient):
+class AsyncAgentex(AsyncAPIClient):
     echo: echo.AsyncEchoResource
     agents: agents.AsyncAgentsResource
     tasks: tasks.AsyncTasksResource
@@ -274,8 +265,8 @@ class AsyncAgentexSDK(AsyncAPIClient):
     states: states.AsyncStatesResource
     events: events.AsyncEventsResource
     tracker: tracker.AsyncTrackerResource
-    with_raw_response: AsyncAgentexSDKWithRawResponse
-    with_streaming_response: AsyncAgentexSDKWithStreamedResponse
+    with_raw_response: AsyncAgentexWithRawResponse
+    with_streaming_response: AsyncAgentexWithStreamedResponse
 
     # client options
     api_key: str | None
@@ -303,7 +294,7 @@ class AsyncAgentexSDK(AsyncAPIClient):
         # part of our public interface in the future.
         _strict_response_validation: bool = False,
     ) -> None:
-        """Construct a new async AsyncAgentexSDK client instance.
+        """Construct a new async AsyncAgentex client instance.
 
         This automatically infers the `api_key` argument from the `AGENTEX_SDK_API_KEY` environment variable if it is not provided.
         """
@@ -312,7 +303,7 @@ class AsyncAgentexSDK(AsyncAPIClient):
         self.api_key = api_key
 
         if base_url is None:
-            base_url = os.environ.get("AGENTEX_SDK_BASE_URL")
+            base_url = os.environ.get("AGENTEX_BASE_URL")
         if base_url is None:
             base_url = f"https://api.example.com"
 
@@ -335,8 +326,8 @@ class AsyncAgentexSDK(AsyncAPIClient):
         self.states = states.AsyncStatesResource(self)
         self.events = events.AsyncEventsResource(self)
         self.tracker = tracker.AsyncTrackerResource(self)
-        self.with_raw_response = AsyncAgentexSDKWithRawResponse(self)
-        self.with_streaming_response = AsyncAgentexSDKWithStreamedResponse(self)
+        self.with_raw_response = AsyncAgentexWithRawResponse(self)
+        self.with_streaming_response = AsyncAgentexWithStreamedResponse(self)
 
     @property
     @override
@@ -475,8 +466,8 @@ class AsyncAgentexSDK(AsyncAPIClient):
         return APIStatusError(err_msg, response=response, body=body)
 
 
-class AgentexSDKWithRawResponse:
-    def __init__(self, client: AgentexSDK) -> None:
+class AgentexWithRawResponse:
+    def __init__(self, client: Agentex) -> None:
         self.echo = echo.EchoResourceWithRawResponse(client.echo)
         self.agents = agents.AgentsResourceWithRawResponse(client.agents)
         self.tasks = tasks.TasksResourceWithRawResponse(client.tasks)
@@ -491,8 +482,8 @@ class AgentexSDKWithRawResponse:
         )
 
 
-class AsyncAgentexSDKWithRawResponse:
-    def __init__(self, client: AsyncAgentexSDK) -> None:
+class AsyncAgentexWithRawResponse:
+    def __init__(self, client: AsyncAgentex) -> None:
         self.echo = echo.AsyncEchoResourceWithRawResponse(client.echo)
         self.agents = agents.AsyncAgentsResourceWithRawResponse(client.agents)
         self.tasks = tasks.AsyncTasksResourceWithRawResponse(client.tasks)
@@ -507,8 +498,8 @@ class AsyncAgentexSDKWithRawResponse:
         )
 
 
-class AgentexSDKWithStreamedResponse:
-    def __init__(self, client: AgentexSDK) -> None:
+class AgentexWithStreamedResponse:
+    def __init__(self, client: Agentex) -> None:
         self.echo = echo.EchoResourceWithStreamingResponse(client.echo)
         self.agents = agents.AgentsResourceWithStreamingResponse(client.agents)
         self.tasks = tasks.TasksResourceWithStreamingResponse(client.tasks)
@@ -523,8 +514,8 @@ class AgentexSDKWithStreamedResponse:
         )
 
 
-class AsyncAgentexSDKWithStreamedResponse:
-    def __init__(self, client: AsyncAgentexSDK) -> None:
+class AsyncAgentexWithStreamedResponse:
+    def __init__(self, client: AsyncAgentex) -> None:
         self.echo = echo.AsyncEchoResourceWithStreamingResponse(client.echo)
         self.agents = agents.AsyncAgentsResourceWithStreamingResponse(client.agents)
         self.tasks = tasks.AsyncTasksResourceWithStreamingResponse(client.tasks)
@@ -539,6 +530,6 @@ class AsyncAgentexSDKWithStreamedResponse:
         )
 
 
-Client = AgentexSDK
+Client = Agentex
 
-AsyncClient = AsyncAgentexSDK
+AsyncClient = AsyncAgentex

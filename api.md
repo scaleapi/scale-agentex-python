@@ -1,4 +1,4 @@
-# AgentexSDK
+# Agentex
 
 Methods:
 

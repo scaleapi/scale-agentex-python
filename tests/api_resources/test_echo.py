@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
@@ -18,7 +18,7 @@ class TestEcho:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_send(self, client: AgentexSDK) -> None:
+    def test_method_send(self, client: Agentex) -> None:
         echo = client.echo.send(
             message="message",
         )
@@ -26,7 +26,7 @@ class TestEcho:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_send(self, client: AgentexSDK) -> None:
+    def test_raw_response_send(self, client: Agentex) -> None:
         response = client.echo.with_raw_response.send(
             message="message",
         )
@@ -38,7 +38,7 @@ class TestEcho:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_send(self, client: AgentexSDK) -> None:
+    def test_streaming_response_send(self, client: Agentex) -> None:
         with client.echo.with_streaming_response.send(
             message="message",
         ) as response:
@@ -58,7 +58,7 @@ class TestAsyncEcho:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_send(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_send(self, async_client: AsyncAgentex) -> None:
         echo = await async_client.echo.send(
             message="message",
         )
@@ -66,7 +66,7 @@ class TestAsyncEcho:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_send(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_send(self, async_client: AsyncAgentex) -> None:
         response = await async_client.echo.with_raw_response.send(
             message="message",
         )
@@ -78,7 +78,7 @@ class TestAsyncEcho:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_send(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_send(self, async_client: AsyncAgentex) -> None:
         async with async_client.echo.with_streaming_response.send(
             message="message",
         ) as response:

@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
 from agentex.types.messages import BatchCreateResponse, BatchUpdateResponse
 
@@ -19,7 +19,7 @@ class TestBatch:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_create(self, client: AgentexSDK) -> None:
+    def test_method_create(self, client: Agentex) -> None:
         batch = client.messages.batch.create(
             contents=[
                 {
@@ -33,7 +33,7 @@ class TestBatch:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_create(self, client: AgentexSDK) -> None:
+    def test_raw_response_create(self, client: Agentex) -> None:
         response = client.messages.batch.with_raw_response.create(
             contents=[
                 {
@@ -51,7 +51,7 @@ class TestBatch:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_create(self, client: AgentexSDK) -> None:
+    def test_streaming_response_create(self, client: Agentex) -> None:
         with client.messages.batch.with_streaming_response.create(
             contents=[
                 {
@@ -71,7 +71,7 @@ class TestBatch:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_update(self, client: AgentexSDK) -> None:
+    def test_method_update(self, client: Agentex) -> None:
         batch = client.messages.batch.update(
             task_id="task_id",
             updates={
@@ -85,7 +85,7 @@ class TestBatch:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_update(self, client: AgentexSDK) -> None:
+    def test_raw_response_update(self, client: Agentex) -> None:
         response = client.messages.batch.with_raw_response.update(
             task_id="task_id",
             updates={
@@ -103,7 +103,7 @@ class TestBatch:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_update(self, client: AgentexSDK) -> None:
+    def test_streaming_response_update(self, client: Agentex) -> None:
         with client.messages.batch.with_streaming_response.update(
             task_id="task_id",
             updates={
@@ -129,7 +129,7 @@ class TestAsyncBatch:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_create(self, async_client: AsyncAgentex) -> None:
         batch = await async_client.messages.batch.create(
             contents=[
                 {
@@ -143,7 +143,7 @@ class TestAsyncBatch:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_create(self, async_client: AsyncAgentex) -> None:
         response = await async_client.messages.batch.with_raw_response.create(
             contents=[
                 {
@@ -161,7 +161,7 @@ class TestAsyncBatch:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_create(self, async_client: AsyncAgentex) -> None:
         async with async_client.messages.batch.with_streaming_response.create(
             contents=[
                 {
@@ -181,7 +181,7 @@ class TestAsyncBatch:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_update(self, async_client: AsyncAgentex) -> None:
         batch = await async_client.messages.batch.update(
             task_id="task_id",
             updates={
@@ -195,7 +195,7 @@ class TestAsyncBatch:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_update(self, async_client: AsyncAgentex) -> None:
         response = await async_client.messages.batch.with_raw_response.update(
             task_id="task_id",
             updates={
@@ -213,7 +213,7 @@ class TestAsyncBatch:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_update(self, async_client: AsyncAgentex) -> None:
         async with async_client.messages.batch.with_streaming_response.update(
             task_id="task_id",
             updates={

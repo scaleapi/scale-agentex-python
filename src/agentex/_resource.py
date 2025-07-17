@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING
 import anyio
 
 if TYPE_CHECKING:
-    from ._client import AgentexSDK, AsyncAgentexSDK
+    from ._client import Agentex, AsyncAgentex
 
 
 class SyncAPIResource:
-    _client: AgentexSDK
+    _client: Agentex
 
-    def __init__(self, client: AgentexSDK) -> None:
+    def __init__(self, client: Agentex) -> None:
         self._client = client
         self._get = client.get
         self._post = client.post
@@ -28,9 +28,9 @@ class SyncAPIResource:
 
 
 class AsyncAPIResource:
-    _client: AsyncAgentexSDK
+    _client: AsyncAgentex
 
-    def __init__(self, client: AsyncAgentexSDK) -> None:
+    def __init__(self, client: AsyncAgentex) -> None:
         self._client = client
         self._get = client.get
         self._post = client.post

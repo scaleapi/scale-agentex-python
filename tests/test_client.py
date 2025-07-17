@@ -21,7 +21,7 @@ import pytest
 from respx import MockRouter
 from pydantic import ValidationError
 
-from agentex import AgentexSDK, AsyncAgentexSDK, APIResponseValidationError
+from agentex import Agentex, AsyncAgentex, APIResponseValidationError
 from agentex._types import Omit
 from agentex._models import BaseModel, FinalRequestOptions
 from agentex._exceptions import APIStatusError, APITimeoutError, APIResponseValidationError
@@ -50,7 +50,7 @@ def _low_retry_timeout(*_args: Any, **_kwargs: Any) -> float:
     return 0.1
 
 
-def _get_open_connections(client: AgentexSDK | AsyncAgentexSDK) -> int:
+def _get_open_connections(client: Agentex | AsyncAgentex) -> int:
     transport = client._client._transport
     assert isinstance(transport, httpx.HTTPTransport) or isinstance(transport, httpx.AsyncHTTPTransport)
 
@@ -58,8 +58,8 @@ def _get_open_connections(client: AgentexSDK | AsyncAgentexSDK) -> int:
     return len(pool._requests)
 
 
-class TestAgentexSDK:
-    client = AgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+class TestAgentex:
+    client = Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
 
     @pytest.mark.respx(base_url=base_url)
     def test_raw_response(self, respx_mock: MockRouter) -> None:
@@ -106,7 +106,7 @@ class TestAgentexSDK:
         assert isinstance(self.client.timeout, httpx.Timeout)
 
     def test_copy_default_headers(self) -> None:
-        client = AgentexSDK(
+        client = Agentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, default_headers={"X-Foo": "bar"}
         )
         assert client.default_headers["X-Foo"] == "bar"
@@ -140,7 +140,7 @@ class TestAgentexSDK:
             client.copy(set_default_headers={}, default_headers={"X-Foo": "Bar"})
 
     def test_copy_default_query(self) -> None:
-        client = AgentexSDK(
+        client = Agentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, default_query={"foo": "bar"}
         )
         assert _get_params(client)["foo"] == "bar"
@@ -266,9 +266,7 @@ class TestAgentexSDK:
         assert timeout == httpx.Timeout(100.0)
 
     def test_client_timeout_option(self) -> None:
-        client = AgentexSDK(
-            base_url=base_url, api_key=api_key, _strict_response_validation=True, timeout=httpx.Timeout(0)
-        )
+        client = Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=True, timeout=httpx.Timeout(0))
 
         request = client._build_request(FinalRequestOptions(method="get", url="/foo"))
         timeout = httpx.Timeout(**request.extensions["timeout"])  # type: ignore
@@ -277,7 +275,7 @@ class TestAgentexSDK:
     def test_http_client_timeout_option(self) -> None:
         # custom timeout given to the httpx client should be used
         with httpx.Client(timeout=None) as http_client:
-            client = AgentexSDK(
+            client = Agentex(
                 base_url=base_url, api_key=api_key, _strict_response_validation=True, http_client=http_client
             )
 
@@ -287,7 +285,7 @@ class TestAgentexSDK:
 
         # no timeout given to the httpx client should not use the httpx default
         with httpx.Client() as http_client:
-            client = AgentexSDK(
+            client = Agentex(
                 base_url=base_url, api_key=api_key, _strict_response_validation=True, http_client=http_client
             )
 
@@ -297,7 +295,7 @@ class TestAgentexSDK:
 
         # explicitly passing the default timeout currently results in it being ignored
         with httpx.Client(timeout=HTTPX_DEFAULT_TIMEOUT) as http_client:
-            client = AgentexSDK(
+            client = Agentex(
                 base_url=base_url, api_key=api_key, _strict_response_validation=True, http_client=http_client
             )
 
@@ -308,7 +306,7 @@ class TestAgentexSDK:
     async def test_invalid_http_client(self) -> None:
         with pytest.raises(TypeError, match="Invalid `http_client` arg"):
             async with httpx.AsyncClient() as http_client:
-                AgentexSDK(
+                Agentex(
                     base_url=base_url,
                     api_key=api_key,
                     _strict_response_validation=True,
@@ -316,14 +314,14 @@ class TestAgentexSDK:
                 )
 
     def test_default_headers_option(self) -> None:
-        client = AgentexSDK(
+        client = Agentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, default_headers={"X-Foo": "bar"}
         )
         request = client._build_request(FinalRequestOptions(method="get", url="/foo"))
         assert request.headers.get("x-foo") == "bar"
         assert request.headers.get("x-stainless-lang") == "python"
 
-        client2 = AgentexSDK(
+        client2 = Agentex(
             base_url=base_url,
             api_key=api_key,
             _strict_response_validation=True,
@@ -337,12 +335,12 @@ class TestAgentexSDK:
         assert request.headers.get("x-stainless-lang") == "my-overriding-header"
 
     def test_validate_headers(self) -> None:
-        client = AgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        client = Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
         request = client._build_request(FinalRequestOptions(method="get", url="/foo"))
         assert request.headers.get("Authorization") == f"Bearer {api_key}"
 
         with update_env(**{"AGENTEX_SDK_API_KEY": Omit()}):
-            client2 = AgentexSDK(base_url=base_url, api_key=None, _strict_response_validation=True)
+            client2 = Agentex(base_url=base_url, api_key=None, _strict_response_validation=True)
 
         with pytest.raises(
             TypeError,
@@ -356,7 +354,7 @@ class TestAgentexSDK:
         assert request2.headers.get("Authorization") is None
 
     def test_default_query_option(self) -> None:
-        client = AgentexSDK(
+        client = Agentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, default_query={"query_param": "bar"}
         )
         request = client._build_request(FinalRequestOptions(method="get", url="/foo"))
@@ -470,7 +468,7 @@ class TestAgentexSDK:
         params = dict(request.url.params)
         assert params == {"foo": "2"}
 
-    def test_multipart_repeating_array(self, client: AgentexSDK) -> None:
+    def test_multipart_repeating_array(self, client: Agentex) -> None:
         request = client._build_request(
             FinalRequestOptions.construct(
                 method="post",
@@ -557,7 +555,7 @@ class TestAgentexSDK:
         assert response.foo == 2
 
     def test_base_url_setter(self) -> None:
-        client = AgentexSDK(base_url="https://example.com/from_init", api_key=api_key, _strict_response_validation=True)
+        client = Agentex(base_url="https://example.com/from_init", api_key=api_key, _strict_response_validation=True)
         assert client.base_url == "https://example.com/from_init/"
 
         client.base_url = "https://example.com/from_setter"  # type: ignore[assignment]
@@ -565,17 +563,15 @@ class TestAgentexSDK:
         assert client.base_url == "https://example.com/from_setter/"
 
     def test_base_url_env(self) -> None:
-        with update_env(AGENTEX_SDK_BASE_URL="http://localhost:5000/from/env"):
-            client = AgentexSDK(api_key=api_key, _strict_response_validation=True)
+        with update_env(AGENTEX_BASE_URL="http://localhost:5000/from/env"):
+            client = Agentex(api_key=api_key, _strict_response_validation=True)
             assert client.base_url == "http://localhost:5000/from/env/"
 
     @pytest.mark.parametrize(
         "client",
         [
-            AgentexSDK(
-                base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True
-            ),
-            AgentexSDK(
+            Agentex(base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True),
+            Agentex(
                 base_url="http://localhost:5000/custom/path/",
                 api_key=api_key,
                 _strict_response_validation=True,
@@ -584,7 +580,7 @@ class TestAgentexSDK:
         ],
         ids=["standard", "custom http client"],
     )
-    def test_base_url_trailing_slash(self, client: AgentexSDK) -> None:
+    def test_base_url_trailing_slash(self, client: Agentex) -> None:
         request = client._build_request(
             FinalRequestOptions(
                 method="post",
@@ -597,10 +593,8 @@ class TestAgentexSDK:
     @pytest.mark.parametrize(
         "client",
         [
-            AgentexSDK(
-                base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True
-            ),
-            AgentexSDK(
+            Agentex(base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True),
+            Agentex(
                 base_url="http://localhost:5000/custom/path/",
                 api_key=api_key,
                 _strict_response_validation=True,
@@ -609,7 +603,7 @@ class TestAgentexSDK:
         ],
         ids=["standard", "custom http client"],
     )
-    def test_base_url_no_trailing_slash(self, client: AgentexSDK) -> None:
+    def test_base_url_no_trailing_slash(self, client: Agentex) -> None:
         request = client._build_request(
             FinalRequestOptions(
                 method="post",
@@ -622,10 +616,8 @@ class TestAgentexSDK:
     @pytest.mark.parametrize(
         "client",
         [
-            AgentexSDK(
-                base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True
-            ),
-            AgentexSDK(
+            Agentex(base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True),
+            Agentex(
                 base_url="http://localhost:5000/custom/path/",
                 api_key=api_key,
                 _strict_response_validation=True,
@@ -634,7 +626,7 @@ class TestAgentexSDK:
         ],
         ids=["standard", "custom http client"],
     )
-    def test_absolute_request_url(self, client: AgentexSDK) -> None:
+    def test_absolute_request_url(self, client: Agentex) -> None:
         request = client._build_request(
             FinalRequestOptions(
                 method="post",
@@ -645,7 +637,7 @@ class TestAgentexSDK:
         assert request.url == "https://myapi.com/foo"
 
     def test_copied_client_does_not_close_http(self) -> None:
-        client = AgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        client = Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
         assert not client.is_closed()
 
         copied = client.copy()
@@ -656,7 +648,7 @@ class TestAgentexSDK:
         assert not client.is_closed()
 
     def test_client_context_manager(self) -> None:
-        client = AgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        client = Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
         with client as c2:
             assert c2 is client
             assert not c2.is_closed()
@@ -677,9 +669,7 @@ class TestAgentexSDK:
 
     def test_client_max_retries_validation(self) -> None:
         with pytest.raises(TypeError, match=r"max_retries cannot be None"):
-            AgentexSDK(
-                base_url=base_url, api_key=api_key, _strict_response_validation=True, max_retries=cast(Any, None)
-            )
+            Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=True, max_retries=cast(Any, None))
 
     @pytest.mark.respx(base_url=base_url)
     def test_received_text_for_expected_json(self, respx_mock: MockRouter) -> None:
@@ -688,12 +678,12 @@ class TestAgentexSDK:
 
         respx_mock.get("/foo").mock(return_value=httpx.Response(200, text="my-custom-format"))
 
-        strict_client = AgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        strict_client = Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
 
         with pytest.raises(APIResponseValidationError):
             strict_client.get("/foo", cast_to=Model)
 
-        client = AgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=False)
+        client = Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=False)
 
         response = client.get("/foo", cast_to=Model)
         assert isinstance(response, str)  # type: ignore[unreachable]
@@ -721,7 +711,7 @@ class TestAgentexSDK:
     )
     @mock.patch("time.time", mock.MagicMock(return_value=1696004797))
     def test_parse_retry_after_header(self, remaining_retries: int, retry_after: str, timeout: float) -> None:
-        client = AgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        client = Agentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
 
         headers = httpx.Headers({"retry-after": retry_after})
         options = FinalRequestOptions(method="get", url="/foo", max_retries=3)
@@ -730,7 +720,7 @@ class TestAgentexSDK:
 
     @mock.patch("agentex._base_client.BaseClient._calculate_retry_timeout", _low_retry_timeout)
     @pytest.mark.respx(base_url=base_url)
-    def test_retrying_timeout_errors_doesnt_leak(self, respx_mock: MockRouter, client: AgentexSDK) -> None:
+    def test_retrying_timeout_errors_doesnt_leak(self, respx_mock: MockRouter, client: Agentex) -> None:
         respx_mock.post("/echo").mock(side_effect=httpx.TimeoutException("Test timeout error"))
 
         with pytest.raises(APITimeoutError):
@@ -740,7 +730,7 @@ class TestAgentexSDK:
 
     @mock.patch("agentex._base_client.BaseClient._calculate_retry_timeout", _low_retry_timeout)
     @pytest.mark.respx(base_url=base_url)
-    def test_retrying_status_errors_doesnt_leak(self, respx_mock: MockRouter, client: AgentexSDK) -> None:
+    def test_retrying_status_errors_doesnt_leak(self, respx_mock: MockRouter, client: Agentex) -> None:
         respx_mock.post("/echo").mock(return_value=httpx.Response(500))
 
         with pytest.raises(APIStatusError):
@@ -753,7 +743,7 @@ class TestAgentexSDK:
     @pytest.mark.parametrize("failure_mode", ["status", "exception"])
     def test_retries_taken(
         self,
-        client: AgentexSDK,
+        client: Agentex,
         failures_before_success: int,
         failure_mode: Literal["status", "exception"],
         respx_mock: MockRouter,
@@ -782,7 +772,7 @@ class TestAgentexSDK:
     @mock.patch("agentex._base_client.BaseClient._calculate_retry_timeout", _low_retry_timeout)
     @pytest.mark.respx(base_url=base_url)
     def test_omit_retry_count_header(
-        self, client: AgentexSDK, failures_before_success: int, respx_mock: MockRouter
+        self, client: Agentex, failures_before_success: int, respx_mock: MockRouter
     ) -> None:
         client = client.with_options(max_retries=4)
 
@@ -807,7 +797,7 @@ class TestAgentexSDK:
     @mock.patch("agentex._base_client.BaseClient._calculate_retry_timeout", _low_retry_timeout)
     @pytest.mark.respx(base_url=base_url)
     def test_overwrite_retry_count_header(
-        self, client: AgentexSDK, failures_before_success: int, respx_mock: MockRouter
+        self, client: Agentex, failures_before_success: int, respx_mock: MockRouter
     ) -> None:
         client = client.with_options(max_retries=4)
 
@@ -878,8 +868,8 @@ class TestAgentexSDK:
         assert exc_info.value.response.headers["Location"] == f"{base_url}/redirected"
 
 
-class TestAsyncAgentexSDK:
-    client = AsyncAgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+class TestAsyncAgentex:
+    client = AsyncAgentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
 
     @pytest.mark.respx(base_url=base_url)
     @pytest.mark.asyncio
@@ -928,7 +918,7 @@ class TestAsyncAgentexSDK:
         assert isinstance(self.client.timeout, httpx.Timeout)
 
     def test_copy_default_headers(self) -> None:
-        client = AsyncAgentexSDK(
+        client = AsyncAgentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, default_headers={"X-Foo": "bar"}
         )
         assert client.default_headers["X-Foo"] == "bar"
@@ -962,7 +952,7 @@ class TestAsyncAgentexSDK:
             client.copy(set_default_headers={}, default_headers={"X-Foo": "Bar"})
 
     def test_copy_default_query(self) -> None:
-        client = AsyncAgentexSDK(
+        client = AsyncAgentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, default_query={"foo": "bar"}
         )
         assert _get_params(client)["foo"] == "bar"
@@ -1088,7 +1078,7 @@ class TestAsyncAgentexSDK:
         assert timeout == httpx.Timeout(100.0)
 
     async def test_client_timeout_option(self) -> None:
-        client = AsyncAgentexSDK(
+        client = AsyncAgentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, timeout=httpx.Timeout(0)
         )
 
@@ -1099,7 +1089,7 @@ class TestAsyncAgentexSDK:
     async def test_http_client_timeout_option(self) -> None:
         # custom timeout given to the httpx client should be used
         async with httpx.AsyncClient(timeout=None) as http_client:
-            client = AsyncAgentexSDK(
+            client = AsyncAgentex(
                 base_url=base_url, api_key=api_key, _strict_response_validation=True, http_client=http_client
             )
 
@@ -1109,7 +1099,7 @@ class TestAsyncAgentexSDK:
 
         # no timeout given to the httpx client should not use the httpx default
         async with httpx.AsyncClient() as http_client:
-            client = AsyncAgentexSDK(
+            client = AsyncAgentex(
                 base_url=base_url, api_key=api_key, _strict_response_validation=True, http_client=http_client
             )
 
@@ -1119,7 +1109,7 @@ class TestAsyncAgentexSDK:
 
         # explicitly passing the default timeout currently results in it being ignored
         async with httpx.AsyncClient(timeout=HTTPX_DEFAULT_TIMEOUT) as http_client:
-            client = AsyncAgentexSDK(
+            client = AsyncAgentex(
                 base_url=base_url, api_key=api_key, _strict_response_validation=True, http_client=http_client
             )
 
@@ -1130,7 +1120,7 @@ class TestAsyncAgentexSDK:
     def test_invalid_http_client(self) -> None:
         with pytest.raises(TypeError, match="Invalid `http_client` arg"):
             with httpx.Client() as http_client:
-                AsyncAgentexSDK(
+                AsyncAgentex(
                     base_url=base_url,
                     api_key=api_key,
                     _strict_response_validation=True,
@@ -1138,14 +1128,14 @@ class TestAsyncAgentexSDK:
                 )
 
     def test_default_headers_option(self) -> None:
-        client = AsyncAgentexSDK(
+        client = AsyncAgentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, default_headers={"X-Foo": "bar"}
         )
         request = client._build_request(FinalRequestOptions(method="get", url="/foo"))
         assert request.headers.get("x-foo") == "bar"
         assert request.headers.get("x-stainless-lang") == "python"
 
-        client2 = AsyncAgentexSDK(
+        client2 = AsyncAgentex(
             base_url=base_url,
             api_key=api_key,
             _strict_response_validation=True,
@@ -1159,12 +1149,12 @@ class TestAsyncAgentexSDK:
         assert request.headers.get("x-stainless-lang") == "my-overriding-header"
 
     def test_validate_headers(self) -> None:
-        client = AsyncAgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        client = AsyncAgentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
         request = client._build_request(FinalRequestOptions(method="get", url="/foo"))
         assert request.headers.get("Authorization") == f"Bearer {api_key}"
 
         with update_env(**{"AGENTEX_SDK_API_KEY": Omit()}):
-            client2 = AsyncAgentexSDK(base_url=base_url, api_key=None, _strict_response_validation=True)
+            client2 = AsyncAgentex(base_url=base_url, api_key=None, _strict_response_validation=True)
 
         with pytest.raises(
             TypeError,
@@ -1178,7 +1168,7 @@ class TestAsyncAgentexSDK:
         assert request2.headers.get("Authorization") is None
 
     def test_default_query_option(self) -> None:
-        client = AsyncAgentexSDK(
+        client = AsyncAgentex(
             base_url=base_url, api_key=api_key, _strict_response_validation=True, default_query={"query_param": "bar"}
         )
         request = client._build_request(FinalRequestOptions(method="get", url="/foo"))
@@ -1292,7 +1282,7 @@ class TestAsyncAgentexSDK:
         params = dict(request.url.params)
         assert params == {"foo": "2"}
 
-    def test_multipart_repeating_array(self, async_client: AsyncAgentexSDK) -> None:
+    def test_multipart_repeating_array(self, async_client: AsyncAgentex) -> None:
         request = async_client._build_request(
             FinalRequestOptions.construct(
                 method="post",
@@ -1379,7 +1369,7 @@ class TestAsyncAgentexSDK:
         assert response.foo == 2
 
     def test_base_url_setter(self) -> None:
-        client = AsyncAgentexSDK(
+        client = AsyncAgentex(
             base_url="https://example.com/from_init", api_key=api_key, _strict_response_validation=True
         )
         assert client.base_url == "https://example.com/from_init/"
@@ -1389,17 +1379,17 @@ class TestAsyncAgentexSDK:
         assert client.base_url == "https://example.com/from_setter/"
 
     def test_base_url_env(self) -> None:
-        with update_env(AGENTEX_SDK_BASE_URL="http://localhost:5000/from/env"):
-            client = AsyncAgentexSDK(api_key=api_key, _strict_response_validation=True)
+        with update_env(AGENTEX_BASE_URL="http://localhost:5000/from/env"):
+            client = AsyncAgentex(api_key=api_key, _strict_response_validation=True)
             assert client.base_url == "http://localhost:5000/from/env/"
 
     @pytest.mark.parametrize(
         "client",
         [
-            AsyncAgentexSDK(
+            AsyncAgentex(
                 base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True
             ),
-            AsyncAgentexSDK(
+            AsyncAgentex(
                 base_url="http://localhost:5000/custom/path/",
                 api_key=api_key,
                 _strict_response_validation=True,
@@ -1408,7 +1398,7 @@ class TestAsyncAgentexSDK:
         ],
         ids=["standard", "custom http client"],
     )
-    def test_base_url_trailing_slash(self, client: AsyncAgentexSDK) -> None:
+    def test_base_url_trailing_slash(self, client: AsyncAgentex) -> None:
         request = client._build_request(
             FinalRequestOptions(
                 method="post",
@@ -1421,10 +1411,10 @@ class TestAsyncAgentexSDK:
     @pytest.mark.parametrize(
         "client",
         [
-            AsyncAgentexSDK(
+            AsyncAgentex(
                 base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True
             ),
-            AsyncAgentexSDK(
+            AsyncAgentex(
                 base_url="http://localhost:5000/custom/path/",
                 api_key=api_key,
                 _strict_response_validation=True,
@@ -1433,7 +1423,7 @@ class TestAsyncAgentexSDK:
         ],
         ids=["standard", "custom http client"],
     )
-    def test_base_url_no_trailing_slash(self, client: AsyncAgentexSDK) -> None:
+    def test_base_url_no_trailing_slash(self, client: AsyncAgentex) -> None:
         request = client._build_request(
             FinalRequestOptions(
                 method="post",
@@ -1446,10 +1436,10 @@ class TestAsyncAgentexSDK:
     @pytest.mark.parametrize(
         "client",
         [
-            AsyncAgentexSDK(
+            AsyncAgentex(
                 base_url="http://localhost:5000/custom/path/", api_key=api_key, _strict_response_validation=True
             ),
-            AsyncAgentexSDK(
+            AsyncAgentex(
                 base_url="http://localhost:5000/custom/path/",
                 api_key=api_key,
                 _strict_response_validation=True,
@@ -1458,7 +1448,7 @@ class TestAsyncAgentexSDK:
         ],
         ids=["standard", "custom http client"],
     )
-    def test_absolute_request_url(self, client: AsyncAgentexSDK) -> None:
+    def test_absolute_request_url(self, client: AsyncAgentex) -> None:
         request = client._build_request(
             FinalRequestOptions(
                 method="post",
@@ -1469,7 +1459,7 @@ class TestAsyncAgentexSDK:
         assert request.url == "https://myapi.com/foo"
 
     async def test_copied_client_does_not_close_http(self) -> None:
-        client = AsyncAgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        client = AsyncAgentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
         assert not client.is_closed()
 
         copied = client.copy()
@@ -1481,7 +1471,7 @@ class TestAsyncAgentexSDK:
         assert not client.is_closed()
 
     async def test_client_context_manager(self) -> None:
-        client = AsyncAgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        client = AsyncAgentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
         async with client as c2:
             assert c2 is client
             assert not c2.is_closed()
@@ -1503,7 +1493,7 @@ class TestAsyncAgentexSDK:
 
     async def test_client_max_retries_validation(self) -> None:
         with pytest.raises(TypeError, match=r"max_retries cannot be None"):
-            AsyncAgentexSDK(
+            AsyncAgentex(
                 base_url=base_url, api_key=api_key, _strict_response_validation=True, max_retries=cast(Any, None)
             )
 
@@ -1515,12 +1505,12 @@ class TestAsyncAgentexSDK:
 
         respx_mock.get("/foo").mock(return_value=httpx.Response(200, text="my-custom-format"))
 
-        strict_client = AsyncAgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        strict_client = AsyncAgentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
 
         with pytest.raises(APIResponseValidationError):
             await strict_client.get("/foo", cast_to=Model)
 
-        client = AsyncAgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=False)
+        client = AsyncAgentex(base_url=base_url, api_key=api_key, _strict_response_validation=False)
 
         response = await client.get("/foo", cast_to=Model)
         assert isinstance(response, str)  # type: ignore[unreachable]
@@ -1549,7 +1539,7 @@ class TestAsyncAgentexSDK:
     @mock.patch("time.time", mock.MagicMock(return_value=1696004797))
     @pytest.mark.asyncio
     async def test_parse_retry_after_header(self, remaining_retries: int, retry_after: str, timeout: float) -> None:
-        client = AsyncAgentexSDK(base_url=base_url, api_key=api_key, _strict_response_validation=True)
+        client = AsyncAgentex(base_url=base_url, api_key=api_key, _strict_response_validation=True)
 
         headers = httpx.Headers({"retry-after": retry_after})
         options = FinalRequestOptions(method="get", url="/foo", max_retries=3)
@@ -1559,7 +1549,7 @@ class TestAsyncAgentexSDK:
     @mock.patch("agentex._base_client.BaseClient._calculate_retry_timeout", _low_retry_timeout)
     @pytest.mark.respx(base_url=base_url)
     async def test_retrying_timeout_errors_doesnt_leak(
-        self, respx_mock: MockRouter, async_client: AsyncAgentexSDK
+        self, respx_mock: MockRouter, async_client: AsyncAgentex
     ) -> None:
         respx_mock.post("/echo").mock(side_effect=httpx.TimeoutException("Test timeout error"))
 
@@ -1570,9 +1560,7 @@ class TestAsyncAgentexSDK:
 
     @mock.patch("agentex._base_client.BaseClient._calculate_retry_timeout", _low_retry_timeout)
     @pytest.mark.respx(base_url=base_url)
-    async def test_retrying_status_errors_doesnt_leak(
-        self, respx_mock: MockRouter, async_client: AsyncAgentexSDK
-    ) -> None:
+    async def test_retrying_status_errors_doesnt_leak(self, respx_mock: MockRouter, async_client: AsyncAgentex) -> None:
         respx_mock.post("/echo").mock(return_value=httpx.Response(500))
 
         with pytest.raises(APIStatusError):
@@ -1586,7 +1574,7 @@ class TestAsyncAgentexSDK:
     @pytest.mark.parametrize("failure_mode", ["status", "exception"])
     async def test_retries_taken(
         self,
-        async_client: AsyncAgentexSDK,
+        async_client: AsyncAgentex,
         failures_before_success: int,
         failure_mode: Literal["status", "exception"],
         respx_mock: MockRouter,
@@ -1616,7 +1604,7 @@ class TestAsyncAgentexSDK:
     @pytest.mark.respx(base_url=base_url)
     @pytest.mark.asyncio
     async def test_omit_retry_count_header(
-        self, async_client: AsyncAgentexSDK, failures_before_success: int, respx_mock: MockRouter
+        self, async_client: AsyncAgentex, failures_before_success: int, respx_mock: MockRouter
     ) -> None:
         client = async_client.with_options(max_retries=4)
 
@@ -1642,7 +1630,7 @@ class TestAsyncAgentexSDK:
     @pytest.mark.respx(base_url=base_url)
     @pytest.mark.asyncio
     async def test_overwrite_retry_count_header(
-        self, async_client: AsyncAgentexSDK, failures_before_success: int, respx_mock: MockRouter
+        self, async_client: AsyncAgentex, failures_before_success: int, respx_mock: MockRouter
     ) -> None:
         client = async_client.with_options(max_retries=4)
 

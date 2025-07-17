@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
 from agentex.types import Agent
 
@@ -19,7 +19,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_retrieve(self, client: AgentexSDK) -> None:
+    def test_method_retrieve(self, client: Agentex) -> None:
         name = client.agents.name.retrieve(
             "agent_name",
         )
@@ -27,7 +27,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_raw_response_retrieve(self, client: Agentex) -> None:
         response = client.agents.name.with_raw_response.retrieve(
             "agent_name",
         )
@@ -39,7 +39,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_streaming_response_retrieve(self, client: Agentex) -> None:
         with client.agents.name.with_streaming_response.retrieve(
             "agent_name",
         ) as response:
@@ -53,7 +53,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_retrieve(self, client: AgentexSDK) -> None:
+    def test_path_params_retrieve(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_name` but received ''"):
             client.agents.name.with_raw_response.retrieve(
                 "",
@@ -61,7 +61,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_delete(self, client: AgentexSDK) -> None:
+    def test_method_delete(self, client: Agentex) -> None:
         name = client.agents.name.delete(
             "agent_name",
         )
@@ -69,7 +69,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_delete(self, client: AgentexSDK) -> None:
+    def test_raw_response_delete(self, client: Agentex) -> None:
         response = client.agents.name.with_raw_response.delete(
             "agent_name",
         )
@@ -81,7 +81,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_delete(self, client: AgentexSDK) -> None:
+    def test_streaming_response_delete(self, client: Agentex) -> None:
         with client.agents.name.with_streaming_response.delete(
             "agent_name",
         ) as response:
@@ -95,7 +95,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_delete(self, client: AgentexSDK) -> None:
+    def test_path_params_delete(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_name` but received ''"):
             client.agents.name.with_raw_response.delete(
                 "",
@@ -103,7 +103,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_rpc(self, client: AgentexSDK) -> None:
+    def test_method_rpc(self, client: Agentex) -> None:
         name = client.agents.name.rpc(
             agent_name="agent_name",
             method="event/send",
@@ -113,7 +113,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_rpc_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_rpc_with_all_params(self, client: Agentex) -> None:
         name = client.agents.name.rpc(
             agent_name="agent_name",
             method="event/send",
@@ -128,7 +128,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_rpc(self, client: AgentexSDK) -> None:
+    def test_raw_response_rpc(self, client: Agentex) -> None:
         response = client.agents.name.with_raw_response.rpc(
             agent_name="agent_name",
             method="event/send",
@@ -142,7 +142,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_rpc(self, client: AgentexSDK) -> None:
+    def test_streaming_response_rpc(self, client: Agentex) -> None:
         with client.agents.name.with_streaming_response.rpc(
             agent_name="agent_name",
             method="event/send",
@@ -158,7 +158,7 @@ class TestName:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_rpc(self, client: AgentexSDK) -> None:
+    def test_path_params_rpc(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_name` but received ''"):
             client.agents.name.with_raw_response.rpc(
                 agent_name="",
@@ -174,7 +174,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
         name = await async_client.agents.name.retrieve(
             "agent_name",
         )
@@ -182,7 +182,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
         response = await async_client.agents.name.with_raw_response.retrieve(
             "agent_name",
         )
@@ -194,7 +194,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
         async with async_client.agents.name.with_streaming_response.retrieve(
             "agent_name",
         ) as response:
@@ -208,7 +208,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_name` but received ''"):
             await async_client.agents.name.with_raw_response.retrieve(
                 "",
@@ -216,7 +216,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_delete(self, async_client: AsyncAgentex) -> None:
         name = await async_client.agents.name.delete(
             "agent_name",
         )
@@ -224,7 +224,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_delete(self, async_client: AsyncAgentex) -> None:
         response = await async_client.agents.name.with_raw_response.delete(
             "agent_name",
         )
@@ -236,7 +236,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_delete(self, async_client: AsyncAgentex) -> None:
         async with async_client.agents.name.with_streaming_response.delete(
             "agent_name",
         ) as response:
@@ -250,7 +250,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_delete(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_delete(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_name` but received ''"):
             await async_client.agents.name.with_raw_response.delete(
                 "",
@@ -258,7 +258,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_rpc(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_rpc(self, async_client: AsyncAgentex) -> None:
         name = await async_client.agents.name.rpc(
             agent_name="agent_name",
             method="event/send",
@@ -268,7 +268,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_rpc_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_rpc_with_all_params(self, async_client: AsyncAgentex) -> None:
         name = await async_client.agents.name.rpc(
             agent_name="agent_name",
             method="event/send",
@@ -283,7 +283,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_rpc(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_rpc(self, async_client: AsyncAgentex) -> None:
         response = await async_client.agents.name.with_raw_response.rpc(
             agent_name="agent_name",
             method="event/send",
@@ -297,7 +297,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_rpc(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_rpc(self, async_client: AsyncAgentex) -> None:
         async with async_client.agents.name.with_streaming_response.rpc(
             agent_name="agent_name",
             method="event/send",
@@ -313,7 +313,7 @@ class TestAsyncName:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_rpc(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_rpc(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_name` but received ''"):
             await async_client.agents.name.with_raw_response.rpc(
                 agent_name="",

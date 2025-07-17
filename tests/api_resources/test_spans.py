@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import pytest
 
-from agentex import AgentexSDK, AsyncAgentexSDK
+from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
 from agentex.types import Span, SpanListResponse
 from agentex._utils import parse_datetime
@@ -20,7 +20,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_create(self, client: AgentexSDK) -> None:
+    def test_method_create(self, client: Agentex) -> None:
         span = client.spans.create(
             name="name",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
@@ -30,7 +30,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_create_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_create_with_all_params(self, client: Agentex) -> None:
         span = client.spans.create(
             name="name",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
@@ -46,7 +46,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_create(self, client: AgentexSDK) -> None:
+    def test_raw_response_create(self, client: Agentex) -> None:
         response = client.spans.with_raw_response.create(
             name="name",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
@@ -60,7 +60,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_create(self, client: AgentexSDK) -> None:
+    def test_streaming_response_create(self, client: Agentex) -> None:
         with client.spans.with_streaming_response.create(
             name="name",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
@@ -76,7 +76,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_retrieve(self, client: AgentexSDK) -> None:
+    def test_method_retrieve(self, client: Agentex) -> None:
         span = client.spans.retrieve(
             "span_id",
         )
@@ -84,7 +84,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_raw_response_retrieve(self, client: Agentex) -> None:
         response = client.spans.with_raw_response.retrieve(
             "span_id",
         )
@@ -96,7 +96,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_retrieve(self, client: AgentexSDK) -> None:
+    def test_streaming_response_retrieve(self, client: Agentex) -> None:
         with client.spans.with_streaming_response.retrieve(
             "span_id",
         ) as response:
@@ -110,7 +110,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_retrieve(self, client: AgentexSDK) -> None:
+    def test_path_params_retrieve(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `span_id` but received ''"):
             client.spans.with_raw_response.retrieve(
                 "",
@@ -118,7 +118,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_update(self, client: AgentexSDK) -> None:
+    def test_method_update(self, client: Agentex) -> None:
         span = client.spans.update(
             span_id="span_id",
         )
@@ -126,7 +126,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_update_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_update_with_all_params(self, client: Agentex) -> None:
         span = client.spans.update(
             span_id="span_id",
             data={"foo": "bar"},
@@ -142,7 +142,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_update(self, client: AgentexSDK) -> None:
+    def test_raw_response_update(self, client: Agentex) -> None:
         response = client.spans.with_raw_response.update(
             span_id="span_id",
         )
@@ -154,7 +154,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_update(self, client: AgentexSDK) -> None:
+    def test_streaming_response_update(self, client: Agentex) -> None:
         with client.spans.with_streaming_response.update(
             span_id="span_id",
         ) as response:
@@ -168,7 +168,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_path_params_update(self, client: AgentexSDK) -> None:
+    def test_path_params_update(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `span_id` but received ''"):
             client.spans.with_raw_response.update(
                 span_id="",
@@ -176,13 +176,13 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list(self, client: AgentexSDK) -> None:
+    def test_method_list(self, client: Agentex) -> None:
         span = client.spans.list()
         assert_matches_type(SpanListResponse, span, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
-    def test_method_list_with_all_params(self, client: AgentexSDK) -> None:
+    def test_method_list_with_all_params(self, client: Agentex) -> None:
         span = client.spans.list(
             trace_id="trace_id",
         )
@@ -190,7 +190,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_raw_response_list(self, client: AgentexSDK) -> None:
+    def test_raw_response_list(self, client: Agentex) -> None:
         response = client.spans.with_raw_response.list()
 
         assert response.is_closed is True
@@ -200,7 +200,7 @@ class TestSpans:
 
     @pytest.mark.skip()
     @parametrize
-    def test_streaming_response_list(self, client: AgentexSDK) -> None:
+    def test_streaming_response_list(self, client: Agentex) -> None:
         with client.spans.with_streaming_response.list() as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -218,7 +218,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_create(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.create(
             name="name",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
@@ -228,7 +228,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_create_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_create_with_all_params(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.create(
             name="name",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
@@ -244,7 +244,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_create(self, async_client: AsyncAgentex) -> None:
         response = await async_client.spans.with_raw_response.create(
             name="name",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
@@ -258,7 +258,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_create(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_create(self, async_client: AsyncAgentex) -> None:
         async with async_client.spans.with_streaming_response.create(
             name="name",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
@@ -274,7 +274,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.retrieve(
             "span_id",
         )
@@ -282,7 +282,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
         response = await async_client.spans.with_raw_response.retrieve(
             "span_id",
         )
@@ -294,7 +294,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
         async with async_client.spans.with_streaming_response.retrieve(
             "span_id",
         ) as response:
@@ -308,7 +308,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_retrieve(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `span_id` but received ''"):
             await async_client.spans.with_raw_response.retrieve(
                 "",
@@ -316,7 +316,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_update(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.update(
             span_id="span_id",
         )
@@ -324,7 +324,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_update_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_update_with_all_params(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.update(
             span_id="span_id",
             data={"foo": "bar"},
@@ -340,7 +340,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_update(self, async_client: AsyncAgentex) -> None:
         response = await async_client.spans.with_raw_response.update(
             span_id="span_id",
         )
@@ -352,7 +352,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_update(self, async_client: AsyncAgentex) -> None:
         async with async_client.spans.with_streaming_response.update(
             span_id="span_id",
         ) as response:
@@ -366,7 +366,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_path_params_update(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_path_params_update(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `span_id` but received ''"):
             await async_client.spans.with_raw_response.update(
                 span_id="",
@@ -374,13 +374,13 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.list()
         assert_matches_type(SpanListResponse, span, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
-    async def test_method_list_with_all_params(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.list(
             trace_id="trace_id",
         )
@@ -388,7 +388,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_raw_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_raw_response_list(self, async_client: AsyncAgentex) -> None:
         response = await async_client.spans.with_raw_response.list()
 
         assert response.is_closed is True
@@ -398,7 +398,7 @@ class TestAsyncSpans:
 
     @pytest.mark.skip()
     @parametrize
-    async def test_streaming_response_list(self, async_client: AsyncAgentexSDK) -> None:
+    async def test_streaming_response_list(self, async_client: AsyncAgentex) -> None:
         async with async_client.spans.with_streaming_response.list() as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
