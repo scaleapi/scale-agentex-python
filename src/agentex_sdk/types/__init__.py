@@ -41,5 +41,6 @@ from .message_update_params import MessageUpdateParams as MessageUpdateParams
 from .tool_response_content import ToolResponseContent as ToolResponseContent
 from .tracker_list_response import TrackerListResponse as TrackerListResponse
 from .tracker_update_params import TrackerUpdateParams as TrackerUpdateParams
+from .send_event_request_param import SendEventRequestParam as SendEventRequestParam
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
 from .tool_response_content_param import ToolResponseContentParam as ToolResponseContentParam
