@@ -26,7 +26,6 @@ class AgentRpcParams(TypedDict, total=False):
     method: Required[Literal["event/send", "task/create", "message/send", "task/cancel"]]
 
     params: Required[Params]
-    """The parameters for the agent RPC request"""
 
     id: Union[int, str, None]
 
