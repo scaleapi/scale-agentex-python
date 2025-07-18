@@ -7,7 +7,6 @@ from typing_extensions import Literal, Required, TypeAlias, TypedDict
 
 from ..data_content_param import DataContentParam
 from ..text_content_param import TextContentParam
-from ..send_event_request_param import SendEventRequestParam
 from ..tool_request_content_param import ToolRequestContentParam
 from ..tool_response_content_param import ToolResponseContentParam
 
@@ -18,6 +17,8 @@ __all__ = [
     "ParamsCancelTaskRequest",
     "ParamsSendMessageRequest",
     "ParamsSendMessageRequestContent",
+    "ParamsSendEventRequest",
+    "ParamsSendEventRequestContent",
 ]
 
 
@@ -63,6 +64,22 @@ class ParamsSendMessageRequest(TypedDict, total=False):
     """The ID of the task that the message was sent to"""
 
 
+ParamsSendEventRequestContent: TypeAlias = Union[
+    TextContentParam, DataContentParam, ToolRequestContentParam, ToolResponseContentParam
+]
+
+
+class ParamsSendEventRequest(TypedDict, total=False):
+    content: Optional[ParamsSendEventRequestContent]
+    """The content to send to the event"""
+
+    task_id: Optional[str]
+    """The ID of the task that the event was sent to"""
+
+    task_name: Optional[str]
+    """The name of the task that the event was sent to"""
+
+
 Params: TypeAlias = Union[
-    ParamsCreateTaskRequest, ParamsCancelTaskRequest, ParamsSendMessageRequest, SendEventRequestParam
+    ParamsCreateTaskRequest, ParamsCancelTaskRequest, ParamsSendMessageRequest, ParamsSendEventRequest
 ]

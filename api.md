@@ -15,7 +15,7 @@ Methods:
 Types:
 
 ```python
-from agentex.types import AcpType, Agent, AgentRpcRequest, SendEventRequest, AgentListResponse
+from agentex.types import AcpType, Agent, AgentRpcRequest, AgentListResponse
 ```
 
 Methods:
