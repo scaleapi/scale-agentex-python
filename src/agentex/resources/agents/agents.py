@@ -179,6 +179,8 @@ class AgentsResource(SyncAPIResource):
         Handle JSON-RPC requests for an agent by its unique ID.
 
         Args:
+          params: The parameters for the agent RPC request
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -353,6 +355,8 @@ class AsyncAgentsResource(AsyncAPIResource):
         Handle JSON-RPC requests for an agent by its unique ID.
 
         Args:
+          params: The parameters for the agent RPC request
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
