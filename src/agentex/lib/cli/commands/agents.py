@@ -80,6 +80,9 @@ def build(
     repository_name: str | None = typer.Option(
         None, help="Repository name to use for the built image"
     ),
+    platforms: str | None = typer.Option(
+        None, help="Platform to build the image for. Please enter a comma separated list of platforms."
+    ),
     push: bool = typer.Option(False, help="Whether to push the image to the registry"),
     secret: str | None = typer.Option(
         None,
@@ -98,11 +101,14 @@ def build(
     """
     typer.echo(f"Building agent image from manifest: {manifest}")
 
+    platform_list = platforms.split(",") if platforms else []
+
     try:
         image_url = build_agent(
             manifest_path=manifest,
             registry_url=registry,
             repository_name=repository_name,
+            platforms=platform_list,
             push=push,
             secret=secret,
             tag=tag,

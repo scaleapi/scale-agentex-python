@@ -22,6 +22,7 @@ def build_agent(
     manifest_path: str,
     registry_url: str,
     repository_name: str,
+    platforms: list[str],
     push: bool = False,
     secret: str = None,
     tag: str = None,
@@ -73,7 +74,7 @@ def build_agent(
                 "context_path": str(build_context.path),
                 "file": str(build_context.path / build_context.dockerfile_path),
                 "tags": [image_name],
-                "platforms": ["linux/amd64"],
+                "platforms": platforms,
             }
 
             # Add Docker build args if provided
