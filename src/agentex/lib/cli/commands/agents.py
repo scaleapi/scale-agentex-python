@@ -11,6 +11,7 @@ from agentex.lib.cli.handlers.agent_handlers import (
     build_agent,
     run_agent,
 )
+from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows
 from agentex.lib.cli.handlers.deploy_handlers import (
     DeploymentError,
     HelmError,
@@ -72,6 +73,35 @@ def delete(
 
 
 @agents.command()
+def cleanup_workflows(
+    agent_name: str = typer.Argument(..., help="Name of the agent to cleanup workflows for"),
+    force: bool = typer.Option(False, help="Force cleanup using direct Temporal termination (bypasses development check)"),
+):
+    """
+    Clean up all running workflows for an agent.
+    
+    By default, uses graceful cancellation via agent RPC.
+    With --force, directly terminates workflows via Temporal client.
+    This is a convenience command that does the same thing as 'agentex tasks cleanup'.
+    """
+    try:
+        console.print(f"[blue]Cleaning up workflows for agent '{agent_name}'...[/blue]")
+        
+        cleanup_agent_workflows(
+            agent_name=agent_name,
+            force=force,
+            development_only=True
+        )
+        
+        console.print(f"[green]✓ Workflow cleanup completed for agent '{agent_name}'[/green]")
+        
+    except Exception as e:
+        console.print(f"[red]Cleanup failed: {str(e)}[/red]")
+        logger.exception("Agent workflow cleanup failed")
+        raise typer.Exit(1) from e
+
+
+@agents.command()
 def build(
     manifest: str = typer.Option(..., help="Path to the manifest you want to use"),
     registry: str | None = typer.Option(
@@ -101,23 +131,33 @@ def build(
     """
     typer.echo(f"Building agent image from manifest: {manifest}")
 
+    # Validate required parameters for building
+    if push and not registry:
+        typer.echo("Error: --registry is required when --push is enabled", err=True)
+        raise typer.Exit(1)
+    
+    # Only proceed with build if we have a registry (for now, to match existing behavior)
+    if not registry:
+        typer.echo("No registry provided, skipping image build")
+        return
+
     platform_list = platforms.split(",") if platforms else []
 
     try:
         image_url = build_agent(
             manifest_path=manifest,
-            registry_url=registry,
-            repository_name=repository_name,
+            registry_url=registry,  # Now guaranteed to be non-None
+            repository_name=repository_name or "default-repo",  # Provide default
             platforms=platform_list,
             push=push,
-            secret=secret,
-            tag=tag,
-            build_args=build_arg,
+            secret=secret or "",  # Provide default empty string
+            tag=tag or "latest",  # Provide default
+            build_args=build_arg or [],  # Provide default empty list
         )
         if image_url:
             typer.echo(f"Successfully built image: {image_url}")
         else:
-            typer.echo("No registry provided, image was not built")
+            typer.echo("Image build completed but no URL returned")
     except Exception as e:
         typer.echo(f"Error building agent image: {str(e)}", err=True)
         logger.exception("Error building agent image")
@@ -127,11 +167,35 @@ def build(
 @agents.command()
 def run(
     manifest: str = typer.Option(..., help="Path to the manifest you want to use"),
+    cleanup_on_start: bool = typer.Option(
+        False, 
+        help="Clean up existing workflows for this agent before starting"
+    ),
 ):
     """
     Run an agent locally from the given manifest.
     """
     typer.echo(f"Running agent from manifest: {manifest}")
+    
+    # Optionally cleanup existing workflows before starting
+    if cleanup_on_start:
+        try:
+            # Parse manifest to get agent name
+            manifest_obj = AgentManifest.from_yaml(file_path=manifest)
+            agent_name = manifest_obj.agent.name
+            
+            console.print(f"[yellow]Cleaning up existing workflows for agent '{agent_name}'...[/yellow]")
+            cleanup_agent_workflows(
+                agent_name=agent_name,
+                force=False,
+                development_only=True
+            )
+            console.print("[green]✓ Pre-run cleanup completed[/green]")
+            
+        except Exception as e:
+            console.print(f"[yellow]⚠ Pre-run cleanup failed: {str(e)}[/yellow]")
+            logger.warning(f"Pre-run cleanup failed: {e}")
+    
     try:
         run_agent(manifest_path=manifest)
     except Exception as e:

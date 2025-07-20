@@ -6,7 +6,10 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 
-from agentex.lib.sdk.config.agent_config import AgentConfig
+from agentex.lib.cli.handlers.cleanup_handlers import (
+    cleanup_agent_workflows,
+    should_cleanup_on_restart
+)
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.utils.logging import make_logger
 
@@ -96,6 +99,20 @@ async def start_temporal_worker_with_reload(
         async def start_worker() -> asyncio.subprocess.Process:
             nonlocal current_process, output_task
             
+            # PRE-RESTART CLEANUP - NEW!
+            if current_process is not None:
+                # Extract agent name from worker path for cleanup
+                agent_name = worker_path.parent.parent.name
+                
+                # Perform cleanup if configured
+                if should_cleanup_on_restart():
+                    console.print("[yellow]Cleaning up workflows before worker restart...[/yellow]")
+                    try:
+                        cleanup_agent_workflows(agent_name)
+                    except Exception as e:
+                        logger.warning(f"Cleanup failed: {e}")
+                        console.print(f"[yellow]⚠ Cleanup failed: {str(e)}[/yellow]")
+            
             # Clean up previous process
             if current_process and current_process.returncode is None:
                 current_process.terminate()
@@ -134,7 +151,7 @@ async def start_temporal_worker_with_reload(
                     console.print(f"[yellow]File changes detected: {changed_files}[/yellow]")
                     console.print("[yellow]Restarting Temporal worker...[/yellow]")
                     
-                    # Restart worker
+                    # Restart worker (with cleanup handled in start_worker)
                     await start_worker()
                     if current_process:
                         output_task = asyncio.create_task(stream_process_output(current_process, "WORKER"))
@@ -397,7 +414,7 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
     # Start with current environment
     env = dict(os.environ)
 
-    agent_config: AgentConfig = manifest.agent
+    agent_config = manifest.agent
 
     # TODO: Combine this logic with the deploy_handlers so that we can reuse the env vars
     env_vars = {
