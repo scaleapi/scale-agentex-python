@@ -70,7 +70,6 @@ class At010AgentChatWorkflow(BaseWorkflow):
             
         if not params.event.content:
             return
-
         if params.event.content.type != "text":
             raise ValueError(f"Expected text message, got {params.event.content.type}")
 

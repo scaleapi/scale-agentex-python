@@ -129,8 +129,32 @@ def build_agent(
 def run_agent(manifest_path: str):
     """Run an agent locally from the given manifest"""
     import asyncio
+    import signal
+    import sys
 
+    # Flag to track if we're shutting down
+    shutting_down = False
+
+    def signal_handler(signum, frame):
+        """Handle signals by raising KeyboardInterrupt"""
+        nonlocal shutting_down
+        if shutting_down:
+            # If we're already shutting down and get another signal, force exit
+            print(f"\nForce exit on signal {signum}")
+            sys.exit(1)
+        
+        shutting_down = True
+        print(f"\nReceived signal {signum}, shutting down...")
+        raise KeyboardInterrupt()
+    
+    # Set up signal handling for the main thread
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     try:
         asyncio.run(_run_agent(manifest_path))
+    except KeyboardInterrupt:
+        print("Shutdown completed.")
+        sys.exit(0)
     except RunError as e:
         raise RuntimeError(str(e)) from e
