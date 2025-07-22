@@ -7,37 +7,27 @@ from typing_extensions import Literal
 
 import httpx
 
-from .name import (
-    NameResource,
-    AsyncNameResource,
-    NameResourceWithRawResponse,
-    AsyncNameResourceWithRawResponse,
-    NameResourceWithStreamingResponse,
-    AsyncNameResourceWithStreamingResponse,
-)
-from ...types import agent_rpc_params, agent_list_params
-from ..._types import NOT_GIVEN, Body, Query, Headers, NotGiven
-from ..._utils import maybe_transform, async_maybe_transform
-from ..._compat import cached_property
-from ..._resource import SyncAPIResource, AsyncAPIResource
-from ..._response import (
+from ..types import AgentRpcParams, agent_rpc_params, agent_list_params, agent_rpc_by_name_params
+from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
+from .._utils import maybe_transform, async_maybe_transform
+from .._compat import cached_property
+from .._resource import SyncAPIResource, AsyncAPIResource
+from .._response import (
     to_raw_response_wrapper,
     to_streamed_response_wrapper,
     async_to_raw_response_wrapper,
     async_to_streamed_response_wrapper,
 )
-from ...types.agent import Agent
-from ..._base_client import make_request_options
-from ...types.agent_list_response import AgentListResponse
+from ..types.agent import Agent
+from .._base_client import make_request_options
+from ..types.agent_rpc_params import AgentRpcParams
+from ..types.agent_rpc_response import AgentRpcResponse
+from ..types.agent_list_response import AgentListResponse
 
 __all__ = ["AgentsResource", "AsyncAgentsResource"]
 
 
 class AgentsResource(SyncAPIResource):
-    @cached_property
-    def name(self) -> NameResource:
-        return NameResource(self._client)
-
     @cached_property
     def with_raw_response(self) -> AgentsResourceWithRawResponse:
         """
@@ -160,12 +150,78 @@ class AgentsResource(SyncAPIResource):
             cast_to=Agent,
         )
 
+    def delete_by_name(
+        self,
+        agent_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Agent:
+        """
+        Delete an agent by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_name:
+            raise ValueError(f"Expected a non-empty value for `agent_name` but received {agent_name!r}")
+        return self._delete(
+            f"/agents/name/{agent_name}",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Agent,
+        )
+
+    def retrieve_by_name(
+        self,
+        agent_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Agent:
+        """
+        Get an agent by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_name:
+            raise ValueError(f"Expected a non-empty value for `agent_name` but received {agent_name!r}")
+        return self._get(
+            f"/agents/name/{agent_name}",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Agent,
+        )
+
     def rpc(
         self,
         agent_id: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: agent_rpc_params.Params,
+        params: AgentRpcParams,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -174,11 +230,13 @@ class AgentsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> object:
+    ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
 
         Args:
+          params: The parameters for the agent RPC request
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -203,15 +261,59 @@ class AgentsResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=object,
+            cast_to=AgentRpcResponse,
+        )
+
+    def rpc_by_name(
+        self,
+        agent_name: str,
+        *,
+        method: Literal["event/send", "task/create", "message/send", "task/cancel"],
+        params: AgentRpcParams,
+        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> AgentRpcResponse:
+        """
+        Handle JSON-RPC requests for an agent by its unique name.
+
+        Args:
+          params: The parameters for the agent RPC request
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_name:
+            raise ValueError(f"Expected a non-empty value for `agent_name` but received {agent_name!r}")
+        return self._post(
+            f"/agents/name/{agent_name}/rpc",
+            body=maybe_transform(
+                {
+                    "method": method,
+                    "params": params,
+                    "id": id,
+                    "jsonrpc": jsonrpc,
+                },
+                agent_rpc_by_name_params.AgentRpcByNameParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=AgentRpcResponse,
         )
 
 
 class AsyncAgentsResource(AsyncAPIResource):
-    @cached_property
-    def name(self) -> AsyncNameResource:
-        return AsyncNameResource(self._client)
-
     @cached_property
     def with_raw_response(self) -> AsyncAgentsResourceWithRawResponse:
         """
@@ -334,12 +436,78 @@ class AsyncAgentsResource(AsyncAPIResource):
             cast_to=Agent,
         )
 
+    async def delete_by_name(
+        self,
+        agent_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Agent:
+        """
+        Delete an agent by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_name:
+            raise ValueError(f"Expected a non-empty value for `agent_name` but received {agent_name!r}")
+        return await self._delete(
+            f"/agents/name/{agent_name}",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Agent,
+        )
+
+    async def retrieve_by_name(
+        self,
+        agent_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Agent:
+        """
+        Get an agent by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_name:
+            raise ValueError(f"Expected a non-empty value for `agent_name` but received {agent_name!r}")
+        return await self._get(
+            f"/agents/name/{agent_name}",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Agent,
+        )
+
     async def rpc(
         self,
         agent_id: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: agent_rpc_params.Params,
+        params: AgentRpcParams,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -348,11 +516,13 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> object:
+    ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
 
         Args:
+          params: The parameters for the agent RPC request
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -377,7 +547,55 @@ class AsyncAgentsResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=object,
+            cast_to=AgentRpcResponse,
+        )
+
+    async def rpc_by_name(
+        self,
+        agent_name: str,
+        *,
+        method: Literal["event/send", "task/create", "message/send", "task/cancel"],
+        params: AgentRpcParams,
+        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> AgentRpcResponse:
+        """
+        Handle JSON-RPC requests for an agent by its unique name.
+
+        Args:
+          params: The parameters for the agent RPC request
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_name:
+            raise ValueError(f"Expected a non-empty value for `agent_name` but received {agent_name!r}")
+        return await self._post(
+            f"/agents/name/{agent_name}/rpc",
+            body=await async_maybe_transform(
+                {
+                    "method": method,
+                    "params": params,
+                    "id": id,
+                    "jsonrpc": jsonrpc,
+                },
+                agent_rpc_by_name_params.AgentRpcByNameParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=AgentRpcResponse,
         )
 
 
@@ -394,13 +612,18 @@ class AgentsResourceWithRawResponse:
         self.delete = to_raw_response_wrapper(
             agents.delete,
         )
+        self.delete_by_name = to_raw_response_wrapper(
+            agents.delete_by_name,
+        )
+        self.retrieve_by_name = to_raw_response_wrapper(
+            agents.retrieve_by_name,
+        )
         self.rpc = to_raw_response_wrapper(
             agents.rpc,
         )
-
-    @cached_property
-    def name(self) -> NameResourceWithRawResponse:
-        return NameResourceWithRawResponse(self._agents.name)
+        self.rpc_by_name = to_raw_response_wrapper(
+            agents.rpc_by_name,
+        )
 
 
 class AsyncAgentsResourceWithRawResponse:
@@ -416,13 +639,18 @@ class AsyncAgentsResourceWithRawResponse:
         self.delete = async_to_raw_response_wrapper(
             agents.delete,
         )
+        self.delete_by_name = async_to_raw_response_wrapper(
+            agents.delete_by_name,
+        )
+        self.retrieve_by_name = async_to_raw_response_wrapper(
+            agents.retrieve_by_name,
+        )
         self.rpc = async_to_raw_response_wrapper(
             agents.rpc,
         )
-
-    @cached_property
-    def name(self) -> AsyncNameResourceWithRawResponse:
-        return AsyncNameResourceWithRawResponse(self._agents.name)
+        self.rpc_by_name = async_to_raw_response_wrapper(
+            agents.rpc_by_name,
+        )
 
 
 class AgentsResourceWithStreamingResponse:
@@ -438,13 +666,18 @@ class AgentsResourceWithStreamingResponse:
         self.delete = to_streamed_response_wrapper(
             agents.delete,
         )
+        self.delete_by_name = to_streamed_response_wrapper(
+            agents.delete_by_name,
+        )
+        self.retrieve_by_name = to_streamed_response_wrapper(
+            agents.retrieve_by_name,
+        )
         self.rpc = to_streamed_response_wrapper(
             agents.rpc,
         )
-
-    @cached_property
-    def name(self) -> NameResourceWithStreamingResponse:
-        return NameResourceWithStreamingResponse(self._agents.name)
+        self.rpc_by_name = to_streamed_response_wrapper(
+            agents.rpc_by_name,
+        )
 
 
 class AsyncAgentsResourceWithStreamingResponse:
@@ -460,10 +693,15 @@ class AsyncAgentsResourceWithStreamingResponse:
         self.delete = async_to_streamed_response_wrapper(
             agents.delete,
         )
+        self.delete_by_name = async_to_streamed_response_wrapper(
+            agents.delete_by_name,
+        )
+        self.retrieve_by_name = async_to_streamed_response_wrapper(
+            agents.retrieve_by_name,
+        )
         self.rpc = async_to_streamed_response_wrapper(
             agents.rpc,
         )
-
-    @cached_property
-    def name(self) -> AsyncNameResourceWithStreamingResponse:
-        return AsyncNameResourceWithStreamingResponse(self._agents.name)
+        self.rpc_by_name = async_to_streamed_response_wrapper(
+            agents.rpc_by_name,
+        )

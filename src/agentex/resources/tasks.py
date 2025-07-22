@@ -4,36 +4,24 @@ from __future__ import annotations
 
 import httpx
 
-from .name import (
-    NameResource,
-    AsyncNameResource,
-    NameResourceWithRawResponse,
-    AsyncNameResourceWithRawResponse,
-    NameResourceWithStreamingResponse,
-    AsyncNameResourceWithStreamingResponse,
-)
-from ..._types import NOT_GIVEN, Body, Query, Headers, NotGiven
-from ..._compat import cached_property
-from ..._resource import SyncAPIResource, AsyncAPIResource
-from ..._response import (
+from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
+from .._compat import cached_property
+from .._resource import SyncAPIResource, AsyncAPIResource
+from .._response import (
     to_raw_response_wrapper,
     to_streamed_response_wrapper,
     async_to_raw_response_wrapper,
     async_to_streamed_response_wrapper,
 )
-from ..._streaming import Stream, AsyncStream
-from ...types.task import Task
-from ..._base_client import make_request_options
-from ...types.task_list_response import TaskListResponse
+from .._streaming import Stream, AsyncStream
+from ..types.task import Task
+from .._base_client import make_request_options
+from ..types.task_list_response import TaskListResponse
 
 __all__ = ["TasksResource", "AsyncTasksResource"]
 
 
 class TasksResource(SyncAPIResource):
-    @cached_property
-    def name(self) -> NameResource:
-        return NameResource(self._client)
-
     @cached_property
     def with_raw_response(self) -> TasksResourceWithRawResponse:
         """
@@ -138,6 +126,72 @@ class TasksResource(SyncAPIResource):
             cast_to=Task,
         )
 
+    def delete_by_name(
+        self,
+        task_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Task:
+        """
+        Delete a task by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not task_name:
+            raise ValueError(f"Expected a non-empty value for `task_name` but received {task_name!r}")
+        return self._delete(
+            f"/tasks/name/{task_name}",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Task,
+        )
+
+    def retrieve_by_name(
+        self,
+        task_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Task:
+        """
+        Get a task by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not task_name:
+            raise ValueError(f"Expected a non-empty value for `task_name` but received {task_name!r}")
+        return self._get(
+            f"/tasks/name/{task_name}",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Task,
+        )
+
     def stream_events(
         self,
         task_id: str,
@@ -173,12 +227,43 @@ class TasksResource(SyncAPIResource):
             stream_cls=Stream[object],
         )
 
+    def stream_events_by_name(
+        self,
+        task_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Stream[object]:
+        """
+        Stream events for a task by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not task_name:
+            raise ValueError(f"Expected a non-empty value for `task_name` but received {task_name!r}")
+        return self._get(
+            f"/tasks/name/{task_name}/stream",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=object,
+            stream=True,
+            stream_cls=Stream[object],
+        )
+
 
 class AsyncTasksResource(AsyncAPIResource):
-    @cached_property
-    def name(self) -> AsyncNameResource:
-        return AsyncNameResource(self._client)
-
     @cached_property
     def with_raw_response(self) -> AsyncTasksResourceWithRawResponse:
         """
@@ -283,6 +368,72 @@ class AsyncTasksResource(AsyncAPIResource):
             cast_to=Task,
         )
 
+    async def delete_by_name(
+        self,
+        task_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Task:
+        """
+        Delete a task by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not task_name:
+            raise ValueError(f"Expected a non-empty value for `task_name` but received {task_name!r}")
+        return await self._delete(
+            f"/tasks/name/{task_name}",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Task,
+        )
+
+    async def retrieve_by_name(
+        self,
+        task_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Task:
+        """
+        Get a task by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not task_name:
+            raise ValueError(f"Expected a non-empty value for `task_name` but received {task_name!r}")
+        return await self._get(
+            f"/tasks/name/{task_name}",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Task,
+        )
+
     async def stream_events(
         self,
         task_id: str,
@@ -318,6 +469,41 @@ class AsyncTasksResource(AsyncAPIResource):
             stream_cls=AsyncStream[object],
         )
 
+    async def stream_events_by_name(
+        self,
+        task_name: str,
+        *,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> AsyncStream[object]:
+        """
+        Stream events for a task by its unique name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not task_name:
+            raise ValueError(f"Expected a non-empty value for `task_name` but received {task_name!r}")
+        return await self._get(
+            f"/tasks/name/{task_name}/stream",
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=object,
+            stream=True,
+            stream_cls=AsyncStream[object],
+        )
+
 
 class TasksResourceWithRawResponse:
     def __init__(self, tasks: TasksResource) -> None:
@@ -332,13 +518,18 @@ class TasksResourceWithRawResponse:
         self.delete = to_raw_response_wrapper(
             tasks.delete,
         )
+        self.delete_by_name = to_raw_response_wrapper(
+            tasks.delete_by_name,
+        )
+        self.retrieve_by_name = to_raw_response_wrapper(
+            tasks.retrieve_by_name,
+        )
         self.stream_events = to_raw_response_wrapper(
             tasks.stream_events,
         )
-
-    @cached_property
-    def name(self) -> NameResourceWithRawResponse:
-        return NameResourceWithRawResponse(self._tasks.name)
+        self.stream_events_by_name = to_raw_response_wrapper(
+            tasks.stream_events_by_name,
+        )
 
 
 class AsyncTasksResourceWithRawResponse:
@@ -354,13 +545,18 @@ class AsyncTasksResourceWithRawResponse:
         self.delete = async_to_raw_response_wrapper(
             tasks.delete,
         )
+        self.delete_by_name = async_to_raw_response_wrapper(
+            tasks.delete_by_name,
+        )
+        self.retrieve_by_name = async_to_raw_response_wrapper(
+            tasks.retrieve_by_name,
+        )
         self.stream_events = async_to_raw_response_wrapper(
             tasks.stream_events,
         )
-
-    @cached_property
-    def name(self) -> AsyncNameResourceWithRawResponse:
-        return AsyncNameResourceWithRawResponse(self._tasks.name)
+        self.stream_events_by_name = async_to_raw_response_wrapper(
+            tasks.stream_events_by_name,
+        )
 
 
 class TasksResourceWithStreamingResponse:
@@ -376,13 +572,18 @@ class TasksResourceWithStreamingResponse:
         self.delete = to_streamed_response_wrapper(
             tasks.delete,
         )
+        self.delete_by_name = to_streamed_response_wrapper(
+            tasks.delete_by_name,
+        )
+        self.retrieve_by_name = to_streamed_response_wrapper(
+            tasks.retrieve_by_name,
+        )
         self.stream_events = to_streamed_response_wrapper(
             tasks.stream_events,
         )
-
-    @cached_property
-    def name(self) -> NameResourceWithStreamingResponse:
-        return NameResourceWithStreamingResponse(self._tasks.name)
+        self.stream_events_by_name = to_streamed_response_wrapper(
+            tasks.stream_events_by_name,
+        )
 
 
 class AsyncTasksResourceWithStreamingResponse:
@@ -398,10 +599,15 @@ class AsyncTasksResourceWithStreamingResponse:
         self.delete = async_to_streamed_response_wrapper(
             tasks.delete,
         )
+        self.delete_by_name = async_to_streamed_response_wrapper(
+            tasks.delete_by_name,
+        )
+        self.retrieve_by_name = async_to_streamed_response_wrapper(
+            tasks.retrieve_by_name,
+        )
         self.stream_events = async_to_streamed_response_wrapper(
             tasks.stream_events,
         )
-
-    @cached_property
-    def name(self) -> AsyncNameResourceWithStreamingResponse:
-        return AsyncNameResourceWithStreamingResponse(self._tasks.name)
+        self.stream_events_by_name = async_to_streamed_response_wrapper(
+            tasks.stream_events_by_name,
+        )

@@ -1,13 +1,5 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from .echo import (
-    EchoResource,
-    AsyncEchoResource,
-    EchoResourceWithRawResponse,
-    AsyncEchoResourceWithRawResponse,
-    EchoResourceWithStreamingResponse,
-    AsyncEchoResourceWithStreamingResponse,
-)
 from .spans import (
     SpansResource,
     AsyncSpansResource,
@@ -66,12 +58,6 @@ from .messages import (
 )
 
 __all__ = [
-    "EchoResource",
-    "AsyncEchoResource",
-    "EchoResourceWithRawResponse",
-    "AsyncEchoResourceWithRawResponse",
-    "EchoResourceWithStreamingResponse",
-    "AsyncEchoResourceWithStreamingResponse",
     "AgentsResource",
     "AsyncAgentsResource",
     "AgentsResourceWithRawResponse",

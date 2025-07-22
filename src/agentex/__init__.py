@@ -5,7 +5,18 @@ import typing as _t
 from . import types
 from ._types import NOT_GIVEN, Omit, NoneType, NotGiven, Transport, ProxiesTypes
 from ._utils import file_from_path
-from ._client import Client, Stream, Agentex, Timeout, Transport, AsyncClient, AsyncStream, AsyncAgentex, RequestOptions
+from ._client import (
+    ENVIRONMENTS,
+    Client,
+    Stream,
+    Agentex,
+    Timeout,
+    Transport,
+    AsyncClient,
+    AsyncStream,
+    AsyncAgentex,
+    RequestOptions,
+)
 from ._models import BaseModel
 from ._version import __title__, __version__
 from ._response import APIResponse as APIResponse, AsyncAPIResponse as AsyncAPIResponse
@@ -61,6 +72,7 @@ __all__ = [
     "AsyncStream",
     "Agentex",
     "AsyncAgentex",
+    "ENVIRONMENTS",
     "file_from_path",
     "BaseModel",
     "DEFAULT_TIMEOUT",
