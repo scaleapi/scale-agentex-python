@@ -8,13 +8,22 @@ from agentex.types import AcpType, Agent, AgentRpcRequest, AgentListResponse
 
 Methods:
 
-- <code title="get /agents/{agent_id}">client.agents.<a href="./src/agentex/resources/agents.py">retrieve</a>(agent_id) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
-- <code title="get /agents">client.agents.<a href="./src/agentex/resources/agents.py">list</a>(\*\*<a href="src/agentex/types/agent_list_params.py">params</a>) -> <a href="./src/agentex/types/agent_list_response.py">AgentListResponse</a></code>
-- <code title="delete /agents/{agent_id}">client.agents.<a href="./src/agentex/resources/agents.py">delete</a>(agent_id) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
-- <code title="delete /agents/name/{agent_name}">client.agents.<a href="./src/agentex/resources/agents.py">delete_by_name</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
-- <code title="get /agents/name/{agent_name}">client.agents.<a href="./src/agentex/resources/agents.py">retrieve_by_name</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
-- <code title="post /agents/{agent_id}/rpc">client.agents.<a href="./src/agentex/resources/agents.py">rpc</a>(agent_id, \*\*<a href="src/agentex/types/agent_rpc_params.py">params</a>) -> object</code>
-- <code title="post /agents/name/{agent_name}/rpc">client.agents.<a href="./src/agentex/resources/agents.py">rpc_by_name</a>(agent_name, \*\*<a href="src/agentex/types/agent_rpc_by_name_params.py">params</a>) -> object</code>
+- <code title="get /agents/{agent_id}">client.agents.<a href="./src/agentex/resources/agents/agents.py">retrieve</a>(agent_id) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="get /agents">client.agents.<a href="./src/agentex/resources/agents/agents.py">list</a>(\*\*<a href="src/agentex/types/agent_list_params.py">params</a>) -> <a href="./src/agentex/types/agent_list_response.py">AgentListResponse</a></code>
+- <code title="delete /agents/{agent_id}">client.agents.<a href="./src/agentex/resources/agents/agents.py">delete</a>(agent_id) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="delete /agents/name/{agent_name}">client.agents.<a href="./src/agentex/resources/agents/agents.py">delete_by_name</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="get /agents/name/{agent_name}">client.agents.<a href="./src/agentex/resources/agents/agents.py">retrieve_by_name</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="post /agents/{agent_id}/rpc">client.agents.<a href="./src/agentex/resources/agents/agents.py">rpc</a>(agent_id, \*\*<a href="src/agentex/types/agent_rpc_params.py">params</a>) -> object</code>
+- <code title="post /agents/name/{agent_name}/rpc">client.agents.<a href="./src/agentex/resources/agents/agents.py">rpc_by_name</a>(agent_name, \*\*<a href="src/agentex/types/agent_rpc_by_name_params.py">params</a>) -> object</code>
+
+## Name
+
+Methods:
+
+- <code title="get /agents/name/{agent_name}">client.agents.name.<a href="./src/agentex/resources/agents/name.py">retrieve</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="delete /agents/name/{agent_name}">client.agents.name.<a href="./src/agentex/resources/agents/name.py">delete</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="post /agents/name/{agent_name}/rpc">client.agents.name.<a href="./src/agentex/resources/agents/name.py">handle_rpc</a>(agent_name, \*\*<a href="src/agentex/types/agents/name_handle_rpc_params.py">params</a>) -> object</code>
+- <code title="post /agents/name/{agent_name}/rpc">client.agents.name.<a href="./src/agentex/resources/agents/name.py">rpc</a>(agent_name, \*\*<a href="src/agentex/types/agents/name_rpc_params.py">params</a>) -> object</code>
 
 # Tasks
 
@@ -26,13 +35,21 @@ from agentex.types import Task, TaskListResponse
 
 Methods:
 
-- <code title="get /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
-- <code title="get /tasks">client.tasks.<a href="./src/agentex/resources/tasks.py">list</a>() -> <a href="./src/agentex/types/task_list_response.py">TaskListResponse</a></code>
-- <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
-- <code title="delete /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete_by_name</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
-- <code title="get /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve_by_name</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
-- <code title="get /tasks/{task_id}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events</a>(task_id) -> object</code>
-- <code title="get /tasks/name/{task_name}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events_by_name</a>(task_name) -> object</code>
+- <code title="get /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks/tasks.py">retrieve</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="get /tasks">client.tasks.<a href="./src/agentex/resources/tasks/tasks.py">list</a>() -> <a href="./src/agentex/types/task_list_response.py">TaskListResponse</a></code>
+- <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="delete /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks/tasks.py">delete_by_name</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="get /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks/tasks.py">retrieve_by_name</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="get /tasks/{task_id}/stream">client.tasks.<a href="./src/agentex/resources/tasks/tasks.py">stream_events</a>(task_id) -> object</code>
+- <code title="get /tasks/name/{task_name}/stream">client.tasks.<a href="./src/agentex/resources/tasks/tasks.py">stream_events_by_name</a>(task_name) -> object</code>
+
+## Name
+
+Methods:
+
+- <code title="get /tasks/name/{task_name}">client.tasks.name.<a href="./src/agentex/resources/tasks/name.py">retrieve</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="delete /tasks/name/{task_name}">client.tasks.name.<a href="./src/agentex/resources/tasks/name.py">delete</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="get /tasks/name/{task_name}/stream">client.tasks.name.<a href="./src/agentex/resources/tasks/name.py">stream_events</a>(task_name) -> object</code>
 
 # Messages
 
