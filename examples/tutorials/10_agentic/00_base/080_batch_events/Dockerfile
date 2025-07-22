@@ -28,10 +28,7 @@ COPY 10_agentic/00_base/080_batch_events/requirements.txt /app/10_agentic/00_bas
 WORKDIR /app/10_agentic/00_base/080_batch_events
 
 # Install the required Python packages
-RUN --mount=type=secret,id=codeartifact-pip-conf,target=/etc/pip.conf \
-    export UV_INDEX_URL=$(grep -E "^index-url" /etc/pip.conf | cut -d'=' -f2- | xargs) && \
-    export UV_EXTRA_INDEX_URL=$(grep -E "^extra-index-url" /etc/pip.conf | cut -d'=' -f2- | xargs || echo "") && \
-    uv pip install --system -r requirements.txt
+RUN uv pip install --system -r requirements.txt
 
 # Copy the project code
 COPY 10_agentic/00_base/080_batch_events/project /app/10_agentic/00_base/080_batch_events/project

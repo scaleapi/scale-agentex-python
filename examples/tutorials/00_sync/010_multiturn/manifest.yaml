@@ -19,7 +19,6 @@ build:
 
     # Paths to include in the Docker build context
     # Must include:
-    # - agentex-py: The core framework (needed for agent execution)
     # - Your agent's directory (your custom agent code)
     # These paths are collected and sent to the Docker daemon for building
     include_paths:

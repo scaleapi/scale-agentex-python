@@ -19,11 +19,9 @@ build:
 
     # Paths to include in the Docker build context
     # Must include:
-    # - agentex-py: The core framework (needed for agent execution)
     # - Your agent's directory (your custom agent code)
     # These paths are collected and sent to the Docker daemon for building
     include_paths:
-      - agentex-py
       - 10_agentic/00_base/080_batch_events
 
     # Path to your agent's Dockerfile

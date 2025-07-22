@@ -93,7 +93,6 @@ uv run agentex agents run --manifest manifest.yaml
 **Benefits of uv:**
 - Faster dependency resolution and installation
 - Better dependency isolation
-- Integrated CodeArtifact support
 - Modern Python packaging standards
 
 {% else %}
@@ -183,14 +182,9 @@ agentex tasks submit --agent {{ agent_name }} --task "Your task here"
 
 ### To build the agent Docker image locally (normally not necessary):
 
-1. First, set up CodeArtifact authentication:
+1. Build the agent image:
 ```bash
-../../setup-build-codeartifact.sh
-```
-
-2. Build the agent image:
-```bash
-agentex agents build --manifest manifest.yaml --secret 'id=codeartifact-pip-conf,src=.codeartifact-pip-conf'
+agentex agents build --manifest manifest.yaml
 ```
 {% if use_uv %}
 ```bash
@@ -287,7 +281,6 @@ pip install -r requirements.txt
 3. **Dependency issues**
 {% if use_uv %}
    - Run `agentex uv sync` to ensure all dependencies are installed
-   - Check if CodeArtifact authentication is working
 {% else %}
    - Run `pip install -r requirements.txt`
    - Check if all dependencies are correctly listed in requirements.txt

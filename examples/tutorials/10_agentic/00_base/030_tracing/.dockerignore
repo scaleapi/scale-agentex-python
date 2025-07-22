@@ -41,6 +41,3 @@ venv.bak/
 
 # Misc
 .DS_Store 
-
-# CodeArtifact configuration
-.codeartifact-pip-conf
