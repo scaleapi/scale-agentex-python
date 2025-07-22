@@ -19,6 +19,7 @@ dependencies = [
     "rich>=13.9.2,<14",
     "fastapi>=0.115.0,<0.116",
     "uvicorn>=0.31.1",
+    "watchfiles>=0.24.0,<1.0",
     "python-on-whales>=0.73.0,<0.74",
     "pyyaml>=6.0.2,<7",
     "jsonschema>=4.23.0,<5",
