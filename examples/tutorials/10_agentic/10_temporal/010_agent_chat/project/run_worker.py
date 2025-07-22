@@ -22,7 +22,7 @@ async def main():
     worker = AgentexWorker(
         task_queue=task_queue_name,
     )
-
+    
     await worker.run(
         activities=get_all_activities(),
         workflow=At010AgentChatWorkflow,
