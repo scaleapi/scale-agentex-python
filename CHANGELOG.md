@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.5 (2025-07-22)
+
+Full Changelog: [v0.1.0-alpha.4...v0.1.0-alpha.5](https://github.com/scaleapi/agentex-python/compare/v0.1.0-alpha.4...v0.1.0-alpha.5)
+
+### Bug Fixes
+
+* **parsing:** parse extra field types ([d40e6e0](https://github.com/scaleapi/agentex-python/commit/d40e6e0d6911be0bc9bfc419e02bd7c1d5ad5be4))
+
 ## 0.1.0-alpha.4 (2025-07-22)
 
 Full Changelog: [v0.1.0-alpha.3...v0.1.0-alpha.4](https://github.com/scaleapi/agentex-python/compare/v0.1.0-alpha.3...v0.1.0-alpha.4)
