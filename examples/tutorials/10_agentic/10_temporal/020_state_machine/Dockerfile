@@ -34,10 +34,7 @@ COPY 10_agentic/10_temporal/020_state_machine/requirements.txt /app/10_agentic/1
 WORKDIR /app/10_agentic/10_temporal/020_state_machine
 
 # Install the required Python packages
-RUN --mount=type=secret,id=codeartifact-pip-conf,target=/etc/pip.conf \
-    export UV_INDEX_URL=$(grep -E "^index-url" /etc/pip.conf | cut -d'=' -f2- | xargs) && \
-    export UV_EXTRA_INDEX_URL=$(grep -E "^extra-index-url" /etc/pip.conf | cut -d'=' -f2- | xargs || echo "") && \
-    uv pip install --system -r requirements.txt
+RUN uv pip install --system -r requirements.txt
 
 # Copy the project code
 COPY 10_agentic/10_temporal/020_state_machine/project /app/10_agentic/10_temporal/020_state_machine/project

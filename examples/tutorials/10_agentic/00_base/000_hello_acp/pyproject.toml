@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ab000-hello-acp"
+version = "0.1.0"
+description = "An AgentEx agent that is not intelligent. It just shows how to implement the base agentic ACP type."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "agentex-sdk",
+    "scale-gp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+    "flake8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["project"]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88 

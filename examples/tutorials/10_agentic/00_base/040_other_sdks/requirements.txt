@@ -1,4 +1,0 @@
-agentex-py>=0.0.4,<0.1.0
-
-# Scale GenAI Platform Python SDK
-scale-gp

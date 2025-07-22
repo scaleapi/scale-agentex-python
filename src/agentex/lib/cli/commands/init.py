@@ -89,19 +89,6 @@ def get_project_context(answers: dict, project_path: Path, manifest_root: Path) 
     # Now, this is actually the exact same as the project_name because we changed the build root to be ../
     project_path_from_build_root = project_name
 
-    # Calculate the agentex-sdk path relative to the project
-    agentex_py_path = Path(__file__).parent.parent.parent.parent.resolve()
-    try:
-        agentex_py_path_relative = agentex_py_path.relative_to(project_path.resolve())
-        agentex_py_path_str = str(agentex_py_path_relative)
-    except ValueError:
-        # If agentex-sdk is not under the project path, use absolute path
-        agentex_py_path_str = str(agentex_py_path)
-        logger.warning(
-            f"agentex-sdk path {agentex_py_path} is not under project path {project_path}. "
-            f"Using absolute path for editable install."
-        )
-
     return {
         **answers,
         "project_name": project_name,
@@ -112,7 +99,6 @@ def get_project_context(answers: dict, project_path: Path, manifest_root: Path) 
         "workflow_name": answers["agent_name"],
         "queue_name": project_name + "_queue",
         "project_path_from_build_root": project_path_from_build_root,
-        "agentex_py_path": agentex_py_path_str,
     }
 
 

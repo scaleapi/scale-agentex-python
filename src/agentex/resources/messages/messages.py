@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Optional
-from typing_extensions import Literal
 
 import httpx
 
@@ -15,7 +14,7 @@ from .batch import (
     BatchResourceWithStreamingResponse,
     AsyncBatchResourceWithStreamingResponse,
 )
-from ...types import message_list_params, message_create_params, message_update_params
+from ...types import StreamingStatus, message_list_params, message_create_params, message_update_params
 from ..._types import NOT_GIVEN, Body, Query, Headers, NotGiven
 from ..._utils import maybe_transform, async_maybe_transform
 from ..._compat import cached_property
@@ -28,8 +27,8 @@ from ..._response import (
 )
 from ..._base_client import make_request_options
 from ...types.task_message import TaskMessage
+from ...types.streaming_status import StreamingStatus
 from ...types.message_list_response import MessageListResponse
-from ...types.task_message_content_param import TaskMessageContentParam
 
 __all__ = ["MessagesResource", "AsyncMessagesResource"]
 
@@ -61,9 +60,9 @@ class MessagesResource(SyncAPIResource):
     def create(
         self,
         *,
-        content: TaskMessageContentParam,
+        content: message_create_params.Content,
         task_id: str,
-        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | NotGiven = NOT_GIVEN,
+        streaming_status: Optional[StreamingStatus] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -136,9 +135,9 @@ class MessagesResource(SyncAPIResource):
         self,
         message_id: str,
         *,
-        content: TaskMessageContentParam,
+        content: message_update_params.Content,
         task_id: str,
-        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | NotGiven = NOT_GIVEN,
+        streaming_status: Optional[StreamingStatus] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -246,9 +245,9 @@ class AsyncMessagesResource(AsyncAPIResource):
     async def create(
         self,
         *,
-        content: TaskMessageContentParam,
+        content: message_create_params.Content,
         task_id: str,
-        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | NotGiven = NOT_GIVEN,
+        streaming_status: Optional[StreamingStatus] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -321,9 +320,9 @@ class AsyncMessagesResource(AsyncAPIResource):
         self,
         message_id: str,
         *,
-        content: TaskMessageContentParam,
+        content: message_update_params.Content,
         task_id: str,
-        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | NotGiven = NOT_GIVEN,
+        streaming_status: Optional[StreamingStatus] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,

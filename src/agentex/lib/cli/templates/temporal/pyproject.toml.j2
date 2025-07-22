@@ -22,11 +22,6 @@ dev = [
     "flake8",
 ]
 
-[dependency-groups]
-editable-apy = [
-    "agentex-sdk @ file://{{ agentex_py_path }}",
-]
-
 [tool.hatch.build.targets.wheel]
 packages = ["project"]
 
@@ -37,6 +32,3 @@ target-version = ['py312']
 [tool.isort]
 profile = "black"
 line_length = 88
-
-[[tool.uv.index]]
-url = "https://scale-307185671274.d.codeartifact.us-west-2.amazonaws.com/pypi/scale-pypi/simple/" 
