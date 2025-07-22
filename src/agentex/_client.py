@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Union, Mapping
-from typing_extensions import Self, override
+from typing import Any, Dict, Union, Mapping, cast
+from typing_extensions import Self, Literal, override
 
 import httpx
 
@@ -12,10 +12,7 @@ from . import _exceptions
 from ._qs import Querystring
 from ._types import (
     NOT_GIVEN,
-    Body,
     Omit,
-    Query,
-    Headers,
     Timeout,
     NotGiven,
     Transport,
@@ -24,30 +21,35 @@ from ._types import (
 )
 from ._utils import is_given, get_async_library
 from ._version import __version__
-from ._response import (
-    to_raw_response_wrapper,
-    to_streamed_response_wrapper,
-    async_to_raw_response_wrapper,
-    async_to_streamed_response_wrapper,
-)
-from .resources import echo, spans, events, states, tracker
+from .resources import spans, tasks, agents, events, states, tracker
 from ._streaming import Stream as Stream, AsyncStream as AsyncStream
 from ._exceptions import APIStatusError
 from ._base_client import (
     DEFAULT_MAX_RETRIES,
     SyncAPIClient,
     AsyncAPIClient,
-    make_request_options,
 )
-from .resources.tasks import tasks
-from .resources.agents import agents
 from .resources.messages import messages
 
-__all__ = ["Timeout", "Transport", "ProxiesTypes", "RequestOptions", "Agentex", "AsyncAgentex", "Client", "AsyncClient"]
+__all__ = [
+    "ENVIRONMENTS",
+    "Timeout",
+    "Transport",
+    "ProxiesTypes",
+    "RequestOptions",
+    "Agentex",
+    "AsyncAgentex",
+    "Client",
+    "AsyncClient",
+]
+
+ENVIRONMENTS: Dict[str, str] = {
+    "production": "http://localhost:5003",
+    "development": "http://localhost:5003",
+}
 
 
 class Agentex(SyncAPIClient):
-    echo: echo.EchoResource
     agents: agents.AgentsResource
     tasks: tasks.TasksResource
     messages: messages.MessagesResource
@@ -61,11 +63,14 @@ class Agentex(SyncAPIClient):
     # client options
     api_key: str | None
 
+    _environment: Literal["production", "development"] | NotGiven
+
     def __init__(
         self,
         *,
         api_key: str | None = None,
-        base_url: str | httpx.URL | None = None,
+        environment: Literal["production", "development"] | NotGiven = NOT_GIVEN,
+        base_url: str | httpx.URL | None | NotGiven = NOT_GIVEN,
         timeout: Union[float, Timeout, None, NotGiven] = NOT_GIVEN,
         max_retries: int = DEFAULT_MAX_RETRIES,
         default_headers: Mapping[str, str] | None = None,
@@ -92,10 +97,31 @@ class Agentex(SyncAPIClient):
             api_key = os.environ.get("AGENTEX_SDK_API_KEY")
         self.api_key = api_key
 
-        if base_url is None:
-            base_url = os.environ.get("AGENTEX_BASE_URL")
-        if base_url is None:
-            base_url = f"https://api.example.com"
+        self._environment = environment
+
+        base_url_env = os.environ.get("AGENTEX_BASE_URL")
+        if is_given(base_url) and base_url is not None:
+            # cast required because mypy doesn't understand the type narrowing
+            base_url = cast("str | httpx.URL", base_url)  # pyright: ignore[reportUnnecessaryCast]
+        elif is_given(environment):
+            if base_url_env and base_url is not None:
+                raise ValueError(
+                    "Ambiguous URL; The `AGENTEX_BASE_URL` env var and the `environment` argument are given. If you want to use the environment, you must pass base_url=None",
+                )
+
+            try:
+                base_url = ENVIRONMENTS[environment]
+            except KeyError as exc:
+                raise ValueError(f"Unknown environment: {environment}") from exc
+        elif base_url_env is not None:
+            base_url = base_url_env
+        else:
+            self._environment = environment = "production"
+
+            try:
+                base_url = ENVIRONMENTS[environment]
+            except KeyError as exc:
+                raise ValueError(f"Unknown environment: {environment}") from exc
 
         super().__init__(
             version=__version__,
@@ -108,7 +134,6 @@ class Agentex(SyncAPIClient):
             _strict_response_validation=_strict_response_validation,
         )
 
-        self.echo = echo.EchoResource(self)
         self.agents = agents.AgentsResource(self)
         self.tasks = tasks.TasksResource(self)
         self.messages = messages.MessagesResource(self)
@@ -141,21 +166,11 @@ class Agentex(SyncAPIClient):
             **self._custom_headers,
         }
 
-    @override
-    def _validate_headers(self, headers: Headers, custom_headers: Headers) -> None:
-        if self.api_key and headers.get("Authorization"):
-            return
-        if isinstance(custom_headers.get("Authorization"), Omit):
-            return
-
-        raise TypeError(
-            '"Could not resolve authentication method. Expected the api_key to be set. Or for the `Authorization` headers to be explicitly omitted"'
-        )
-
     def copy(
         self,
         *,
         api_key: str | None = None,
+        environment: Literal["production", "development"] | None = None,
         base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
         http_client: httpx.Client | None = None,
@@ -191,6 +206,7 @@ class Agentex(SyncAPIClient):
         return self.__class__(
             api_key=api_key or self.api_key,
             base_url=base_url or self.base_url,
+            environment=environment or self._environment,
             timeout=self.timeout if isinstance(timeout, NotGiven) else timeout,
             http_client=http_client,
             max_retries=max_retries if is_given(max_retries) else self.max_retries,
@@ -202,25 +218,6 @@ class Agentex(SyncAPIClient):
     # Alias for `copy` for nicer inline usage, e.g.
     # client.with_options(timeout=10).foo.create(...)
     with_options = copy
-
-    def get_root(
-        self,
-        *,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> object:
-        """Root"""
-        return self.get(
-            "/",
-            options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
-            ),
-            cast_to=object,
-        )
 
     @override
     def _make_status_error(
@@ -257,7 +254,6 @@ class Agentex(SyncAPIClient):
 
 
 class AsyncAgentex(AsyncAPIClient):
-    echo: echo.AsyncEchoResource
     agents: agents.AsyncAgentsResource
     tasks: tasks.AsyncTasksResource
     messages: messages.AsyncMessagesResource
@@ -271,11 +267,14 @@ class AsyncAgentex(AsyncAPIClient):
     # client options
     api_key: str | None
 
+    _environment: Literal["production", "development"] | NotGiven
+
     def __init__(
         self,
         *,
         api_key: str | None = None,
-        base_url: str | httpx.URL | None = None,
+        environment: Literal["production", "development"] | NotGiven = NOT_GIVEN,
+        base_url: str | httpx.URL | None | NotGiven = NOT_GIVEN,
         timeout: Union[float, Timeout, None, NotGiven] = NOT_GIVEN,
         max_retries: int = DEFAULT_MAX_RETRIES,
         default_headers: Mapping[str, str] | None = None,
@@ -302,10 +301,31 @@ class AsyncAgentex(AsyncAPIClient):
             api_key = os.environ.get("AGENTEX_SDK_API_KEY")
         self.api_key = api_key
 
-        if base_url is None:
-            base_url = os.environ.get("AGENTEX_BASE_URL")
-        if base_url is None:
-            base_url = f"https://api.example.com"
+        self._environment = environment
+
+        base_url_env = os.environ.get("AGENTEX_BASE_URL")
+        if is_given(base_url) and base_url is not None:
+            # cast required because mypy doesn't understand the type narrowing
+            base_url = cast("str | httpx.URL", base_url)  # pyright: ignore[reportUnnecessaryCast]
+        elif is_given(environment):
+            if base_url_env and base_url is not None:
+                raise ValueError(
+                    "Ambiguous URL; The `AGENTEX_BASE_URL` env var and the `environment` argument are given. If you want to use the environment, you must pass base_url=None",
+                )
+
+            try:
+                base_url = ENVIRONMENTS[environment]
+            except KeyError as exc:
+                raise ValueError(f"Unknown environment: {environment}") from exc
+        elif base_url_env is not None:
+            base_url = base_url_env
+        else:
+            self._environment = environment = "production"
+
+            try:
+                base_url = ENVIRONMENTS[environment]
+            except KeyError as exc:
+                raise ValueError(f"Unknown environment: {environment}") from exc
 
         super().__init__(
             version=__version__,
@@ -318,7 +338,6 @@ class AsyncAgentex(AsyncAPIClient):
             _strict_response_validation=_strict_response_validation,
         )
 
-        self.echo = echo.AsyncEchoResource(self)
         self.agents = agents.AsyncAgentsResource(self)
         self.tasks = tasks.AsyncTasksResource(self)
         self.messages = messages.AsyncMessagesResource(self)
@@ -351,21 +370,11 @@ class AsyncAgentex(AsyncAPIClient):
             **self._custom_headers,
         }
 
-    @override
-    def _validate_headers(self, headers: Headers, custom_headers: Headers) -> None:
-        if self.api_key and headers.get("Authorization"):
-            return
-        if isinstance(custom_headers.get("Authorization"), Omit):
-            return
-
-        raise TypeError(
-            '"Could not resolve authentication method. Expected the api_key to be set. Or for the `Authorization` headers to be explicitly omitted"'
-        )
-
     def copy(
         self,
         *,
         api_key: str | None = None,
+        environment: Literal["production", "development"] | None = None,
         base_url: str | httpx.URL | None = None,
         timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
         http_client: httpx.AsyncClient | None = None,
@@ -401,6 +410,7 @@ class AsyncAgentex(AsyncAPIClient):
         return self.__class__(
             api_key=api_key or self.api_key,
             base_url=base_url or self.base_url,
+            environment=environment or self._environment,
             timeout=self.timeout if isinstance(timeout, NotGiven) else timeout,
             http_client=http_client,
             max_retries=max_retries if is_given(max_retries) else self.max_retries,
@@ -412,25 +422,6 @@ class AsyncAgentex(AsyncAPIClient):
     # Alias for `copy` for nicer inline usage, e.g.
     # client.with_options(timeout=10).foo.create(...)
     with_options = copy
-
-    async def get_root(
-        self,
-        *,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> object:
-        """Root"""
-        return await self.get(
-            "/",
-            options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
-            ),
-            cast_to=object,
-        )
 
     @override
     def _make_status_error(
@@ -468,7 +459,6 @@ class AsyncAgentex(AsyncAPIClient):
 
 class AgentexWithRawResponse:
     def __init__(self, client: Agentex) -> None:
-        self.echo = echo.EchoResourceWithRawResponse(client.echo)
         self.agents = agents.AgentsResourceWithRawResponse(client.agents)
         self.tasks = tasks.TasksResourceWithRawResponse(client.tasks)
         self.messages = messages.MessagesResourceWithRawResponse(client.messages)
@@ -477,14 +467,9 @@ class AgentexWithRawResponse:
         self.events = events.EventsResourceWithRawResponse(client.events)
         self.tracker = tracker.TrackerResourceWithRawResponse(client.tracker)
 
-        self.get_root = to_raw_response_wrapper(
-            client.get_root,
-        )
-
 
 class AsyncAgentexWithRawResponse:
     def __init__(self, client: AsyncAgentex) -> None:
-        self.echo = echo.AsyncEchoResourceWithRawResponse(client.echo)
         self.agents = agents.AsyncAgentsResourceWithRawResponse(client.agents)
         self.tasks = tasks.AsyncTasksResourceWithRawResponse(client.tasks)
         self.messages = messages.AsyncMessagesResourceWithRawResponse(client.messages)
@@ -493,14 +478,9 @@ class AsyncAgentexWithRawResponse:
         self.events = events.AsyncEventsResourceWithRawResponse(client.events)
         self.tracker = tracker.AsyncTrackerResourceWithRawResponse(client.tracker)
 
-        self.get_root = async_to_raw_response_wrapper(
-            client.get_root,
-        )
-
 
 class AgentexWithStreamedResponse:
     def __init__(self, client: Agentex) -> None:
-        self.echo = echo.EchoResourceWithStreamingResponse(client.echo)
         self.agents = agents.AgentsResourceWithStreamingResponse(client.agents)
         self.tasks = tasks.TasksResourceWithStreamingResponse(client.tasks)
         self.messages = messages.MessagesResourceWithStreamingResponse(client.messages)
@@ -509,14 +489,9 @@ class AgentexWithStreamedResponse:
         self.events = events.EventsResourceWithStreamingResponse(client.events)
         self.tracker = tracker.TrackerResourceWithStreamingResponse(client.tracker)
 
-        self.get_root = to_streamed_response_wrapper(
-            client.get_root,
-        )
-
 
 class AsyncAgentexWithStreamedResponse:
     def __init__(self, client: AsyncAgentex) -> None:
-        self.echo = echo.AsyncEchoResourceWithStreamingResponse(client.echo)
         self.agents = agents.AsyncAgentsResourceWithStreamingResponse(client.agents)
         self.tasks = tasks.AsyncTasksResourceWithStreamingResponse(client.tasks)
         self.messages = messages.AsyncMessagesResourceWithStreamingResponse(client.messages)
@@ -524,10 +499,6 @@ class AsyncAgentexWithStreamedResponse:
         self.states = states.AsyncStatesResourceWithStreamingResponse(client.states)
         self.events = events.AsyncEventsResourceWithStreamingResponse(client.events)
         self.tracker = tracker.AsyncTrackerResourceWithStreamingResponse(client.tracker)
-
-        self.get_root = async_to_streamed_response_wrapper(
-            client.get_root,
-        )
 
 
 Client = Agentex

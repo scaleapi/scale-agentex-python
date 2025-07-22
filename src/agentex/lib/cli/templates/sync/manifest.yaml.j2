@@ -1,0 +1,116 @@
+# Agent Manifest Configuration
+# ---------------------------
+# This file defines how your agent should be built and deployed.
+
+# Build Configuration
+# ------------------
+# The build config defines what gets packaged into your agent's Docker image.
+# This same configuration is used whether building locally or remotely.
+#
+# When building:
+# 1. All files from include_paths are collected into a build context
+# 2. The context is filtered by dockerignore rules
+# 3. The Dockerfile uses this context to build your agent's image
+# 4. The image is pushed to a registry and used to run your agent
+build:
+  context:
+    # Root directory for the build context
+    root: ../  # Keep this as the default root
+
+    # Paths to include in the Docker build context
+    # Must include:
+    # - Your agent's directory (your custom agent code)
+    # These paths are collected and sent to the Docker daemon for building
+    include_paths:
+      - {{ project_path_from_build_root }}
+
+    # Path to your agent's Dockerfile
+    # This defines how your agent's image is built from the context
+    # Relative to the root directory
+    dockerfile: {{ project_path_from_build_root }}/Dockerfile
+
+    # Path to your agent's .dockerignore
+    # Filters unnecessary files from the build context
+    # Helps keep build context small and builds fast
+    dockerignore: {{ project_path_from_build_root }}/.dockerignore
+
+
+# Local Development Configuration
+# -----------------------------
+# Only used when running the agent locally
+local_development:
+  agent:
+    port: 8000  # Port where your local ACP server is running
+    host_address: host.docker.internal  # Host address for Docker networking (host.docker.internal for Docker, localhost for direct) 
+
+  # File paths for local development (relative to this manifest.yaml)
+  paths:
+    # Path to ACP server file
+    # Examples:
+    #   project/acp.py          (standard)
+    #   src/server.py           (custom structure)
+    #   ../shared/acp.py        (shared across projects)
+    #   /absolute/path/acp.py   (absolute path)
+    acp: project/acp.py
+
+
+# Agent Configuration
+# -----------------
+agent:
+  acp_type: sync
+  # Unique name for your agent
+  # Used for task routing and monitoring
+  name: {{ agent_name }}
+
+  # Description of what your agent does
+  # Helps with documentation and discovery
+  description: {{ description }}
+
+  # Temporal workflow configuration
+  # Set enabled: true to use Temporal workflows for long-running tasks
+  temporal:
+    enabled: false
+
+  # Optional: Credentials mapping
+  # Maps Kubernetes secrets to environment variables
+  # Common credentials include:
+  # credentials:
+  #   - env_var_name: OPENAI_API_KEY
+  #     secret_name: openai-api-key
+  #     secret_key: api-key
+
+  # Optional: Set Environment variables for running your agent locally as well 
+  # as for deployment later on
+  # env:
+  #   OPENAI_API_KEY: "<YOUR_OPENAI_API_KEY_HERE>"
+  #   OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
+  #   OPENAI_ORG_ID: "<YOUR_OPENAI_ORG_ID_HERE>"
+
+
+# Deployment Configuration
+# -----------------------
+# Configuration for deploying your agent to Kubernetes clusters
+deployment:
+  # Container image configuration
+  image:
+    repository: "" # Update with your container registry
+    tag: "latest"  # Default tag, should be versioned in production
+
+  # Global deployment settings that apply to all clusters
+  # These can be overridden in cluster-specific files (deploy/*.yaml)
+  global:
+    agent:
+      name: "{{ agent_name }}"
+      description: "{{ description }}"
+    
+    # Default replica count
+    replicaCount: 1
+    
+    # Default resource requirements
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi" 

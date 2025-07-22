@@ -1,0 +1,29 @@
+from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.lib.types.fastacp import AgenticACPConfig
+from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+
+
+# Create an ACP server
+acp = FastACP.create(
+    acp_type="agentic",
+    config=AgenticACPConfig(type="base")
+)
+
+
+@acp.on_task_event_send
+async def handle_task_event_send(params: SendEventParams):
+    # For this tutorial, we print the parameters sent to the handler 
+    # so you can see where and how messages within a task are handled
+    print(f"Hello world! I just received this message: {params}")
+
+@acp.on_task_cancel
+async def handle_task_canceled(params: CancelTaskParams):
+    # For this tutorial, we print the parameters sent to the handler 
+    # so you can see where and how task cancellation is handled
+    print(f"Hello world! Task canceled: {params.task.id}") 
+
+@acp.on_task_create
+async def handle_task_create(params: CreateTaskParams):
+    # For this tutorial, we print the parameters sent to the handler 
+    # so you can see where and how task creation is handled
+    print(f"Hello world! Task created: {params.task.id}")

@@ -1,0 +1,199 @@
+# {{ agent_name }} - AgentEx Starter Template
+
+This is a generic starter template for building agents with the AgentEx framework. It provides a basic implementation of the Agent 2 Client Protocol (ACP) to help you get started quickly.
+
+## What You'll Learn
+
+- **Tasks**: A task is a grouping mechanism for related messages. Think of it as a conversation thread or a session.
+- **Messages**: Messages are communication objects within a task. They can contain text, data, or instructions.
+- **ACP Events**: The agent responds to four main events:
+  - `task_received`: When a new task is created
+  - `task_message_received`: When a message is sent within a task
+  - `task_approved`: When a task is approved
+  - `task_canceled`: When a task is canceled
+
+## Running the Agent
+
+1. Run the agent locally:
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+The agent will start on port 8000 and print messages whenever it receives any of the ACP events.
+
+## What's Inside
+
+This template:
+- Sets up a basic ACP server
+- Handles each of the required ACP events with simple print statements
+- Provides a foundation for building more complex agents
+
+## Next Steps
+
+For more advanced agent development, check out the AgentEx tutorials:
+
+- **Tutorials 00-08**: Learn about building synchronous agents with ACP
+- **Tutorials 09-10**: Learn how to use Temporal to power asynchronous agents
+  - Tutorial 09: Basic Temporal workflow setup
+  - Tutorial 10: Advanced Temporal patterns and best practices
+
+These tutorials will help you understand:
+- How to handle long-running tasks
+- Implementing state machines
+- Managing complex workflows
+- Best practices for async agent development
+
+## The Manifest File
+
+The `manifest.yaml` file is your agent's configuration file. It defines:
+- How your agent should be built and packaged
+- What files are included in your agent's Docker image
+- Your agent's name and description
+- Local development settings (like the port your agent runs on)
+
+This file is essential for both local development and deployment of your agent.
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/                  # Your agent's code
+│   ├── __init__.py
+│   └── acp.py               # ACP server and event handlers
+├── Dockerfile               # Container definition
+├── manifest.yaml            # Deployment config
+{% if use_uv %}
+└── pyproject.toml          # Dependencies (uv)
+{% else %}
+└── requirements.txt         # Dependencies (pip)
+{% endif %}
+```
+
+## Development
+
+### 1. Customize Event Handlers
+- Modify the handlers in `acp.py` to implement your agent's logic
+- Add your own tools and capabilities
+- Implement custom state management
+
+### 2. Manage Dependencies
+
+{% if use_uv %}
+You chose **uv** for package management. Here's how to work with dependencies:
+
+```bash
+# Add new dependencies
+agentex uv add requests openai anthropic
+
+# Install/sync dependencies
+agentex uv sync
+
+# Run commands with uv
+uv run agentex agents run --manifest manifest.yaml
+```
+
+**Benefits of uv:**
+- Faster dependency resolution and installation
+- Better dependency isolation
+- Integrated CodeArtifact support
+- Modern Python packaging standards
+
+{% else %}
+You chose **pip** for package management. Here's how to work with dependencies:
+
+```bash
+# Edit requirements.txt manually to add dependencies
+echo "requests" >> requirements.txt
+echo "openai" >> requirements.txt
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**Benefits of pip:**
+- Familiar workflow for most Python developers
+- Simple requirements.txt management
+- Wide compatibility
+{% endif %}
+
+### 3. Configure Credentials
+Options:
+1. Add any required credentials to your manifest.yaml via the `env` section
+2. Export them in your shell: `export OPENAI_API_KEY=...`
+3. For local development, create a `.env.local` file in the project directory
+
+```python
+import os
+from dotenv import load_dotenv
+
+if os.environ.get("ENVIRONMENT") == "development":
+    load_dotenv()
+```
+
+## Local Development
+
+
+### 1. Start the Agentex Backend
+```bash
+# Navigate to the backend directory
+cd agentex
+
+# Start all services using Docker Compose
+make dev
+
+# Optional: In a separate terminal, use lazydocker for a better UI (everything should say "healthy")
+lzd
+```
+
+### 2. Setup Your Agent's requirements/pyproject.toml
+```bash
+agentex uv sync [--group editable-apy]
+source .venv/bin/activate
+
+# OR
+conda create -n {{ project_name }} python=3.12
+conda activate {{ project_name }}
+pip install -r requirements.txt
+```
+### 3. Run Your Agent
+```bash
+# From this directory
+export ENVIRONMENT=development && [uv run] agentex agents run --manifest manifest.yaml
+```
+
+### 4. Interact with Your Agent
+
+Option 0: CLI (deprecated - to be replaced once a new CLI is implemented - please use the web UI for now!)
+```bash
+# Submit a task via CLI
+agentex tasks submit --agent {{ agent_name }} --task "Your task here"
+```
+
+Option 1: Web UI
+```bash
+# Start the local web interface
+cd agentex-web
+make dev
+
+# Then open http://localhost:3000 in your browser to chat with your agent
+```
+
+## Development Tips
+
+### Environment Variables
+- Set environment variables in project/.env for any required credentials
+- Or configure them in the manifest.yaml under the `env` section
+- The `.env` file is automatically loaded in development mode
+
+### To build the agent Docker image locally (normally not necessary):
+
+1. First, set up CodeArtifact authentication:
+```bash
+../../setup-build-codeartifact.sh
+```
+
+2. Build the agent image:
+```bash
+agentex agents build --manifest manifest.yaml --secret 'id=codeartifact-pip-conf,src=.codeartifact-pip-conf'
+```
+

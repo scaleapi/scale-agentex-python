@@ -37,17 +37,17 @@ class TextContent(BaseModel):
     attachments: Optional[List[Attachment]] = None
     """Optional list of file attachments with structured metadata."""
 
-    format: Optional[Literal["markdown", "plain", "code"]] = None
+    format: Literal["markdown", "plain", "code"] = "plain"
     """The format of the message.
 
     This is used by the client to determine how to display the message.
     """
 
-    style: Optional[MessageStyle] = None
+    style: MessageStyle = "static"
     """The style of the message.
 
     This is used by the client to determine how to display the message.
     """
 
-    type: Optional[Literal["text"]] = None
+    type: Literal["text"] = "text"
     """The type of the message, in this case `text`."""

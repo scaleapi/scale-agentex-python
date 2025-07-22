@@ -1,0 +1,55 @@
+# Example Override Configuration
+# =============================
+# This file shows how to override deployment settings from the global defaults in manifest.yaml.
+# You can create multiple override files for different environments (e.g., staging.yaml, prod.yaml, dev.yaml)
+# Only specify values that differ from the global defaults in manifest.yaml
+
+# Override image tag
+# image:
+#   tag: "v1.2.3"
+
+# Override replica count
+# replicaCount: 2
+
+# Environment-specific environment variables
+# env:
+#   - name: LOG_LEVEL
+#     value: "DEBUG"
+#   - name: ENVIRONMENT
+#     value: "staging"
+
+# Override resource requirements
+# resources:
+#   requests:
+#     cpu: "250m"
+#     memory: "512Mi"
+#   limits:
+#     cpu: "500m"
+#     memory: "1Gi"
+
+# Advanced: Additional helm chart value overrides
+# Use this for any helm chart values not covered by the simple options above
+# additional_overrides:
+#   autoscaling:
+#     enabled: true
+#     minReplicas: 2
+#     maxReplicas: 10
+#     targetCPUUtilizationPercentage: 70
+#   
+#   service:
+#     type: LoadBalancer
+#   
+#   ingress:
+#     enabled: true
+#     annotations:
+#       kubernetes.io/ingress.class: "nginx"
+#     hosts:
+#       - host: {{ agent_name }}.example.com
+#         paths:
+#           - path: /
+#             pathType: Prefix
+
+# To use this configuration:
+# 1. Copy this file to a new file (e.g., staging.yaml, prod.yaml)
+# 2. Uncomment and modify the values you want to override
+# 3. Deploy with: agentex agents deploy --cluster your-cluster --namespace your-namespace --override-file staging.yaml 

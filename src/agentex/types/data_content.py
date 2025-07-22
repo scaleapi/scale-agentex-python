@@ -20,11 +20,11 @@ class DataContent(BaseModel):
     data: Dict[str, object]
     """The contents of the data message."""
 
-    style: Optional[MessageStyle] = None
+    style: MessageStyle = "static"
     """The style of the message.
 
     This is used by the client to determine how to display the message.
     """
 
-    type: Optional[Literal["data"]] = None
+    type: Literal["data"] = "data"
     """The type of the message, in this case `data`."""
