@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Optional
-from typing_extensions import Literal, Required, TypedDict
+from typing import Union, Optional
+from typing_extensions import Required, TypeAlias, TypedDict
 
-from .task_message_content_param import TaskMessageContentParam
+from .streaming_status import StreamingStatus
+from .data_content_param import DataContentParam
+from .text_content_param import TextContentParam
+from .tool_request_content_param import ToolRequestContentParam
+from .tool_response_content_param import ToolResponseContentParam
 
-__all__ = ["MessageUpdateParams"]
+__all__ = ["MessageUpdateParams", "Content"]
 
 
 class MessageUpdateParams(TypedDict, total=False):
-    content: Required[TaskMessageContentParam]
+    content: Required[Content]
 
     task_id: Required[str]
 
-    streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]]
+    streaming_status: Optional[StreamingStatus]
+
+
+Content: TypeAlias = Union[TextContentParam, DataContentParam, ToolRequestContentParam, ToolResponseContentParam]
