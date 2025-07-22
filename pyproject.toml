@@ -35,8 +35,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/stainless-sdks/agentex-sdk-python"
-Repository = "https://github.com/stainless-sdks/agentex-sdk-python"
+Homepage = "https://github.com/scaleapi/agentex-python"
+Repository = "https://github.com/scaleapi/agentex-python"
 
 [project.optional-dependencies]
 aiohttp = ["aiohttp", "httpx_aiohttp>=0.1.8"]
@@ -125,7 +125,7 @@ path = "README.md"
 [[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
 # replace relative links with absolute links
 pattern = '\[(.+?)\]\(((?!https?://)\S+?)\)'
-replacement = '[\1](https://github.com/stainless-sdks/agentex-sdk-python/tree/main/\g<2>)'
+replacement = '[\1](https://github.com/scaleapi/agentex-python/tree/main/\g<2>)'
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

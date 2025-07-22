@@ -31,7 +31,7 @@ class NameResource(SyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/stainless-sdks/agentex-sdk-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
         """
         return NameResourceWithRawResponse(self)
 
@@ -40,7 +40,7 @@ class NameResource(SyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/stainless-sdks/agentex-sdk-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
         """
         return NameResourceWithStreamingResponse(self)
 
@@ -164,7 +164,7 @@ class AsyncNameResource(AsyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/stainless-sdks/agentex-sdk-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
         """
         return AsyncNameResourceWithRawResponse(self)
 
@@ -173,7 +173,7 @@ class AsyncNameResource(AsyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/stainless-sdks/agentex-sdk-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
         """
         return AsyncNameResourceWithStreamingResponse(self)
 
