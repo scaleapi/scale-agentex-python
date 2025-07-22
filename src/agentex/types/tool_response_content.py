@@ -26,11 +26,11 @@ class ToolResponseContent(BaseModel):
     tool_call_id: str
     """The ID of the tool call that is being responded to."""
 
-    style: Optional[MessageStyle] = None
+    style: MessageStyle = "static"
     """The style of the message.
 
     This is used by the client to determine how to display the message.
     """
 
-    type: Optional[Literal["tool_response"]] = None
+    type: Literal["tool_response"] = "tool_response"
     """The type of the message, in this case `tool_response`."""

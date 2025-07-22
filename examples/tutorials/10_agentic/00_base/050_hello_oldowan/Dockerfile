@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1.3
+FROM python:3.12-slim
+COPY --from=ghcr.io/astral-sh/uv:0.6.4 /uv /uvx /bin/
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    htop \
+    vim \
+    curl \
+    tar \
+    python3-dev \
+    postgresql-client \
+    build-essential \
+    libpq-dev \
+    gcc \
+    cmake \
+    netcat-openbsd \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN uv pip install --system --upgrade pip setuptools wheel
+
+ENV UV_HTTP_TIMEOUT=1000
+
+# Copy just the requirements file to optimize caching
+COPY 050_hello_oldowan/requirements.txt /app/requirements.txt
+
+WORKDIR /app/
+
+# Install the required Python packages
+RUN --mount=type=secret,id=codeartifact-pip-conf,target=/etc/pip.conf \
+    export UV_INDEX_URL=$(grep -E "^index-url" /etc/pip.conf | cut -d'=' -f2- | xargs) && \
+    export UV_EXTRA_INDEX_URL=$(grep -E "^extra-index-url" /etc/pip.conf | cut -d'=' -f2- | xargs || echo "") && \
+    uv pip install --system -r requirements.txt
+
+# Copy the project code
+COPY 050_hello_oldowan/project /app/project
+
+WORKDIR /app/project
+
+# Set environment variables
+ENV PYTHONPATH=/app
+
+# Run the agent using uvicorn
+CMD ["uvicorn", "acp:acp", "--host", "0.0.0.0", "--port", "8000"] 
