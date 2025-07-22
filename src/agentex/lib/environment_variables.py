@@ -27,7 +27,7 @@ class EnvVarKeys(str, Enum):
     # Workflow Configuraiton
     WORKFLOW_NAME = "WORKFLOW_NAME"
     WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
-    BASE64_AUTH_PRINCIPAL = "BASE64_AUTH_PRINCIPAL"
+    AUTH_PRINCIPAL_B64 = "AUTH_PRINCIPAL_B64"
 
 
 class Environment(str, Enum):

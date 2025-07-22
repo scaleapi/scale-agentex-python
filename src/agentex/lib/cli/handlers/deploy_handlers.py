@@ -8,8 +8,10 @@ import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
 
+from agentex.lib.cli.handlers.auth_handlers import _encode_principal_context
 from agentex.lib.cli.utils.exceptions import DeploymentError, HelmError
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
+from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.sdk.config.deployment_config import ClusterConfig
@@ -163,10 +165,13 @@ def merge_deployment_configs(
             helm_values[TEMPORAL_WORKER_KEY]["secretEnvVars"] = secret_env_vars
 
     # Set the agent_config env vars first to the helm values and so then it can be overriden by the cluster config
+    encoded_principal = _encode_principal_context(manifest)
     if agent_config.env:
         helm_values["env"] = agent_config.env
         if TEMPORAL_WORKER_KEY in helm_values:
             helm_values[TEMPORAL_WORKER_KEY]["env"] = agent_config.env
+        if encoded_principal:
+            helm_values["env"][EnvVarKeys.AUTH_PRINCIPAL_B64] = encoded_principal
 
     if manifest.deployment and manifest.deployment.imagePullSecrets:
         pull_secrets = [

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Dict
 
 from pydantic import Field
 
@@ -88,6 +88,10 @@ class ClusterConfig(BaseModel):
     additional_overrides: dict[str, Any] | None = Field(
         default=None, description="Additional helm chart value overrides"
     )
+
+
+class AuthenticationConfig(BaseModel):
+    principal: Dict[str, Any] = Field(description="Principal used for authorization on registration")
 
 
 class InjectedImagePullSecretValues(BaseModel):
