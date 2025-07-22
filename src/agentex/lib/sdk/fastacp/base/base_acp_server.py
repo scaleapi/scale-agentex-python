@@ -344,11 +344,11 @@ class BaseACPServer(FastAPI):
         uvicorn.run(self, host=host, port=port, **kwargs)
 
     def _get_auth_principal(self, env_vars: EnvironmentVariables):
-        if not env_vars.BASE64_AUTH_PRINCIPAL:
+        if not env_vars.AUTH_PRINCIPAL_B64:
             return None
 
         try:
-            decoded_str = base64.b64decode(env_vars.BASE64_AUTH_PRINCIPAL).decode('utf-8')
+            decoded_str = base64.b64decode(env_vars.AUTH_PRINCIPAL_B64).decode('utf-8')
             return json.loads(decoded_str)
         except Exception:
             return None
