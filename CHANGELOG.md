@@ -1,0 +1,10 @@
+# Changelog
+
+## 0.0.1-alpha.1 (2025-07-22)
+
+Full Changelog: [v0.0.1-alpha.0...v0.0.1-alpha.1](https://github.com/scaleapi/agentex-python/compare/v0.0.1-alpha.0...v0.0.1-alpha.1)
+
+### Chores
+
+* sync repo ([bc305f4](https://github.com/scaleapi/agentex-python/commit/bc305f43efedb5b7d7b28eaa059bce1d280c9dbb))
+* update SDK settings ([e5a06b4](https://github.com/scaleapi/agentex-python/commit/e5a06b4e3d8f8ad15d55b92393d7ddd833415f86))
