@@ -294,7 +294,7 @@ class BaseACPServer(FastAPI):
         self,
         fn: Callable[
             [SendMessageParams],
-            Awaitable[list[TaskMessageContent] | AsyncGenerator[TaskMessageUpdate, None]],
+            Awaitable[TaskMessageContent | list[TaskMessageContent] | AsyncGenerator[TaskMessageUpdate, None]],
         ],
     ):
         """Handle message/send method - supports both single and streaming responses
