@@ -165,11 +165,12 @@ def merge_deployment_configs(
             helm_values[TEMPORAL_WORKER_KEY]["secretEnvVars"] = secret_env_vars
 
     # Set the agent_config env vars first to the helm values and so then it can be overriden by the cluster config
-    encoded_principal = _encode_principal_context(manifest)
     if agent_config.env:
         helm_values["env"] = agent_config.env
         if TEMPORAL_WORKER_KEY in helm_values:
             helm_values[TEMPORAL_WORKER_KEY]["env"] = agent_config.env
+
+        encoded_principal = _encode_principal_context(manifest)
         if encoded_principal:
             helm_values["env"][EnvVarKeys.AUTH_PRINCIPAL_B64] = encoded_principal
 
