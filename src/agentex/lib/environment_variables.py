@@ -27,6 +27,7 @@ class EnvVarKeys(str, Enum):
     # Workflow Configuraiton
     WORKFLOW_NAME = "WORKFLOW_NAME"
     WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
+    BASE64_AUTH_PRINCIPAL = "BASE64_AUTH_PRINCIPAL"
 
 
 class Environment(str, Enum):
@@ -54,6 +55,7 @@ class EnvironmentVariables(BaseModel):
     # Workflow Configuration
     WORKFLOW_TASK_QUEUE: str | None = None
     WORKFLOW_NAME: str | None = None
+    BASE64_AUTH_PRINCIPAL: str | None = None
 
     @classmethod
     def refresh(cls) -> EnvironmentVariables | None:
