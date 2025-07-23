@@ -1,3 +1,9 @@
+# Shared Types
+
+```python
+from agentex.types import TaskMessageUpdate
+```
+
 # Agents
 
 Types:
@@ -13,7 +19,6 @@ from agentex.types import (
     DataDelta,
     TaskMessageContent,
     TaskMessageDelta,
-    TaskMessageUpdate,
     TextDelta,
     ToolRequestDelta,
     ToolResponseDelta,
