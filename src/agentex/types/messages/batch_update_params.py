@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Dict
-from typing_extensions import Required, TypedDict
+from typing import Dict, Union
+from typing_extensions import Required, TypeAlias, TypedDict
 
-from ..task_message_content_param import TaskMessageContentParam
+from ..data_content_param import DataContentParam
+from ..text_content_param import TextContentParam
+from ..tool_request_content_param import ToolRequestContentParam
+from ..tool_response_content_param import ToolResponseContentParam
 
-__all__ = ["BatchUpdateParams"]
+__all__ = ["BatchUpdateParams", "Updates"]
 
 
 class BatchUpdateParams(TypedDict, total=False):
     task_id: Required[str]
 
-    updates: Required[Dict[str, TaskMessageContentParam]]
+    updates: Required[Dict[str, Updates]]
+
+
+Updates: TypeAlias = Union[TextContentParam, DataContentParam, ToolRequestContentParam, ToolResponseContentParam]

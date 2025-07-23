@@ -7,7 +7,7 @@ from typing_extensions import Literal
 
 import httpx
 
-from ..types import AgentRpcParams, agent_rpc_params, agent_list_params, agent_rpc_by_name_params
+from ..types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
 from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
 from .._utils import maybe_transform, async_maybe_transform
 from .._compat import cached_property
@@ -20,8 +20,6 @@ from .._response import (
 )
 from ..types.agent import Agent
 from .._base_client import make_request_options
-from ..types.agent_rpc_params import AgentRpcParams
-from ..types.agent_rpc_response import AgentRpcResponse
 from ..types.agent_list_response import AgentListResponse
 
 __all__ = ["AgentsResource", "AsyncAgentsResource"]
@@ -221,7 +219,7 @@ class AgentsResource(SyncAPIResource):
         agent_id: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: AgentRpcParams,
+        params: agent_rpc_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -230,13 +228,11 @@ class AgentsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AgentRpcResponse:
+    ) -> object:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
 
         Args:
-          params: The parameters for the agent RPC request
-
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -261,7 +257,7 @@ class AgentsResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AgentRpcResponse,
+            cast_to=object,
         )
 
     def rpc_by_name(
@@ -269,7 +265,7 @@ class AgentsResource(SyncAPIResource):
         agent_name: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: AgentRpcParams,
+        params: agent_rpc_by_name_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -278,13 +274,11 @@ class AgentsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AgentRpcResponse:
+    ) -> object:
         """
         Handle JSON-RPC requests for an agent by its unique name.
 
         Args:
-          params: The parameters for the agent RPC request
-
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -309,7 +303,7 @@ class AgentsResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AgentRpcResponse,
+            cast_to=object,
         )
 
 
@@ -507,7 +501,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         agent_id: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: AgentRpcParams,
+        params: agent_rpc_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -516,13 +510,11 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AgentRpcResponse:
+    ) -> object:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
 
         Args:
-          params: The parameters for the agent RPC request
-
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -547,7 +539,7 @@ class AsyncAgentsResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AgentRpcResponse,
+            cast_to=object,
         )
 
     async def rpc_by_name(
@@ -555,7 +547,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         agent_name: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: AgentRpcParams,
+        params: agent_rpc_by_name_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -564,13 +556,11 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AgentRpcResponse:
+    ) -> object:
         """
         Handle JSON-RPC requests for an agent by its unique name.
 
         Args:
-          params: The parameters for the agent RPC request
-
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -595,7 +585,7 @@ class AsyncAgentsResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AgentRpcResponse,
+            cast_to=object,
         )
 
 
