@@ -18,6 +18,7 @@ from ..._response import (
 )
 from ..._base_client import make_request_options
 from ...types.messages import batch_create_params, batch_update_params
+from ...types.task_message_content_param import TaskMessageContentParam
 from ...types.messages.batch_create_response import BatchCreateResponse
 from ...types.messages.batch_update_response import BatchUpdateResponse
 
@@ -47,7 +48,7 @@ class BatchResource(SyncAPIResource):
     def create(
         self,
         *,
-        contents: Iterable[batch_create_params.Content],
+        contents: Iterable[TaskMessageContentParam],
         task_id: str,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -87,7 +88,7 @@ class BatchResource(SyncAPIResource):
         self,
         *,
         task_id: str,
-        updates: Dict[str, batch_update_params.Updates],
+        updates: Dict[str, TaskMessageContentParam],
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -146,7 +147,7 @@ class AsyncBatchResource(AsyncAPIResource):
     async def create(
         self,
         *,
-        contents: Iterable[batch_create_params.Content],
+        contents: Iterable[TaskMessageContentParam],
         task_id: str,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -186,7 +187,7 @@ class AsyncBatchResource(AsyncAPIResource):
         self,
         *,
         task_id: str,
-        updates: Dict[str, batch_update_params.Updates],
+        updates: Dict[str, TaskMessageContentParam],
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
