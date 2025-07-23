@@ -2,13 +2,12 @@
 
 from typing import Union, Optional
 from datetime import datetime
-from typing_extensions import Annotated, TypeAlias
+from typing_extensions import Literal, Annotated, TypeAlias
 
 from .._utils import PropertyInfo
 from .._models import BaseModel
 from .data_content import DataContent
 from .text_content import TextContent
-from .streaming_status import StreamingStatus
 from .tool_request_content import ToolRequestContent
 from .tool_response_content import ToolResponseContent
 
@@ -20,17 +19,23 @@ Content: TypeAlias = Annotated[
 
 
 class TaskMessage(BaseModel):
-    id: str
-    """The task message's unique id"""
-
     content: Content
+    """The content of the message.
 
-    created_at: datetime
-    """The timestamp when the message was created"""
+    This content is not OpenAI compatible. These are messages that are meant to be
+    displayed to the user.
+    """
 
     task_id: str
+    """ID of the task this message belongs to"""
 
-    streaming_status: Optional[StreamingStatus] = None
+    id: Optional[str] = None
+    """The task message's unique id"""
+
+    created_at: Optional[datetime] = None
+    """The timestamp when the message was created"""
+
+    streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] = None
 
     updated_at: Optional[datetime] = None
     """The timestamp when the message was last updated"""
