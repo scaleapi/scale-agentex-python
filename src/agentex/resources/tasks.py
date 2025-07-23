@@ -17,6 +17,8 @@ from .._streaming import Stream, AsyncStream
 from ..types.task import Task
 from .._base_client import make_request_options
 from ..types.task_list_response import TaskListResponse
+from ..types.task_delete_response import TaskDeleteResponse
+from ..types.task_delete_by_name_response import TaskDeleteByNameResponse
 
 __all__ = ["TasksResource", "AsyncTasksResource"]
 
@@ -103,7 +105,7 @@ class TasksResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> Task:
+    ) -> TaskDeleteResponse:
         """
         Delete a task by its unique ID.
 
@@ -123,7 +125,7 @@ class TasksResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=Task,
+            cast_to=TaskDeleteResponse,
         )
 
     def delete_by_name(
@@ -136,7 +138,7 @@ class TasksResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> Task:
+    ) -> TaskDeleteByNameResponse:
         """
         Delete a task by its unique name.
 
@@ -156,7 +158,7 @@ class TasksResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=Task,
+            cast_to=TaskDeleteByNameResponse,
         )
 
     def retrieve_by_name(
@@ -345,7 +347,7 @@ class AsyncTasksResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> Task:
+    ) -> TaskDeleteResponse:
         """
         Delete a task by its unique ID.
 
@@ -365,7 +367,7 @@ class AsyncTasksResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=Task,
+            cast_to=TaskDeleteResponse,
         )
 
     async def delete_by_name(
@@ -378,7 +380,7 @@ class AsyncTasksResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> Task:
+    ) -> TaskDeleteByNameResponse:
         """
         Delete a task by its unique name.
 
@@ -398,7 +400,7 @@ class AsyncTasksResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=Task,
+            cast_to=TaskDeleteByNameResponse,
         )
 
     async def retrieve_by_name(

@@ -1,9 +1,30 @@
+# Shared Types
+
+```python
+from agentex.types import TaskMessageUpdate
+```
+
 # Agents
 
 Types:
 
 ```python
-from agentex.types import AcpType, Agent, AgentRpcRequest, AgentListResponse
+from agentex.types import (
+    AcpType,
+    Agent,
+    AgentRpcParams,
+    AgentRpcRequest,
+    AgentRpcResponse,
+    AgentRpcResult,
+    DataDelta,
+    TaskMessageContent,
+    TaskMessageDelta,
+    TaskMessageUpdate,
+    TextDelta,
+    ToolRequestDelta,
+    ToolResponseDelta,
+    AgentListResponse,
+)
 ```
 
 Methods:
@@ -13,23 +34,23 @@ Methods:
 - <code title="delete /agents/{agent_id}">client.agents.<a href="./src/agentex/resources/agents.py">delete</a>(agent_id) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
 - <code title="delete /agents/name/{agent_name}">client.agents.<a href="./src/agentex/resources/agents.py">delete_by_name</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
 - <code title="get /agents/name/{agent_name}">client.agents.<a href="./src/agentex/resources/agents.py">retrieve_by_name</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
-- <code title="post /agents/{agent_id}/rpc">client.agents.<a href="./src/agentex/resources/agents.py">rpc</a>(agent_id, \*\*<a href="src/agentex/types/agent_rpc_params.py">params</a>) -> object</code>
-- <code title="post /agents/name/{agent_name}/rpc">client.agents.<a href="./src/agentex/resources/agents.py">rpc_by_name</a>(agent_name, \*\*<a href="src/agentex/types/agent_rpc_by_name_params.py">params</a>) -> object</code>
+- <code title="post /agents/{agent_id}/rpc">client.agents.<a href="./src/agentex/resources/agents.py">rpc</a>(agent_id, \*\*<a href="src/agentex/types/agent_rpc_params.py">params</a>) -> <a href="./src/agentex/types/agent_rpc_response.py">AgentRpcResponse</a></code>
+- <code title="post /agents/name/{agent_name}/rpc">client.agents.<a href="./src/agentex/resources/agents.py">rpc_by_name</a>(agent_name, \*\*<a href="src/agentex/types/agent_rpc_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agent_rpc_response.py">AgentRpcResponse</a></code>
 
 # Tasks
 
 Types:
 
 ```python
-from agentex.types import Task, TaskListResponse
+from agentex.types import Task, TaskListResponse, TaskDeleteResponse, TaskDeleteByNameResponse
 ```
 
 Methods:
 
 - <code title="get /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
 - <code title="get /tasks">client.tasks.<a href="./src/agentex/resources/tasks.py">list</a>() -> <a href="./src/agentex/types/task_list_response.py">TaskListResponse</a></code>
-- <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
-- <code title="delete /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete_by_name</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/task_delete_response.py">TaskDeleteResponse</a></code>
+- <code title="delete /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete_by_name</a>(task_name) -> <a href="./src/agentex/types/task_delete_by_name_response.py">TaskDeleteByNameResponse</a></code>
 - <code title="get /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve_by_name</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
 - <code title="get /tasks/{task_id}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events</a>(task_id) -> object</code>
 - <code title="get /tasks/name/{task_name}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events_by_name</a>(task_name) -> object</code>
@@ -43,7 +64,6 @@ from agentex.types import (
     DataContent,
     MessageAuthor,
     MessageStyle,
-    StreamingStatus,
     TaskMessage,
     TextContent,
     ToolRequestContent,
