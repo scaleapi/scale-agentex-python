@@ -28,17 +28,16 @@ pip install git+ssh://git@github.com/scaleapi/agentex-python.git
 The full API of this library can be found in [api.md](api.md).
 
 ```python
+import os
 from agentex import Agentex
 
 client = Agentex(
+    api_key=os.environ.get("AGENTEX_SDK_API_KEY"),  # This is the default and can be omitted
     # defaults to "production".
     environment="development",
 )
 
-agent = client.agents.retrieve(
-    "agent_id",
-)
-print(agent.id)
+tasks = client.tasks.list()
 ```
 
 While you can provide an `api_key` keyword argument,
@@ -51,20 +50,19 @@ so that your API Key is not stored in source control.
 Simply import `AsyncAgentex` instead of `Agentex` and use `await` with each API call:
 
 ```python
+import os
 import asyncio
 from agentex import AsyncAgentex
 
 client = AsyncAgentex(
+    api_key=os.environ.get("AGENTEX_SDK_API_KEY"),  # This is the default and can be omitted
     # defaults to "production".
     environment="development",
 )
 
 
 async def main() -> None:
-    agent = await client.agents.retrieve(
-        "agent_id",
-    )
-    print(agent.id)
+    tasks = await client.tasks.list()
 
 
 asyncio.run(main())
@@ -93,12 +91,10 @@ from agentex import AsyncAgentex
 
 async def main() -> None:
     async with AsyncAgentex(
+        api_key="My API Key",
         http_client=DefaultAioHttpClient(),
     ) as client:
-        agent = await client.agents.retrieve(
-            "agent_id",
-        )
-        print(agent.id)
+        tasks = await client.tasks.list()
 
 
 asyncio.run(main())
@@ -129,9 +125,7 @@ from agentex import Agentex
 client = Agentex()
 
 try:
-    client.agents.retrieve(
-        "agent_id",
-    )
+    client.tasks.list()
 except agentex.APIConnectionError as e:
     print("The server could not be reached")
     print(e.__cause__)  # an underlying Exception, likely raised within httpx.
@@ -174,9 +168,7 @@ client = Agentex(
 )
 
 # Or, configure per-request:
-client.with_options(max_retries=5).agents.retrieve(
-    "agent_id",
-)
+client.with_options(max_retries=5).tasks.list()
 ```
 
 ### Timeouts
@@ -199,9 +191,7 @@ client = Agentex(
 )
 
 # Override per-request:
-client.with_options(timeout=5.0).agents.retrieve(
-    "agent_id",
-)
+client.with_options(timeout=5.0).tasks.list()
 ```
 
 On timeout, an `APITimeoutError` is thrown.
@@ -242,13 +232,11 @@ The "raw" Response object can be accessed by prefixing `.with_raw_response.` to 
 from agentex import Agentex
 
 client = Agentex()
-response = client.agents.with_raw_response.retrieve(
-    "agent_id",
-)
+response = client.tasks.with_raw_response.list()
 print(response.headers.get('X-My-Header'))
 
-agent = response.parse()  # get the object that `agents.retrieve()` would have returned
-print(agent.id)
+task = response.parse()  # get the object that `tasks.list()` would have returned
+print(task)
 ```
 
 These methods return an [`APIResponse`](https://github.com/scaleapi/agentex-python/tree/main/src/agentex/_response.py) object.
@@ -262,9 +250,7 @@ The above interface eagerly reads the full response body when you make the reque
 To stream the response body, use `.with_streaming_response` instead, which requires a context manager and only reads the response body once you call `.read()`, `.text()`, `.json()`, `.iter_bytes()`, `.iter_text()`, `.iter_lines()` or `.parse()`. In the async client, these are async methods.
 
 ```python
-with client.agents.with_streaming_response.retrieve(
-    "agent_id",
-) as response:
+with client.tasks.with_streaming_response.list() as response:
     print(response.headers.get("X-My-Header"))
 
     for line in response.iter_lines():
