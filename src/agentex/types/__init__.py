@@ -40,6 +40,7 @@ from .state_list_response import StateListResponse as StateListResponse
 from .state_update_params import StateUpdateParams as StateUpdateParams
 from .tool_response_delta import ToolResponseDelta as ToolResponseDelta
 from .tracker_list_params import TrackerListParams as TrackerListParams
+from .task_delete_response import TaskDeleteResponse as TaskDeleteResponse
 from .task_message_content import TaskMessageContent as TaskMessageContent
 from .tool_request_content import ToolRequestContent as ToolRequestContent
 from .message_create_params import MessageCreateParams as MessageCreateParams
@@ -52,3 +53,4 @@ from .agent_rpc_by_name_params import AgentRpcByNameParams as AgentRpcByNamePara
 from .task_message_content_param import TaskMessageContentParam as TaskMessageContentParam
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
 from .tool_response_content_param import ToolResponseContentParam as ToolResponseContentParam
+from .task_delete_by_name_response import TaskDeleteByNameResponse as TaskDeleteByNameResponse
