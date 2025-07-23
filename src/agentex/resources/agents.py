@@ -20,7 +20,9 @@ from .._response import (
 )
 from ..types.agent import Agent
 from .._base_client import make_request_options
+from ..types.agent_rpc_response import AgentRpcResponse
 from ..types.agent_list_response import AgentListResponse
+from ..types.agent_rpc_by_name_response import AgentRpcByNameResponse
 
 __all__ = ["AgentsResource", "AsyncAgentsResource"]
 
@@ -228,11 +230,13 @@ class AgentsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> object:
+    ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
 
         Args:
+          params: The parameters for the agent RPC request
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -257,7 +261,7 @@ class AgentsResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=object,
+            cast_to=AgentRpcResponse,
         )
 
     def rpc_by_name(
@@ -274,11 +278,13 @@ class AgentsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> object:
+    ) -> AgentRpcByNameResponse:
         """
         Handle JSON-RPC requests for an agent by its unique name.
 
         Args:
+          params: The parameters for the agent RPC request
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -303,7 +309,7 @@ class AgentsResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=object,
+            cast_to=AgentRpcByNameResponse,
         )
 
 
@@ -510,11 +516,13 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> object:
+    ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
 
         Args:
+          params: The parameters for the agent RPC request
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -539,7 +547,7 @@ class AsyncAgentsResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=object,
+            cast_to=AgentRpcResponse,
         )
 
     async def rpc_by_name(
@@ -556,11 +564,13 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> object:
+    ) -> AgentRpcByNameResponse:
         """
         Handle JSON-RPC requests for an agent by its unique name.
 
         Args:
+          params: The parameters for the agent RPC request
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -585,7 +595,7 @@ class AsyncAgentsResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=object,
+            cast_to=AgentRpcByNameResponse,
         )
 
 

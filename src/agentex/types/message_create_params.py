@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from typing import Union, Optional
-from typing_extensions import Required, TypeAlias, TypedDict
+from typing_extensions import Literal, Required, TypeAlias, TypedDict
 
-from .streaming_status import StreamingStatus
 from .data_content_param import DataContentParam
 from .text_content_param import TextContentParam
 from .tool_request_content_param import ToolRequestContentParam
@@ -19,7 +18,7 @@ class MessageCreateParams(TypedDict, total=False):
 
     task_id: Required[str]
 
-    streaming_status: Optional[StreamingStatus]
+    streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]]
 
 
 Content: TypeAlias = Union[TextContentParam, DataContentParam, ToolRequestContentParam, ToolResponseContentParam]
