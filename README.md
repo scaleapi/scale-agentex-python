@@ -17,7 +17,7 @@ The full API of this library can be found in [api.md](api.md).
 
 ```sh
 # install from PyPI
-pip install --pre agentex-sdk
+pip install agentex-sdk
 ```
 
 ## Usage
@@ -75,7 +75,7 @@ You can enable this by installing `aiohttp`:
 
 ```sh
 # install from PyPI
-pip install --pre agentex-sdk[aiohttp]
+pip install agentex-sdk[aiohttp]
 ```
 
 Then you can enable it by instantiating the client with `http_client=DefaultAioHttpClient()`:
