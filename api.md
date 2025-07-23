@@ -1,9 +1,3 @@
-# Shared Types
-
-```python
-from agentex.types import TaskMessageUpdate
-```
-
 # Agents
 
 Types:
