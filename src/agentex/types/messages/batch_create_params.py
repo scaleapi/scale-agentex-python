@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Iterable
-from typing_extensions import Required, TypedDict
+from typing import Union, Iterable
+from typing_extensions import Required, TypeAlias, TypedDict
 
-from ..task_message_content_param import TaskMessageContentParam
+from ..data_content_param import DataContentParam
+from ..text_content_param import TextContentParam
+from ..tool_request_content_param import ToolRequestContentParam
+from ..tool_response_content_param import ToolResponseContentParam
 
-__all__ = ["BatchCreateParams"]
+__all__ = ["BatchCreateParams", "Content"]
 
 
 class BatchCreateParams(TypedDict, total=False):
-    contents: Required[Iterable[TaskMessageContentParam]]
+    contents: Required[Iterable[Content]]
 
     task_id: Required[str]
+
+
+Content: TypeAlias = Union[TextContentParam, DataContentParam, ToolRequestContentParam, ToolResponseContentParam]
