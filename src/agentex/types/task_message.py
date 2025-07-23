@@ -1,25 +1,17 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import Union, Optional
+from typing import Optional
 from datetime import datetime
-from typing_extensions import Literal, Annotated, TypeAlias
+from typing_extensions import Literal
 
-from .._utils import PropertyInfo
 from .._models import BaseModel
-from .data_content import DataContent
-from .text_content import TextContent
-from .tool_request_content import ToolRequestContent
-from .tool_response_content import ToolResponseContent
+from .task_message_content import TaskMessageContent
 
-__all__ = ["TaskMessage", "Content"]
-
-Content: TypeAlias = Annotated[
-    Union[TextContent, DataContent, ToolRequestContent, ToolResponseContent], PropertyInfo(discriminator="type")
-]
+__all__ = ["TaskMessage"]
 
 
 class TaskMessage(BaseModel):
-    content: Content
+    content: TaskMessageContent
     """The content of the message.
 
     This content is not OpenAI compatible. These are messages that are meant to be

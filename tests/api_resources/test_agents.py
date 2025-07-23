@@ -13,7 +13,6 @@ from agentex.types import (
     Agent,
     AgentRpcResponse,
     AgentListResponse,
-    AgentRpcByNameResponse,
 )
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
@@ -299,7 +298,7 @@ class TestAgents:
             method="event/send",
             params={},
         )
-        assert_matches_type(AgentRpcByNameResponse, agent, path=["response"])
+        assert_matches_type(AgentRpcResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -314,7 +313,7 @@ class TestAgents:
             id=0,
             jsonrpc="2.0",
         )
-        assert_matches_type(AgentRpcByNameResponse, agent, path=["response"])
+        assert_matches_type(AgentRpcResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -328,7 +327,7 @@ class TestAgents:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         agent = response.parse()
-        assert_matches_type(AgentRpcByNameResponse, agent, path=["response"])
+        assert_matches_type(AgentRpcResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -342,7 +341,7 @@ class TestAgents:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             agent = response.parse()
-            assert_matches_type(AgentRpcByNameResponse, agent, path=["response"])
+            assert_matches_type(AgentRpcResponse, agent, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -639,7 +638,7 @@ class TestAsyncAgents:
             method="event/send",
             params={},
         )
-        assert_matches_type(AgentRpcByNameResponse, agent, path=["response"])
+        assert_matches_type(AgentRpcResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -654,7 +653,7 @@ class TestAsyncAgents:
             id=0,
             jsonrpc="2.0",
         )
-        assert_matches_type(AgentRpcByNameResponse, agent, path=["response"])
+        assert_matches_type(AgentRpcResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -668,7 +667,7 @@ class TestAsyncAgents:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         agent = await response.parse()
-        assert_matches_type(AgentRpcByNameResponse, agent, path=["response"])
+        assert_matches_type(AgentRpcResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -682,7 +681,7 @@ class TestAsyncAgents:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             agent = await response.parse()
-            assert_matches_type(AgentRpcByNameResponse, agent, path=["response"])
+            assert_matches_type(AgentRpcResponse, agent, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
