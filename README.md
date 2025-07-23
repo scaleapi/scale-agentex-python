@@ -1,7 +1,7 @@
 # Agentex Python API library
 
 <!-- prettier-ignore -->
-[![PyPI version](https://img.shields.io/pypi/v/agentex.svg?label=pypi%20(stable))](https://pypi.org/project/agentex/)
+[![PyPI version](https://img.shields.io/pypi/v/agentex-sdk.svg?label=pypi%20(stable))](https://pypi.org/project/agentex-sdk/)
 
 The Agentex Python library provides convenient access to the Agentex REST API from any Python 3.8+
 application. The library includes type definitions for all request params and response fields,
@@ -21,7 +21,7 @@ pip install git+ssh://git@github.com/scaleapi/agentex-python.git
 ```
 
 > [!NOTE]
-> Once this package is [published to PyPI](https://www.stainless.com/docs/guides/publish), this will become: `pip install --pre agentex`
+> Once this package is [published to PyPI](https://www.stainless.com/docs/guides/publish), this will become: `pip install --pre agentex-sdk`
 
 ## Usage
 
@@ -78,7 +78,7 @@ You can enable this by installing `aiohttp`:
 
 ```sh
 # install from the production repo
-pip install 'agentex[aiohttp] @ git+ssh://git@github.com/scaleapi/agentex-python.git'
+pip install 'agentex-sdk[aiohttp] @ git+ssh://git@github.com/scaleapi/agentex-python.git'
 ```
 
 Then you can enable it by instantiating the client with `http_client=DefaultAioHttpClient()`:
