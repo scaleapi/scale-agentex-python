@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0-alpha.5 (2025-07-23)
+
+Full Changelog: [v0.1.0-alpha.4...v0.1.0-alpha.5](https://github.com/scaleapi/agentex-python/compare/v0.1.0-alpha.4...v0.1.0-alpha.5)
+
+### Features
+
+* **api:** deprecate name subresource ([14881c0](https://github.com/scaleapi/agentex-python/commit/14881c0ff2922e0a622975a0f5b314de99d7aabb))
+* **api:** manual updates ([a885d8d](https://github.com/scaleapi/agentex-python/commit/a885d8dbabfe2cc2a556ef02e75e5502fd799c46))
+
+
+### Bug Fixes
+
+* **api:** build errors ([7bde6b7](https://github.com/scaleapi/agentex-python/commit/7bde6b727d6d16ebd6805ef843596fc3224445a6))
+* **parsing:** parse extra field types ([d40e6e0](https://github.com/scaleapi/agentex-python/commit/d40e6e0d6911be0bc9bfc419e02bd7c1d5ad5be4))
+
 ## 0.1.0-alpha.4 (2025-07-22)
 
 Full Changelog: [v0.1.0-alpha.3...v0.1.0-alpha.4](https://github.com/scaleapi/agentex-python/compare/v0.1.0-alpha.3...v0.1.0-alpha.4)
