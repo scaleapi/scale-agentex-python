@@ -5,15 +5,15 @@ from __future__ import annotations
 from typing import Union
 from typing_extensions import Literal, Required, TypedDict
 
-from .agent_rpc_params import AgentRpcParams
+from . import agent_rpc_params
 
-__all__ = ["AgentRpcByNameParams"]
+__all__ = ["AgentRpcParams"]
 
 
-class AgentRpcByNameParams(TypedDict, total=False):
+class AgentRpcParams(TypedDict, total=False):
     method: Required[Literal["event/send", "task/create", "message/send", "task/cancel"]]
 
-    params: Required[AgentRpcParams]
+    params: Required[agent_rpc_params.AgentRpcParams]
     """The parameters for the agent RPC request"""
 
     id: Union[int, str, None]
