@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 (2025-07-24)
+
+Full Changelog: [v0.1.1...v0.2.0](https://github.com/scaleapi/agentex-python/compare/v0.1.1...v0.2.0)
+
+### Features
+
+* **api:** update typescript sdk with big changes ([06e9d67](https://github.com/scaleapi/agentex-python/commit/06e9d67e4041437d193db9c46c290126d2d13712))
+
+
+### Chores
+
+* **project:** add settings file for vscode ([e4088d1](https://github.com/scaleapi/agentex-python/commit/e4088d13fc8109ac71a8dd3bcced4ddc4b91bbda))
+
 ## 0.1.1 (2025-07-24)
 
 Full Changelog: [v0.1.0...v0.1.1](https://github.com/scaleapi/agentex-python/compare/v0.1.0...v0.1.1)
