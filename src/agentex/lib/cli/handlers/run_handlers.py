@@ -6,7 +6,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 
-from agentex.lib.cli.handlers.auth_handlers import _encode_principal_context
+from agentex.lib.cli.utils.auth_utils import _encode_principal_context
 from agentex.lib.cli.handlers.cleanup_handlers import (
     cleanup_agent_workflows,
     should_cleanup_on_restart

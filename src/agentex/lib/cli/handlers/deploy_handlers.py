@@ -8,7 +8,7 @@ import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
 
-from agentex.lib.cli.handlers.auth_handlers import _encode_principal_context
+from agentex.lib.cli.utils.auth_utils import _encode_principal_context
 from agentex.lib.cli.utils.exceptions import DeploymentError, HelmError
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.environment_variables import EnvVarKeys
