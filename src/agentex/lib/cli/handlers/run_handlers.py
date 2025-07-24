@@ -6,10 +6,12 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 
+from agentex.lib.cli.utils.auth_utils import _encode_principal_context
 from agentex.lib.cli.handlers.cleanup_handlers import (
     cleanup_agent_workflows,
     should_cleanup_on_restart
 )
+from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.utils.logging import make_logger
 
@@ -426,6 +428,11 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
         "ACP_URL": f"http://{manifest.local_development.agent.host_address}",
         "ACP_PORT": str(manifest.local_development.agent.port),
     }
+
+    # Add authorization principal if set
+    encoded_principal = _encode_principal_context(manifest)
+    if encoded_principal:
+        env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64] = encoded_principal
 
     # Add description if available
     if manifest.agent.description:

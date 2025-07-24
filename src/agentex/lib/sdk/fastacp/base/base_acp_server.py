@@ -1,5 +1,7 @@
 import asyncio
+import base64
 import inspect
+import json
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
@@ -341,6 +343,16 @@ class BaseACPServer(FastAPI):
         """Start the Uvicorn server for async handlers."""
         uvicorn.run(self, host=host, port=port, **kwargs)
 
+    def _get_auth_principal(self, env_vars: EnvironmentVariables):
+        if not env_vars.AUTH_PRINCIPAL_B64:
+            return None
+
+        try:
+            decoded_str = base64.b64decode(env_vars.AUTH_PRINCIPAL_B64).decode('utf-8')
+            return json.loads(decoded_str)
+        except Exception:
+            return None
+
     async def _register_agent(self, env_vars: EnvironmentVariables):
         """Register this agent with the Agentex server"""
         # Build the agent's own URL
@@ -350,12 +362,14 @@ class BaseACPServer(FastAPI):
             env_vars.AGENT_DESCRIPTION
             or f"Generic description for agent: {env_vars.AGENT_NAME}"
         )
+
         # Prepare registration data
         registration_data = {
             "name": env_vars.AGENT_NAME,
             "description": description,
             "acp_url": full_acp_url,
             "acp_type": env_vars.ACP_TYPE,
+            "principal_context": self._get_auth_principal(env_vars)
         }
 
         if env_vars.AGENT_ID:
