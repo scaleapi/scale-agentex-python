@@ -6,7 +6,6 @@ Types:
 from agentex.types import (
     AcpType,
     Agent,
-    AgentRpcParams,
     AgentRpcRequest,
     AgentRpcResponse,
     AgentRpcResult,
