@@ -232,13 +232,6 @@ def merge_deployment_configs(
         helm_values[TEMPORAL_WORKER_KEY]["env"] = convert_env_vars_dict_to_list(
             helm_values[TEMPORAL_WORKER_KEY]["env"]
         )
-
-    print("Deploying with the following helm values: ", helm_values)alues["env"] = convert_env_vars_dict_to_list(helm_values["env"])
-    if TEMPORAL_WORKER_KEY in helm_values:
-        helm_values[TEMPORAL_WORKER_KEY]["env"] = convert_env_vars_dict_to_list(
-            helm_values[TEMPORAL_WORKER_KEY]["env"]
-        )
-
     print("Deploying with the following helm values: ", helm_values)
     return helm_values
 
