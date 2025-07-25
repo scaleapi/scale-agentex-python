@@ -94,6 +94,12 @@ def load_override_config(override_file_path: str | None = None) -> ClusterConfig
         ) from e
 
 
+
+def convert_env_vars_dict_to_list(env_vars: dict[str, str]) -> list[dict[str, str]]:
+    """Convert a dictionary of environment variables to a list of dictionaries"""
+    return [{"name": key, "value": value} for key, value in env_vars.items()]
+
+
 def merge_deployment_configs(
     manifest: AgentManifest,
     cluster_config: ClusterConfig | None,
@@ -219,6 +225,21 @@ def merge_deployment_configs(
         if cluster_config.additional_overrides:
             _deep_merge(helm_values, cluster_config.additional_overrides)
 
+    # Convert the env vars to a list of dictionaries
+    if "env" in helm_values:
+        helm_values["env"] = convert_env_vars_dict_to_list(helm_values["env"])
+    if TEMPORAL_WORKER_KEY in helm_values and "env" in helm_values[TEMPORAL_WORKER_KEY]:
+        helm_values[TEMPORAL_WORKER_KEY]["env"] = convert_env_vars_dict_to_list(
+            helm_values[TEMPORAL_WORKER_KEY]["env"]
+        )
+
+    print("Deploying with the following helm values: ", helm_values)alues["env"] = convert_env_vars_dict_to_list(helm_values["env"])
+    if TEMPORAL_WORKER_KEY in helm_values:
+        helm_values[TEMPORAL_WORKER_KEY]["env"] = convert_env_vars_dict_to_list(
+            helm_values[TEMPORAL_WORKER_KEY]["env"]
+        )
+
+    print("Deploying with the following helm values: ", helm_values)
     return helm_values
 
 
