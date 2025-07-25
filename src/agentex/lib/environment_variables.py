@@ -24,9 +24,11 @@ class EnvVarKeys(str, Enum):
     ACP_URL = "ACP_URL"
     ACP_PORT = "ACP_PORT"
     ACP_TYPE = "ACP_TYPE"
-    # Workflow Configuraiton
+    # Workflow Configuration
     WORKFLOW_NAME = "WORKFLOW_NAME"
     WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
+    # Auth Configuration
+    AUTH_PRINCIPAL_B64 = "AUTH_PRINCIPAL_B64"
 
 
 class Environment(str, Enum):
@@ -54,6 +56,7 @@ class EnvironmentVariables(BaseModel):
     # Workflow Configuration
     WORKFLOW_TASK_QUEUE: str | None = None
     WORKFLOW_NAME: str | None = None
+    AUTH_PRINCIPAL_B64: str | None = None
 
     @classmethod
     def refresh(cls) -> EnvironmentVariables | None:

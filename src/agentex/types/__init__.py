@@ -7,7 +7,6 @@ from .task import Task as Task
 from .agent import Agent as Agent
 from .event import Event as Event
 from .state import State as State
-from .shared import TaskMessageUpdate as TaskMessageUpdate
 from .acp_type import AcpType as AcpType
 from .data_delta import DataDelta as DataDelta
 from .text_delta import TextDelta as TextDelta
@@ -38,6 +37,7 @@ from .message_list_params import MessageListParams as MessageListParams
 from .state_create_params import StateCreateParams as StateCreateParams
 from .state_list_response import StateListResponse as StateListResponse
 from .state_update_params import StateUpdateParams as StateUpdateParams
+from .task_message_update import TaskMessageUpdate as TaskMessageUpdate
 from .tool_response_delta import ToolResponseDelta as ToolResponseDelta
 from .tracker_list_params import TrackerListParams as TrackerListParams
 from .task_delete_response import TaskDeleteResponse as TaskDeleteResponse

@@ -15,7 +15,7 @@ from pydantic import Field
 
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.build_config import BuildConfig
-from agentex.lib.sdk.config.deployment_config import DeploymentConfig
+from agentex.lib.sdk.config.deployment_config import DeploymentConfig, AuthenticationConfig
 from agentex.lib.sdk.config.local_development_config import LocalDevelopmentConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
@@ -36,6 +36,7 @@ class AgentManifest(BaseModel):
     deployment: DeploymentConfig | None = Field(
         default=None, description="Deployment configuration for the agent"
     )
+    auth: AuthenticationConfig | None = Field(default=None, description="Authentication configuration")
 
     def context_manager(self, build_context_root: Path) -> BuildContextManager:
         """

@@ -3,11 +3,11 @@
 from typing import Union, Optional
 from typing_extensions import Literal, Annotated, TypeAlias
 
-from ..._utils import PropertyInfo
-from ..._models import BaseModel
-from ..task_message import TaskMessage
-from ..task_message_delta import TaskMessageDelta
-from ..task_message_content import TaskMessageContent
+from .._utils import PropertyInfo
+from .._models import BaseModel
+from .task_message import TaskMessage
+from .task_message_delta import TaskMessageDelta
+from .task_message_content import TaskMessageContent
 
 __all__ = [
     "TaskMessageUpdate",
