@@ -391,9 +391,6 @@ class BaseACPServer(FastAPI):
                         registration_url, json=registration_data, timeout=30.0
                     )
                     if response.status_code == 200:
-                        logger.info(
-                            f"Successfully registered agent '{env_vars.AGENT_NAME}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
-                        )
                         agent = response.json()
                         agent_id, agent_name = agent["id"], agent["name"]
 
@@ -401,6 +398,10 @@ class BaseACPServer(FastAPI):
                         os.environ["AGENT_NAME"] = agent_name
                         refreshed_environment_variables.AGENT_ID = agent_id
                         refreshed_environment_variables.AGENT_NAME = agent_name
+                        
+                        logger.info(
+                            f"Successfully registered agent '{agent_name}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
+                        )
                         return  # Success, exit the retry loop
                     else:
                         error_msg = f"Failed to register agent. Status: {response.status_code}, Response: {response.text}"
