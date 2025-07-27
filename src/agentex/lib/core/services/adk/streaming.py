@@ -2,7 +2,7 @@ import json
 from typing import Literal, cast
 
 from agentex import AsyncAgentex
-from agentex.lib.core.adapters.streams.port import EventStreamRepository
+from agentex.lib.core.adapters.streams.port import StreamRepository
 from agentex.lib.types.task_message_updates import (
     TaskMessageDelta, 
     TaskMessageUpdate,
@@ -22,7 +22,6 @@ from agentex.types.task_message import (
     TaskMessage,
     TaskMessageContent,
 )
-from agentex.types.task_message_content_param import TaskMessageContentParam
 from agentex.types.text_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
@@ -221,7 +220,7 @@ class StreamingService:
     def __init__(
         self,
         agentex_client: AsyncAgentex,
-        stream_repository: EventStreamRepository,
+        stream_repository: StreamRepository,
     ):
         self._agentex_client = agentex_client
         self._stream_repository = stream_repository

@@ -60,6 +60,7 @@ This file is essential for both local development and deployment of your agent.
 │   └── acp.py               # ACP server and event handlers
 ├── Dockerfile               # Container definition
 ├── manifest.yaml            # Deployment config
+├── dev.ipynb                # Development notebook for testing
 {% if use_uv %}
 └── pyproject.toml          # Dependencies (uv)
 {% else %}
@@ -74,7 +75,26 @@ This file is essential for both local development and deployment of your agent.
 - Add your own tools and capabilities
 - Implement custom response generation
 
-### 2. Manage Dependencies
+### 2. Test Your Agent with the Development Notebook
+Use the included `dev.ipynb` Jupyter notebook to test your agent interactively:
+
+```bash
+# Start Jupyter notebook (make sure you have jupyter installed)
+jupyter notebook dev.ipynb
+
+# Or use VS Code to open the notebook directly
+code dev.ipynb
+```
+
+The notebook includes:
+- **Setup**: Connect to your local AgentEx backend
+- **Non-streaming tests**: Send messages and get complete responses
+- **Streaming tests**: Test real-time streaming responses
+- **Task management**: Optional task creation and management
+
+The notebook automatically uses your agent name (`{{ agent_name }}`) and provides examples for both streaming and non-streaming message handling.
+
+### 3. Manage Dependencies
 
 {% if use_uv %}
 You chose **uv** for package management. Here's how to work with dependencies:
@@ -113,7 +133,7 @@ pip install -r requirements.txt
 - Wide compatibility
 {% endif %}
 
-### 3. Configure Credentials
+### 4. Configure Credentials
 Options:
 1. Add any required credentials to your manifest.yaml via the `env` section
 2. Export them in your shell: `export OPENAI_API_KEY=...`
