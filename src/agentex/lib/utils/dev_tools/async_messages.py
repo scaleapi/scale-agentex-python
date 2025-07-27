@@ -12,7 +12,7 @@ from typing import List, Optional
 from yaspin.core import Yaspin
 
 from agentex import Agentex
-from agentex.types import Task, TaskMessage, TextContent
+from agentex.types import Task, TaskMessage, TextContent, ToolRequestContent, ToolResponseContent
 from agentex.types.task_message_update import (
     TaskMessageUpdate,
     StreamTaskMessageStart,
@@ -56,13 +56,70 @@ def print_task_message(
     
     if isinstance(message.content, TextContent):        
         content = message.content.content
+        content_type = "text"
+    elif isinstance(message.content, ToolRequestContent):
+        tool_name = message.content.name
+        tool_args = message.content.arguments
+        
+        # Format arguments as pretty JSON
+        try:
+            if isinstance(tool_args, str):
+                parsed_args = json.loads(tool_args)
+                formatted_args = json.dumps(parsed_args, indent=2)
+            else:
+                formatted_args = json.dumps(tool_args, indent=2)
+            content = f"🔧 **Tool Request: {tool_name}**\n\n**Arguments:**\n```json\n{formatted_args}\n```"
+        except (json.JSONDecodeError, TypeError):
+            content = f"🔧 **Tool Request: {tool_name}**\n\n**Arguments:**\n```json\n{tool_args}\n```"
+        
+        content_type = "tool_request"
+    elif isinstance(message.content, ToolResponseContent):
+        tool_name = message.content.name
+        tool_response = message.content.content
+        
+        # Try to parse and format JSON response nicely
+        try:
+            if isinstance(tool_response, str):
+                parsed_response = json.loads(tool_response)
+                formatted_json = json.dumps(parsed_response, indent=2)
+                content = f"✅ **Tool Response: {tool_name}**\n\n**Response:**\n```json\n{formatted_json}\n```"
+            else:
+                formatted_json = json.dumps(tool_response, indent=2)
+                content = f"✅ **Tool Response: {tool_name}**\n\n**Response:**\n```json\n{formatted_json}\n```"
+        except (json.JSONDecodeError, TypeError):
+            # If it's not valid JSON, display as text
+            if isinstance(tool_response, str):
+                # Try to extract text content if it's a JSON string with text field
+                try:
+                    parsed = json.loads(tool_response)
+                    if isinstance(parsed, dict) and "text" in parsed:
+                        text_content = str(parsed["text"])
+                        content = f"✅ **Tool Response: {tool_name}**\n\n{text_content}"
+                    else:
+                        content = f"✅ **Tool Response: {tool_name}**\n\n{tool_response}"
+                except json.JSONDecodeError:
+                    content = f"✅ **Tool Response: {tool_name}**\n\n{tool_response}"
+            else:
+                content = f"✅ **Tool Response: {tool_name}**\n\n{tool_response}"
+        
+        content_type = "tool_response"
     else:
         content = f"{type(message.content).__name__}: {message.content}"
+        content_type = "other"
     
     if rich_print and console:
         author_color = "bright_cyan" if message.content.author == "user" else "green"
         title = f"[bold {author_color}]{message.content.author.upper()}[/bold {author_color}] [{timestamp}]"
-        panel = Panel(Markdown(content), title=title, border_style=author_color, width=80)
+        
+        # Use different border styles for tool messages
+        if content_type == "tool_request":
+            border_style = "yellow"
+        elif content_type == "tool_response":
+            border_style = "bright_green"
+        else:
+            border_style = author_color
+            
+        panel = Panel(Markdown(content), title=title, border_style=border_style, width=80)
         console.print(panel)
     else:
         title = f"{message.content.author.upper()} [{timestamp}]"
@@ -131,7 +188,7 @@ def print_task_message_update(
             else:
                 print(f"Non-text content: {content_type}")
                 
-    elif isinstance(task_message_update, StreamTaskMessageDone):
+    else:  # StreamTaskMessageDone
         if rich_print and console:
             console.print("\n✅ [green]Agent finished responding.[/green]")
         else:

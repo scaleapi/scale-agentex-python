@@ -116,7 +116,7 @@ def init():
     )
 
     # Use a Rich table for template descriptions
-    table = Table(show_header=True, header_style="bold magenta")
+    table = Table(show_header=True, header_style="bold blue")
     table.add_column("Template", style="cyan", no_wrap=True)
     table.add_column("Description", style="white")
     table.add_row(
