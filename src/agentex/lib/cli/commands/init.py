@@ -75,9 +75,8 @@ def create_project_structure(
         root_templates["requirements.txt.j2"] = "requirements.txt"
         root_templates["Dockerfile.j2"] = "Dockerfile"
 
-    # Add development notebook for sync agents
-    if template_type == TemplateType.SYNC:
-        root_templates["dev.ipynb.j2"] = "dev.ipynb"
+    # Add development notebook for agents
+    root_templates["dev.ipynb.j2"] = "dev.ipynb"
 
     for template, output in root_templates.items():
         output_path = project_dir / output

@@ -167,7 +167,7 @@ def subscribe_to_async_task_messages(
         client: The Agentex client instance
         task: The task to subscribe to
         print_messages: Whether to print messages as they arrive
-        only_after_timestamp: Only include messages created after this timestamp
+        only_after_timestamp: Only include messages created after this timestamp. If None, all messages will be included.
         rich_print: Whether to use rich to print the message
         timeout: The timeout in seconds for the streaming connection. If the connection times out, the function will return with any messages collected so far.
     Returns:
