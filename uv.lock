@@ -9,7 +9,6 @@ source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "anyio" },
-    { name = "debugpy" },
     { name = "distro" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -62,7 +61,6 @@ requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.10,<4" },
     { name = "aiohttp", marker = "extra == 'aiohttp'" },
     { name = "anyio", specifier = ">=3.5.0,<5" },
-    { name = "debugpy", specifier = ">=1.8.15" },
     { name = "distro", specifier = ">=1.7.0,<2" },
     { name = "fastapi", specifier = ">=0.115.0,<0.116" },
     { name = "httpx", specifier = ">=0.27.2,<0.28" },

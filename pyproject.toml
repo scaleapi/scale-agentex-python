@@ -38,8 +38,7 @@ dependencies = [
     "pytest>=8.4.0",
     "pytest-asyncio>=1.0.0",
     "scale-gp-beta==0.1.0a20",
-    "ipykernel>=6.29.5",
-    "debugpy>=1.8.15",
+    "ipykernel>=6.29.5",    
 ]
 requires-python = ">= 3.12,<4"
 classifiers = [
@@ -87,6 +86,7 @@ dev-dependencies = [
     "rich>=13.7.1",
     "nest_asyncio==1.6.0",
     "pytest-xdist>=3.6.1",
+    "debugpy>=1.8.15",
 ]
 
 [tool.rye.scripts]
