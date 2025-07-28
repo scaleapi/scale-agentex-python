@@ -124,6 +124,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "ipywidgets>=8.1.7",
+    "nbstripout>=0.8.1",
     "yaspin>=3.1.0",
 ]
 
