@@ -18,6 +18,9 @@ from agentex.lib.cli.utils.path_utils import (
 
 from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
+
+# Import debug functionality
+from agentex.lib.cli.debug import DebugConfig, start_acp_server_debug, start_temporal_worker_debug
 from agentex.lib.utils.logging import make_logger
 
 logger = make_logger(__name__)
@@ -249,7 +252,7 @@ async def stream_process_output(process: asyncio.subprocess.Process, prefix: str
         logger.debug(f"Output streaming ended for {prefix}: {e}")
 
 
-async def run_agent(manifest_path: str):
+async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
     """Run an agent locally from the given manifest"""
 
     # Validate manifest exists
@@ -289,11 +292,16 @@ async def run_agent(manifest_path: str):
             )
         )
 
-        # Start ACP server
+        # Start ACP server (with debug support if enabled)
         manifest_dir = Path(manifest_path).parent
-        acp_process = await start_acp_server(
-            file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir
-        )
+        if debug_config and debug_config.should_debug_acp():
+            acp_process = await start_acp_server_debug(
+                file_paths["acp"], manifest.local_development.agent.port, agent_env, debug_config
+            )
+        else:
+            acp_process = await start_acp_server(
+                file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir
+            )
         process_manager.add_process(acp_process)
 
         # Start output streaming for ACP
@@ -301,9 +309,18 @@ async def run_agent(manifest_path: str):
 
         tasks = [acp_output_task]
 
-        # Start temporal worker if needed
+        # Start temporal worker if needed (with debug support if enabled)
         if is_temporal_agent(manifest) and file_paths["worker"]:
-            worker_task = await start_temporal_worker_with_reload(file_paths["worker"], agent_env, process_manager)
+            if debug_config and debug_config.should_debug_worker():
+                # In debug mode, start worker without auto-reload to prevent conflicts
+                worker_process = await start_temporal_worker_debug(
+                    file_paths["worker"], agent_env, debug_config
+                )
+                process_manager.add_process(worker_process)
+                worker_task = asyncio.create_task(stream_process_output(worker_process, "WORKER"))
+            else:
+                # Normal mode with auto-reload
+                worker_task = await start_temporal_worker_with_reload(file_paths["worker"], agent_env, process_manager)
             tasks.append(worker_task)
 
         console.print(

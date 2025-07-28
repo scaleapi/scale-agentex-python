@@ -7,6 +7,7 @@ from rich.console import Console
 
 from agentex.lib.cli.handlers.run_handlers import RunError
 from agentex.lib.cli.handlers.run_handlers import run_agent as _run_agent
+from agentex.lib.cli.debug import DebugConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.utils.logging import make_logger
 
@@ -126,7 +127,7 @@ def build_agent(
     return image_name
 
 
-def run_agent(manifest_path: str):
+def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
     """Run an agent locally from the given manifest"""
     import asyncio
     import signal
@@ -152,7 +153,7 @@ def run_agent(manifest_path: str):
     signal.signal(signal.SIGTERM, signal_handler)
     
     try:
-        asyncio.run(_run_agent(manifest_path))
+        asyncio.run(_run_agent(manifest_path, debug_config))
     except KeyboardInterrupt:
         print("Shutdown completed.")
         sys.exit(0)
