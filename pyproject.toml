@@ -39,6 +39,7 @@ dependencies = [
     "pytest-asyncio>=1.0.0",
     "scale-gp-beta==0.1.0a20",
     "ipykernel>=6.29.5",
+    "debugpy>=1.8.15",
 ]
 requires-python = ">= 3.12,<4"
 classifiers = [

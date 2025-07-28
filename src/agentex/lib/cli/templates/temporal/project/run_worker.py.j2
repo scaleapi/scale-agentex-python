@@ -1,39 +1,9 @@
 import asyncio
-import os
-import sys
-
-# === DEBUG SETUP (AgentEx CLI Debug Support) ===
-if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
-    try:
-        import debugpy
-        debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "5678"))
-        debug_type = os.getenv("AGENTEX_DEBUG_TYPE", "worker")
-        wait_for_attach = os.getenv("AGENTEX_DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true"
-        
-        # Configure debugpy
-        debugpy.configure(subProcess=False)
-        debugpy.listen(debug_port)
-        
-        print(f"🐛 [{debug_type.upper()}] Debug server listening on port {debug_port}")
-        
-        if wait_for_attach:
-            print(f"⏳ [{debug_type.upper()}] Waiting for debugger to attach...")
-            debugpy.wait_for_client()
-            print(f"✅ [{debug_type.upper()}] Debugger attached!")
-        else:
-            print(f"📡 [{debug_type.upper()}] Ready for debugger attachment")
-            
-    except ImportError:
-        print("❌ debugpy not available. Install with: pip install debugpy")
-        sys.exit(1)
-    except Exception as e:
-        print(f"❌ Debug setup failed: {e}")
-        sys.exit(1)
-# === END DEBUG SETUP ===
 
 from agentex.lib.core.temporal.activities import get_all_activities
 from agentex.lib.core.temporal.workers.worker import AgentexWorker
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.environment_variables import EnvironmentVariables
 
 from workflow import {{ workflow_class }}
@@ -45,6 +15,9 @@ logger = make_logger(__name__)
 
 
 async def main():
+    # Setup debug mode if enabled
+    setup_debug_if_enabled()
+    
     task_queue_name = environment_variables.WORKFLOW_TASK_QUEUE
     if task_queue_name is None:
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")

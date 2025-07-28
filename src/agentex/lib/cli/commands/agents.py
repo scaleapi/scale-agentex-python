@@ -223,7 +223,7 @@ def run(
             mode=mode,
             port=debug_port,
             wait_for_attach=wait_for_debugger,
-            auto_port=True  # Always use auto port detection
+            auto_port=False  # Use fixed port to match VS Code launch.json
         )
         
         console.print(f"[blue]🐛 Debug mode enabled: {mode.value}[/blue]")

@@ -106,6 +106,12 @@ class AgentexWorker:
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
         )
+        
+        # Enable debug mode if AgentEx debug is enabled (disables deadlock detection)
+        debug_enabled = os.environ.get("AGENTEX_DEBUG_ENABLED", "false").lower() == "true"
+        if debug_enabled:
+            logger.info("🐛 [WORKER] Temporal debug mode enabled - deadlock detection disabled")
+        
         worker = Worker(
             client=temporal_client,
             task_queue=self.task_queue,
@@ -115,6 +121,7 @@ class AgentexWorker:
             workflow_runner=UnsandboxedWorkflowRunner(),
             max_concurrent_activities=self.max_concurrent_activities,
             build_id=str(uuid.uuid4()),
+            debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
         )
 
         logger.info(f"Starting workers for task queue: {self.task_queue}")

@@ -164,6 +164,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "agentex-sdk" },
+    { name = "debugpy" },
     { name = "scale-gp" },
 ]
 
@@ -179,6 +180,7 @@ dev = [
 requires-dist = [
     { name = "agentex-sdk" },
     { name = "black", marker = "extra == 'dev'" },
+    { name = "debugpy", specifier = ">=1.8.15" },
     { name = "flake8", marker = "extra == 'dev'" },
     { name = "isort", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },

@@ -7,7 +7,7 @@ Provides debug-enabled versions of ACP server and temporal worker startup.
 import asyncio
 import sys
 from pathlib import Path
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Dict, TYPE_CHECKING
 
 from rich.console import Console
 
@@ -48,11 +48,13 @@ async def start_temporal_worker_debug(
     
     console.print(f"[blue]🐛 Starting Temporal worker in debug mode[/blue]")
     console.print(f"[yellow]📡 Debug server will listen on port {debug_port}[/yellow]")
+    console.print(f"[green]✓ VS Code should connect to: localhost:{debug_port}[/green]")
     
     if debug_config.wait_for_attach:
         console.print(f"[yellow]⏳ Worker will wait for debugger to attach[/yellow]")
     
     console.print(f"[dim]💡 In your IDE: Attach to localhost:{debug_port}[/dim]")
+    console.print(f"[dim]🔧 If connection fails, check that VS Code launch.json uses port {debug_port}[/dim]")
     
     return await asyncio.create_subprocess_exec(
         *cmd,
