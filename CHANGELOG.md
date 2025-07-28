@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 (2025-07-28)
+
+Full Changelog: [v0.2.1...v0.3.0](https://github.com/scaleapi/agentex-python/compare/v0.2.1...v0.3.0)
+
+### Features
+
+* **api:** api update ([f53428b](https://github.com/scaleapi/agentex-python/commit/f53428b161f989d091bfce08ed81aa0f6d9e13ce))
+
 ## 0.2.1 (2025-07-27)
 
 Full Changelog: [v0.2.0...v0.2.1](https://github.com/scaleapi/agentex-python/compare/v0.2.0...v0.2.1)
