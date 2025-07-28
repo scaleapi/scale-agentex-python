@@ -2,7 +2,7 @@ from scale_gp import SGPClient, SGPClientError
 
 from agentex import AsyncAgentex
 from agentex.lib.core.adapters.llm.adapter_litellm import LiteLLMGateway
-from agentex.lib.core.adapters.streams.adapter_redis import RedisEventStreamRepository
+from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
 from agentex.lib.core.services.adk.acp.acp import ACPService
 from agentex.lib.core.services.adk.agent_task_tracker import AgentTaskTrackerService
 from agentex.lib.core.services.adk.events import EventsService
@@ -57,7 +57,7 @@ def get_all_activities(sgp_client=None):
         sgp_client = None
 
     llm_gateway = LiteLLMGateway()
-    stream_repository = RedisEventStreamRepository()
+    stream_repository = RedisStreamRepository()
     agentex_client = AsyncAgentex()
     tracer = AsyncTracer(agentex_client)
 

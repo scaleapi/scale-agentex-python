@@ -3,14 +3,32 @@
 from __future__ import annotations
 
 from typing import Dict, Union, Optional
-from typing_extensions import Required, TypeAlias, TypedDict
+from typing_extensions import Literal, Required, TypeAlias, TypedDict
 
 from .task_message_content_param import TaskMessageContentParam
 
-__all__ = ["AgentRpcParams", "CreateTaskRequest", "CancelTaskRequest", "SendMessageRequest", "SendEventRequest"]
+__all__ = [
+    "AgentRpcParams",
+    "Params",
+    "ParamsCreateTaskRequest",
+    "ParamsCancelTaskRequest",
+    "ParamsSendMessageRequest",
+    "ParamsSendEventRequest",
+]
 
 
-class CreateTaskRequest(TypedDict, total=False):
+class AgentRpcParams(TypedDict, total=False):
+    method: Required[Literal["event/send", "task/create", "message/send", "task/cancel"]]
+
+    params: Required[Params]
+    """The parameters for the agent RPC request"""
+
+    id: Union[int, str, None]
+
+    jsonrpc: Literal["2.0"]
+
+
+class ParamsCreateTaskRequest(TypedDict, total=False):
     name: Optional[str]
     """The name of the task to create"""
 
@@ -18,7 +36,7 @@ class CreateTaskRequest(TypedDict, total=False):
     """The parameters for the task"""
 
 
-class CancelTaskRequest(TypedDict, total=False):
+class ParamsCancelTaskRequest(TypedDict, total=False):
     task_id: Optional[str]
     """The ID of the task to cancel. Either this or task_name must be provided."""
 
@@ -26,7 +44,7 @@ class CancelTaskRequest(TypedDict, total=False):
     """The name of the task to cancel. Either this or task_id must be provided."""
 
 
-class SendMessageRequest(TypedDict, total=False):
+class ParamsSendMessageRequest(TypedDict, total=False):
     content: Required[TaskMessageContentParam]
     """The message that was sent to the agent"""
 
@@ -37,7 +55,7 @@ class SendMessageRequest(TypedDict, total=False):
     """The ID of the task that the message was sent to"""
 
 
-class SendEventRequest(TypedDict, total=False):
+class ParamsSendEventRequest(TypedDict, total=False):
     content: Optional[TaskMessageContentParam]
     """The content to send to the event"""
 
@@ -48,4 +66,6 @@ class SendEventRequest(TypedDict, total=False):
     """The name of the task that the event was sent to"""
 
 
-AgentRpcParams: TypeAlias = Union[CreateTaskRequest, CancelTaskRequest, SendMessageRequest, SendEventRequest]
+Params: TypeAlias = Union[
+    ParamsCreateTaskRequest, ParamsCancelTaskRequest, ParamsSendMessageRequest, ParamsSendEventRequest
+]

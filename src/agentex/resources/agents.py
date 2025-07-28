@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Union, Optional
+import json
+from typing import AsyncGenerator, Generator, Union, Optional
 from typing_extensions import Literal
 
 import httpx
 
-from ..types import AgentRpcParams, agent_rpc_params, agent_list_params, agent_rpc_by_name_params
+from ..types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
 from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
 from .._utils import maybe_transform, async_maybe_transform
 from .._compat import cached_property
@@ -20,8 +21,7 @@ from .._response import (
 )
 from ..types.agent import Agent
 from .._base_client import make_request_options
-from ..types.agent_rpc_params import AgentRpcParams
-from ..types.agent_rpc_response import AgentRpcResponse
+from ..types.agent_rpc_response import AgentRpcResponse, CancelTaskResponse, CreateTaskResponse, SendEventResponse, SendMessageResponse, SendMessageStreamResponse
 from ..types.agent_list_response import AgentListResponse
 
 __all__ = ["AgentsResource", "AsyncAgentsResource"]
@@ -221,7 +221,7 @@ class AgentsResource(SyncAPIResource):
         agent_id: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: AgentRpcParams,
+        params: agent_rpc_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -269,7 +269,7 @@ class AgentsResource(SyncAPIResource):
         agent_name: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: AgentRpcParams,
+        params: agent_rpc_by_name_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -311,6 +311,260 @@ class AgentsResource(SyncAPIResource):
             ),
             cast_to=AgentRpcResponse,
         )
+    
+    def create_task(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsCreateTaskRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> CreateTaskResponse:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if agent_id is not None:
+        raw_agent_rpc_response = self.rpc(
+          agent_id=agent_id,
+          method="task/create",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        raw_agent_rpc_response = self.rpc_by_name(
+          agent_name=agent_name,
+          method="task/create",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      else:
+        raise ValueError("Either agent_id or agent_name must be provided")
+      
+      return CreateTaskResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
+    
+    def cancel_task(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsCancelTaskRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> CancelTaskResponse:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if agent_id is not None:
+        raw_agent_rpc_response = self.rpc(
+          agent_id=agent_id,
+          method="task/cancel",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        raw_agent_rpc_response = self.rpc_by_name(
+          agent_name=agent_name,
+          method="task/cancel",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      else:
+        raise ValueError("Either agent_id or agent_name must be provided")
+      
+      return CancelTaskResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
+
+    def send_message(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsSendMessageRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> SendMessageResponse:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if "stream" in params and params["stream"] == True:
+        raise ValueError("If stream is set to True, use send_message_stream() instead")
+      else:
+        if agent_id is not None:
+          raw_agent_rpc_response = self.rpc(
+            agent_id=agent_id,
+            method="message/send",
+            params=params,
+            id=id,
+            jsonrpc=jsonrpc,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
+            timeout=timeout,
+          )
+        elif agent_name is not None:
+          raw_agent_rpc_response = self.rpc_by_name(
+            agent_name=agent_name,
+            method="message/send",
+            params=params,
+            id=id,
+            jsonrpc=jsonrpc,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
+            timeout=timeout,
+          )
+        else:
+          raise ValueError("Either agent_id or agent_name must be provided")
+        
+        return SendMessageResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
+    
+    def send_message_stream(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsSendMessageRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> Generator[SendMessageStreamResponse, None, None]:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+
+      if "stream" in params and params["stream"] == False:
+        raise ValueError("If stream is set to False, use send_message() instead")
+      
+      params["stream"] = True
+      
+      if agent_id is not None:
+        raw_agent_rpc_response = self.with_streaming_response.rpc(
+          agent_id=agent_id,
+          method="message/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        raw_agent_rpc_response = self.with_streaming_response.rpc_by_name(
+          agent_name=agent_name,
+          method="message/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      else:
+        raise ValueError("Either agent_id or agent_name must be provided")
+      
+      with raw_agent_rpc_response as response:
+        for agent_rpc_response_str in response.iter_text():
+          if agent_rpc_response_str.strip():  # Only process non-empty lines
+            try:
+              chunk_rpc_response = SendMessageStreamResponse.model_validate(
+                json.loads(agent_rpc_response_str), 
+                from_attributes=True
+              )
+              yield chunk_rpc_response
+            except json.JSONDecodeError:
+              # Skip invalid JSON lines
+              continue
+    
+    def send_event(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsSendEventRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> SendEventResponse:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if agent_id is not None:
+        raw_agent_rpc_response = self.rpc(
+          agent_id=agent_id,
+          method="event/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        raw_agent_rpc_response = self.rpc_by_name(
+          agent_name=agent_name,
+          method="event/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      else:
+        raise ValueError("Either agent_id or agent_name must be provided")
+      
+      return SendEventResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
 
 
 class AsyncAgentsResource(AsyncAPIResource):
@@ -507,7 +761,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         agent_id: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: AgentRpcParams,
+        params: agent_rpc_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -555,7 +809,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         agent_name: str,
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
-        params: AgentRpcParams,
+        params: agent_rpc_by_name_params.Params,
         id: Union[int, str, None] | NotGiven = NOT_GIVEN,
         jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -597,7 +851,260 @@ class AsyncAgentsResource(AsyncAPIResource):
             ),
             cast_to=AgentRpcResponse,
         )
+    
+    async def create_task(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsCreateTaskRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> CreateTaskResponse:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if agent_id is not None:
+        raw_agent_rpc_response = await self.rpc(
+          agent_id=agent_id,
+          method="task/create",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        raw_agent_rpc_response = await self.rpc_by_name(
+          agent_name=agent_name,
+          method="task/create",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      else:
+        raise ValueError("Either agent_id or agent_name must be provided")
+      
+      return CreateTaskResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
+    
+    async def cancel_task(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsCancelTaskRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> CancelTaskResponse:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if agent_id is not None:
+        raw_agent_rpc_response = await self.rpc(
+          agent_id=agent_id,
+          method="task/cancel",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        raw_agent_rpc_response = await self.rpc_by_name(
+          agent_name=agent_name,
+          method="task/cancel",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      else:
+        raise ValueError("Either agent_id or agent_name must be provided")
+      
+      return CancelTaskResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
 
+    async def send_message(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsSendMessageRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> SendMessageResponse:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if "stream" in params and params["stream"] == True:
+        raise ValueError("If stream is set to True, use send_message_stream() instead")
+      else:
+        if agent_id is not None:
+          raw_agent_rpc_response = await self.rpc(
+            agent_id=agent_id,
+            method="message/send",
+            params=params,
+            id=id,
+            jsonrpc=jsonrpc,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
+            timeout=timeout,
+          )
+        elif agent_name is not None:
+          raw_agent_rpc_response = await self.rpc_by_name(
+            agent_name=agent_name,
+            method="message/send",
+            params=params,
+            id=id,
+            jsonrpc=jsonrpc,
+            extra_headers=extra_headers,
+            extra_query=extra_query,
+            extra_body=extra_body,
+            timeout=timeout,
+          )
+        else:
+          raise ValueError("Either agent_id or agent_name must be provided")
+        
+        return SendMessageResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
+    
+    async def send_message_stream(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsSendMessageRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> AsyncGenerator[SendMessageStreamResponse, None]:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if "stream" in params and params["stream"] == False:
+        raise ValueError("If stream is set to False, use send_message() instead")
+      
+      params["stream"] = True
+      
+      if agent_id is not None:
+        raw_agent_rpc_response = self.with_streaming_response.rpc(
+          agent_id=agent_id,
+          method="message/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        raw_agent_rpc_response = self.with_streaming_response.rpc_by_name(
+          agent_name=agent_name,
+          method="message/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      else:
+        raise ValueError("Either agent_id or agent_name must be provided")
+      
+      async with raw_agent_rpc_response as response:
+        async for agent_rpc_response_str in response.iter_text():
+          if agent_rpc_response_str.strip():  # Only process non-empty lines
+            try:
+              chunk_rpc_response = SendMessageStreamResponse.model_validate(
+                json.loads(agent_rpc_response_str), 
+                from_attributes=True
+              )
+              yield chunk_rpc_response
+            except json.JSONDecodeError:
+              # Skip invalid JSON lines
+              continue
+    
+    async def send_event(
+      self,
+      agent_id: str | None = None,
+      agent_name: str | None = None,
+      *,
+      params: agent_rpc_params.ParamsSendEventRequest,
+      id: Union[int, str, None] | NotGiven = NOT_GIVEN,
+      jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+      # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+      # The extra values given here take precedence over values defined on the client or passed to this method.
+      extra_headers: Headers | None = None,
+      extra_query: Query | None = None,
+      extra_body: Body | None = None,
+      timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+    ) -> SendEventResponse:
+      if agent_id is not None and agent_name is not None:
+        raise ValueError("Either agent_id or agent_name must be provided, but not both")
+      
+      if agent_id is not None:
+        raw_agent_rpc_response = await self.rpc(
+          agent_id=agent_id,
+          method="event/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        raw_agent_rpc_response = await self.rpc_by_name(
+          agent_name=agent_name,
+          method="event/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      else:
+        raise ValueError("Either agent_id or agent_name must be provided")
+      
+      return SendEventResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
 
 class AgentsResourceWithRawResponse:
     def __init__(self, agents: AgentsResource) -> None:
