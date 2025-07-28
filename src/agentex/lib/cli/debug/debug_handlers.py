@@ -44,7 +44,9 @@ async def start_temporal_worker_debug(
     })
     
     # Start the worker process
-    cmd = [sys.executable, "-m", "run_worker"]
+    # For debugging, use absolute path to run_worker.py to run from workspace root
+    worker_script = worker_path.parent / "run_worker.py"
+    cmd = [sys.executable, str(worker_script)]
     
     console.print(f"[blue]🐛 Starting Temporal worker in debug mode[/blue]")
     console.print(f"[yellow]📡 Debug server will listen on port {debug_port}[/yellow]")
@@ -58,7 +60,7 @@ async def start_temporal_worker_debug(
     
     return await asyncio.create_subprocess_exec(
         *cmd,
-        cwd=worker_path.parent,
+        cwd=Path.cwd(),  # Run from current working directory (workspace root)
         env=debug_env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,

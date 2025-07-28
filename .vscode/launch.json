@@ -7,7 +7,24 @@
             "request": "attach",
             "connect": {
                 "host": "localhost",
-                "port": 5678 // change this if your debug server is running on a different port
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "."
+                }
+            ],
+            "justMyCode": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Attach to AgentEx Worker (Port 5679)",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5679
             },
             "pathMappings": [
                 {
