@@ -393,11 +393,15 @@ class BaseACPServer(FastAPI):
                     if response.status_code == 200:
                         agent = response.json()
                         agent_id, agent_name = agent["id"], agent["name"]
+                        print(agent)
+                        agent_api_key = agent["agent_api_key"]
 
                         os.environ["AGENT_ID"] = agent_id
                         os.environ["AGENT_NAME"] = agent_name
+                        os.environ["AGENT_API_KEY"] = agent_api_key
                         #refreshed_environment_variables.AGENT_ID = agent_id
                         #refreshed_environment_variables.AGENT_NAME = agent_name
+                        #refreshed_environment_variables.AGENT_API_KEY = agent_api_key
                         
                         logger.info(
                             f"Successfully registered agent '{agent_name}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
