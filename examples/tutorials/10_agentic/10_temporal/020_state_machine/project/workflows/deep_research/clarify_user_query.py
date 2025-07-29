@@ -10,6 +10,7 @@ from state_machines.deep_research import DeepResearchData, DeepResearchState
 
 logger = make_logger(__name__)
 
+
 FOLLOW_UP_QUESTION_TEMPLATE = """
 Given the following research query from the user, ask a follow up question to clarify the research direction.
 <query>

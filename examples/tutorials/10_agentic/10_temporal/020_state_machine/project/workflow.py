@@ -1,5 +1,4 @@
 import asyncio
-import json
 from typing import override
 
 from temporalio import workflow
@@ -25,6 +24,7 @@ if environment_variables.WORKFLOW_NAME is None:
 
 if environment_variables.AGENT_NAME is None:
     raise ValueError("Environment variable AGENT_NAME is not set")
+
 
 logger = make_logger(__name__)
 

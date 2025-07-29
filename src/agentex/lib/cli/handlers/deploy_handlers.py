@@ -11,6 +11,7 @@ from rich.console import Console
 from agentex.lib.cli.utils.auth_utils import _encode_principal_context
 from agentex.lib.cli.utils.exceptions import DeploymentError, HelmError
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
+from agentex.lib.cli.utils.path_utils import calculate_docker_acp_module, PathResolutionError
 from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
@@ -100,10 +101,24 @@ def convert_env_vars_dict_to_list(env_vars: dict[str, str]) -> list[dict[str, st
     return [{"name": key, "value": value} for key, value in env_vars.items()]
 
 
+def add_acp_command_to_helm_values(helm_values: dict[str, Any], manifest: AgentManifest, manifest_path: str) -> None:
+    """Add dynamic ACP command to helm values based on manifest configuration"""
+    try:
+        docker_acp_module = calculate_docker_acp_module(manifest, manifest_path)
+        # Create the uvicorn command with the correct module path
+        helm_values["command"] = ["uvicorn", f"{docker_acp_module}:acp", "--host", "0.0.0.0", "--port", "8000"]
+        logger.info(f"Using dynamic ACP command: uvicorn {docker_acp_module}:acp")
+    except (PathResolutionError, Exception) as e:
+        # Fallback to default command structure
+        logger.warning(f"Could not calculate dynamic ACP module ({e}), using default: project.acp")
+        helm_values["command"] = ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
+
+
 def merge_deployment_configs(
     manifest: AgentManifest,
     cluster_config: ClusterConfig | None,
     deploy_overrides: InputDeployOverrides,
+    manifest_path: str,
 ) -> dict[str, Any]:
     agent_config: AgentConfig = manifest.agent
 
@@ -231,10 +246,16 @@ def merge_deployment_configs(
     # Convert the env vars to a list of dictionaries
     if "env" in helm_values:
         helm_values["env"] = convert_env_vars_dict_to_list(helm_values["env"])
+
+    # Convert the temporal worker env vars to a list of dictionaries
     if TEMPORAL_WORKER_KEY in helm_values and "env" in helm_values[TEMPORAL_WORKER_KEY]:
         helm_values[TEMPORAL_WORKER_KEY]["env"] = convert_env_vars_dict_to_list(
             helm_values[TEMPORAL_WORKER_KEY]["env"]
         )
+    
+    # Add dynamic ACP command based on manifest configuration
+    add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
+    
     print("Deploying with the following helm values: ", helm_values)
     return helm_values
 
@@ -290,7 +311,7 @@ def deploy_agent(
     add_helm_repo()
 
     # Merge configurations
-    helm_values = merge_deployment_configs(manifest, override_config, deploy_overrides)
+    helm_values = merge_deployment_configs(manifest, override_config, deploy_overrides, manifest_path)
 
     # Create values file
     values_file = create_helm_values_file(helm_values)
