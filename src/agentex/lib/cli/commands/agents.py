@@ -146,8 +146,8 @@ def build(
     try:
         image_url = build_agent(
             manifest_path=manifest,
-            registry_url=registry,  # Now guaranteed to be non-None
-            repository_name=repository_name or "default-repo",  # Provide default
+            registry_url=registry,
+            repository_name=repository_name,
             platforms=platform_list,
             push=push,
             secret=secret or "",  # Provide default empty string
