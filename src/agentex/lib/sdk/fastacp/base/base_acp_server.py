@@ -2,18 +2,20 @@ import asyncio
 import base64
 import inspect
 import json
+import os
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
 import uvicorn
+from agentex.lib.adk.utils._modules.client import get_async_agentex_client
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter, ValidationError
 
 # from agentex.lib.sdk.fastacp.types import BaseACPConfig
-from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
 from agentex.lib.types.acp import (
     PARAMS_MODEL_BY_METHOD,
     RPC_SYNC_METHODS,
@@ -390,6 +392,14 @@ class BaseACPServer(FastAPI):
                         registration_url, json=registration_data, timeout=30.0
                     )
                     if response.status_code == 200:
+                        agent = response.json()
+                        agent_id, agent_name = agent["id"], agent["name"]
+
+                        os.environ["AGENT_ID"] = agent_id
+                        os.environ["AGENT_NAME"] = agent_name
+                        refreshed_environment_variables.AGENT_ID = agent_id
+                        refreshed_environment_variables.AGENT_NAME = agent_name
+                        get_async_agentex_client()  # refresh cache
                         logger.info(
                             f"Successfully registered agent '{env_vars.AGENT_NAME}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
                         )
