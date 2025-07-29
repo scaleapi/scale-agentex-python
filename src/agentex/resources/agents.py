@@ -23,8 +23,7 @@ from ..types.agent import Agent
 from .._base_client import make_request_options
 from ..types.agent_rpc_response import AgentRpcResponse, CancelTaskResponse, CreateTaskResponse, SendEventResponse, SendMessageResponse, SendMessageStreamResponse
 from ..types.agent_list_response import AgentListResponse
-from ..types.agent_delete_response import AgentDeleteResponse
-from ..types.agent_delete_by_name_response import AgentDeleteByNameResponse
+from ..types.shared.delete_response import DeleteResponse
 
 __all__ = ["AgentsResource", "AsyncAgentsResource"]
 
@@ -129,7 +128,7 @@ class AgentsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AgentDeleteResponse:
+    ) -> DeleteResponse:
         """
         Delete an agent by its unique ID.
 
@@ -149,7 +148,7 @@ class AgentsResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AgentDeleteResponse,
+            cast_to=DeleteResponse,
         )
 
     def delete_by_name(
@@ -162,7 +161,7 @@ class AgentsResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AgentDeleteByNameResponse:
+    ) -> DeleteResponse:
         """
         Delete an agent by its unique name.
 
@@ -182,7 +181,7 @@ class AgentsResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AgentDeleteByNameResponse,
+            cast_to=DeleteResponse,
         )
 
     def retrieve_by_name(
@@ -669,7 +668,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AgentDeleteResponse:
+    ) -> DeleteResponse:
         """
         Delete an agent by its unique ID.
 
@@ -689,7 +688,7 @@ class AsyncAgentsResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AgentDeleteResponse,
+            cast_to=DeleteResponse,
         )
 
     async def delete_by_name(
@@ -702,7 +701,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
-    ) -> AgentDeleteByNameResponse:
+    ) -> DeleteResponse:
         """
         Delete an agent by its unique name.
 
@@ -722,7 +721,7 @@ class AsyncAgentsResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=AgentDeleteByNameResponse,
+            cast_to=DeleteResponse,
         )
 
     async def retrieve_by_name(
