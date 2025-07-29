@@ -115,8 +115,3 @@ deployment:
       limits:
         cpu: "1000m"
         memory: "2Gi"
-
-auth:
-  principal:
-    user_id: d6dee46a-25e2-45af-bf89-eb6ae949ac1a
-    account_id: 6630377a5a7b09c735cfeebb
