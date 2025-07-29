@@ -181,7 +181,7 @@ def merge_deployment_configs(
     if encoded_principal:
         if "env" not in helm_values:
             helm_values["env"] = {}
-        helm_values["env"][EnvVarKeys.AUTH_PRINCIPAL_B64] = encoded_principal
+        helm_values["env"][EnvVarKeys.AUTH_PRINCIPAL_B64.value] = encoded_principal
 
     if manifest.deployment and manifest.deployment.imagePullSecrets:
         pull_secrets = [
