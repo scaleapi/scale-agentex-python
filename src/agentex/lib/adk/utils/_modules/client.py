@@ -1,10 +1,11 @@
 import os
 
 from agentex import AsyncAgentex
-from agentex.lib.environment_variables import refreshed_environment_variables
+from agentex.lib.environment_variables import refreshed_environment_variables, EnvironmentVariables
 
 
 def create_async_agentex_client(**kwargs):
+    EnvironmentVariables.refresh()
     agent_id = refreshed_environment_variables.AGENT_ID
     default_headers = {
         "x-agent-identity": agent_id
