@@ -9,7 +9,7 @@ import pytest
 
 from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
-from agentex.types import Task, TaskListResponse, TaskDeleteByNameResponse
+from agentex.types import Task, TaskListResponse, TaskDeleteResponse, TaskDeleteByNameResponse
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 
@@ -93,7 +93,7 @@ class TestTasks:
         task = client.tasks.delete(
             "task_id",
         )
-        assert_matches_type(Task, task, path=["response"])
+        assert_matches_type(TaskDeleteResponse, task, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -105,7 +105,7 @@ class TestTasks:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         task = response.parse()
-        assert_matches_type(Task, task, path=["response"])
+        assert_matches_type(TaskDeleteResponse, task, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -117,7 +117,7 @@ class TestTasks:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             task = response.parse()
-            assert_matches_type(Task, task, path=["response"])
+            assert_matches_type(TaskDeleteResponse, task, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -377,7 +377,7 @@ class TestAsyncTasks:
         task = await async_client.tasks.delete(
             "task_id",
         )
-        assert_matches_type(Task, task, path=["response"])
+        assert_matches_type(TaskDeleteResponse, task, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -389,7 +389,7 @@ class TestAsyncTasks:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         task = await response.parse()
-        assert_matches_type(Task, task, path=["response"])
+        assert_matches_type(TaskDeleteResponse, task, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -401,7 +401,7 @@ class TestAsyncTasks:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             task = await response.parse()
-            assert_matches_type(Task, task, path=["response"])
+            assert_matches_type(TaskDeleteResponse, task, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
