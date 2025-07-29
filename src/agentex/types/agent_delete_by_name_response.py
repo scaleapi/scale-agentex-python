@@ -2,10 +2,10 @@
 
 from .._models import BaseModel
 
-__all__ = ["TaskDeleteByNameResponse"]
+__all__ = ["AgentDeleteByNameResponse"]
 
 
-class TaskDeleteByNameResponse(BaseModel):
+class AgentDeleteByNameResponse(BaseModel):
     id: str
 
     message: str
