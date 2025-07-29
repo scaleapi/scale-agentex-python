@@ -179,6 +179,7 @@ class MessagesResource(SyncAPIResource):
     def list(
         self,
         *,
+        task_id: str,
         limit: Optional[int] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -191,6 +192,8 @@ class MessagesResource(SyncAPIResource):
         List Messages
 
         Args:
+          task_id: The task ID
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -206,7 +209,13 @@ class MessagesResource(SyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=maybe_transform({"limit": limit}, message_list_params.MessageListParams),
+                query=maybe_transform(
+                    {
+                        "task_id": task_id,
+                        "limit": limit,
+                    },
+                    message_list_params.MessageListParams,
+                ),
             ),
             cast_to=MessageListResponse,
         )
@@ -357,6 +366,7 @@ class AsyncMessagesResource(AsyncAPIResource):
     async def list(
         self,
         *,
+        task_id: str,
         limit: Optional[int] | NotGiven = NOT_GIVEN,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -369,6 +379,8 @@ class AsyncMessagesResource(AsyncAPIResource):
         List Messages
 
         Args:
+          task_id: The task ID
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -384,7 +396,13 @@ class AsyncMessagesResource(AsyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=await async_maybe_transform({"limit": limit}, message_list_params.MessageListParams),
+                query=await async_maybe_transform(
+                    {
+                        "task_id": task_id,
+                        "limit": limit,
+                    },
+                    message_list_params.MessageListParams,
+                ),
             ),
             cast_to=MessageListResponse,
         )
