@@ -1,7 +1,6 @@
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
 from agentex.lib.core.services.adk.streaming import (
     StreamingService,
@@ -35,7 +34,7 @@ class StreamingModule:
         """
         if streaming_service is None:
             stream_repository = RedisStreamRepository()
-            agentex_client = create_async_agentex_client()
+            agentex_client = AsyncAgentex()
             self._streaming_service = StreamingService(
                 agentex_client=agentex_client,
                 stream_repository=stream_repository,
