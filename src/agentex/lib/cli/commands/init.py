@@ -1,5 +1,6 @@
 from enum import Enum
 from pathlib import Path
+from typing import Any, Dict
 
 import questionary
 from jinja2 import Environment, FileSystemLoader
@@ -23,7 +24,7 @@ class TemplateType(str, Enum):
 
 
 def render_template(
-    template_path: str, context: dict, template_type: TemplateType
+    template_path: str, context: Dict[str, Any], template_type: TemplateType
 ) -> str:
     """Render a template with the given context"""
     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR / template_type.value))
@@ -32,7 +33,7 @@ def render_template(
 
 
 def create_project_structure(
-    path: Path, context: dict, template_type: TemplateType, use_uv: bool
+    path: Path, context: Dict[str, Any], template_type: TemplateType, use_uv: bool
 ):
     """Create the project structure from templates"""
     # Create project directory
@@ -74,6 +75,9 @@ def create_project_structure(
         root_templates["requirements.txt.j2"] = "requirements.txt"
         root_templates["Dockerfile.j2"] = "Dockerfile"
 
+    # Add development notebook for agents
+    root_templates["dev.ipynb.j2"] = "dev.ipynb"
+
     for template, output in root_templates.items():
         output_path = project_dir / output
         output_path.write_text(render_template(template, context, template_type))
@@ -81,7 +85,7 @@ def create_project_structure(
     console.print(f"\n[green]✓[/green] Created project structure at: {project_dir}")
 
 
-def get_project_context(answers: dict, project_path: Path, manifest_root: Path) -> dict:
+def get_project_context(answers: Dict[str, Any], project_path: Path, manifest_root: Path) -> Dict[str, Any]:
     """Get the project context from user answers"""
     # Use agent_directory_name as project_name
     project_name = answers["agent_directory_name"].replace("-", "_")
@@ -112,7 +116,7 @@ def init():
     )
 
     # Use a Rich table for template descriptions
-    table = Table(show_header=True, header_style="bold magenta")
+    table = Table(show_header=True, header_style="bold blue")
     table.add_column("Template", style="cyan", no_wrap=True)
     table.add_column("Description", style="white")
     table.add_row(

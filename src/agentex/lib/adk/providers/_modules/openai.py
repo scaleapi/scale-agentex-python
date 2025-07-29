@@ -10,7 +10,7 @@ from mcp import StdioServerParameters
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex
-from agentex.lib.core.adapters.streams.adapter_redis import RedisEventStreamRepository
+from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
 from agentex.lib.core.services.adk.providers.openai import OpenAIService
 from agentex.lib.core.services.adk.streaming import StreamingService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
@@ -47,7 +47,7 @@ class OpenAIModule:
         if openai_service is None:
             # Create default service
             agentex_client = AsyncAgentex()
-            stream_repository = RedisEventStreamRepository()
+            stream_repository = RedisStreamRepository()
             streaming_service = StreamingService(
                 agentex_client=agentex_client,
                 stream_repository=stream_repository,

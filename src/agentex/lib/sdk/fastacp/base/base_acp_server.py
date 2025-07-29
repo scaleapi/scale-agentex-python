@@ -401,7 +401,7 @@ class BaseACPServer(FastAPI):
                         refreshed_environment_variables.AGENT_NAME = agent_name
                         get_async_agentex_client()  # refresh cache
                         logger.info(
-                            f"Successfully registered agent '{agent_name}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
+                            f"Successfully registered agent '{env_vars.AGENT_NAME}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
                         )
                         return  # Success, exit the retry loop
                     else:

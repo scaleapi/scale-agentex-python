@@ -1,6 +1,6 @@
 [project]
-name = "agentex"
-version = "0.1.0-alpha.5"
+name = "agentex-sdk"
+version = "0.2.3"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -120,6 +120,13 @@ typecheck = { chain = [
 [build-system]
 requires = ["hatchling==1.26.3", "hatch-fancy-pypi-readme"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ipywidgets>=8.1.7",
+    "nbstripout>=0.8.1",
+    "yaspin>=3.1.0",
+]
 
 [tool.hatch.build]
 include = [

@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 
-class EventStreamRepository(ABC):
+class StreamRepository(ABC):
     """
     Interface for event streaming repositories.
     Used to publish and subscribe to event streams.
