@@ -17,7 +17,7 @@ def _build_headers() -> Dict[str, str]:
     return {}
 
 
-def create_async_agentex_client(**kwargs) -> "AsyncAgentex":
+def get_async_agentex_client(**kwargs) -> "AsyncAgentex":
     """
     Return a cached AsyncAgentex instance (created synchronously).
     Each call re-checks env vars and updates client.default_headers if needed.
