@@ -229,16 +229,13 @@ class TestMessages:
     @pytest.mark.skip()
     @parametrize
     def test_method_list(self, client: Agentex) -> None:
-        message = client.messages.list(
-            task_id="task_id",
-        )
+        message = client.messages.list()
         assert_matches_type(MessageListResponse, message, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         message = client.messages.list(
-            task_id="task_id",
             limit=0,
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
@@ -246,9 +243,7 @@ class TestMessages:
     @pytest.mark.skip()
     @parametrize
     def test_raw_response_list(self, client: Agentex) -> None:
-        response = client.messages.with_raw_response.list(
-            task_id="task_id",
-        )
+        response = client.messages.with_raw_response.list()
 
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -258,9 +253,7 @@ class TestMessages:
     @pytest.mark.skip()
     @parametrize
     def test_streaming_response_list(self, client: Agentex) -> None:
-        with client.messages.with_streaming_response.list(
-            task_id="task_id",
-        ) as response:
+        with client.messages.with_streaming_response.list() as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
@@ -484,16 +477,13 @@ class TestAsyncMessages:
     @pytest.mark.skip()
     @parametrize
     async def test_method_list(self, async_client: AsyncAgentex) -> None:
-        message = await async_client.messages.list(
-            task_id="task_id",
-        )
+        message = await async_client.messages.list()
         assert_matches_type(MessageListResponse, message, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.list(
-            task_id="task_id",
             limit=0,
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
@@ -501,9 +491,7 @@ class TestAsyncMessages:
     @pytest.mark.skip()
     @parametrize
     async def test_raw_response_list(self, async_client: AsyncAgentex) -> None:
-        response = await async_client.messages.with_raw_response.list(
-            task_id="task_id",
-        )
+        response = await async_client.messages.with_raw_response.list()
 
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -513,9 +501,7 @@ class TestAsyncMessages:
     @pytest.mark.skip()
     @parametrize
     async def test_streaming_response_list(self, async_client: AsyncAgentex) -> None:
-        async with async_client.messages.with_streaming_response.list(
-            task_id="task_id",
-        ) as response:
+        async with async_client.messages.with_streaming_response.list() as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
