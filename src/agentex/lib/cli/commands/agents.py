@@ -141,7 +141,7 @@ def build(
         typer.echo("No registry provided, skipping image build")
         return
 
-    platform_list = platforms.split(",") if platforms else []
+    platform_list = platforms.split(",") if platforms else ["linux/amd64"]
 
     try:
         image_url = build_agent(
