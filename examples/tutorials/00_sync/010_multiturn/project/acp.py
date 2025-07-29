@@ -1,7 +1,7 @@
 import os
 from typing import AsyncGenerator, Union
 
-from agentex.lib import adk
+
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.acp import SendMessageParams
 from agentex.lib.types.llm_messages import AssistantMessage, LLMConfig, SystemMessage, UserMessage
@@ -26,6 +26,7 @@ class StateModel(BaseModel):
 async def handle_message_send(
     params: SendMessageParams
 ) -> Union[TaskMessageContent, AsyncGenerator[TaskMessageUpdate, None]]:
+    from agentex.lib import adk
     """
     In this tutorial, we'll see how to handle a basic multi-turn conversation without streaming.
     """

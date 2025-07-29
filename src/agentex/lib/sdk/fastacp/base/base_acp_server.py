@@ -100,6 +100,21 @@ class BaseACPServer(FastAPI):
             data = await request.json()
             rpc_request = JSONRPCRequest(**data)
 
+            # Check if the request is authenticated
+            if os.environ.get("AGENT_API_KEY") is not None:
+                authorization_header = request.headers.get("Authorization")
+                if authorization_header is None:
+                    return JSONRPCResponse(
+                        id=rpc_request.id,
+                        error=JSONRPCError(code=-32601, message="Unauthorized"),
+                    )
+                if authorization_header != f"Bearer {os.environ.get("AGENT_API_KEY")}":
+                    return JSONRPCResponse(
+                        id=rpc_request.id,
+                        error=JSONRPCError(code=-32601, message="Unauthorized"),
+                    )
+
+
             # Check if method is valid first
             try:
                 method = RPCMethod(rpc_request.method)
