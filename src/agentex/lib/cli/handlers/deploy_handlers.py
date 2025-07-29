@@ -176,9 +176,12 @@ def merge_deployment_configs(
         if TEMPORAL_WORKER_KEY in helm_values:
             helm_values[TEMPORAL_WORKER_KEY]["env"] = agent_config.env
 
-        encoded_principal = _encode_principal_context(manifest)
-        if encoded_principal:
-            helm_values["env"][EnvVarKeys.AUTH_PRINCIPAL_B64] = encoded_principal
+    # Add auth principal env var if manifest principal is set
+    encoded_principal = _encode_principal_context(manifest)
+    if encoded_principal:
+        if "env" not in helm_values:
+            helm_values["env"] = {}
+        helm_values["env"][EnvVarKeys.AUTH_PRINCIPAL_B64] = encoded_principal
 
     if manifest.deployment and manifest.deployment.imagePullSecrets:
         pull_secrets = [
