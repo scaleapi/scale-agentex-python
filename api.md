@@ -35,14 +35,14 @@ Methods:
 Types:
 
 ```python
-from agentex.types import Task, TaskListResponse, TaskDeleteResponse, TaskDeleteByNameResponse
+from agentex.types import Task, TaskListResponse, TaskDeleteByNameResponse
 ```
 
 Methods:
 
 - <code title="get /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
 - <code title="get /tasks">client.tasks.<a href="./src/agentex/resources/tasks.py">list</a>() -> <a href="./src/agentex/types/task_list_response.py">TaskListResponse</a></code>
-- <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/task_delete_response.py">TaskDeleteResponse</a></code>
+- <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
 - <code title="delete /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete_by_name</a>(task_name) -> <a href="./src/agentex/types/task_delete_by_name_response.py">TaskDeleteByNameResponse</a></code>
 - <code title="get /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve_by_name</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
 - <code title="get /tasks/{task_id}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events</a>(task_id) -> object</code>
