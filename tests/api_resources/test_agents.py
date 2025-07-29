@@ -13,9 +13,8 @@ from agentex.types import (
     Agent,
     AgentRpcResponse,
     AgentListResponse,
-    AgentDeleteResponse,
-    AgentDeleteByNameResponse,
 )
+from agentex.types.shared import DeleteResponse
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 
@@ -107,7 +106,7 @@ class TestAgents:
         agent = client.agents.delete(
             "agent_id",
         )
-        assert_matches_type(AgentDeleteResponse, agent, path=["response"])
+        assert_matches_type(DeleteResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -119,7 +118,7 @@ class TestAgents:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         agent = response.parse()
-        assert_matches_type(AgentDeleteResponse, agent, path=["response"])
+        assert_matches_type(DeleteResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -131,7 +130,7 @@ class TestAgents:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             agent = response.parse()
-            assert_matches_type(AgentDeleteResponse, agent, path=["response"])
+            assert_matches_type(DeleteResponse, agent, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -149,7 +148,7 @@ class TestAgents:
         agent = client.agents.delete_by_name(
             "agent_name",
         )
-        assert_matches_type(AgentDeleteByNameResponse, agent, path=["response"])
+        assert_matches_type(DeleteResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -161,7 +160,7 @@ class TestAgents:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         agent = response.parse()
-        assert_matches_type(AgentDeleteByNameResponse, agent, path=["response"])
+        assert_matches_type(DeleteResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -173,7 +172,7 @@ class TestAgents:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             agent = response.parse()
-            assert_matches_type(AgentDeleteByNameResponse, agent, path=["response"])
+            assert_matches_type(DeleteResponse, agent, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -447,7 +446,7 @@ class TestAsyncAgents:
         agent = await async_client.agents.delete(
             "agent_id",
         )
-        assert_matches_type(AgentDeleteResponse, agent, path=["response"])
+        assert_matches_type(DeleteResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -459,7 +458,7 @@ class TestAsyncAgents:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         agent = await response.parse()
-        assert_matches_type(AgentDeleteResponse, agent, path=["response"])
+        assert_matches_type(DeleteResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -471,7 +470,7 @@ class TestAsyncAgents:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             agent = await response.parse()
-            assert_matches_type(AgentDeleteResponse, agent, path=["response"])
+            assert_matches_type(DeleteResponse, agent, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -489,7 +488,7 @@ class TestAsyncAgents:
         agent = await async_client.agents.delete_by_name(
             "agent_name",
         )
-        assert_matches_type(AgentDeleteByNameResponse, agent, path=["response"])
+        assert_matches_type(DeleteResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -501,7 +500,7 @@ class TestAsyncAgents:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         agent = await response.parse()
-        assert_matches_type(AgentDeleteByNameResponse, agent, path=["response"])
+        assert_matches_type(DeleteResponse, agent, path=["response"])
 
     @pytest.mark.skip()
     @parametrize
@@ -513,7 +512,7 @@ class TestAsyncAgents:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             agent = await response.parse()
-            assert_matches_type(AgentDeleteByNameResponse, agent, path=["response"])
+            assert_matches_type(DeleteResponse, agent, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
