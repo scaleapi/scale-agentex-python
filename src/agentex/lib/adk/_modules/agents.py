@@ -1,7 +1,7 @@
 from datetime import timedelta
 from typing import Optional
 
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.adk.utils._modules.client import get_async_agentex_client
 from agentex.lib.core.temporal.activities.adk.agents_activities import AgentsActivityName, GetAgentParams
 from temporalio.common import RetryPolicy
 
@@ -29,7 +29,7 @@ class AgentsModule:
         agents_service: Optional[AgentsService] = None,
     ):
         if agents_service is None:
-            agentex_client = create_async_agentex_client()
+            agentex_client = get_async_agentex_client()
             tracer = AsyncTracer(agentex_client)
             self._agents_service = AgentsService(agentex_client=agentex_client, tracer=tracer)
         else:

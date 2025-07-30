@@ -4,7 +4,7 @@ from typing import Any
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.adk.utils._modules.client import get_async_agentex_client
 from agentex.lib.core.services.adk.acp.acp import ACPService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
 from agentex.lib.core.temporal.activities.adk.acp.acp_activities import (
@@ -41,7 +41,7 @@ class ACPModule:
             acp_activities (Optional[ACPActivities]): Optional pre-configured ACP activities. If None, will be auto-initialized.
         """
         if acp_service is None:
-            agentex_client = create_async_agentex_client()
+            agentex_client = get_async_agentex_client()
             tracer = AsyncTracer(agentex_client)
             self._acp_service = ACPService(agentex_client=agentex_client, tracer=tracer)
         else:

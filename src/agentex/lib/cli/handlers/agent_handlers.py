@@ -21,7 +21,7 @@ class DockerBuildError(Exception):
 def build_agent(
     manifest_path: str,
     registry_url: str,
-    repository_name: str,
+    repository_name: str | None,
     platforms: list[str],
     push: bool = False,
     secret: str = None,
