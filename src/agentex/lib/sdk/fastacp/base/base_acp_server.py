@@ -103,7 +103,7 @@ class BaseACPServer(FastAPI):
             rpc_request = JSONRPCRequest(**data)
 
             # Check if the request is authenticated
-            if refreshed_environment_variables.AGENT_API_KEY_HASH:
+            if refreshed_environment_variables and getattr(refreshed_environment_variables, "AGENT_API_KEY_HASH", None):
                 authorization_header = request.headers.get("Authorization")
                 if authorization_header != f"Bearer {refreshed_environment_variables.AGENT_API_KEY_HASH}":
                     return JSONRPCResponse(

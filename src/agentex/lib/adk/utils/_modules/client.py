@@ -12,8 +12,8 @@ _lock = threading.RLock()
 
 def _build_headers() -> Dict[str, str]:
     EnvironmentVariables.refresh()
-    if refreshed_environment_variables and getattr(refreshed_environment_variables, "AGENT_ID", None):
-        return {"x-agent-identity": refreshed_environment_variables.AGENT_ID}
+    if refreshed_environment_variables and getattr(refreshed_environment_variables, "AGENT_API_KEY", None):
+        return {"x-agent-identity": refreshed_environment_variables.AGENT_API_KEY}
     return {}
 
 
