@@ -11,6 +11,11 @@ from agentex.lib.cli.handlers.cleanup_handlers import (
     cleanup_agent_workflows,
     should_cleanup_on_restart
 )
+from agentex.lib.cli.utils.path_utils import (
+    get_file_paths,
+    calculate_uvicorn_target_for_local,
+)
+
 from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.utils.logging import make_logger
@@ -104,7 +109,10 @@ async def start_temporal_worker_with_reload(
             # PRE-RESTART CLEANUP - NEW!
             if current_process is not None:
                 # Extract agent name from worker path for cleanup
-                agent_name = worker_path.parent.parent.name
+
+                agent_name = env.get("AGENT_NAME")
+                if agent_name is None:
+                    agent_name = worker_path.parent.parent.name
                 
                 # Perform cleanup if configured
                 if should_cleanup_on_restart():
@@ -180,15 +188,17 @@ async def start_temporal_worker_with_reload(
 
 
 async def start_acp_server(
-    acp_path: Path, port: int, env: dict[str, str]
+    acp_path: Path, port: int, env: dict[str, str], manifest_dir: Path
 ) -> asyncio.subprocess.Process:
     """Start the ACP server process"""
-    # Use the actual file path instead of module path for better reload detection
+    # Use file path relative to manifest directory if possible
+    uvicorn_target = calculate_uvicorn_target_for_local(acp_path, manifest_dir)
+    
     cmd = [
         sys.executable,
         "-m",
         "uvicorn",
-        f"{acp_path.parent.name}.acp:acp",
+        f"{uvicorn_target}:acp",
         "--reload",
         "--reload-dir",
         str(acp_path.parent),  # Watch the project directory specifically
@@ -201,7 +211,7 @@ async def start_acp_server(
     console.print(f"[blue]Starting ACP server from {acp_path} on port {port}...[/blue]")
     return await asyncio.create_subprocess_exec(
         *cmd,
-        cwd=acp_path.parent.parent,
+        cwd=manifest_dir,  # Always use manifest directory as CWD for consistency
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
@@ -218,7 +228,7 @@ async def start_temporal_worker(
 
     return await asyncio.create_subprocess_exec(
         *cmd,
-        cwd=worker_path.parent,
+        cwd=worker_path.parent,  # Use worker directory as CWD for imports to work
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
@@ -280,8 +290,9 @@ async def run_agent(manifest_path: str):
         )
 
         # Start ACP server
+        manifest_dir = Path(manifest_path).parent
         acp_process = await start_acp_server(
-            file_paths["acp"], manifest.local_development.agent.port, agent_env
+            file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir
         )
         process_manager.add_process(acp_process)
 
@@ -291,7 +302,7 @@ async def run_agent(manifest_path: str):
         tasks = [acp_output_task]
 
         # Start temporal worker if needed
-        if is_temporal_agent(manifest):
+        if is_temporal_agent(manifest) and file_paths["worker"]:
             worker_task = await start_temporal_worker_with_reload(file_paths["worker"], agent_env, process_manager)
             tasks.append(worker_task)
 
@@ -323,92 +334,7 @@ async def run_agent(manifest_path: str):
         await process_manager.cleanup_processes()
 
 
-def resolve_and_validate_path(base_path: Path, configured_path: str, file_type: str) -> Path:
-    """Resolve and validate a configured path"""
-    path_obj = Path(configured_path)
 
-    if path_obj.is_absolute():
-        # Absolute path - use as-is
-        resolved_path = path_obj
-    else:
-        # Relative path - resolve relative to manifest directory
-        resolved_path = (base_path / configured_path).resolve()
-
-    # Validate the file exists
-    if not resolved_path.exists():
-        raise RunError(
-            f"{file_type} file not found: {resolved_path}\n"
-            f"  Configured path: {configured_path}\n"
-            f"  Resolved from manifest: {base_path}"
-        )
-
-    # Validate it's actually a file
-    if not resolved_path.is_file():
-        raise RunError(f"{file_type} path is not a file: {resolved_path}")
-
-    return resolved_path
-
-
-def validate_path_security(resolved_path: Path, manifest_dir: Path) -> None:
-    """Basic security validation for resolved paths"""
-    try:
-        # Ensure the resolved path is accessible
-        resolved_path.resolve()
-
-        # Optional: Add warnings for paths that go too far up
-        try:
-            # Check if path goes more than 3 levels up from manifest
-            relative_to_manifest = resolved_path.relative_to(manifest_dir.parent.parent.parent)
-            if str(relative_to_manifest).startswith(".."):
-                logger.warning(
-                    f"Path goes significantly outside project structure: {resolved_path}"
-                )
-        except ValueError:
-            # Path is outside the tree - that's okay, just log it
-            logger.info(f"Using path outside manifest directory tree: {resolved_path}")
-
-    except Exception as e:
-        raise RunError(f"Path resolution failed: {resolved_path} - {str(e)}") from e
-
-
-def get_file_paths(manifest: AgentManifest, manifest_path: str) -> dict[str, Path]:
-    """Get resolved file paths from manifest configuration"""
-    manifest_dir = Path(manifest_path).parent.resolve()
-
-    # Use configured paths or fall back to defaults for backward compatibility
-    if manifest.local_development and manifest.local_development.paths:
-        paths_config = manifest.local_development.paths
-
-        # Resolve ACP path
-        acp_path = resolve_and_validate_path(manifest_dir, paths_config.acp, "ACP server")
-        validate_path_security(acp_path, manifest_dir)
-
-        # Resolve worker path if specified
-        worker_path = None
-        if paths_config.worker:
-            worker_path = resolve_and_validate_path(
-                manifest_dir, paths_config.worker, "Temporal worker"
-            )
-            validate_path_security(worker_path, manifest_dir)
-    else:
-        # Backward compatibility: use old hardcoded structure
-        project_dir = manifest_dir / "project"
-        acp_path = project_dir / "acp.py"
-        worker_path = project_dir / "run_worker.py" if is_temporal_agent(manifest) else None
-
-        # Validate backward compatibility paths
-        if not acp_path.exists():
-            raise RunError(f"ACP file not found: {acp_path}")
-
-        if worker_path and not worker_path.exists():
-            raise RunError(f"Worker file not found: {worker_path}")
-
-    return {
-        "acp": acp_path,
-        "worker": worker_path,
-        "acp_dir": acp_path.parent,
-        "worker_dir": worker_path.parent if worker_path else None,
-    }
 
 
 def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:

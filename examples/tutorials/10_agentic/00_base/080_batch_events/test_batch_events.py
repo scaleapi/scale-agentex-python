@@ -10,7 +10,8 @@ import asyncio
 
 # Configuration
 BASE_URL = "http://localhost:5003"
-AGENT_ID = "b4f32d71-ff69-4ac9-84d1-eb2937fea0c7"
+# AGENT_ID = "b4f32d71-ff69-4ac9-84d1-eb2937fea0c7"
+AGENT_ID = "58e78cd0-c898-4009-b5d9-eada8ebcad83"
 RPC_ENDPOINT = f"{BASE_URL}/agents/{AGENT_ID}/rpc"
 
 async def send_rpc_request(method: str, params: dict):
