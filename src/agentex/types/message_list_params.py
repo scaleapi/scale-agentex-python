@@ -10,5 +10,6 @@ __all__ = ["MessageListParams"]
 
 class MessageListParams(TypedDict, total=False):
     task_id: Required[str]
+    """The task ID"""
 
     limit: Optional[int]
