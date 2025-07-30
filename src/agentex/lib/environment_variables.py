@@ -20,6 +20,8 @@ class EnvVarKeys(str, Enum):
     AGENT_NAME = "AGENT_NAME"
     AGENT_DESCRIPTION = "AGENT_DESCRIPTION"
     AGENT_ID = "AGENT_ID"
+    AGENT_API_KEY = "AGENT_API_KEY"
+    AGENT_API_KEY_HASH = "AGENT_API_KEY_HASH"
     # ACP Configuration
     ACP_URL = "ACP_URL"
     ACP_PORT = "ACP_PORT"
@@ -49,6 +51,8 @@ class EnvironmentVariables(BaseModel):
     AGENT_NAME: str
     AGENT_DESCRIPTION: str | None = None
     AGENT_ID: str | None = None
+    AGENT_API_KEY: str | None = None
+    AGENT_API_KEY_HASH: str | None = None
     ACP_TYPE: str | None = "agentic"
     # ACP Configuration
     ACP_URL: str
