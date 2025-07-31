@@ -397,9 +397,11 @@ class BaseACPServer(FastAPI):
 
                         os.environ["AGENT_ID"] = agent_id
                         os.environ["AGENT_NAME"] = agent_name
-                        refreshed_environment_variables.AGENT_ID = agent_id
-                        refreshed_environment_variables.AGENT_NAME = agent_name
+                        env_vars.AGENT_ID = agent_id
+                        env_vars.AGENT_NAME = agent_name
                         create_async_agentex_client()  # refresh cache
+                        global refreshed_environment_variables
+                        refreshed_environment_variables = env_vars
                         logger.info(
                             f"Successfully registered agent '{env_vars.AGENT_NAME}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
                         )

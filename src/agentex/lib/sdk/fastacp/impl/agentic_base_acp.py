@@ -1,4 +1,6 @@
 from typing import Any
+
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from typing_extensions import override
 from agentex import AsyncAgentex
 from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
@@ -24,7 +26,7 @@ class AgenticBaseACP(BaseACPServer):
     def __init__(self):
         super().__init__()
         self._setup_handlers()
-        self._agentex_client = AsyncAgentex()
+        self._agentex_client = create_async_agentex_client()
 
     @classmethod
     @override

@@ -1,6 +1,7 @@
 from typing import Any, Dict, override
 
 from agentex import Agentex, AsyncAgentex
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     AsyncTracingProcessor,
     SyncTracingProcessor,
@@ -65,7 +66,7 @@ class AgentexSyncTracingProcessor(SyncTracingProcessor):
 
 class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
     def __init__(self, config: AgentexTracingProcessorConfig):
-        self.client = AsyncAgentex()
+        self.client = create_async_agentex_client()
 
     @override
     async def on_span_start(self, span: Span) -> None:

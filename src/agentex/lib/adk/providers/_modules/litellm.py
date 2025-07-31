@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from datetime import timedelta
 
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex
@@ -39,7 +40,7 @@ class LiteLLMModule:
     ):
         if litellm_service is None:
             # Create default service
-            agentex_client = AsyncAgentex()
+            agentex_client = create_async_agentex_client()
             stream_repository = RedisStreamRepository()
             streaming_service = StreamingService(
                 agentex_client=agentex_client,
