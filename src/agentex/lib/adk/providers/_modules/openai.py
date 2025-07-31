@@ -1,6 +1,7 @@
 from datetime import timedelta
 from typing import Any, Literal
 
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agents import Agent, RunResult, RunResultStreaming
 from agents.agent import StopAtTools, ToolsToFinalOutputFunction
 from agents.agent_output import AgentOutputSchemaBase
@@ -46,7 +47,7 @@ class OpenAIModule:
     ):
         if openai_service is None:
             # Create default service
-            agentex_client = AsyncAgentex()
+            agentex_client = create_async_agentex_client()
             stream_repository = RedisStreamRepository()
             streaming_service = StreamingService(
                 agentex_client=agentex_client,

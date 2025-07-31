@@ -3,7 +3,7 @@ from datetime import timedelta
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex
-from agentex.lib.adk.utils._modules.client import get_async_agentex_client
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.services.adk.events import EventsService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
 from agentex.lib.core.temporal.activities.adk.events_activities import (
@@ -33,7 +33,7 @@ class EventsModule:
         events_service: EventsService | None = None,
     ):
         if events_service is None:
-            agentex_client = get_async_agentex_client()
+            agentex_client = create_async_agentex_client()
             tracer = AsyncTracer(agentex_client)
             self._events_service = EventsService(
                 agentex_client=agentex_client, tracer=tracer
