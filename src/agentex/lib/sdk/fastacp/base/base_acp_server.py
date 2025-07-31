@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import hashlib
 import inspect
 import json
 import os
@@ -103,9 +102,9 @@ class BaseACPServer(FastAPI):
             rpc_request = JSONRPCRequest(**data)
 
             # Check if the request is authenticated
-            if refreshed_environment_variables and getattr(refreshed_environment_variables, "AGENT_API_KEY_HASH", None):
+            if refreshed_environment_variables and getattr(refreshed_environment_variables, "AGENT_API_KEY", None):
                 authorization_header = request.headers.get("Authorization")
-                if authorization_header != f"Bearer {refreshed_environment_variables.AGENT_API_KEY_HASH}":
+                if authorization_header != f"Bearer {refreshed_environment_variables.AGENT_API_KEY}":
                     return JSONRPCResponse(
                         id=rpc_request.id,
                         error=JSONRPCError(code=-32601, message="Unauthorized"),
@@ -406,16 +405,13 @@ class BaseACPServer(FastAPI):
                         agent = response.json()
                         agent_id, agent_name = agent["id"], agent["name"]
                         agent_api_key = agent["agent_api_key"]
-                        agent_api_key_hash = hashlib.sha256(agent_api_key.encode()).hexdigest()
 
                         os.environ["AGENT_ID"] = agent_id
                         os.environ["AGENT_NAME"] = agent_name
                         os.environ["AGENT_API_KEY"] = agent_api_key
-                        os.environ["AGENT_API_KEY_HASH"] = agent_api_key_hash
                         refreshed_environment_variables.AGENT_ID = agent_id
                         refreshed_environment_variables.AGENT_NAME = agent_name
                         refreshed_environment_variables.AGENT_API_KEY = agent_api_key
-                        refreshed_environment_variables.AGENT_API_KEY_HASH = agent_api_key_hash
                         get_async_agentex_client()  # refresh cache
                         logger.info(
                             f"Successfully registered agent '{env_vars.AGENT_NAME}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
