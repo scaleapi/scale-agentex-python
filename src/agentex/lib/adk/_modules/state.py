@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex
-from agentex.lib.adk.utils._modules.client import get_async_agentex_client
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.services.adk.state import StateService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
 from agentex.lib.core.temporal.activities.adk.state_activities import (
@@ -37,7 +37,7 @@ class StateModule:
         state_service: StateService | None = None,
     ):
         if state_service is None:
-            agentex_client = get_async_agentex_client()
+            agentex_client = create_async_agentex_client()
             tracer = AsyncTracer(agentex_client)
             self._state_service = StateService(
                 agentex_client=agentex_client, tracer=tracer

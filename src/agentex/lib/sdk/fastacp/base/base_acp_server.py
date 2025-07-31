@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 import uvicorn
-from agentex.lib.adk.utils._modules.client import get_async_agentex_client
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter, ValidationError
@@ -399,7 +399,7 @@ class BaseACPServer(FastAPI):
                         os.environ["AGENT_NAME"] = agent_name
                         refreshed_environment_variables.AGENT_ID = agent_id
                         refreshed_environment_variables.AGENT_NAME = agent_name
-                        get_async_agentex_client()  # refresh cache
+                        create_async_agentex_client()  # refresh cache
                         logger.info(
                             f"Successfully registered agent '{env_vars.AGENT_NAME}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
                         )
