@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.6 (2025-07-31)
+
+Full Changelog: [v0.2.5...v0.2.6](https://github.com/scaleapi/agentex-python/compare/v0.2.5...v0.2.6)
+
+### Features
+
+* **client:** support file upload requests ([78133f2](https://github.com/scaleapi/agentex-python/commit/78133f2cd436e051bdd5e68890ea8ee25bb54781))
+
 ## 0.2.5 (2025-07-30)
 
 Full Changelog: [v0.2.4...v0.2.5](https://github.com/scaleapi/agentex-python/compare/v0.2.4...v0.2.5)
