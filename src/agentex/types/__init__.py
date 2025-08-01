@@ -7,6 +7,7 @@ from .task import Task as Task
 from .agent import Agent as Agent
 from .event import Event as Event
 from .state import State as State
+from .shared import DeleteResponse as DeleteResponse
 from .acp_type import AcpType as AcpType
 from .data_delta import DataDelta as DataDelta
 from .text_delta import TextDelta as TextDelta
@@ -18,6 +19,7 @@ from .message_author import MessageAuthor as MessageAuthor
 from .agent_rpc_params import AgentRpcParams as AgentRpcParams
 from .agent_rpc_result import AgentRpcResult as AgentRpcResult
 from .span_list_params import SpanListParams as SpanListParams
+from .task_list_params import TaskListParams as TaskListParams
 from .agent_list_params import AgentListParams as AgentListParams
 from .event_list_params import EventListParams as EventListParams
 from .state_list_params import StateListParams as StateListParams
@@ -40,7 +42,6 @@ from .state_update_params import StateUpdateParams as StateUpdateParams
 from .task_message_update import TaskMessageUpdate as TaskMessageUpdate
 from .tool_response_delta import ToolResponseDelta as ToolResponseDelta
 from .tracker_list_params import TrackerListParams as TrackerListParams
-from .task_delete_response import TaskDeleteResponse as TaskDeleteResponse
 from .task_message_content import TaskMessageContent as TaskMessageContent
 from .tool_request_content import ToolRequestContent as ToolRequestContent
 from .message_create_params import MessageCreateParams as MessageCreateParams
@@ -53,4 +54,3 @@ from .agent_rpc_by_name_params import AgentRpcByNameParams as AgentRpcByNamePara
 from .task_message_content_param import TaskMessageContentParam as TaskMessageContentParam
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
 from .tool_response_content_param import ToolResponseContentParam as ToolResponseContentParam
-from .task_delete_by_name_response import TaskDeleteByNameResponse as TaskDeleteByNameResponse

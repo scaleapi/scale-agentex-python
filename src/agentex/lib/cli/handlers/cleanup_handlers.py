@@ -168,19 +168,13 @@ def cleanup_single_task(client: Agentex, agent_name: str, task_id: str) -> None:
     """
     try:
         # Use the agent RPC method to cancel the task
-        try:
-            client.agents.rpc_by_name(
-                agent_name=agent_name,
-                method="task/cancel",
-                params={"task_id": task_id}
-            )
-            logger.debug(f"Successfully cancelled task {task_id} via agent '{agent_name}'")
-        except Exception as e:
-            # If RPC cancel fails, try direct task deletion as fallback
-            logger.warning(f"RPC task/cancel failed for task {task_id}, trying direct deletion: {e}")
-            client.tasks.delete(task_id=task_id)
-            logger.debug(f"Successfully deleted task {task_id} directly")
-        
+        client.agents.rpc_by_name(
+            agent_name=agent_name,
+            method="task/cancel",
+            params={"task_id": task_id}
+        )
+        logger.debug(f"Successfully cancelled task {task_id} via agent '{agent_name}'")
+    
     except Exception as e:
-        logger.warning(f"Failed to cleanup task {task_id}: {e}")
-        raise 
+        logger.warning(f"RPC task/cancel failed for task {task_id}: {e}")
+        raise

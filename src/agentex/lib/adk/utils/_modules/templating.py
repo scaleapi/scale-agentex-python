@@ -1,6 +1,7 @@
 from datetime import timedelta
 from typing import Any
 
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex
@@ -39,7 +40,7 @@ class TemplatingModule:
             templating_service (Optional[TemplatingService]): Optional pre-configured templating service. If None, will be auto-initialized.
         """
         if templating_service is None:
-            agentex_client = AsyncAgentex()
+            agentex_client = create_async_agentex_client()
             tracer = AsyncTracer(agentex_client)
             self._templating_service = TemplatingService(tracer=tracer)
         else:

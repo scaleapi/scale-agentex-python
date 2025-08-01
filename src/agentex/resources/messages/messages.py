@@ -192,6 +192,8 @@ class MessagesResource(SyncAPIResource):
         List Messages
 
         Args:
+          task_id: The task ID
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -377,6 +379,8 @@ class AsyncMessagesResource(AsyncAPIResource):
         List Messages
 
         Args:
+          task_id: The task ID
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request

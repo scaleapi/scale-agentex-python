@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 from agentex.lib.core.temporal.activities import get_all_activities
 from agentex.lib.core.temporal.workers.worker import AgentexWorker

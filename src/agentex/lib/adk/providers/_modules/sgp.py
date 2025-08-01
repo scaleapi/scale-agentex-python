@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from scale_gp import SGPClient, SGPClientError
 from temporalio.common import RetryPolicy
 
@@ -33,7 +34,7 @@ class SGPModule:
         if sgp_service is None:
             try:
                 sgp_client = SGPClient()
-                agentex_client = AsyncAgentex()
+                agentex_client = create_async_agentex_client()
                 tracer = AsyncTracer(agentex_client)
                 self._sgp_service = SGPService(sgp_client=sgp_client, tracer=tracer)
             except SGPClientError:
