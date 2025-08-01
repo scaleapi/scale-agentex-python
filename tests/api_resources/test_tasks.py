@@ -68,6 +68,15 @@ class TestTasks:
 
     @pytest.mark.skip()
     @parametrize
+    def test_method_list_with_all_params(self, client: Agentex) -> None:
+        task = client.tasks.list(
+            agent_id="agent_id",
+            agent_name="agent_name",
+        )
+        assert_matches_type(TaskListResponse, task, path=["response"])
+
+    @pytest.mark.skip()
+    @parametrize
     def test_raw_response_list(self, client: Agentex) -> None:
         response = client.tasks.with_raw_response.list()
 
@@ -348,6 +357,15 @@ class TestAsyncTasks:
     @parametrize
     async def test_method_list(self, async_client: AsyncAgentex) -> None:
         task = await async_client.tasks.list()
+        assert_matches_type(TaskListResponse, task, path=["response"])
+
+    @pytest.mark.skip()
+    @parametrize
+    async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
+        task = await async_client.tasks.list(
+            agent_id="agent_id",
+            agent_name="agent_name",
+        )
         assert_matches_type(TaskListResponse, task, path=["response"])
 
     @pytest.mark.skip()
