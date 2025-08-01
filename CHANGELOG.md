@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 (2025-08-01)
+
+Full Changelog: [v0.2.5...v0.3.0](https://github.com/scaleapi/agentex-python/compare/v0.2.5...v0.3.0)
+
+### Features
+
+* **api:** add query params to tasks.list ([d4902d5](https://github.com/scaleapi/agentex-python/commit/d4902d52caf82e2f57d1bbf19527cdc1448ed397))
+* **client:** support file upload requests ([e004b30](https://github.com/scaleapi/agentex-python/commit/e004b304c22286151330c2200bcb85046a7ac111))
+
 ## 0.2.5 (2025-07-30)
 
 Full Changelog: [v0.2.4...v0.2.5](https://github.com/scaleapi/agentex-python/compare/v0.2.4...v0.2.5)
