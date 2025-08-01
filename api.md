@@ -47,7 +47,7 @@ from agentex.types import Task, TaskListResponse
 Methods:
 
 - <code title="get /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve</a>(task_id) -> <a href="./src/agentex/types/task.py">Task</a></code>
-- <code title="get /tasks">client.tasks.<a href="./src/agentex/resources/tasks.py">list</a>() -> <a href="./src/agentex/types/task_list_response.py">TaskListResponse</a></code>
+- <code title="get /tasks">client.tasks.<a href="./src/agentex/resources/tasks.py">list</a>(\*\*<a href="src/agentex/types/task_list_params.py">params</a>) -> <a href="./src/agentex/types/task_list_response.py">TaskListResponse</a></code>
 - <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
 - <code title="delete /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete_by_name</a>(task_name) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
 - <code title="get /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve_by_name</a>(task_name) -> <a href="./src/agentex/types/task.py">Task</a></code>
