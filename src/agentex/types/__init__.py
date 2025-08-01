@@ -19,6 +19,7 @@ from .message_author import MessageAuthor as MessageAuthor
 from .agent_rpc_params import AgentRpcParams as AgentRpcParams
 from .agent_rpc_result import AgentRpcResult as AgentRpcResult
 from .span_list_params import SpanListParams as SpanListParams
+from .task_list_params import TaskListParams as TaskListParams
 from .agent_list_params import AgentListParams as AgentListParams
 from .event_list_params import EventListParams as EventListParams
 from .state_list_params import StateListParams as StateListParams
