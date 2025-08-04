@@ -66,7 +66,6 @@ class At010AgentChatWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        print("🔥 DEBUG: on_task_event_send called - breakpoint should hit here!")
         logger.info(f"Received task message instruction: {params}")
             
         if not params.event.content:
