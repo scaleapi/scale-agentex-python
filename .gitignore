@@ -13,3 +13,12 @@ dist
 .envrc
 codegen.log
 Brewfile.lock.json
+
+# OpenAI Deep Research Tutorial development files
+0.0.19
+agentex_openai_deep_research.md
+clarification_log.md
+debug_log.md
+deep_research_prompts.md
+openai_deep_research.md
+to_do.md
