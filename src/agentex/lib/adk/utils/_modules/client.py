@@ -18,7 +18,8 @@ class EnvAuth(httpx.Auth):
             agent_api_key = env_vars.AGENT_API_KEY  
             if agent_api_key:
                 request.headers[self.header_name] = agent_api_key
-                logger.info(f"Adding header {self.header_name}:{agent_api_key}")
+                masked_key = agent_api_key[-4:] if agent_api_key and len(agent_api_key) > 4 else "****"
+                logger.info(f"Adding header {self.header_name}:{masked_key}")
         yield request
 
 

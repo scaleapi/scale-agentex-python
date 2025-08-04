@@ -4,7 +4,7 @@ import os
 import httpx
 import asyncio
 
-from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
 from agentex.lib.utils.logging import make_logger
 
 logger = make_logger(__name__)
