@@ -15,10 +15,10 @@ class EnvAuth(httpx.Auth):
         # This gets called for every request
         env_vars = EnvironmentVariables.refresh()
         if env_vars:
-            agent_id = env_vars.AGENT_ID
-            if agent_id:
-                request.headers[self.header_name] = agent_id
-                logger.info(f"Adding header {self.header_name}:{agent_id}")
+            agent_api_key = env_vars.AGENT_API_KEY  
+            if agent_api_key:
+                request.headers[self.header_name] = agent_api_key
+                logger.info(f"Adding header {self.header_name}:{agent_api_key}")
         yield request
 
 

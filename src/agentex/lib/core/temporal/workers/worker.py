@@ -24,6 +24,8 @@ from temporalio.worker import (
 )
 
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.registration import register_agent
+from agentex.lib.environment_variables import EnvironmentVariables
 
 logger = make_logger(__name__)
 
@@ -103,6 +105,7 @@ class AgentexWorker:
         workflow: type,
     ):
         await self.start_health_check_server()
+        await self._register_agent()
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
         )
@@ -160,3 +163,10 @@ class AgentexWorker:
                         f"Failed to start health check server on alternative port {alt_port}: {e}"
                     )
                     raise
+
+    async def _register_agent(self):
+        env_vars = EnvironmentVariables.refresh()
+        if env_vars and env_vars.AGENTEX_BASE_URL:
+            await register_agent(env_vars)
+        else:
+            logger.warning("AGENTEX_BASE_URL not set, skipping worker registration")
