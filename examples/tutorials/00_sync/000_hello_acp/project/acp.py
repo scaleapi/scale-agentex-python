@@ -25,4 +25,3 @@ async def handle_message_send(
         author="agent",
         content=f"Hello! I've received your message. Here's a generic response, but in future tutorials we'll see how you can get me to intelligently respond to your message. This is what I heard you say: {params.content.content}",
     )
-    
