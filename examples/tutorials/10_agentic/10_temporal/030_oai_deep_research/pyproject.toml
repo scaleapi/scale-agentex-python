@@ -17,6 +17,7 @@ dependencies = [
     "jinja2",
     "python-dotenv",
     "scale-gp",
+    "httpx>=0.24.0",
 ]
 
 [project.optional-dependencies]

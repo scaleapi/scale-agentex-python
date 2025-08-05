@@ -2,6 +2,7 @@ import os
 from datetime import timedelta
 from typing import override
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from agentex.lib import adk
 from agentex.lib.sdk.state_machine.state_workflow import StateWorkflow
 from agentex.lib.utils.logging import make_logger
@@ -77,8 +78,13 @@ class ResearchWorkflow(StateWorkflow):
             result = await workflow.execute_activity(
                 "run_deep_research",
                 research_params,
-                start_to_close_timeout=timedelta(minutes=20),  # 20 minutes timeout
-                heartbeat_timeout=timedelta(minutes=1)  # 1 minute heartbeat
+                start_to_close_timeout=timedelta(hours=2),  # 2 hours timeout for complex research
+                heartbeat_timeout=timedelta(minutes=5),  # 5 minute heartbeat
+                retry_policy=RetryPolicy(
+                    maximum_attempts=3,
+                    initial_interval=timedelta(seconds=30),
+                    maximum_interval=timedelta(minutes=5)
+                )
             )
             
             logger.info("ResearchWorkflow: Deep research activity completed")
