@@ -69,7 +69,7 @@ class BaseACPServer(FastAPI):
         @asynccontextmanager
         async def lifespan_context(app: FastAPI):
             env_vars = EnvironmentVariables.refresh()
-            if env_vars and env_vars.AGENTEX_BASE_URL:
+            if env_vars.AGENTEX_BASE_URL:
                 await register_agent(env_vars)
             else:
                 logger.warning("AGENTEX_BASE_URL not set, skipping agent registration")
@@ -99,7 +99,7 @@ class BaseACPServer(FastAPI):
 
             # Check if the request is authenticated
             if refreshed_environment_variables and getattr(refreshed_environment_variables, "AGENT_API_KEY", None):
-                authorization_header = request.headers.get("x-agent-identity")
+                authorization_header = request.headers.get("x-agent-api-key")
                 if authorization_header != refreshed_environment_variables.AGENT_API_KEY:
                     return JSONRPCResponse(
                         id=rpc_request.id,

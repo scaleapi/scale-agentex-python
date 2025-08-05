@@ -8,7 +8,7 @@ logger = make_logger(__name__)
 
 
 class EnvAuth(httpx.Auth):
-    def __init__(self, header_name="x-agent-identity"):
+    def __init__(self, header_name="x-agent-api-key"):
         self.header_name = header_name
 
     def auth_flow(self, request):
