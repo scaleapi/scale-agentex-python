@@ -99,8 +99,8 @@ class BaseACPServer(FastAPI):
 
             # Check if the request is authenticated
             if refreshed_environment_variables and getattr(refreshed_environment_variables, "AGENT_API_KEY", None):
-                authorization_header = request.headers.get("Authorization")
-                if authorization_header != f"Bearer {refreshed_environment_variables.AGENT_API_KEY}":
+                authorization_header = request.headers.get("x-agent-identity")
+                if authorization_header != refreshed_environment_variables.AGENT_API_KEY:
                     return JSONRPCResponse(
                         id=rpc_request.id,
                         error=JSONRPCError(code=-32601, message="Unauthorized"),
