@@ -1,0 +1,42 @@
+# Critic Agent Manifest Configuration
+# ---------------------------------
+# This file defines how the critic agent should be built and deployed.
+
+build:
+  context:
+    root: ../
+    dockerfile: Dockerfile
+    build_args:
+      AGENT_FILE: critic.py
+      PORT: 8002
+
+local_development:
+  agent:
+    port: 8002
+    host_address: host.docker.internal
+  paths:
+    acp: project/critic.py
+
+agent:
+  name: ab090-critic-agent
+  acp_type: agentic
+  description: Critic agent that reviews content drafts against specified rules and provides feedback
+  temporal:
+    enabled: false
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+  global:
+    agent:
+      name: "ab090-critic-agent"
+      description: "Critic agent that reviews content drafts against specified rules and provides feedback"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
