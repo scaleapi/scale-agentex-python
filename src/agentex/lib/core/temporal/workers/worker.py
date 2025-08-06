@@ -164,6 +164,13 @@ class AgentexWorker:
                     )
                     raise
 
+    """
+    Register the worker with the Agentex server.
+    
+    Even though the Temporal server will also register the agent with the server,
+    doing this on the worker side is required to make sure that both share the API key
+    which is returned on registration and used to authenticate the worker with the Agentex server.
+    """
     async def _register_agent(self):
         env_vars = EnvironmentVariables.refresh()
         if env_vars and env_vars.AGENTEX_BASE_URL:
