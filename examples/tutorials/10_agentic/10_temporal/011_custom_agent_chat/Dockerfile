@@ -28,16 +28,18 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the requirements file to optimize caching
-COPY 000_hello_acp/requirements.txt /app/requirements.txt
+# Copy requirements
+COPY pyproject.toml /app/pyproject.toml
+COPY uv.lock /app/uv.lock
+COPY README.md /app/README.md
 
 WORKDIR /app/
 
 # Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+RUN uv sync
 
 # Copy the project code
-COPY 000_hello_acp/project /app/project
+COPY project /app/project
 
 WORKDIR /app/project
 
