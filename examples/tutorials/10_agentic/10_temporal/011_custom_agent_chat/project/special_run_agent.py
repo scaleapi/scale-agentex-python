@@ -212,20 +212,20 @@ async def special_run_agent(params: SpecialRunAgentParams) -> SpecialRunAgentRes
 
                             # Finish the streaming context (sends DONE event and updates message)
                             if maybe_item_id and maybe_item_id in item_id_to_streaming_context:
-                                streaming_context = item_id_to_streaming_context[item_id]
+                                streaming_context = item_id_to_streaming_context[maybe_item_id]
                                 await streaming_context.close()
-                                unclosed_item_ids.remove(item_id)
+                                unclosed_item_ids.remove(maybe_item_id)
 
                         elif event.data.type == "response.completed":
                             # All items complete, finish all remaining streaming contexts for this session
-                            for item_id in unclosed_item_ids:
+                            for item_id in list(unclosed_item_ids):
                                 streaming_context = item_id_to_streaming_context[item_id]
                                 await streaming_context.close()
                                 unclosed_item_ids.remove(item_id)
 
             finally:
                 # Cleanup: ensure all streaming contexts for this session are properly finished
-                for item_id in unclosed_item_ids:
+                for item_id in list(unclosed_item_ids):
                     streaming_context = item_id_to_streaming_context[item_id]
                     await streaming_context.close()
                     unclosed_item_ids.remove(item_id)
