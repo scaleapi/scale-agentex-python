@@ -118,7 +118,7 @@ class At011CustomAgentChatWorkflow(BaseWorkflow):
                     parent_span_id=span.id if span else None,
                 )
 
-            # Custom activity that generates a response
+            # Custom activity that we implemented in special_run_agent.py
             run_result: SpecialRunAgentResult = await workflow.execute_activity(
                 activity=SPECIAL_RUN_AGENT_ACTIVITY_NAME,
                 arg=SpecialRunAgentParams(

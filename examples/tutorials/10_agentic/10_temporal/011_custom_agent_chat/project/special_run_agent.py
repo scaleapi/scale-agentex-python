@@ -66,6 +66,8 @@ class SpecialRunAgentParams:
 
 
 class SpecialRunAgentResult(TypedDict):
+    """Note that activities must return a serializable dict."""
+
     final_output: Any
     """The final output of the agent. This should not be None."""
 
@@ -75,7 +77,11 @@ class SpecialRunAgentResult(TypedDict):
 
 @activity.defn(name=SPECIAL_RUN_AGENT_ACTIVITY_NAME)
 async def special_run_agent(params: SpecialRunAgentParams) -> SpecialRunAgentResult:
-    """Run an agent with streaming and automatic TaskMessage creation."""
+    """
+    Run an agent with streaming and automatic TaskMessage creation.
+    
+    Note that activities must return a serializable dict.
+    """
 
     tool_call_map: dict[str, ResponseFunctionToolCall] = {}
     redacted_params = redact_mcp_server_params(
