@@ -11,6 +11,7 @@ from agentex.lib.cli.handlers.agent_handlers import (
     build_agent,
     run_agent,
 )
+from agentex.lib.cli.debug import DebugConfig, DebugMode
 from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows
 from agentex.lib.cli.handlers.deploy_handlers import (
     DeploymentError,
@@ -171,7 +172,13 @@ def run(
         False, 
         help="Clean up existing workflows for this agent before starting"
     ),
-):
+    # Debug options
+    debug: bool = typer.Option(False, help="Enable debug mode for both worker and ACP (disables auto-reload)"),
+    debug_worker: bool = typer.Option(False, help="Enable debug mode for temporal worker only"),
+    debug_acp: bool = typer.Option(False, help="Enable debug mode for ACP server only"),
+    debug_port: int = typer.Option(5678, help="Port for remote debugging (worker uses this, ACP uses port+1)"),
+    wait_for_debugger: bool = typer.Option(False, help="Wait for debugger to attach before starting"),
+) -> None:
     """
     Run an agent locally from the given manifest.
     """
@@ -196,8 +203,35 @@ def run(
             console.print(f"[yellow]⚠ Pre-run cleanup failed: {str(e)}[/yellow]")
             logger.warning(f"Pre-run cleanup failed: {e}")
     
+    # Create debug configuration based on CLI flags
+    debug_config = None
+    if debug or debug_worker or debug_acp:
+        # Determine debug mode
+        if debug:
+            mode = DebugMode.BOTH
+        elif debug_worker and debug_acp:
+            mode = DebugMode.BOTH
+        elif debug_worker:
+            mode = DebugMode.WORKER
+        elif debug_acp:
+            mode = DebugMode.ACP
+        else:
+            mode = DebugMode.NONE
+        
+        debug_config = DebugConfig(
+            enabled=True,
+            mode=mode,
+            port=debug_port,
+            wait_for_attach=wait_for_debugger,
+            auto_port=False  # Use fixed port to match VS Code launch.json
+        )
+        
+        console.print(f"[blue]🐛 Debug mode enabled: {mode.value}[/blue]")
+        if wait_for_debugger:
+            console.print("[yellow]⏳ Processes will wait for debugger attachment[/yellow]")
+    
     try:
-        run_agent(manifest_path=manifest)
+        run_agent(manifest_path=manifest, debug_config=debug_config)
     except Exception as e:
         typer.echo(f"Error running agent: {str(e)}", err=True)
         logger.exception("Error running agent")

@@ -1,0 +1,42 @@
+# Creator Agent Manifest Configuration
+# ----------------------------------
+# This file defines how the creator agent should be built and deployed.
+
+build:
+  context:
+    root: ../
+    dockerfile: Dockerfile
+    build_args:
+      AGENT_FILE: creator.py
+      PORT: 8001
+
+local_development:
+  agent:
+    port: 8001
+    host_address: host.docker.internal
+  paths:
+    acp: project/creator.py
+
+agent:
+  name: ab090-creator-agent
+  acp_type: agentic
+  description: Creator agent that generates and revises content based on requests and feedback
+  temporal:
+    enabled: false
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+  global:
+    agent:
+      name: "ab090-creator-agent"
+      description: "Creator agent that generates and revises content based on requests and feedback"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

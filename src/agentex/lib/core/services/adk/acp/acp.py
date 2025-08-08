@@ -64,7 +64,7 @@ class ACPService:
             else:
                 raise ValueError("Either agent_name or agent_id must be provided")
 
-            task_entry = Task.model_validate(json_rpc_response["result"])
+            task_entry = Task.model_validate(json_rpc_response.result)
             if span:
                 span.output = task_entry.model_dump()
             return task_entry
@@ -115,7 +115,7 @@ class ACPService:
             else:
                 raise ValueError("Either agent_name or agent_id must be provided")
 
-            task_message = TaskMessage.model_validate(json_rpc_response["result"])
+            task_message = TaskMessage.model_validate(json_rpc_response.result)
             if span:
                 span.output = task_message.model_dump()
             return task_message
@@ -147,7 +147,7 @@ class ACPService:
                     agent_name=agent_name,
                     method="event/send",
                     params={
-                        "task_name": task_name,
+                        "task_id": task_id,
                         "content": cast(TaskMessageContentParam, content.model_dump()),
                     },
                 )
@@ -163,7 +163,7 @@ class ACPService:
             else:
                 raise ValueError("Either agent_name or agent_id must be provided")
 
-            event_entry = Event.model_validate(json_rpc_response["result"])
+            event_entry = Event.model_validate(json_rpc_response.result)
             if span:
                 span.output = event_entry.model_dump()
             return event_entry
@@ -204,7 +204,7 @@ class ACPService:
             else:
                 raise ValueError("Either task_name or task_id must be provided")
 
-            task_entry = Task.model_validate(json_rpc_response["result"])
+            task_entry = Task.model_validate(json_rpc_response.result)
             if span:
                 span.output = task_entry.model_dump()
             return task_entry

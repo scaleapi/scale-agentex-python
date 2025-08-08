@@ -1,0 +1,42 @@
+# Orchestrator Agent Manifest Configuration
+# ----------------------------------------
+# This file defines how the orchestrator agent should be built and deployed.
+
+build:
+  context:
+    root: ../
+    dockerfile: Dockerfile
+    build_args:
+      AGENT_FILE: orchestrator.py
+      PORT: 8000
+
+local_development:
+  agent:
+    port: 8000
+    host_address: host.docker.internal
+  paths:
+    acp: project/orchestrator.py
+
+agent:
+  name: ab090-orchestrator-agent
+  acp_type: agentic
+  description: Orchestrator agent that coordinates a multi-agent content creation workflow using state machines and inter-agent communication
+  temporal:
+    enabled: false
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+  global:
+    agent:
+      name: "ab090-orchestrator-agent"
+      description: "Orchestrator agent that coordinates a multi-agent content creation workflow using state machines and inter-agent communication"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

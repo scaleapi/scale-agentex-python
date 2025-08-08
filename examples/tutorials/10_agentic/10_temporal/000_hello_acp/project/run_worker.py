@@ -1,9 +1,9 @@
 import asyncio
-import os
 
 from agentex.lib.core.temporal.activities import get_all_activities
 from agentex.lib.core.temporal.workers.worker import AgentexWorker
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.environment_variables import EnvironmentVariables
 
 from workflow import At000HelloAcpWorkflow
@@ -15,6 +15,9 @@ logger = make_logger(__name__)
 
 
 async def main():
+    # Setup debug mode if enabled
+    setup_debug_if_enabled()
+    
     task_queue_name = environment_variables.WORKFLOW_TASK_QUEUE
     if task_queue_name is None:
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")

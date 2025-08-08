@@ -67,6 +67,37 @@ asyncio.run(main())
 
 Functionality between the synchronous and asynchronous clients is otherwise identical.
 
+## Debugging
+
+AgentEx provides built-in debugging support for **temporal projects** during local development.
+
+```bash
+# Basic debugging
+uv run agentex agents run --manifest manifest.yaml --debug-worker
+
+# Wait for debugger to attach before starting
+uv run agentex agents run --manifest manifest.yaml --debug-worker --wait-for-debugger
+
+# Custom debug port
+uv run agentex agents run --manifest manifest.yaml --debug-worker --debug-port 5679
+```
+
+For **VS Code**, add this configuration to `.vscode/launch.json`:
+
+```json
+{
+  "name": "Attach to AgentEx Worker",
+  "type": "debugpy",
+  "request": "attach",
+  "connect": { "host": "localhost", "port": 5678 },
+  "pathMappings": [{ "localRoot": "${workspaceFolder}", "remoteRoot": "." }],
+  "justMyCode": false,
+  "console": "integratedTerminal"
+}
+```
+
+The debug server automatically finds an available port starting from 5678 and prints connection details when starting.
+
 ### With aiohttp
 
 By default, the async client uses `httpx` for HTTP requests. However, for improved concurrency performance you may also use `aiohttp` as the HTTP backend.

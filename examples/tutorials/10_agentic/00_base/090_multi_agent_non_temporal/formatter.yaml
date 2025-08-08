@@ -1,0 +1,42 @@
+# Formatter Agent Manifest Configuration
+# -------------------------------------
+# This file defines how the formatter agent should be built and deployed.
+
+build:
+  context:
+    root: ../
+    dockerfile: Dockerfile
+    build_args:
+      AGENT_FILE: formatter.py
+      PORT: 8003
+
+local_development:
+  agent:
+    port: 8003
+    host_address: host.docker.internal
+  paths:
+    acp: project/formatter.py
+
+agent:
+  name: ab090-formatter-agent
+  acp_type: agentic
+  description: Formatter agent that converts approved content to various target formats (HTML, Markdown, etc.)
+  temporal:
+    enabled: false
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+  global:
+    agent:
+      name: "ab090-formatter-agent"
+      description: "Formatter agent that converts approved content to various target formats (HTML, Markdown, etc.)"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

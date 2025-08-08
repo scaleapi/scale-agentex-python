@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.2.6"
+version = "0.2.7"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -38,7 +38,7 @@ dependencies = [
     "pytest>=8.4.0",
     "pytest-asyncio>=1.0.0",
     "scale-gp-beta==0.1.0a20",
-    "ipykernel>=6.29.5",
+    "ipykernel>=6.29.5",    
 ]
 requires-python = ">= 3.12,<4"
 classifiers = [
@@ -86,6 +86,7 @@ dev-dependencies = [
     "rich>=13.7.1",
     "nest_asyncio==1.6.0",
     "pytest-xdist>=3.6.1",
+    "debugpy>=1.8.15",
 ]
 
 [tool.rye.scripts]
@@ -194,7 +195,7 @@ reportPrivateUsage = false
 [tool.ruff]
 line-length = 120
 output-format = "grouped"
-target-version = "py37"
+target-version = "py38"
 
 [tool.ruff.format]
 docstring-code-format = true
