@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.7 (2025-08-08)
+
+Full Changelog: [v0.2.6...v0.2.7](https://github.com/scaleapi/agentex-python/compare/v0.2.6...v0.2.7)
+
+### Features
+
+* **api:** api update ([e3d08ba](https://github.com/scaleapi/agentex-python/commit/e3d08baad59346db48e04a394a929d6347dafa07))
+* debug features ([40d8db2](https://github.com/scaleapi/agentex-python/commit/40d8db22dcc8f00a6c78e9bc3e1d036ebd1423b6))
+
+
+### Chores
+
+* **internal:** fix ruff target version ([1b880e1](https://github.com/scaleapi/agentex-python/commit/1b880e1dd81d47bb9df12507f13351611ff6367f))
+
 ## 0.2.6 (2025-08-01)
 
 Full Changelog: [v0.2.5...v0.2.6](https://github.com/scaleapi/agentex-python/compare/v0.2.5...v0.2.6)
