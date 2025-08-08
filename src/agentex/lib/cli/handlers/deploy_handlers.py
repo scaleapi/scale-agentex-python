@@ -22,7 +22,7 @@ logger = make_logger(__name__)
 console = Console()
 
 TEMPORAL_WORKER_KEY = "temporal-worker"
-AGENTEX_AGENTS_HELM_CHART_VERSION = "0.1.4-v1-beta"
+AGENTEX_AGENTS_HELM_CHART_VERSION = "0.1.6-v1-beta"
 
 
 class InputDeployOverrides(BaseModel):
@@ -204,7 +204,6 @@ def merge_deployment_configs(
             for pull_secret in manifest.deployment.imagePullSecrets
         ]
         helm_values["global"]["imagePullSecrets"] = pull_secrets
-        # TODO: Remove this once i bump the chart version again
         helm_values["imagePullSecrets"] = pull_secrets
 
     # Apply cluster-specific overrides
