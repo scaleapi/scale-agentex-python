@@ -508,17 +508,24 @@ class AgentsResource(SyncAPIResource):
         raise ValueError("Either agent_id or agent_name must be provided")
       
       with raw_agent_rpc_response as response:
-        for agent_rpc_response_str in response.iter_text():
-          if agent_rpc_response_str.strip():  # Only process non-empty lines
-            try:
-              chunk_rpc_response = SendMessageStreamResponse.model_validate(
-                json.loads(agent_rpc_response_str), 
-                from_attributes=True
-              )
-              yield chunk_rpc_response
-            except json.JSONDecodeError:
-              # Skip invalid JSON lines
-              continue
+        for _line in response.iter_lines():
+          if not _line:
+            continue
+          line = _line.strip()
+          # Handle optional SSE-style prefix
+          if line.startswith("data:"):
+            line = line[len("data:"):].strip()
+          if not line:
+            continue
+          try:
+            chunk_rpc_response = SendMessageStreamResponse.model_validate(
+              json.loads(line),
+              from_attributes=True
+            )
+            yield chunk_rpc_response
+          except json.JSONDecodeError:
+            # Skip invalid JSON lines
+            continue
     
     def send_event(
       self,
@@ -1048,17 +1055,24 @@ class AsyncAgentsResource(AsyncAPIResource):
         raise ValueError("Either agent_id or agent_name must be provided")
       
       async with raw_agent_rpc_response as response:
-        async for agent_rpc_response_str in response.iter_text():
-          if agent_rpc_response_str.strip():  # Only process non-empty lines
-            try:
-              chunk_rpc_response = SendMessageStreamResponse.model_validate(
-                json.loads(agent_rpc_response_str), 
-                from_attributes=True
-              )
-              yield chunk_rpc_response
-            except json.JSONDecodeError:
-              # Skip invalid JSON lines
-              continue
+        async for _line in response.iter_lines():
+          if not _line:
+            continue
+          line = _line.strip()
+          # Handle optional SSE-style prefix
+          if line.startswith("data:"):
+            line = line[len("data:"):].strip()
+          if not line:
+            continue
+          try:
+            chunk_rpc_response = SendMessageStreamResponse.model_validate(
+              json.loads(line),
+              from_attributes=True
+            )
+            yield chunk_rpc_response
+          except json.JSONDecodeError:
+            # Skip invalid JSON lines
+            continue
     
     async def send_event(
       self,
