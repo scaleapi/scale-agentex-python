@@ -39,10 +39,8 @@ RUN uv pip install --system -r requirements.txt
 # Copy the project code
 COPY 000_hello_acp/project /app/project
 
-WORKDIR /app/project
-
 # Run the ACP server using uvicorn
-CMD ["uvicorn", "acp:acp", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
 
 # When we deploy the worker, we will replace the CMD with the following
 # CMD ["python", "-m", "run_worker"] 

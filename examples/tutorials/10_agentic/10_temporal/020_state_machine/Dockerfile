@@ -29,20 +29,18 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy just the requirements file to optimize caching
-COPY 10_agentic/10_temporal/020_state_machine/requirements.txt /app/10_agentic/10_temporal/020_state_machine/requirements.txt
+COPY 020_state_machine/requirements.txt /app/requirements.txt
 
-WORKDIR /app/10_agentic/10_temporal/020_state_machine
+WORKDIR /app/
 
 # Install the required Python packages
 RUN uv pip install --system -r requirements.txt
 
 # Copy the project code
-COPY 10_agentic/10_temporal/020_state_machine/project /app/10_agentic/10_temporal/020_state_machine/project
-
-WORKDIR /app/10_agentic/10_temporal/020_state_machine/project
+COPY 020_state_machine/project /app/project
 
 # Run the ACP server using uvicorn
-CMD ["uvicorn", "acp:acp", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
 
 # When we deploy the worker, we will replace the CMD with the following
 # CMD ["python", "-m", "run_worker"] 
