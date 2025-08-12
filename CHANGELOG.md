@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.9 (2025-08-12)
+
+Full Changelog: [v0.2.8...v0.2.9](https://github.com/scaleapi/agentex-python/compare/v0.2.8...v0.2.9)
+
+### Chores
+
+* **internal:** update test skipping reason ([4affc92](https://github.com/scaleapi/agentex-python/commit/4affc925c69ed626d429732b470d4d1535b1be8d))
+
 ## 0.2.8 (2025-08-09)
 
 Full Changelog: [v0.2.7...v0.2.8](https://github.com/scaleapi/agentex-python/compare/v0.2.7...v0.2.8)
