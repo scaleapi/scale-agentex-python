@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Mapping
+from datetime import datetime
 from typing import Any, TypeVar
 
 from pydantic import BaseModel as PydanticBaseModel
@@ -35,6 +36,9 @@ def recursive_model_dump(obj: Any) -> Any:
     if isinstance(obj, PydanticBaseModel):
         # Serialize BaseModel to dict
         return obj.model_dump(mode="json")
+    elif isinstance(obj, datetime):
+        # Serialize datetime to ISO format string
+        return obj.isoformat()
     elif isinstance(obj, Mapping):
         # Recursively serialize dictionary values
         return {k: recursive_model_dump(v) for k, v in obj.items()}
