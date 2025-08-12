@@ -23,20 +23,18 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy just the requirements file to optimize caching
-COPY 10_agentic/00_base/080_batch_events/requirements.txt /app/10_agentic/00_base/080_batch_events/requirements.txt
+COPY 080_batch_events/requirements.txt /app/requirements.txt
 
-WORKDIR /app/10_agentic/00_base/080_batch_events
+WORKDIR /app/
 
 # Install the required Python packages
 RUN uv pip install --system -r requirements.txt
 
 # Copy the project code
-COPY 10_agentic/00_base/080_batch_events/project /app/10_agentic/00_base/080_batch_events/project
-
-WORKDIR /app/10_agentic/00_base/080_batch_events/project
+COPY 080_batch_events/project /app/project
 
 # Set environment variables
 ENV PYTHONPATH=/app
 
 # Run the agent using uvicorn
-CMD ["uvicorn", "acp:acp", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]

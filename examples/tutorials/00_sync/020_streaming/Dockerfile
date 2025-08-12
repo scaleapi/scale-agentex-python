@@ -32,10 +32,8 @@ RUN uv pip install --system -r requirements.txt
 # Copy the project code
 COPY 020_streaming/project /app/project
 
-WORKDIR /app/project
-
 # Set environment variables
 ENV PYTHONPATH=/app
 
 # Run the agent using uvicorn
-CMD ["uvicorn", "acp:acp", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
