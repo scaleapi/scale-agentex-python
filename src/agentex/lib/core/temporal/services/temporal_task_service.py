@@ -1,3 +1,4 @@
+from typing import Any
 from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
 from agentex.lib.core.clients.temporal.types import WorkflowState
 from agentex.lib.core.temporal.types.workflow import SignalName
@@ -22,7 +23,7 @@ class TemporalTaskService:
         self._temporal_client = temporal_client
         self._env_vars = env_vars
 
-    async def submit_task(self, agent: Agent, task: Task) -> str:
+    async def submit_task(self, agent: Agent, task: Task, params: dict[str, Any] | None) -> str:
         """
         Submit a task to the async runtime for execution.
 
@@ -33,7 +34,7 @@ class TemporalTaskService:
             arg=CreateTaskParams(
                 agent=agent,
                 task=task,
-                params=None,
+                params=params,
             ),
             id=task.id,
             task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,

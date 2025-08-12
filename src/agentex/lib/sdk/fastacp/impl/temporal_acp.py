@@ -71,7 +71,7 @@ class TemporalACP(BaseACPServer):
         async def handle_task_create(params: CreateTaskParams) -> None:
             """Default create task handler - logs the task"""
             logger.info(f"TemporalACP received task create rpc call for task {params.task.id}")
-            await self._temporal_task_service.submit_task(agent=params.agent, task=params.task)
+            await self._temporal_task_service.submit_task(agent=params.agent, task=params.task, params=params.params)
 
         @self.on_task_event_send
         async def handle_event_send(params: SendEventParams) -> None:
