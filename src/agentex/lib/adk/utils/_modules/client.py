@@ -1,6 +1,6 @@
 import httpx
 
-from agentex import AsyncAgentex
+from agentex import AsyncAgentex, Agentex
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.utils.logging import make_logger
 
@@ -25,5 +25,11 @@ class EnvAuth(httpx.Auth):
 
 def create_async_agentex_client(**kwargs) -> AsyncAgentex:
     client = AsyncAgentex(**kwargs)
+    client._client.auth = EnvAuth()
+    return client
+
+
+def create_sync_agentex_client(**kwargs) -> Agentex:
+    client = Agentex(**kwargs)
     client._client.auth = EnvAuth()
     return client
