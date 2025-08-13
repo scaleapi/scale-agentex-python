@@ -39,10 +39,16 @@ async def handle_message_send(
     if params.content.author != "user":
         raise ValueError(f"Expected user message, got {params.content.author}")
     
-    if not os.environ.get("OPENAI_API_KEY"):
+    if not os.environ.get("SGP_API_KEY"):
         return TextContent(
             author="agent",
-            content="Hey, sorry I'm unable to respond to your message because you're running this example without an OpenAI API key. Please set the OPENAI_API_KEY environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
+            content="Hey, sorry I'm unable to respond to your message because you're running this example without an SGP API key. Please set the SGP_API_KEY environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
+        )
+
+    if not os.environ.get("SGP_ACCOUNT_ID"):
+        return TextContent(
+            author="agent",
+            content="Hey, sorry I'm unable to respond to your message because you're running this example without an SGP Account ID. Please set the SGP_ACCOUNT_ID environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
         )
 
     #########################################################
@@ -54,7 +60,7 @@ async def handle_message_send(
 
     if not task_state:
         # If the state doesn't exist, create it.
-        state = StateModel(system_prompt="You are a helpful assistant that can answer questions.", model="gpt-4o-mini")
+        state = StateModel(system_prompt="You are a helpful assistant that can answer questions.", model="openai/gpt-4o-mini")
         task_state = await adk.state.create(task_id=params.task.id, agent_id=params.agent.id, state=state)
     else:
         state = StateModel.model_validate(task_state.state)
@@ -96,7 +102,7 @@ async def handle_message_send(
     #########################################################
 
     # Call an LLM to respond to the user's message
-    chat_completion = await adk.providers.litellm.chat_completion(
+    chat_completion = await adk.providers.sgp.chat_completion(
         llm_config=LLMConfig(model=state.model, messages=llm_messages),
         trace_id=params.task.id,
     )
