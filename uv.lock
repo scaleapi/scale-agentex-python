@@ -2,9 +2,19 @@ version = 1
 revision = 2
 requires-python = ">=3.12, <4"
 
+[manifest]
+members = [
+    "agentex-sdk",
+    "knowledge-orchestration-hub",
+]
+
 [[package]]
 name = "agentex-sdk"
+<<<<<<< Updated upstream
 version = "0.2.6"
+=======
+version = "0.2.10"
+>>>>>>> Stashed changes
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -858,6 +868,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/b9/7d/160595ca88ee87ac6
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/6a/ca128561b22b60bd5a0c4ea26649e68c8556b82bc70a0c396eebc977fe86/jupyterlab_widgets-3.0.15-py3-none-any.whl", hash = "sha256:d59023d7d7ef71400d51e6fee9a88867f6e65e10a4201605d2d7f3e8f012a31c", size = 216571, upload-time = "2025-05-05T12:32:29.534Z" },
 ]
+
+[[package]]
+name = "knowledge-orchestration-hub"
+version = "0.1.0"
+source = { virtual = "examples/wmt/knowledge_orchestration_hub" }
+dependencies = [
+    { name = "agentex-sdk" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "agentex-sdk", editable = "." }]
 
 [[package]]
 name = "kubernetes"
