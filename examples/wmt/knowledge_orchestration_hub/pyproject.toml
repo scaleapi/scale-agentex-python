@@ -1,0 +1,12 @@
+[project]
+name = "knowledge-orchestration-hub"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "agentex-sdk",
+]
+
+[tool.uv.sources]
+agentex-sdk = { workspace = true }

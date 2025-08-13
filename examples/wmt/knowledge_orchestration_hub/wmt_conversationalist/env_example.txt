@@ -1,0 +1,17 @@
+# Environment variables for the conversational agent
+# Copy this to .env and update the values
+
+# OpenAI API Key (will be retrieved from AWS Secrets Manager if not set)
+# OPENAI_API_KEY=your_openai_key_here
+
+# RAG Engine Type: 'dummy' for testing, 'full' for production with knowledge base
+RAG_ENGINE=dummy
+
+# Knowledge Repository Backend (when using full RAG engine)
+# KNOWLEDGE_BACKEND=postgres
+# DATABASE_URL=postgresql://user:pass@localhost:5432/knowledge_hub
+
+# Confluence MCP Server Configuration (optional)
+# CONFLUENCE_URL=https://your-company.atlassian.net/wiki
+# CONFLUENCE_USERNAME=your-email@company.com
+# CONFLUENCE_TOKEN=your_api_token
