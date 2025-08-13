@@ -52,13 +52,6 @@ local_development:
     #   ../shared/acp.py        (shared across projects)
     #   /absolute/path/acp.py   (absolute path)
     acp: project/acp.py
-    
-    # Path to temporal worker file
-    # Examples:
-    #   project/run_worker.py   (standard)
-    #   workers/temporal.py     (custom structure)
-    #   ../shared/worker.py     (shared across projects)
-    worker: project/run_worker.py
 
 
 # Agent Configuration
@@ -76,18 +69,9 @@ agent:
   description: An AgentEx agent that manages the conversational aspects of interacting with the system of agents
 
   # Temporal workflow configuration
-  # This enables your agent to run as a Temporal workflow for long-running tasks
+  # Set enabled: true to use Temporal workflows for long-running tasks
   temporal:
-    enabled: true
-    workflows:
-      # Name of the workflow class
-      # Must match the @workflow.defn name in your workflow.py
-      - name: wmt-conversationalist
-
-        # Queue name for task distribution
-        # Used by Temporal to route tasks to your agent
-        # Convention: <agent_name>_task_queue
-        queue_name: wmt_conversationalist_queue
+    enabled: false
 
   # Optional: Credentials mapping
   # Maps Kubernetes secrets to environment variables
@@ -114,11 +98,8 @@ deployment:
     repository: "" # Update with your container registry
     tag: "latest"  # Default tag, should be versioned in production
 
-  imagePullSecrets:
-    - name: my-registry-secret  # Update with your image pull secret name
-
   # Global deployment settings that apply to all clusters
-  # These can be overridden using --override-file with custom configuration files
+  # These can be overridden in cluster-specific files (deploy/*.yaml)
   global:
     agent:
       name: "wmt-conversationalist"
