@@ -1,8 +1,13 @@
+from datetime import datetime
 import os
 import sys
 from typing import Any, Dict, List
 from dotenv import load_dotenv
 from mcp import StdioServerParameters
+from project.prompts import AGENT_INSTRUCTIONS_TEMPLATE, WELCOME_MESSAGE_TEMPLATE
+
+ENABLE_TOOLS = True
+
 
 # === DEBUG SETUP (AgentEx CLI Debug Support) ===
 if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
@@ -106,25 +111,19 @@ async def handle_task_create(params: CreateTaskParams):
         task_id=params.task.id, agent_id=params.agent.id, state=state
     )
 
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    welcome_message = await adk.utils.templating.render_jinja(
+        trace_id=params.task.id,
+        template=WELCOME_MESSAGE_TEMPLATE,
+        variables={"has_deep_research_tool": ENABLE_TOOLS, "current_date": current_date},
+        parent_span_id=None,
+    )
     # Send welcome message
     await adk.messages.create(
         task_id=params.task.id,
         content=TextContent(
             author="agent",
-            content="""Hello! I'm your Knowledge Hub Assistant. I have access to:
-
-🌐 **Web Search**: Current information and real-time data
-📚 **Confluence**: Organizational documentation and internal knowledge  
-🧠 **Research Artifacts**: Previously generated comprehensive research reports
-
-I can help you with:
-- Finding current information through web search
-- Accessing internal documentation from Confluence
-- Searching through existing research reports and analysis
-- Combining information from multiple sources
-- Answering questions with proper citations
-
-What would you like to explore today?""",
+            content=welcome_message,
         ),
     )
 
@@ -200,48 +199,34 @@ async def handle_event_send(params: SendEventParams):
 
     #########################################################
     # 5. Use OpenAI agent with MCP servers and custom tools for advanced capabilities
-    #########################################################
+    #########################################################   
     async with adk.tracing.span(
         trace_id=params.task.id,
         name=f"Knowledge Hub Turn {state.turn_number}",
         input=state,
     ) as span:
-        # Call the OpenAI agent with MCP servers and custom tools
-        agent_instructions = """You are a knowledgeable conversational assistant for a Knowledge Hub system with access to multiple information sources.
-
-**Your capabilities:**
-
-🔍 **Web Search**: You can search the web for current information and real-time data
-📚 **Confluence Access**: You have access to organizational Confluence spaces and documentation
-🧠 **Deep Research Artifacts**: You can search previously generated comprehensive research reports
-
-**Guidelines:**
-- Always cite sources when providing information
-- Use web search for current events or information not in organizational systems
-- Check Confluence for internal documentation, processes, and organizational knowledge
-- Search deep research artifacts for comprehensive analysis on topics that may have been previously researched
-- Be conversational but precise
-- Suggest follow-up questions when appropriate
-- If you can't find information in one source, try another
-
-**Tool Usage:**
-- Use web search for general queries and current information
-- Use Confluence tools for organizational/internal information
-- Use `search_deep_research_artifacts` to find previously generated research reports
-- Combine information from multiple sources when helpful
-
-How can I help you explore the Knowledge Hub today?"""
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        agent_instructions = await adk.utils.templating.render_jinja(
+            trace_id=params.task.id,
+            template=AGENT_INSTRUCTIONS_TEMPLATE,
+            variables={
+                "has_deep_research_tool": ENABLE_TOOLS,
+                "current_date": current_date,
+            },
+            parent_span_id=span.id if span else None,
+        )        
 
         run_result = await adk.providers.openai.run_agent_streamed_auto_send(
             task_id=params.task.id,
             trace_id=params.task.id,
             input_list=state.input_list,
             mcp_server_params=MCP_SERVERS,
-            tools=AVAILABLE_TOOLS,
+            tools=AVAILABLE_TOOLS if ENABLE_TOOLS else None,
             agent_name="Knowledge Hub Assistant",
             agent_instructions=agent_instructions,
             parent_span_id=span.id if span else None,
-            model="openai/gpt-4o-mini",
+            # model="openai/gpt-4o-mini",
+            model="openai/gpt-4.1",
         )
         # Update the state with the conversation history
         if hasattr(run_result, "final_input_list"):

@@ -11,7 +11,8 @@ sources.
 **Your capabilities:**
 
 📚 **Confluence Access**: You have access to organizational Confluence \
-spaces and documentation via Atlassian MCP server tools
+spaces and documentation via Atlassian MCP server tools. Make sure to \
+use getConfluenceSpaces to understand what available spaces can be queried. \
 {%- if has_deep_research_tool %}
 🧠 **Deep Research Artifacts**: You can search previously generated \
 comprehensive research reports
