@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from agentex.lib.utils.model_utils import BaseModel
 from mcp import StdioServerParameters
 from temporalio import workflow
+from agents import ModelSettings
+from openai.types.shared import Reasoning
 
 from agentex.lib import adk
 from agentex.lib.types.acp import CreateTaskParams, SendEventParams
@@ -117,6 +119,13 @@ class At010AgentChatWorkflow(BaseWorkflow):
                 You have access to sequential thinking and web search capabilities through MCP servers.
                 Use these tools when appropriate to provide accurate and well-reasoned responses.""",
                 parent_span_id=span.id if span else None,
+                model="o4-mini",
+                model_settings=ModelSettings(
+                    # Include reasoning items in the response (IDs, summaries)
+                    # response_include=["reasoning.encrypted_content"],
+                    # Ask the model to include a short reasoning summary
+                    reasoning=Reasoning(effort="medium", summary="auto"),
+                )
             )
             self._state.input_list = run_result.final_input_list
 
