@@ -29,6 +29,7 @@ from agentex.lib.types.task_message_updates import (
 )
 from agentex.types.task_message_content import (
     TextContent,
+    ReasoningContent,
     ToolRequestContent,
     ToolResponseContent,
 )
@@ -645,6 +646,31 @@ class OpenAIService:
                                         update=StreamTaskMessageFull(
                                             parent_task_message=streaming_context.task_message,
                                             content=tool_response_content,
+                                        ),
+                                    )
+                            
+                            elif event.item.type == "reasoning_item":
+                                # Handle reasoning items
+                                reasoning_item = event.item.raw_item
+                                
+                                reasoning_content = ReasoningContent(
+                                    author="agent",
+                                    summary=[summary.text for summary in reasoning_item.summary],
+                                    content=[content.text for content in reasoning_item.content] if reasoning_item.content else None,
+                                )
+
+                                # Create reasoning content using streaming context (immediate completion)
+                                async with (
+                                    self.streaming_service.streaming_task_message_context(
+                                        task_id=task_id,
+                                        initial_content=reasoning_content,
+                                    ) as streaming_context
+                                ):
+                                    # The message has already been persisted, but we still need to send an update
+                                    await streaming_context.stream_update(
+                                        update=StreamTaskMessageFull(
+                                            parent_task_message=streaming_context.task_message,
+                                            content=reasoning_content,
                                         ),
                                     )
 
