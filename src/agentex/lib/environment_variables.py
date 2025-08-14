@@ -64,7 +64,7 @@ class EnvironmentVariables(BaseModel):
     AUTH_PRINCIPAL_B64: str | None = None
 
     @classmethod
-    def refresh(cls) -> EnvironmentVariables | None:
+    def refresh(cls) -> EnvironmentVariables:
         global refreshed_environment_variables
         if refreshed_environment_variables is not None:
             return refreshed_environment_variables

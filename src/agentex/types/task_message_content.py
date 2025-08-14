@@ -6,11 +6,13 @@ from typing_extensions import Annotated, TypeAlias
 from .._utils import PropertyInfo
 from .data_content import DataContent
 from .text_content import TextContent
+from .reasoning_content import ReasoningContent
 from .tool_request_content import ToolRequestContent
 from .tool_response_content import ToolResponseContent
 
 __all__ = ["TaskMessageContent"]
 
 TaskMessageContent: TypeAlias = Annotated[
-    Union[TextContent, DataContent, ToolRequestContent, ToolResponseContent], PropertyInfo(discriminator="type")
+    Union[TextContent, ReasoningContent, DataContent, ToolRequestContent, ToolResponseContent],
+    PropertyInfo(discriminator="type"),
 ]

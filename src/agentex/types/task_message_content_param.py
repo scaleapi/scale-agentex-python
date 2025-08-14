@@ -7,11 +7,12 @@ from typing_extensions import TypeAlias
 
 from .data_content_param import DataContentParam
 from .text_content_param import TextContentParam
+from .reasoning_content_param import ReasoningContentParam
 from .tool_request_content_param import ToolRequestContentParam
 from .tool_response_content_param import ToolResponseContentParam
 
 __all__ = ["TaskMessageContentParam"]
 
 TaskMessageContentParam: TypeAlias = Union[
-    TextContentParam, DataContentParam, ToolRequestContentParam, ToolResponseContentParam
+    TextContentParam, ReasoningContentParam, DataContentParam, ToolRequestContentParam, ToolResponseContentParam
 ]

@@ -63,6 +63,7 @@ from agentex.types import (
     DataContent,
     MessageAuthor,
     MessageStyle,
+    ReasoningContent,
     TaskMessage,
     TextContent,
     ToolRequestContent,

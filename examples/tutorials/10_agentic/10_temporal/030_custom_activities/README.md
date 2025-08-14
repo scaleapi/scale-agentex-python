@@ -1,0 +1,301 @@
+# at030-custom-activities - AgentEx Temporal Agent Template
+
+This is a starter template for building asynchronous agents with the AgentEx framework and Temporal. It provides a basic implementation of the Agent 2 Client Protocol (ACP) with Temporal workflow support to help you get started quickly.
+
+## What You'll Learn
+
+- **Tasks**: A task is a grouping mechanism for related messages. Think of it as a conversation thread or a session.
+- **Messages**: Messages are communication objects within a task. They can contain text, data, or instructions.
+- **ACP Events**: The agent responds to four main events:
+  - `task_received`: When a new task is created
+  - `task_message_received`: When a message is sent within a task
+  - `task_approved`: When a task is approved
+  - `task_canceled`: When a task is canceled
+- **Temporal Workflows**: Long-running processes that can handle complex state management and async operations
+
+## Running the Agent
+
+1. Run the agent locally:
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+The agent will start on port 8000 and print messages whenever it receives any of the ACP events.
+
+## What's Inside
+
+This template:
+- Sets up a basic ACP server with Temporal integration
+- Handles each of the required ACP events
+- Provides a foundation for building complex async agents
+- Includes Temporal workflow and activity definitions
+
+## Next Steps
+
+For more advanced agent development, check out the AgentEx tutorials:
+
+- **Tutorials 00-08**: Learn about building synchronous agents with ACP
+- **Tutorials 09-10**: Learn how to use Temporal to power asynchronous agents
+  - Tutorial 09: Basic Temporal workflow setup
+  - Tutorial 10: Advanced Temporal patterns and best practices
+
+These tutorials will help you understand:
+- How to handle long-running tasks
+- Implementing state machines
+- Managing complex workflows
+- Best practices for async agent development
+
+## The Manifest File
+
+The `manifest.yaml` file is your agent's configuration file. It defines:
+- How your agent should be built and packaged
+- What files are included in your agent's Docker image
+- Your agent's name and description
+- Local development settings (like the port your agent runs on)
+- Temporal worker configuration
+
+This file is essential for both local development and deployment of your agent.
+
+## Project Structure
+
+```
+030_custom_activities/
+├── project/                  # Your agent's code
+│   ├── __init__.py
+│   ├── acp.py               # ACP server and event handlers
+│   ├── workflow.py          # Temporal workflow definitions
+│   ├── activities.py        # Temporal activity definitions
+│   └── run_worker.py        # Temporal worker setup
+├── Dockerfile               # Container definition
+├── manifest.yaml            # Deployment config
+├── dev.ipynb                # Development notebook for testing
+
+└── pyproject.toml          # Dependencies (uv)
+
+```
+
+## Development
+
+### 1. Customize Event Handlers
+- Modify the handlers in `acp.py` to implement your agent's logic
+- Add your own tools and capabilities
+- Implement custom state management
+
+### 2. Test Your Agent with the Development Notebook
+Use the included `dev.ipynb` Jupyter notebook to test your agent interactively:
+
+```bash
+# Start Jupyter notebook (make sure you have jupyter installed)
+jupyter notebook dev.ipynb
+
+# Or use VS Code to open the notebook directly
+code dev.ipynb
+```
+
+The notebook includes:
+- **Setup**: Connect to your local AgentEx backend
+- **Task creation**: Create a new task for the conversation
+- **Event sending**: Send events to the agent and get responses
+- **Async message subscription**: Subscribe to server-side events to receive agent responses
+- **Rich message display**: Beautiful formatting with timestamps and author information
+
+The notebook automatically uses your agent name (`at030-custom-activities`) and demonstrates the agentic ACP workflow: create task → send event → subscribe to responses.
+
+### 3. Develop Temporal Workflows
+- Edit `workflow.py` to define your agent's async workflow logic
+- Modify `activities.py` to add custom activities
+- Use `run_worker.py` to configure the Temporal worker
+
+### 4. Manage Dependencies
+
+
+You chose **uv** for package management. Here's how to work with dependencies:
+
+```bash
+# Add new dependencies
+agentex uv add requests openai anthropic
+
+# Add Temporal-specific dependencies (already included)
+agentex uv add temporalio
+
+# Install/sync dependencies
+agentex uv sync
+
+# Run commands with uv
+uv run agentex agents run --manifest manifest.yaml
+```
+
+**Benefits of uv:**
+- Faster dependency resolution and installation
+- Better dependency isolation
+- Modern Python packaging standards
+
+
+
+### 5. Configure Credentials
+- Add any required credentials to your manifest.yaml
+- For local development, create a `.env` file in the project directory
+- Use `load_dotenv()` only in development mode:
+
+```python
+import os
+from dotenv import load_dotenv
+
+if os.environ.get("ENVIRONMENT") == "development":
+    load_dotenv()
+```
+
+## Local Development
+
+### 1. Start the Agentex Backend
+```bash
+# Navigate to the backend directory
+cd agentex
+
+# Start all services using Docker Compose
+make dev
+
+# Optional: In a separate terminal, use lazydocker for a better UI (everything should say "healthy")
+lzd
+```
+
+### 2. Setup Your Agent's requirements/pyproject.toml
+```bash
+agentex uv sync [--group editable-apy]
+source .venv/bin/activate
+
+# OR
+conda create -n 030_custom_activities python=3.12
+conda activate 030_custom_activities
+pip install -r requirements.txt
+```
+### 3. Run Your Agent
+```bash
+# From this directory
+export ENVIRONMENT=development && [uv run] agentex agents run --manifest manifest.yaml
+```
+4. **Interact with your agent**
+
+Option 0: CLI (deprecated - to be replaced once a new CLI is implemented - please use the web UI for now!)
+```bash
+# Submit a task via CLI
+agentex tasks submit --agent at030-custom-activities --task "Your task here"
+```
+
+Option 1: Web UI
+```bash
+# Start the local web interface
+cd agentex-web
+make dev
+
+# Then open http://localhost:3000 in your browser to chat with your agent
+```
+
+## Development Tips
+
+### Environment Variables
+- Set environment variables in project/.env for any required credentials
+- Or configure them in the manifest.yaml under the `env` section
+- The `.env` file is automatically loaded in development mode
+
+### Local Testing
+- Use `export ENVIRONMENT=development` before running your agent
+- This enables local service discovery and debugging features
+- Your agent will automatically connect to locally running services
+
+### Temporal-Specific Tips
+- Monitor workflows in the Temporal Web UI at http://localhost:8080
+- Use the Temporal CLI for advanced workflow management
+- Check workflow logs for debugging async operations
+
+### Debugging
+- Check agent logs in the terminal where you ran the agent
+- Use the web UI to inspect task history and responses
+- Monitor backend services with `lzd` (LazyDocker)
+- Use Temporal Web UI for workflow debugging
+
+### To build the agent Docker image locally (normally not necessary):
+
+1. Build the agent image:
+```bash
+agentex agents build --manifest manifest.yaml
+```
+
+## Advanced Features
+
+### Temporal Workflows
+Extend your agent with sophisticated async workflows:
+
+```python
+# In project/workflow.py
+@workflow.defn
+class MyWorkflow(BaseWorkflow):
+    async def complex_operation(self):
+        # Multi-step async operations
+        # Error handling and retries
+        # State management
+        pass
+```
+
+### Custom Activities
+Add custom activities for external operations:
+
+```python
+# In project/activities.py
+@activity.defn
+async def call_external_api(data):
+    # HTTP requests, database operations, etc.
+    pass
+```
+
+### Integration with External Services
+
+```bash
+# Add service clients
+agentex uv add httpx requests-oauthlib
+
+# Add AI/ML libraries
+agentex uv add openai anthropic transformers
+
+# Add database clients
+agentex uv add asyncpg redis
+```
+
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Agent not appearing in web UI**
+   - Check if agent is running on port 8000
+   - Verify `ENVIRONMENT=development` is set
+   - Check agent logs for errors
+
+2. **Temporal workflow issues**
+   - Check Temporal Web UI at http://localhost:8080
+   - Verify Temporal server is running in backend services
+   - Check workflow logs for specific errors
+
+3. **Dependency issues**
+
+   - Run `agentex uv sync` to ensure all dependencies are installed
+   - Verify temporalio is properly installed
+
+
+4. **Port conflicts**
+   - Check if another service is using port 8000
+   - Use `lsof -i :8000` to find conflicting processes
+
+### Temporal-Specific Troubleshooting
+
+1. **Workflow not starting**
+   - Check if Temporal server is running (`docker ps`)
+   - Verify task queue configuration in `run_worker.py`
+   - Check workflow registration in the worker
+
+2. **Activity failures**
+   - Check activity logs in the console
+   - Verify activity registration
+   - Check for timeout issues
+
+Happy building with Temporal! 🚀⚡

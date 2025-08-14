@@ -22,6 +22,7 @@ from .span_list_params import SpanListParams as SpanListParams
 from .task_list_params import TaskListParams as TaskListParams
 from .agent_list_params import AgentListParams as AgentListParams
 from .event_list_params import EventListParams as EventListParams
+from .reasoning_content import ReasoningContent as ReasoningContent
 from .state_list_params import StateListParams as StateListParams
 from .agent_rpc_response import AgentRpcResponse as AgentRpcResponse
 from .agent_task_tracker import AgentTaskTracker as AgentTaskTracker
@@ -50,6 +51,7 @@ from .message_update_params import MessageUpdateParams as MessageUpdateParams
 from .tool_response_content import ToolResponseContent as ToolResponseContent
 from .tracker_list_response import TrackerListResponse as TrackerListResponse
 from .tracker_update_params import TrackerUpdateParams as TrackerUpdateParams
+from .reasoning_content_param import ReasoningContentParam as ReasoningContentParam
 from .agent_rpc_by_name_params import AgentRpcByNameParams as AgentRpcByNameParams
 from .task_message_content_param import TaskMessageContentParam as TaskMessageContentParam
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
