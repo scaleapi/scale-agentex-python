@@ -1,4 +1,4 @@
-# 030-custom-activities - AgentEx Temporal Agent Template
+# at030-custom-activities - AgentEx Temporal Agent Template
 
 This is a starter template for building asynchronous agents with the AgentEx framework and Temporal. It provides a basic implementation of the Agent 2 Client Protocol (ACP) with Temporal workflow support to help you get started quickly.
 
@@ -99,7 +99,7 @@ The notebook includes:
 - **Async message subscription**: Subscribe to server-side events to receive agent responses
 - **Rich message display**: Beautiful formatting with timestamps and author information
 
-The notebook automatically uses your agent name (`030-custom-activities`) and demonstrates the agentic ACP workflow: create task → send event → subscribe to responses.
+The notebook automatically uses your agent name (`at030-custom-activities`) and demonstrates the agentic ACP workflow: create task → send event → subscribe to responses.
 
 ### 3. Develop Temporal Workflows
 - Edit `workflow.py` to define your agent's async workflow logic
@@ -179,7 +179,7 @@ export ENVIRONMENT=development && [uv run] agentex agents run --manifest manifes
 Option 0: CLI (deprecated - to be replaced once a new CLI is implemented - please use the web UI for now!)
 ```bash
 # Submit a task via CLI
-agentex tasks submit --agent 030-custom-activities --task "Your task here"
+agentex tasks submit --agent at030-custom-activities --task "Your task here"
 ```
 
 Option 1: Web UI

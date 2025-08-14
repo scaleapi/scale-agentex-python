@@ -6,7 +6,7 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.environment_variables import EnvironmentVariables
 
-from project.workflow import 030CustomActivitiesWorkflow
+from project.workflow import At030CustomActivitiesWorkflow
 
 
 environment_variables = EnvironmentVariables.refresh()
@@ -29,7 +29,7 @@ async def main():
 
     await worker.run(
         activities=get_all_activities(),
-        workflow=030CustomActivitiesWorkflow,
+        workflow=At030CustomActivitiesWorkflow,
     )
 
 if __name__ == "__main__":

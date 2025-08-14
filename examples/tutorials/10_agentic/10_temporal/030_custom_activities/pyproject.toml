@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "030_custom_activities"
 version = "0.1.0"
-description = "An AgentEx agent"
+description = "An AgentEx agent with custom activities"
 requires-python = ">=3.12"
 dependencies = [
     "agentex-sdk",

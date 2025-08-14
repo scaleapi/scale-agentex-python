@@ -21,7 +21,7 @@ if environment_variables.AGENT_NAME is None:
 logger = make_logger(__name__)
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
-class 030CustomActivitiesWorkflow(BaseWorkflow):
+class At030CustomActivitiesWorkflow(BaseWorkflow):
     """
     Minimal async workflow template for AgentEx Temporal agents.
     """

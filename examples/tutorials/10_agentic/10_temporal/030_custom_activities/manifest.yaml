@@ -69,11 +69,11 @@ agent:
 
   # Unique name for your agent
   # Used for task routing and monitoring
-  name: 030-custom-activities
+  name: at030-custom-activities
 
   # Description of what your agent does
   # Helps with documentation and discovery
-  description: An AgentEx agent
+  description: An AgentEx agent with custom activities
 
   # Temporal workflow configuration
   # This enables your agent to run as a Temporal workflow for long-running tasks
@@ -82,7 +82,7 @@ agent:
     workflows:
       # Name of the workflow class
       # Must match the @workflow.defn name in your workflow.py
-      - name: 030-custom-activities
+      - name: at030-custom-activities
 
         # Queue name for task distribution
         # Used by Temporal to route tasks to your agent
@@ -121,8 +121,8 @@ deployment:
   # These can be overridden using --override-file with custom configuration files
   global:
     agent:
-      name: "030-custom-activities"
-      description: "An AgentEx agent"
+      name: "at030-custom-activities"
+      description: "An AgentEx agent with custom activities"
     
     # Default replica count
     replicaCount: 1
