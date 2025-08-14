@@ -10,9 +10,6 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
     FunctionTool,
 )
-from agents.tool_context import ToolContext
-# from agents.tool import FunctionTool
-# from agents import RunContextWrapper
 
 logger = make_logger(__name__)
 
@@ -39,8 +36,6 @@ class DeepResearchResult(BaseModel):
 
 
 async def invoke_search_deep_research_artifacts(
-    # tool_context: ToolContext[Any],
-    # args_json: dict[str, Any]
     ctx: RunContextWrapper[Any], args: str
 ) -> str:
     """
