@@ -1,6 +1,8 @@
-import json
+import asyncio
+from typing import List, Any, override
 
 from temporalio import workflow
+from pydantic import BaseModel
 
 from agentex.lib import adk
 from agentex.lib.types.acp import CreateTaskParams, SendEventParams
@@ -10,57 +12,167 @@ from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.environment_variables import EnvironmentVariables
 
+
+from project.workflow_utils import BatchProcessingUtils
+from project.shared_models import StateModel, IncomingEventData
+
+
 environment_variables = EnvironmentVariables.refresh()
 
 if environment_variables.WORKFLOW_NAME is None:
     raise ValueError("Environment variable WORKFLOW_NAME is not set")
 
-if environment_variables.AGENT_NAME is None:
+if not environment_variables.AGENT_NAME:
     raise ValueError("Environment variable AGENT_NAME is not set")
 
 logger = make_logger(__name__)
 
+
+WAIT_TIMEOUT = 300
+BATCH_SIZE = 5
+MAX_QUEUE_DEPTH = 50
+
+
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
 class At030CustomActivitiesWorkflow(BaseWorkflow):
     """
-    Minimal async workflow template for AgentEx Temporal agents.
+    Simple tutorial workflow demonstrating custom activities with concurrent processing.
+    
+    Key Learning Points:
+    1. Queue incoming events using Temporal signals
+    2. Process events in batches when enough arrive
+    3. Use asyncio.create_task() for concurrent processing
+    4. Execute custom activities from within workflows
+    5. Handle workflow completion cleanly
     """
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
-        self._complete_task = False
+        self._incoming_queue: asyncio.Queue[Any] = asyncio.Queue()
+        self._processing_tasks: List[asyncio.Task[Any]] = []
+        self._batch_size = BATCH_SIZE
+        self._state: StateModel
+
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
+    @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        logger.info(f"Received task message instruction: {params}")
-            
-        # 2. Echo back the client's message to show it in the UI. This is not done by default so the agent developer has full control over what is shown to the user.
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        if params.event.content is None:
+            return
+        
+        if params.event.content.type == "text":
+            if self._incoming_queue.qsize() >= MAX_QUEUE_DEPTH:
+                logger.warning(f"Queue is at max depth of {MAX_QUEUE_DEPTH}. Dropping event.")
+                if self._state:
+                    self._state.total_events_dropped += 1
+            else:
+                await self._incoming_queue.put(params.event.content)
+            return
 
-        # 3. Send a simple response message.
-        # In future tutorials, this is where we'll add more sophisticated response logic.
-        await adk.messages.create(
-            task_id=params.task.id,
-            content=TextContent(
-                author="agent",
-                content=f"Hello! I've received your message. I can't respond right now, but in future tutorials we'll see how you can get me to intelligently respond to your message.",
-            ),
-        )
+        elif params.event.content.type == "data":
+            received_data = params.event.content.data
+            try:
+                received_data = IncomingEventData.model_validate(received_data)
+            except Exception as e:
+                logger.error(f"Error parsing received data: {e}. Dropping event.")
+                return
+            
+            if received_data.clear_queue:
+                await BatchProcessingUtils.handle_queue_clear(self._incoming_queue, params.task.id)
+            
+            elif received_data.cancel_running_tasks:
+                await BatchProcessingUtils.handle_task_cancellation(self._processing_tasks, params.task.id)
+            else:
+                logger.info(f"Received IncomingEventData: {received_data} with no known action.")
+        else:
+            logger.info(f"Received event: {params.event.content} with no action.")
+        
 
     @workflow.run
-    async def on_task_create(self, params: CreateTaskParams) -> str:
+    @override
+    async def on_task_create(self, params: CreateTaskParams) -> None:
         logger.info(f"Received task create params: {params}")
-
-        # 1. Acknowledge that the task has been created.
+        
+        self._state = StateModel()
         await adk.messages.create(
             task_id=params.task.id,
             content=TextContent(
                 author="agent",
-                content=f"Hello! I've received your task. Normally you can do some state initialization here, or just pass and do nothing until you get your first event. For now I'm just acknowledging that I've received a task with the following params:\n\n{json.dumps(params.params, indent=2)}.\n\nYou should only see this message once, when the task is created. All subsequent events will be handled by the `on_task_event_send` handler.",
+                content=f"🚀 Starting batch processing! I'll collect events into batches of {self._batch_size} and process them using custom activities.",
             ),
         )
 
-        await workflow.wait_condition(
-            lambda: self._complete_task,
-            timeout=None, # Set a timeout if you want to prevent the task from running indefinitely. Generally this is not needed. Temporal can run hundreds of millions of workflows in parallel and more. Only do this if you have a specific reason to do so.
-        )
-        return "Task completed"
+        # Simple event processing loop with progress tracking
+        while True:
+            # Check for completed tasks and update progress
+            self._processing_tasks = await BatchProcessingUtils.update_progress(self._processing_tasks, self._state, params.task.id)
+            
+            # Wait for enough events to form a batch, or timeout
+            try:
+                await workflow.wait_condition(
+                    lambda: self._incoming_queue.qsize() >= self._batch_size, 
+                    timeout=WAIT_TIMEOUT
+                )
+            except asyncio.TimeoutError:
+                logger.info(f"⏰ Timeout after {WAIT_TIMEOUT} seconds - ending workflow")
+                break
+
+            # We have enough events - start processing them as a batch
+            data_to_process: List[Any] = []
+            await BatchProcessingUtils.dequeue_pending_data(self._incoming_queue, data_to_process, self._batch_size)
+            
+            if data_to_process:
+                batch_number = len(self._processing_tasks) + 1  # Number this batch based on total started
+                
+                await adk.messages.create(
+                    task_id=params.task.id,
+                    content=TextContent(
+                        author="agent",
+                        content=f"📦 Starting batch #{batch_number} with {len(data_to_process)} events using asyncio.create_task()",
+                    ),
+                )
+                
+                # Create concurrent task for this batch - this is the key learning point!
+                task = asyncio.create_task(
+                    BatchProcessingUtils.process_batch_concurrent(
+                        events=data_to_process,
+                        batch_number=batch_number,
+                        task_id=params.task.id
+                    )
+                )
+                self._processing_tasks.append(task)
+                
+                logger.info(f"📝 Tutorial Note: Created asyncio.create_task() for batch #{batch_number} to run asynchronously")
+                
+                # Check progress again immediately to show real-time updates
+                self._processing_tasks = await BatchProcessingUtils.update_progress(self._processing_tasks, self._state, params.task.id)
+        
+        # Process any remaining events that didn't form a complete batch
+        if self._incoming_queue.qsize() > 0:
+            data_to_process: List[Any] = []
+            await BatchProcessingUtils.dequeue_pending_data(self._incoming_queue, data_to_process, self._incoming_queue.qsize())
+            
+            await adk.messages.create(
+                task_id=params.task.id,
+                content=TextContent(
+                    author="agent",
+                    content=f"🔄 Processing final {len(data_to_process)} events that didn't form a complete batch.",
+                ),
+            )
+            
+            # Now, add another batch to process the remaining events
+            batch_number = len(self._processing_tasks) + 1
+            task = asyncio.create_task(
+                BatchProcessingUtils.process_batch_concurrent(
+                    events=data_to_process,
+                    batch_number=batch_number,
+                    task_id=params.task.id
+                )
+            )
+            self._processing_tasks.append(task)
+
+        # Wait for all remaining tasks to complete, with real-time progress updates
+        await BatchProcessingUtils.wait_for_remaining_tasks(self._processing_tasks, self._state, params.task.id)
+        
+        # Final summary with complete statistics
+        await BatchProcessingUtils.send_final_summary(self._state, params.task.id)
+        return
