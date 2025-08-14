@@ -9,8 +9,15 @@ description = "An AgentEx agent with custom activities"
 requires-python = ">=3.12"
 dependencies = [
     "agentex-sdk",
+    "ipykernel>=6.30.1",
+    "jupyter-server>=2.16.0",
+    "jupyterlab>=4.4.5",
+    "nbconvert>=7.16.6",
+    "nbformat>=5.10.4",
+    "notebook>=7.4.5",
     "scale-gp",
     "temporalio",
+    "yaspin>=3.1.0",
 ]
 
 [project.optional-dependencies]

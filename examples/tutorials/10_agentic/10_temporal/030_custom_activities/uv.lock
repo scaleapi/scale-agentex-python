@@ -12,8 +12,15 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "agentex-sdk" },
+    { name = "ipykernel" },
+    { name = "jupyter-server" },
+    { name = "jupyterlab" },
+    { name = "nbconvert" },
+    { name = "nbformat" },
+    { name = "notebook" },
     { name = "scale-gp" },
     { name = "temporalio" },
+    { name = "yaspin" },
 ]
 
 [package.optional-dependencies]
@@ -32,11 +39,18 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
     { name = "debugpy", marker = "extra == 'dev'", specifier = ">=1.8.15" },
     { name = "flake8", marker = "extra == 'dev'" },
+    { name = "ipykernel", specifier = ">=6.30.1" },
     { name = "isort", marker = "extra == 'dev'" },
     { name = "jupyter", marker = "extra == 'dev'" },
+    { name = "jupyter-server", specifier = ">=2.16.0" },
+    { name = "jupyterlab", specifier = ">=4.4.5" },
+    { name = "nbconvert", specifier = ">=7.16.6" },
+    { name = "nbformat", specifier = ">=5.10.4" },
+    { name = "notebook", specifier = ">=7.4.5" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "scale-gp" },
     { name = "temporalio" },
+    { name = "yaspin", specifier = ">=3.1.0" },
 ]
 provides-extras = ["dev"]
 
@@ -2539,6 +2553,15 @@ wheels = [
 ]
 
 [[package]]
+name = "termcolor"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/85/147a0529b4e80b6b9d021ca8db3a820fcac53ec7374b87073d004aaf444c/termcolor-2.3.0.tar.gz", hash = "sha256:b5b08f68937f138fe92f6c089b99f1e2da0ae56c52b78bf7075fd95420fd9a5a", size = 12163, upload-time = "2023-04-23T19:45:24.004Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/67/e1/434566ffce04448192369c1a282931cf4ae593e91907558eaecd2e9f2801/termcolor-2.3.0-py3-none-any.whl", hash = "sha256:3afb05607b89aed0ffe25202399ee0867ad4d3cb4180d98aaf8eefa6a5f7d475", size = 6872, upload-time = "2023-04-23T19:45:22.671Z" },
+]
+
+[[package]]
 name = "terminado"
 version = "0.18.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2924,6 +2947,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/24/fd/725b8e73ac2a50e78a4534ac43c6addf5c1c2d65380dd48a9169cc6739a9/yarl-1.20.1-cp313-cp313t-win32.whl", hash = "sha256:b121ff6a7cbd4abc28985b6028235491941b9fe8fe226e6fdc539c977ea1739d", size = 86591, upload-time = "2025-06-10T00:45:25.793Z" },
     { url = "https://files.pythonhosted.org/packages/94/c3/b2e9f38bc3e11191981d57ea08cab2166e74ea770024a646617c9cddd9f6/yarl-1.20.1-cp313-cp313t-win_amd64.whl", hash = "sha256:541d050a355bbbc27e55d906bc91cb6fe42f96c01413dd0f4ed5a5240513874f", size = 93003, upload-time = "2025-06-10T00:45:27.752Z" },
     { url = "https://files.pythonhosted.org/packages/b4/2d/2345fce04cfd4bee161bf1e7d9cdc702e3e16109021035dbb24db654a622/yarl-1.20.1-py3-none-any.whl", hash = "sha256:83b8eb083fe4683c6115795d9fc1cfaf2cbbefb19b3a1cb68f6527460f483a77", size = 46542, upload-time = "2025-06-10T00:46:07.521Z" },
+]
+
+[[package]]
+name = "yaspin"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "termcolor" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/3c/70df5034e6712fcc238b76f6afd1871de143a2a124d80ae2c377cde180f3/yaspin-3.1.0.tar.gz", hash = "sha256:7b97c7e257ec598f98cef9878e038bfa619ceb54ac31d61d8ead2b3128f8d7c7", size = 36791, upload-time = "2024-09-22T17:07:09.376Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/89/78/fa25b385d9f2c406719b5cf574a0980f5ccc6ea1f8411d56249f44acd3c2/yaspin-3.1.0-py3-none-any.whl", hash = "sha256:5e3d4dfb547d942cae6565718123f1ecfa93e745b7e51871ad2bbae839e71b73", size = 18629, upload-time = "2024-09-22T17:07:06.923Z" },
 ]
 
 [[package]]

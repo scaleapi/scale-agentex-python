@@ -80,7 +80,7 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
             if received_data.clear_queue:
                 await BatchProcessingUtils.handle_queue_clear(self._incoming_queue, params.task.id)
             
-            elif received_data.cancel_running_tasks:
+            if received_data.cancel_running_tasks:
                 await BatchProcessingUtils.handle_task_cancellation(self._processing_tasks, params.task.id)
             else:
                 logger.info(f"Received IncomingEventData: {received_data} with no known action.")
@@ -102,6 +102,8 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
             ),
         )
 
+        batch_number = 0
+
         # Simple event processing loop with progress tracking
         while True:
             # Check for completed tasks and update progress
@@ -121,9 +123,7 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
             data_to_process: List[Any] = []
             await BatchProcessingUtils.dequeue_pending_data(self._incoming_queue, data_to_process, self._batch_size)
             
-            if data_to_process:
-                batch_number = len(self._processing_tasks) + 1  # Number this batch based on total started
-                
+            if data_to_process:                
                 await adk.messages.create(
                     task_id=params.task.id,
                     content=TextContent(
@@ -140,6 +140,7 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
                         task_id=params.task.id
                     )
                 )
+                batch_number += 1
                 self._processing_tasks.append(task)
                 
                 logger.info(f"📝 Tutorial Note: Created asyncio.create_task() for batch #{batch_number} to run asynchronously")
@@ -161,7 +162,6 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
             )
             
             # Now, add another batch to process the remaining events
-            batch_number = len(self._processing_tasks) + 1
             task = asyncio.create_task(
                 BatchProcessingUtils.process_batch_concurrent(
                     events=data_to_process,
@@ -170,6 +170,7 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
                 )
             )
             self._processing_tasks.append(task)
+            batch_number += 1
 
         # Wait for all remaining tasks to complete, with real-time progress updates
         await BatchProcessingUtils.wait_for_remaining_tasks(self._processing_tasks, self._state, params.task.id)
@@ -185,15 +186,16 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
             retry_policy=RetryPolicy(maximum_attempts=3)
         )
 
-        final_summary = f"✅ Workflow Complete! Final Summary:\n"
-                        f"• Batches completed successfully: {self._state.num_batches_processed} ✅\n" 
-                        f"• Batches failed: {self._state.num_batches_failed} ❌\n"
-                        f"• Total events processed: {self._state.total_events_processed}\n"
-                        f"• Events dropped (queue full): {self._state.total_events_dropped}\n"
-                        f"📝 Tutorial completed - you learned how to use asyncio.create_task() with Temporal custom activities!"
-
+        final_summary = (
+            f"✅ Workflow Complete! Final Summary:\n"
+            f"• Batches completed successfully: {self._state.num_batches_processed} ✅\n" 
+            f"• Batches failed: {self._state.num_batches_failed} ❌\n"
+            f"• Total events processed: {self._state.total_events_processed}\n"
+            f"• Events dropped (queue full): {self._state.total_events_dropped}\n"
+            f"📝 Tutorial completed - you learned how to use asyncio.create_task() with Temporal custom activities!"
+        )
         await adk.messages.create(
-            task_id=task_id,
+            task_id=params.task.id,
             content=TextContent(
                 author="agent",
                 content=final_summary
