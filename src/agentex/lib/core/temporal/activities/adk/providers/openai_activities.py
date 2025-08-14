@@ -4,7 +4,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from enum import Enum
 from typing import Any, Literal
 
-from agents import RunResult, RunResultStreaming
+from agents import RunContextWrapper, RunResult, RunResultStreaming
 from agents.mcp import MCPServerStdio, MCPServerStdioParams
 from agents.model_settings import ModelSettings as OAIModelSettings
 from agents.tool import FunctionTool as OAIFunctionTool
@@ -41,7 +41,7 @@ class FunctionTool(BaseModelWithTraceParams):
     name: str
     description: str
     params_json_schema: dict[str, Any]
-    on_invoke_tool: Callable[[dict[str, Any]], Any]
+    on_invoke_tool: Callable[[RunContextWrapper, str], Any]
     strict_json_schema: bool = True
     is_enabled: bool = True
 
