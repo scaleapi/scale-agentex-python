@@ -6,8 +6,8 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.environment_variables import EnvironmentVariables
 
-from workflow import At000HelloAcpWorkflow
-
+from project.workflow import At030CustomActivitiesWorkflow
+from project.custom_activites import CustomActivities
 
 
 environment_variables = EnvironmentVariables.refresh()
@@ -28,9 +28,18 @@ async def main():
         task_queue=task_queue_name,
     )
 
+    agentex_activities = get_all_activities()
+
+    custom_activities_use_case = CustomActivities()
+    all_activites = [
+        custom_activities_use_case.report_progress, 
+        custom_activities_use_case.process_batch_events,
+        *agentex_activities, 
+    ]
+
     await worker.run(
-        activities=get_all_activities(),
-        workflow=At000HelloAcpWorkflow,
+        activities=all_activites,
+        workflow=At030CustomActivitiesWorkflow,
     )
 
 if __name__ == "__main__":
