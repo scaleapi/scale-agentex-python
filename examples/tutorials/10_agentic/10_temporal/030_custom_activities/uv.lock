@@ -1,58 +1,6 @@
 version = 1
 revision = 2
-requires-python = ">=3.12"
-resolution-markers = [
-    "python_full_version >= '3.14'",
-    "python_full_version < '3.14'",
-]
-
-[[package]]
-name = "030-custom-activities"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "agentex-sdk" },
-    { name = "ipykernel" },
-    { name = "jupyter-server" },
-    { name = "jupyterlab" },
-    { name = "nbconvert" },
-    { name = "nbformat" },
-    { name = "notebook" },
-    { name = "scale-gp" },
-    { name = "temporalio" },
-    { name = "yaspin" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "black" },
-    { name = "debugpy" },
-    { name = "flake8" },
-    { name = "isort" },
-    { name = "jupyter" },
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "agentex-sdk" },
-    { name = "black", marker = "extra == 'dev'" },
-    { name = "debugpy", marker = "extra == 'dev'", specifier = ">=1.8.15" },
-    { name = "flake8", marker = "extra == 'dev'" },
-    { name = "ipykernel", specifier = ">=6.30.1" },
-    { name = "isort", marker = "extra == 'dev'" },
-    { name = "jupyter", marker = "extra == 'dev'" },
-    { name = "jupyter-server", specifier = ">=2.16.0" },
-    { name = "jupyterlab", specifier = ">=4.4.5" },
-    { name = "nbconvert", specifier = ">=7.16.6" },
-    { name = "nbformat", specifier = ">=5.10.4" },
-    { name = "notebook", specifier = ">=7.4.5" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "scale-gp" },
-    { name = "temporalio" },
-    { name = "yaspin", specifier = ">=3.1.0" },
-]
-provides-extras = ["dev"]
+requires-python = ">=3.12, <4"
 
 [manifest]
 members = [
@@ -63,6 +11,7 @@ members = [
 [[package]]
 name = "agentex-sdk"
 version = "0.2.6"
+source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "anyio" },
@@ -80,6 +29,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-xdist" },
     { name = "python-on-whales" },
     { name = "pyyaml" },
     { name = "questionary" },
@@ -96,9 +46,67 @@ dependencies = [
     { name = "uvicorn" },
     { name = "watchfiles" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/06/80/5e6f84089d3d036035e32cb8fce57f4b20ed5cf7464b1d4d4a2b9d2d12af/agentex_sdk-0.2.10.tar.gz", hash = "sha256:f1ef1c79ff1a1a38104fc17999456ee13ab5907c809119579f98a8df0dea2697", size = 3616984, upload-time = "2025-08-13T05:51:25.379Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/53/bb5e88d8a5062f7a23a3988e6e881edad47196cd366708221c849860867c/agentex_sdk-0.2.10-py3-none-any.whl", hash = "sha256:72fc2c93854d2183f9051e1bccad93b2fd73f773aa79d720d6b02245c0ce9109", size = 3452593, upload-time = "2025-08-13T05:51:23.667Z" },
+
+[package.optional-dependencies]
+aiohttp = [
+    { name = "aiohttp" },
+    { name = "httpx-aiohttp" },
+]
+dev = [
+    { name = "ruff" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ipywidgets" },
+    { name = "nbstripout" },
+    { name = "yaspin" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.10.10,<4" },
+    { name = "aiohttp", marker = "extra == 'aiohttp'" },
+    { name = "anyio", specifier = ">=3.5.0,<5" },
+    { name = "distro", specifier = ">=1.7.0,<2" },
+    { name = "fastapi", specifier = ">=0.115.0,<0.116" },
+    { name = "httpx", specifier = ">=0.27.2,<0.28" },
+    { name = "httpx-aiohttp", marker = "extra == 'aiohttp'", specifier = ">=0.1.8" },
+    { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "jinja2", specifier = ">=3.1.3,<4" },
+    { name = "jsonref", specifier = ">=1.1.0,<2" },
+    { name = "jsonschema", specifier = ">=4.23.0,<5" },
+    { name = "kubernetes", specifier = ">=25.0.0,<29.0.0" },
+    { name = "litellm", specifier = ">=1.66.0,<2" },
+    { name = "mcp", extras = ["cli"], specifier = ">=1.4.1" },
+    { name = "openai-agents", specifier = ">=0.0.7,!=0.2.3" },
+    { name = "pydantic", specifier = ">=2.0.0,<3" },
+    { name = "pytest", specifier = ">=8.4.0" },
+    { name = "pytest-asyncio", specifier = ">=1.0.0" },
+    { name = "python-on-whales", specifier = ">=0.73.0,<0.74" },
+    { name = "pyyaml", specifier = ">=6.0.2,<7" },
+    { name = "questionary", specifier = ">=2.0.1,<3" },
+    { name = "redis", specifier = ">=5.2.0,<6" },
+    { name = "rich", specifier = ">=13.9.2,<14" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.4" },
+    { name = "scale-gp", specifier = ">=0.1.0a59" },
+    { name = "scale-gp-beta", specifier = "==0.1.0a20" },
+    { name = "sniffio" },
+    { name = "temporalio", specifier = ">=1.10.0,<2" },
+    { name = "typer", specifier = ">=0.16,<0.17" },
+    { name = "typing-extensions", specifier = ">=4.10,<5" },
+    { name = "tzdata", specifier = ">=2025.2" },
+    { name = "tzlocal", specifier = ">=5.3.1" },
+    { name = "uvicorn", specifier = ">=0.31.1" },
+    { name = "watchfiles", specifier = ">=0.24.0,<1.0" },
+]
+provides-extras = ["aiohttp", "dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipywidgets", specifier = ">=8.1.7" },
+    { name = "nbstripout", specifier = ">=0.8.1" },
+    { name = "yaspin", specifier = ">=3.1.0" },
 ]
 
 [[package]]
@@ -545,6 +553,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722, upload-time = "2023-12-24T09:54:32.31Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277, upload-time = "2023-12-24T09:54:30.421Z" },
+]
+
+[[package]]
+name = "execnet"
+version = "2.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/ff/b4c0dc78fbe20c3e59c0c7334de0c27eb4001a2b2017999af398bf730817/execnet-2.1.1.tar.gz", hash = "sha256:5189b52c6121c24feae288166ab41b32549c7e2348652736540b9e6e7d4e72e3", size = 166524, upload-time = "2024-04-08T09:04:19.245Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/43/09/2aea36ff60d16dd8879bdb2f5b3ee0ba8d08cbbdcdfe870e695ce3784385/execnet-2.1.1-py3-none-any.whl", hash = "sha256:26dee51f1b80cebd6d0ca8e74dd8745419761d3bef34163928cbebbdc4749fdc", size = 40612, upload-time = "2024-04-08T09:04:17.414Z" },
 ]
 
 [[package]]
@@ -2015,6 +2032,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/4e/51/f8794af39eeb870e87a8c8068642fc07bce0c854d6865d7dd0f2a9d338c2/pytest_asyncio-1.1.0.tar.gz", hash = "sha256:796aa822981e01b68c12e4827b8697108f7205020f24b5793b3c41555dab68ea", size = 46652, upload-time = "2025-07-16T04:29:26.393Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/9d/bf86eddabf8c6c9cb1ea9a869d6873b46f105a5d292d3a6f7071f5b07935/pytest_asyncio-1.1.0-py3-none-any.whl", hash = "sha256:5fe2d69607b0bd75c656d1211f969cadba035030156745ee09e7d71740e58ecf", size = 15157, upload-time = "2025-07-16T04:29:24.929Z" },
+]
+
+[[package]]
+name = "pytest-xdist"
+version = "3.8.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "execnet" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/78/b4/439b179d1ff526791eb921115fca8e44e596a13efeda518b9d845a619450/pytest_xdist-3.8.0.tar.gz", hash = "sha256:7e578125ec9bc6050861aa93f2d59f1d8d085595d6551c2c90b6f4fad8d3a9f1", size = 88069, upload-time = "2025-07-01T13:30:59.346Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/31/d4e37e9e550c2b92a9cbc2e4d0b7420a27224968580b5a447f420847c975/pytest_xdist-3.8.0-py3-none-any.whl", hash = "sha256:202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88", size = 46396, upload-time = "2025-07-01T13:30:56.632Z" },
 ]
 
 [[package]]

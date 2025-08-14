@@ -178,9 +178,15 @@ class TestRecursiveModelDump:
         assert "<function" in parsed["function"]
 
     def test_base_model_to_dict_method(self):
+<<<<<<< HEAD
         """Test that BaseModel can be serialized with recursive_model_dump."""
         model = SampleModel(name="to_dict_test", value=500)
         result = recursive_model_dump(model)
+=======
+        """Test that BaseModel.to_dict() uses recursive_model_dump."""
+        model = SampleModel(name="to_dict_test", value=500)
+        result = model.to_dict()
+>>>>>>> cc2d4a8 (Fixes to tool calling)
 
         assert isinstance(result, dict)
         assert result["name"] == "to_dict_test"

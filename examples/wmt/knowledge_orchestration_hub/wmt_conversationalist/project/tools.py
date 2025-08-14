@@ -3,12 +3,14 @@
 import json
 from typing import Any
 
+from agents import RunContextWrapper
 from pydantic import BaseModel, Field
 from agentex.lib.utils.logging import make_logger
 
 from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
     FunctionTool,
 )
+from agents.tool_context import ToolContext
 # from agents.tool import FunctionTool
 # from agents import RunContextWrapper
 
@@ -37,7 +39,9 @@ class DeepResearchResult(BaseModel):
 
 
 async def invoke_search_deep_research_artifacts(
-    args_json: dict[str, Any]
+    # tool_context: ToolContext[Any],
+    # args_json: dict[str, Any]
+    ctx: RunContextWrapper[Any], args: str
 ) -> str:
     """
     Search for previously generated deep research artifacts.
@@ -52,7 +56,8 @@ async def invoke_search_deep_research_artifacts(
     Returns:
         JSON string containing search results or empty results if none found
     """
-    args = DeepResearchSearchParams.model_validate(args_json)
+    # args = DeepResearchSearchParams.model_validate(args_json)
+    args = DeepResearchSearchParams.model_validate_json(args)
     query = args.query
     max_results = args.max_results
 
