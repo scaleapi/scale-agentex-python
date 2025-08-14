@@ -15,11 +15,18 @@ class ProcessBatchEventsActivityParams(BaseModel):
   events: List[Any]
   batch_number: int
 
+
 REPORT_PROGRESS_ACTIVITY = "report_progress"
 class ReportProgressActivityParams(BaseModel):
   num_batches_processed: int
   num_batches_failed: int
   num_batches_running: int
+  task_id: str
+
+
+COMPLETE_WORKFLOW_ACTIVITY = "complete_workflow"
+class CompleteWorkflowActivityParams(BaseModel):
+  task_id: str
 
 
 class CustomActivities:
@@ -82,9 +89,22 @@ class CustomActivities:
     logger.info(f"📊 Progress Update - num_batches_processed: {params.num_batches_processed}, num_batches_failed: {params.num_batches_failed}, num_batches_running: {params.num_batches_running}")
 
     await adk.messages.create(
-        task_id=task_id,
+        task_id=params.task_id,
         content=TextContent(
             author="agent",
             content=f"📊 Progress Update - num_batches_processed: {params.num_batches_processed}, num_batches_failed: {params.num_batches_failed}, num_batches_running: {params.num_batches_running}",
         ),
     )
+
+  @activity.defn(name=COMPLETE_WORKFLOW_ACTIVITY)
+  async def complete_workflow(self, params: CompleteWorkflowActivityParams) -> None:
+    """
+    This activity will complete the workflow.
+
+    Typically here you may do anything like:
+    - Send a final email to the user
+    - Send a final message to the user
+    - Update a job status in a database to completed
+    """
+    logger.info(f"🎉 Workflow Complete! Task ID: {params.task_id}")
+

@@ -86,7 +86,7 @@ class ProcessManager:
 
 
 async def start_temporal_worker_with_reload(
-    worker_path: Path, env: dict[str, str], process_manager: ProcessManager
+    worker_path: Path, env: dict[str, str], process_manager: ProcessManager, manifest_dir: Path
 ) -> asyncio.Task[None]:
     """Start temporal worker with auto-reload using watchfiles"""
     
@@ -143,7 +143,7 @@ async def start_temporal_worker_with_reload(
                 except asyncio.CancelledError:
                     pass
             
-            current_process = await start_temporal_worker(worker_path, env)
+            current_process = await start_temporal_worker(worker_path, env, manifest_dir)
             process_manager.add_process(current_process)
             console.print("[green]Temporal worker started[/green]")
             return current_process
@@ -222,7 +222,7 @@ async def start_acp_server(
 
 
 async def start_temporal_worker(
-    worker_path: Path, env: dict[str, str]
+    worker_path: Path, env: dict[str, str], manifest_dir: Path
 ) -> asyncio.subprocess.Process:
     """Start the temporal worker process"""
     cmd = [sys.executable, "-m", "run_worker"]
@@ -231,7 +231,7 @@ async def start_temporal_worker(
 
     return await asyncio.create_subprocess_exec(
         *cmd,
-        cwd=worker_path.parent,  # Use worker directory as CWD for imports to work
+        cwd=manifest_dir,  # Use worker directory as CWD for imports to work
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
@@ -320,7 +320,7 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
                 worker_task = asyncio.create_task(stream_process_output(worker_process, "WORKER"))
             else:
                 # Normal mode with auto-reload
-                worker_task = await start_temporal_worker_with_reload(file_paths["worker"], agent_env, process_manager)
+                worker_task = await start_temporal_worker_with_reload(file_paths["worker"], agent_env, process_manager, manifest_dir)
             tasks.append(worker_task)
 
         console.print(

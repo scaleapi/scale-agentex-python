@@ -15,6 +15,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "jupyter",
     "pytest",
     "black",
     "isort",

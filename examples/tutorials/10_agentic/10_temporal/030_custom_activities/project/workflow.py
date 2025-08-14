@@ -2,7 +2,8 @@ import asyncio
 from typing import List, Any, override
 
 from temporalio import workflow
-from pydantic import BaseModel
+from temporalio.common import RetryPolicy
+from datetime import timedelta
 
 from agentex.lib import adk
 from agentex.lib.types.acp import CreateTaskParams, SendEventParams
@@ -15,7 +16,7 @@ from agentex.lib.environment_variables import EnvironmentVariables
 
 from project.workflow_utils import BatchProcessingUtils
 from project.shared_models import StateModel, IncomingEventData
-
+from project.custom_activites import REPORT_PROGRESS_ACTIVITY, ReportProgressActivityParams, COMPLETE_WORKFLOW_ACTIVITY, CompleteWorkflowActivityParams
 
 environment_variables = EnvironmentVariables.refresh()
 
@@ -97,7 +98,7 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
             task_id=params.task.id,
             content=TextContent(
                 author="agent",
-                content=f"🚀 Starting batch processing! I'll collect events into batches of {self._batch_size} and process them using custom activities.",
+                content=f"🚀 Starting batch processing! I'll collect events into batches of {self._batch_size} and process them using custom activities. I'll also report progress you as I go..",
             ),
         )
 
@@ -172,7 +173,39 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
 
         # Wait for all remaining tasks to complete, with real-time progress updates
         await BatchProcessingUtils.wait_for_remaining_tasks(self._processing_tasks, self._state, params.task.id)
-        
-        # Final summary with complete statistics
-        await BatchProcessingUtils.send_final_summary(self._state, params.task.id)
-        return
+        await workflow.execute_activity(
+            REPORT_PROGRESS_ACTIVITY,
+            ReportProgressActivityParams(
+                num_batches_processed=self._state.num_batches_processed,
+                num_batches_failed=self._state.num_batches_failed,
+                num_batches_running=0,
+                task_id=params.task.id
+            ),
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=RetryPolicy(maximum_attempts=3)
+        )
+
+        final_summary = f"✅ Workflow Complete! Final Summary:\n"
+                        f"• Batches completed successfully: {self._state.num_batches_processed} ✅\n" 
+                        f"• Batches failed: {self._state.num_batches_failed} ❌\n"
+                        f"• Total events processed: {self._state.total_events_processed}\n"
+                        f"• Events dropped (queue full): {self._state.total_events_dropped}\n"
+                        f"📝 Tutorial completed - you learned how to use asyncio.create_task() with Temporal custom activities!"
+
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=final_summary
+            ),
+        )
+
+        await workflow.execute_activity(
+            COMPLETE_WORKFLOW_ACTIVITY,
+            CompleteWorkflowActivityParams(
+                task_id=params.task.id
+            ),
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=RetryPolicy(maximum_attempts=3)            
+        )        
+

@@ -123,7 +123,8 @@ class BatchProcessingUtils:
                 ReportProgressActivityParams(
                     num_batches_processed=state.num_batches_processed,
                     num_batches_failed=state.num_batches_failed,
-                    num_batches_running=len(still_running)
+                    num_batches_running=len(still_running),
+                    task_id=task_id,
                 ),
                 start_to_close_timeout=timedelta(minutes=1),
                 retry_policy=RetryPolicy(maximum_attempts=3)
@@ -198,21 +199,3 @@ class BatchProcessingUtils:
                 # Some tasks still running, update progress and continue waiting
                 processing_tasks[:] = await BatchProcessingUtils.update_progress(processing_tasks, state, task_id)
                 continue
-
-    @staticmethod
-    async def send_final_summary(state: Any, task_id: str) -> None:
-        """
-        Send the final workflow completion summary with statistics.
-        """
-        await adk.messages.create(
-            task_id=task_id,
-            content=TextContent(
-                author="agent",
-                content=f"✅ Workflow Complete! Final Summary:\n"
-                       f"• Batches completed successfully: {state.num_batches_processed} ✅\n" 
-                       f"• Batches failed: {state.num_batches_failed} ❌\n"
-                       f"• Total events processed: {state.total_events_processed}\n"
-                       f"• Events dropped (queue full): {state.total_events_dropped}\n"
-                       f"📝 Tutorial completed - you learned how to use asyncio.create_task() with Temporal custom activities!",
-            ),
-        )
