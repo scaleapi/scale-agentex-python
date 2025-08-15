@@ -7,7 +7,7 @@ The **WMT Conversationalist** is an intelligent conversational agent that serves
 This agent acts as a knowledgeable assistant with access to:
 
 🌐 **Web Search**: Current information and real-time data via MCP web search  
-📚 **Confluence**: Organizational documentation and internal knowledge via Atlassian MCP  
+📚 **Confluence**: Organizational documentation and internal knowledge via Atlassian MCP Remote Server (requires user delegated OAuth2.1)  
 🧠 **Deep Research Artifacts**: Previously generated comprehensive research reports from the knowledge database
 
 ## Capabilities
@@ -26,7 +26,7 @@ The conversationalist agent can:
 The agent is built using:
 
 - **Orchestration using OpenAI agent SDK** over tools
-   - TODO: evaluate more complex orchestration (particularly as # of tools / complexity of tools becomes larger)
+  - TODO: evaluate more complex orchestration (particularly as # of tools / complexity of tools becomes larger)
 - **AgentEx Temporal workflows** for state management
 - **Model Context Protocol (MCP)** for external tool access
 - **Custom tools** for deep research artifact search
@@ -36,8 +36,8 @@ The agent is built using:
 
 ### MCP Servers
 
-- **Web Search**: `openai-websearch-mcp` for current information
-- **Confluence**: Atlassian remote MCP server for organizational knowledge
+- **Web Search**: OpenAI's Hosted Web Search MCP Server for current information
+- **Confluence**: Atlassian MCP Remote Server for organizational knowledge (requires user delegated OAuth2.1)
 
 ### Custom Tools
 
@@ -119,8 +119,7 @@ wmt_conversationalist/
 
 ## Dependencies
 
-Key dependencies managed via `uv`.  Refer to pyproject.toml
-
+Key dependencies managed via `uv`. Refer to pyproject.toml
 
 ## Development
 
@@ -157,10 +156,9 @@ uv run jupyter notebook dev.ipynb
 
 The conversationalist agent is part of the larger Knowledge Hub system:
 
-1. **Deep Research Agent**: Generates comprehensive research reports
-2. **Knowledge Monitor Agent**: Tracks updates from Confluence/Google Drive
+1. **Conversationalist Agent** (port 8000): Provides user interface and search capabilities
+2. **Deep Research Agent** (port 8001): Generates comprehensive research reports
 3. **Shared Knowledge Repository**: PostgreSQL database with vector embeddings
-4. **Conversationalist Agent**: Provides user interface and search capabilities
 
 The agent currently includes a placeholder for deep research artifact search that returns empty results. This will be connected to the actual knowledge database once the other agents are implemented.
 
@@ -175,6 +173,7 @@ The agent currently includes a placeholder for deep research artifact search tha
    - Ensure AgentEx backend is running
 
 2. **OpenAI API key issues**
+
    - Run `aws sso login` to ensure credentials are refreshed
    - Run `sai dev` to ensure that the `ml-admin` profile is created under `~/.aws/config`
 
