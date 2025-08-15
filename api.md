@@ -16,6 +16,8 @@ from agentex.types import (
     AgentRpcResponse,
     AgentRpcResult,
     DataDelta,
+    ReasoningContentDelta,
+    ReasoningSummaryDelta,
     TaskMessageContent,
     TaskMessageDelta,
     TaskMessageUpdate,
