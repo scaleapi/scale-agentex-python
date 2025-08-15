@@ -51,7 +51,9 @@ from .message_update_params import MessageUpdateParams as MessageUpdateParams
 from .tool_response_content import ToolResponseContent as ToolResponseContent
 from .tracker_list_response import TrackerListResponse as TrackerListResponse
 from .tracker_update_params import TrackerUpdateParams as TrackerUpdateParams
+from .reasoning_content_delta import ReasoningContentDelta as ReasoningContentDelta
 from .reasoning_content_param import ReasoningContentParam as ReasoningContentParam
+from .reasoning_summary_delta import ReasoningSummaryDelta as ReasoningSummaryDelta
 from .agent_rpc_by_name_params import AgentRpcByNameParams as AgentRpcByNameParams
 from .task_message_content_param import TaskMessageContentParam as TaskMessageContentParam
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
