@@ -6,7 +6,7 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.environment_variables import EnvironmentVariables
 
-from workflow import At010AgentChatWorkflow
+from project.workflow import At010AgentChatWorkflow
 
 
 

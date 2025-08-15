@@ -13,9 +13,9 @@ from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.sdk.state_machine.state import State
 
 from state_machines.deep_research import DeepResearchStateMachine, DeepResearchState, DeepResearchData
-from workflows.deep_research.clarify_user_query import ClarifyUserQueryWorkflow
-from workflows.deep_research.waiting_for_user_input import WaitingForUserInputWorkflow
-from workflows.deep_research.performing_deep_research import PerformingDeepResearchWorkflow
+from project.workflows.deep_research.clarify_user_query import ClarifyUserQueryWorkflow
+from project.workflows.deep_research.waiting_for_user_input import WaitingForUserInputWorkflow
+from project.workflows.deep_research.performing_deep_research import PerformingDeepResearchWorkflow
 
 environment_variables = EnvironmentVariables.refresh()
 

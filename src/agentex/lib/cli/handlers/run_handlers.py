@@ -89,14 +89,13 @@ async def start_temporal_worker_with_reload(
     worker_path: Path, env: dict[str, str], process_manager: ProcessManager, manifest_dir: Path
 ) -> asyncio.Task[None]:
     """Start temporal worker with auto-reload using watchfiles"""
-    
     try:
         from watchfiles import awatch
     except ImportError:
         console.print("[yellow]watchfiles not installed, falling back to basic worker start[/yellow]")
         console.print("[dim]Install with: pip install watchfiles[/dim]")
         # Fallback to regular worker without reload
-        worker_process = await start_temporal_worker(worker_path, env)
+        worker_process = await start_temporal_worker(worker_path, env, manifest_dir)
         process_manager.add_process(worker_process)
         return asyncio.create_task(stream_process_output(worker_process, "WORKER"))
     
@@ -114,6 +113,7 @@ async def start_temporal_worker_with_reload(
                 # Extract agent name from worker path for cleanup
 
                 agent_name = env.get("AGENT_NAME")
+                console.print(f"FOUND AGENT_NAME FROM ENV VARS: {agent_name} {agent_name is None}")
                 if agent_name is None:
                     agent_name = worker_path.parent.parent.name
                 
@@ -150,12 +150,12 @@ async def start_temporal_worker_with_reload(
         
         try:
             # Start initial worker
-            await start_worker()
+            current_process = await start_worker()
             if current_process:
                 output_task = asyncio.create_task(stream_process_output(current_process, "WORKER"))
             
             # Watch for file changes
-            async for changes in awatch(worker_path.parent):
+            async for changes in awatch(manifest_dir, recursive=True):
                 # Filter for Python files
                 py_changes = [(change, path) for change, path in changes if str(path).endswith('.py')]
                 
@@ -225,7 +225,9 @@ async def start_temporal_worker(
     worker_path: Path, env: dict[str, str], manifest_dir: Path
 ) -> asyncio.subprocess.Process:
     """Start the temporal worker process"""
-    cmd = [sys.executable, "-m", "run_worker"]
+    run_worker_target = calculate_uvicorn_target_for_local(worker_path, manifest_dir)
+
+    cmd = [sys.executable, "-m", run_worker_target]
 
     console.print(f"[blue]Starting Temporal worker from {worker_path}...[/blue]")
 

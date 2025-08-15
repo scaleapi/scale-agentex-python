@@ -653,10 +653,11 @@ class OpenAIService:
                                 # Handle reasoning items
                                 reasoning_item = event.item.raw_item
                                 
+                                print(f"TRYING TO GET CONTENT OF REASONING ITEM: {reasoning_item}")
                                 reasoning_content = ReasoningContent(
                                     author="agent",
                                     summary=[summary.text for summary in reasoning_item.summary],
-                                    content=[content.text for content in reasoning_item.content] if reasoning_item.content else None,
+                                    content=[content.text for content in reasoning_item.content] if hasattr(reasoning_item, "content") else None,
                                 )
 
                                 # Create reasoning content using streaming context (immediate completion)
