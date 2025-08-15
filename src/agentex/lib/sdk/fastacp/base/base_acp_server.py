@@ -21,7 +21,7 @@ from agentex.lib.types.acp import (
     SendMessageParams,
 )
 from agentex.lib.types.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
-from agentex.lib.types.task_message_updates import StreamTaskMessageFull, TaskMessageUpdate
+from agentex.types.task_message_update import StreamTaskMessageFull, TaskMessageUpdate
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel

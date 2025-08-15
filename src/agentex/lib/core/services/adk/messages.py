@@ -4,7 +4,7 @@ from typing import Any, Coroutine, cast
 from agentex import AsyncAgentex
 from agentex.lib.core.services.adk.streaming import StreamingService
 from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.lib.types.task_message_updates import StreamTaskMessageFull, TaskMessageUpdate
+from agentex.types.task_message_update import StreamTaskMessageFull, TaskMessageUpdate
 from agentex.types.task_message import TaskMessage, TaskMessageContent
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow

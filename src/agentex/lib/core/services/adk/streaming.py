@@ -3,18 +3,19 @@ from typing import Literal, cast
 
 from agentex import AsyncAgentex
 from agentex.lib.core.adapters.streams.port import StreamRepository
-from agentex.lib.types.task_message_updates import (
+from agentex.types.task_message_update import (
     TaskMessageDelta, 
     TaskMessageUpdate,
-    TextDelta,
-    DataDelta,
-    ToolRequestDelta,
-    ToolResponseDelta,
-    StreamTaskMessage,
     StreamTaskMessageStart,
     StreamTaskMessageDelta,
     StreamTaskMessageFull,
     StreamTaskMessageDone,
+)
+from agentex.types.task_message_delta import (
+    TextDelta,
+    DataDelta,
+    ToolRequestDelta,
+    ToolResponseDelta,
 )
 from agentex.lib.utils.logging import make_logger
 from agentex.types.data_content import DataContent
@@ -187,8 +188,8 @@ class StreamingTaskMessageContext:
         return self.task_message
 
     async def stream_update(
-        self, update: StreamTaskMessage
-    ) -> StreamTaskMessage | None:
+        self, update: TaskMessageUpdate
+    ) -> TaskMessageUpdate | None:
         """Stream an update to the repository."""
         if self._is_closed:
             raise ValueError("Context is already done")

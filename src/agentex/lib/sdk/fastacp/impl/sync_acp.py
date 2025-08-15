@@ -3,12 +3,12 @@ from typing import Any, override
 
 from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 from agentex.lib.types.acp import SendMessageParams
-from agentex.lib.types.task_message_updates import (
+from agentex.types.task_message_update import (
     StreamTaskMessageDelta,
     StreamTaskMessageFull,
     TaskMessageUpdate,
-    TextDelta,
 )
+from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_content import TaskMessageContent, TextContent
 from agentex.lib.utils.logging import make_logger
 

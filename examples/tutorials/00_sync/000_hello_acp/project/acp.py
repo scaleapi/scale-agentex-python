@@ -2,7 +2,7 @@ from typing import AsyncGenerator, Union
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.acp import SendMessageParams
 
-from agentex.lib.types.task_message_updates import TaskMessageUpdate
+from agentex.types.task_message_update import TaskMessageUpdate
 from agentex.types.task_message import TaskMessageContent
 from agentex.types.task_message_content import TextContent
 from agentex.lib.utils.logging import make_logger
