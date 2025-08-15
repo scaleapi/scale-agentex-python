@@ -10,7 +10,7 @@ from agentex.lib.sdk.state_machine.state_workflow import StateWorkflow
 from agentex.types.text_content import TextContent
 from agentex.lib.utils.logging import make_logger
 
-from state_machines.deep_research import DeepResearchData, DeepResearchState
+from project.state_machines.deep_research import DeepResearchData, DeepResearchState
 
 logger = make_logger(__name__)
 
