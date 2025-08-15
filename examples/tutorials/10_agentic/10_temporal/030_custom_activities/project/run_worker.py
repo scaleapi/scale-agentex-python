@@ -34,6 +34,7 @@ async def main():
     all_activites = [
         custom_activities_use_case.report_progress, 
         custom_activities_use_case.process_batch_events,
+        custom_activities_use_case.complete_workflow,
         *agentex_activities, 
     ]
 
