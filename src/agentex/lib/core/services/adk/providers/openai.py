@@ -653,7 +653,6 @@ class OpenAIService:
                                 # Handle reasoning items
                                 reasoning_item = event.item.raw_item
                                 
-                                print(f"TRYING TO GET CONTENT OF REASONING ITEM: {reasoning_item}")
                                 reasoning_content = ReasoningContent(
                                     author="agent",
                                     summary=[summary.text for summary in reasoning_item.summary],
