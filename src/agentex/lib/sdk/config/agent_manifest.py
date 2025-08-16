@@ -15,7 +15,7 @@ from pydantic import Field
 
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.build_config import BuildConfig
-from agentex.lib.sdk.config.deployment_config import DeploymentConfig, AuthenticationConfig
+from agentex.lib.sdk.config.deployment_config import DeploymentConfig
 from agentex.lib.sdk.config.local_development_config import LocalDevelopmentConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
@@ -36,7 +36,7 @@ class AgentManifest(BaseModel):
     deployment: DeploymentConfig | None = Field(
         default=None, description="Deployment configuration for the agent"
     )
-    auth: AuthenticationConfig | None = Field(default=None, description="Authentication configuration")
+
 
     def context_manager(self, build_context_root: Path) -> BuildContextManager:
         """
@@ -45,6 +45,23 @@ class AgentManifest(BaseModel):
         return BuildContextManager(
             agent_manifest=self, build_context_root=build_context_root
         )
+    
+    def load_environments_config(self, manifest_dir: Path) -> "AgentEnvironmentsConfig | None":
+        """Load environments.yaml from same directory as manifest.yaml.
+        
+        Args:
+            manifest_dir: Directory containing manifest.yaml
+            
+        Returns:
+            AgentEnvironmentsConfig if environments.yaml exists, None otherwise
+            
+        Raises:
+            ValueError: If environments.yaml exists but is invalid
+        """
+        # Import here to avoid circular imports
+        from agentex.lib.sdk.config.environment_config import load_environments_config_from_manifest_dir
+        
+        return load_environments_config_from_manifest_dir(manifest_dir)
 
 
 class BuildContextManager:

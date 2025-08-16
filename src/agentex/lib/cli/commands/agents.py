@@ -243,10 +243,13 @@ def deploy(
     cluster: str = typer.Option(
         ..., help="Target cluster name (must match kubectl context)"
     ),
+    environment: str = typer.Option(
+        ..., help="Environment name (dev, prod, etc.) - must be defined in environments.yaml"
+    ),
     manifest: str = typer.Option("manifest.yaml", help="Path to the manifest file"),
     namespace: str | None = typer.Option(
         None,
-        help="Kubernetes namespace to deploy to (required in non-interactive mode)",
+        help="Override Kubernetes namespace (defaults to namespace from environments.yaml)",
     ),
     tag: str | None = typer.Option(None, help="Override the image tag for deployment"),
     repository: str | None = typer.Option(
@@ -272,23 +275,30 @@ def deploy(
             console.print(f"[red]Error:[/red] Manifest file not found: {manifest}")
             raise typer.Exit(1)
 
-        # In non-interactive mode, require namespace
-        if not interactive and not namespace:
-            console.print(
-                "[red]Error:[/red] --namespace is required in non-interactive mode"
-            )
+        # Validate environments.yaml exists
+        environments_file = manifest_path.parent / "environments.yaml"
+        if not environments_file.exists():
+            console.print(f"[red]Error:[/red] environments.yaml not found next to {manifest}")
+            console.print("\n💡 To create one:")
+            console.print("   agentex agents init-environments")
+            console.print("\n📋 Why required:")
+            console.print("   Environment-specific settings (auth, namespace, resources)")
+            console.print("   must be separated from global manifest for proper isolation.")
             raise typer.Exit(1)
 
-        # Get namespace if not provided (only in interactive mode)
-        if not namespace:
-            namespace = questionary.text(
-                "Enter Kubernetes namespace:", default="default"
-            ).ask()
-            namespace = handle_questionary_cancellation(namespace, "namespace input")
+        # Load and validate environment configuration
+        try:
+            from agentex.lib.sdk.config.environment_config import AgentEnvironmentsConfig
+            environments_config = AgentEnvironmentsConfig.from_yaml(str(environments_file))
+            agent_env_config = environments_config.get_config_for_env(environment)
+        except Exception as e:
+            console.print(f"[red]Error:[/red] Failed to load environment config: {e}")
+            raise typer.Exit(1)
 
-            if not namespace:
-                console.print("Deployment cancelled")
-                raise typer.Exit(0)
+        # Use namespace from environment config if not overridden
+        if not namespace:
+            namespace = agent_env_config.kubernetes.namespace
+            console.print(f"[blue]ℹ[/blue] Using namespace from environments.yaml: {namespace}")
 
         # Validate override file exists if provided
         if override_file:
@@ -305,6 +315,7 @@ def deploy(
         # Confirm deployment (only in interactive mode)
         console.print("\n[bold]Deployment Summary:[/bold]")
         console.print(f"  Manifest: {manifest}")
+        console.print(f"  Environment: {environment}")
         console.print(f"  Cluster: {cluster}")
         console.print(f"  Namespace: {namespace}")
         if tag:
@@ -340,6 +351,7 @@ def deploy(
             namespace=namespace,
             deploy_overrides=deploy_overrides,
             override_file_path=override_file,
+            environment_name=environment,
         )
 
         # Use the already loaded manifest object
