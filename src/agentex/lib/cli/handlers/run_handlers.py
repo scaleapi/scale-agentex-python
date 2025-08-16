@@ -6,7 +6,6 @@ from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 
-from agentex.lib.cli.utils.auth_utils import _encode_principal_context
 from agentex.lib.cli.handlers.cleanup_handlers import (
     cleanup_agent_workflows,
     should_cleanup_on_restart
@@ -374,10 +373,13 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
         "ACP_PORT": str(manifest.local_development.agent.port),
     }
 
-    # Add authorization principal if set
+    # Add authorization principal if set - for local development, auth is optional
+    from agentex.lib.cli.utils.auth_utils import _encode_principal_context
     encoded_principal = _encode_principal_context(manifest)
     if encoded_principal:
         env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64] = encoded_principal
+    else:
+        logger.info("No auth principal configured - agent will run without authentication context")
 
     # Add description if available
     if manifest.agent.description:

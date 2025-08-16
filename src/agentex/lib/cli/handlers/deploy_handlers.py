@@ -8,14 +8,14 @@ import yaml
 from pydantic import BaseModel, Field
 from rich.console import Console
 
-from agentex.lib.cli.utils.auth_utils import _encode_principal_context
 from agentex.lib.cli.utils.exceptions import DeploymentError, HelmError
+from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.cli.utils.path_utils import calculate_docker_acp_module, PathResolutionError
 from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
-from agentex.lib.sdk.config.deployment_config import ClusterConfig
+
 from agentex.lib.utils.logging import make_logger
 
 logger = make_logger(__name__)
@@ -76,25 +76,6 @@ def add_helm_repo() -> None:
         raise HelmError(f"Failed to add helm repository: {e}") from e
 
 
-def load_override_config(override_file_path: str | None = None) -> ClusterConfig | None:
-    """Load override configuration from specified file path"""
-    if not override_file_path:
-        return None
-
-    override_path = Path(override_file_path)
-    if not override_path.exists():
-        raise DeploymentError(f"Override file not found: {override_file_path}")
-
-    try:
-        with open(override_path) as f:
-            config_data = yaml.safe_load(f)
-            return ClusterConfig(**config_data) if config_data else None
-    except Exception as e:
-        raise DeploymentError(
-            f"Failed to load override config from {override_file_path}: {e}"
-        ) from e
-
-
 
 def convert_env_vars_dict_to_list(env_vars: dict[str, str]) -> list[dict[str, str]]:
     """Convert a dictionary of environment variables to a list of dictionaries"""
@@ -116,13 +97,13 @@ def add_acp_command_to_helm_values(helm_values: dict[str, Any], manifest: AgentM
 
 def merge_deployment_configs(
     manifest: AgentManifest,
-    cluster_config: ClusterConfig | None,
+    agent_env_config: AgentEnvironmentConfig | None,
     deploy_overrides: InputDeployOverrides,
     manifest_path: str,
 ) -> dict[str, Any]:
     agent_config: AgentConfig = manifest.agent
 
-    """Merge global deployment config with cluster-specific overrides into helm values"""
+    """Merge global deployment config with environment-specific overrides into helm values"""
     if not manifest.deployment:
         raise DeploymentError("No deployment configuration found in manifest")
 
@@ -185,18 +166,27 @@ def merge_deployment_configs(
                 "taskQueue": temporal_config.queue_name,
             }
 
-    # Collect all environment variables with conflict detection
+    # Collect all environment variables with proper precedence
+    # Priority: manifest -> environments.yaml -> secrets (highest)
     all_env_vars: dict[str, str] = {}
     secret_env_vars: list[dict[str, str]] = []
     
-    # Start with agent_config env vars
+    # Start with agent_config env vars from manifest
     if agent_config.env:
         all_env_vars.update(agent_config.env)
+    
+    # Override with environment config env vars if they exist
+    if agent_env_config and agent_env_config.helm_overrides and "env" in agent_env_config.helm_overrides:
+        env_overrides = agent_env_config.helm_overrides["env"]
+        if isinstance(env_overrides, list):
+            # Convert list format to dict for easier merging
+            env_override_dict: dict[str, str] = {}
+            for env_var in env_overrides:
+                if isinstance(env_var, dict) and "name" in env_var and "value" in env_var:
+                    env_override_dict[str(env_var["name"])] = str(env_var["value"])
+            all_env_vars.update(env_override_dict)
 
-    # Add auth principal env var if manifest principal is set
-    encoded_principal = _encode_principal_context(manifest)
-    if encoded_principal:
-        all_env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64.value] = encoded_principal
+
 
     # Handle credentials and check for conflicts
     if agent_config.credentials:
@@ -228,57 +218,23 @@ def merge_deployment_configs(
                 }
             )
 
-    # Apply cluster-specific overrides
-    if cluster_config:
-        if cluster_config.image:
-            if cluster_config.image.repository:
-                helm_values["global"]["image"]["repository"] = (
-                    cluster_config.image.repository
-                )
-            if cluster_config.image.tag:
-                helm_values["global"]["image"]["tag"] = cluster_config.image.tag
-
-        if cluster_config.replicaCount is not None:
-            helm_values["replicaCount"] = cluster_config.replicaCount
-
-        if cluster_config.resources:
-            if cluster_config.resources.requests:
-                helm_values["resources"]["requests"].update(
-                    {
-                        "cpu": cluster_config.resources.requests.cpu,
-                        "memory": cluster_config.resources.requests.memory,
-                    }
-                )
-            if cluster_config.resources.limits:
-                helm_values["resources"]["limits"].update(
-                    {
-                        "cpu": cluster_config.resources.limits.cpu,
-                        "memory": cluster_config.resources.limits.memory,
-                    }
-                )
-
-        # Handle cluster env vars with conflict detection
-        if cluster_config.env:
-            # Convert cluster env list to dict for easier conflict detection
-            cluster_env_dict = {env_var["name"]: env_var["value"] for env_var in cluster_config.env}
-            
-            # Check for conflicts with secret env vars
-            for secret_env_var in secret_env_vars:
-                if secret_env_var["name"] in cluster_env_dict:
-                    logger.warning(
-                        f"Environment variable '{secret_env_var['name']}' is defined in both "
-                        f"cluster config env and secretEnvVars. The secret value will take precedence."
-                    )
-                    del cluster_env_dict[secret_env_var["name"]]
-            
-            # Update all_env_vars with cluster overrides
-            all_env_vars.update(cluster_env_dict)
-
-        # Apply additional arbitrary overrides
-        if cluster_config.additional_overrides:
-            _deep_merge(helm_values, cluster_config.additional_overrides)
+    # Apply agent environment configuration overrides
+    if agent_env_config:
+        # Add auth principal env var if environment config is set
+        if agent_env_config.auth:
+            from agentex.lib.cli.utils.auth_utils import _encode_principal_context_from_env_config
+            encoded_principal = _encode_principal_context_from_env_config(agent_env_config.auth)
+            logger.info(f"Encoding auth principal from {agent_env_config.auth}")
+            if encoded_principal:
+                all_env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64.value] = encoded_principal
+            else:
+                raise DeploymentError(f"Auth principal unable to be encoded for agent_env_config: {agent_env_config}")
+                
+        if agent_env_config.helm_overrides:
+            _deep_merge(helm_values, agent_env_config.helm_overrides)
 
     # Set final environment variables
+    # Environment variable precedence: manifest -> environments.yaml -> secrets (highest)
     if all_env_vars:
         helm_values["env"] = convert_env_vars_dict_to_list(all_env_vars)
     
@@ -295,7 +251,7 @@ def merge_deployment_configs(
     # Handle image pull secrets
     if manifest.deployment and manifest.deployment.imagePullSecrets:
         pull_secrets = [
-            pull_secret.to_dict()
+            pull_secret.model_dump()
             for pull_secret in manifest.deployment.imagePullSecrets
         ]
         helm_values["global"]["imagePullSecrets"] = pull_secrets
@@ -333,7 +289,7 @@ def deploy_agent(
     cluster_name: str,
     namespace: str,
     deploy_overrides: InputDeployOverrides,
-    override_file_path: str | None = None,
+    environment_name: str | None = None,
 ) -> None:
     """Deploy an agent using helm"""
 
@@ -345,21 +301,23 @@ def deploy_agent(
     check_and_switch_cluster_context(cluster_name)
 
     manifest = AgentManifest.from_yaml(file_path=manifest_path)
-    override_config = load_override_config(override_file_path)
 
-    # Provide feedback about override configuration
-    if override_config:
-        console.print(f"[green]✓[/green] Using override config: {override_file_path}")
-    else:
-        console.print(
-            "[yellow]ℹ[/yellow] No override config specified, using global defaults"
-        )
+    # Load agent environment configuration
+    agent_env_config = None
+    if environment_name:
+        manifest_dir = Path(manifest_path).parent
+        environments_config = manifest.load_environments_config(manifest_dir)
+        if environments_config:
+            agent_env_config = environments_config.get_config_for_env(environment_name)
+            console.print(f"[green]✓[/green] Using environment config: {environment_name}")
+        else:
+            console.print(f"[yellow]⚠[/yellow] No environments.yaml found, skipping environment-specific config")
 
     # Add helm repository/update
     add_helm_repo()
 
     # Merge configurations
-    helm_values = merge_deployment_configs(manifest, override_config, deploy_overrides, manifest_path)
+    helm_values = merge_deployment_configs(manifest, agent_env_config, deploy_overrides, manifest_path)
 
     # Create values file
     values_file = create_helm_values_file(helm_values)
