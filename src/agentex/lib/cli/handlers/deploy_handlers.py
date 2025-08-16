@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from rich.console import Console
 
 from agentex.lib.cli.utils.exceptions import DeploymentError, HelmError
+from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.cli.utils.path_utils import calculate_docker_acp_module, PathResolutionError
 from agentex.lib.environment_variables import EnvVarKeys
@@ -115,7 +116,7 @@ def add_acp_command_to_helm_values(helm_values: dict[str, Any], manifest: AgentM
 
 def merge_deployment_configs(
     manifest: AgentManifest,
-    agent_env_config,
+    agent_env_config: AgentEnvironmentConfig | None,
     cluster_config: ClusterConfig | None,
     deploy_overrides: InputDeployOverrides,
     manifest_path: str,
@@ -193,12 +194,7 @@ def merge_deployment_configs(
     if agent_config.env:
         all_env_vars.update(agent_config.env)
 
-    # Add auth principal env var if environment config is set
-    if agent_env_config and agent_env_config.auth:
-        from agentex.lib.cli.utils.auth_utils import _encode_principal_context_from_env_config
-        encoded_principal = _encode_principal_context_from_env_config(agent_env_config.auth)
-        if encoded_principal:
-            all_env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64.value] = encoded_principal
+
 
     # Handle credentials and check for conflicts
     if agent_config.credentials:
@@ -282,11 +278,22 @@ def merge_deployment_configs(
 
     # Apply agent environment configuration overrides
     if agent_env_config:
+        # Add auth principal env var if environment config is set
+        if agent_env_config.auth:
+            from agentex.lib.cli.utils.auth_utils import _encode_principal_context_from_env_config
+            encoded_principal = _encode_principal_context_from_env_config(agent_env_config.auth)
+            logger.info(f"Encoding auth principal from {agent_env_config.auth}")
+            if encoded_principal:
+                all_env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64.value] = encoded_principal
+            else:
+                raise DeploymentError(f"Auth principal unable to be encoded for agent_env_config: {agent_env_config}")
+                
         if agent_env_config.helm_overrides:
             _deep_merge(helm_values, agent_env_config.helm_overrides)
 
     # Set final environment variables
     if all_env_vars:
+        # WORRY: That this will override env vars set in the environments.yaml file
         helm_values["env"] = convert_env_vars_dict_to_list(all_env_vars)
     
     if secret_env_vars:

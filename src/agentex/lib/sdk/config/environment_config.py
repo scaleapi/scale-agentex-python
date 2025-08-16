@@ -65,8 +65,8 @@ class AgentKubernetesConfig(BaseModel):
 class AgentEnvironmentConfig(BaseModel):
     """Complete configuration for an agent in a specific environment."""
     
-    kubernetes: AgentKubernetesConfig = Field(
-        ..., 
+    kubernetes: AgentKubernetesConfig | None = Field(
+        default=None, 
         description="Kubernetes deployment configuration"
     )
     auth: AgentAuthConfig = Field(

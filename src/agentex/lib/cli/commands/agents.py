@@ -295,10 +295,17 @@ def deploy(
             console.print(f"[red]Error:[/red] Failed to load environment config: {e}")
             raise typer.Exit(1)
 
+        # Load manifest for credential validation
+        manifest_obj = AgentManifest.from_yaml(str(manifest_path))
+
         # Use namespace from environment config if not overridden
         if not namespace:
-            namespace = agent_env_config.kubernetes.namespace
-            console.print(f"[blue]ℹ[/blue] Using namespace from environments.yaml: {namespace}")
+            namespace_from_config = agent_env_config.kubernetes.namespace if agent_env_config.kubernetes else None
+            if namespace_from_config:
+                console.print(f"[blue]ℹ[/blue] Using namespace from environments.yaml: {namespace_from_config}")
+                namespace = namespace_from_config
+            else:
+                raise DeploymentError(f"No namespace found in environments.yaml for environment: {environment}, and not passed in as --namespace")
 
         # Validate override file exists if provided
         if override_file:
@@ -309,8 +316,6 @@ def deploy(
                 )
                 raise typer.Exit(1)
 
-        # Load manifest for credential validation
-        manifest_obj = AgentManifest.from_yaml(str(manifest_path))
 
         # Confirm deployment (only in interactive mode)
         console.print("\n[bold]Deployment Summary:[/bold]")

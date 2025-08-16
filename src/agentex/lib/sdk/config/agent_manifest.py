@@ -15,6 +15,7 @@ from pydantic import Field
 
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.build_config import BuildConfig
+from agentex.lib.sdk.config.environment_config import AgentEnvironmentsConfig
 from agentex.lib.sdk.config.deployment_config import DeploymentConfig
 from agentex.lib.sdk.config.local_development_config import LocalDevelopmentConfig
 from agentex.lib.utils.logging import make_logger

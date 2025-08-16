@@ -32,7 +32,7 @@ def _encode_principal_context_from_env_config(auth_config: "AgentAuthConfig | No
         return None
     
     principal = auth_config.principal
-    if principal is None:
+    if not principal:
         return None
 
     json_str = json.dumps(principal, separators=(',', ':'))
