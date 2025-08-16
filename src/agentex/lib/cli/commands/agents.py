@@ -255,9 +255,6 @@ def deploy(
     repository: str | None = typer.Option(
         None, help="Override the repository for deployment"
     ),
-    override_file: str | None = typer.Option(
-        None, help="Path to override configuration file"
-    ),
     interactive: bool = typer.Option(
         True, "--interactive/--no-interactive", help="Enable interactive prompts"
     ),
@@ -307,16 +304,6 @@ def deploy(
             else:
                 raise DeploymentError(f"No namespace found in environments.yaml for environment: {environment}, and not passed in as --namespace")
 
-        # Validate override file exists if provided
-        if override_file:
-            override_path = Path(override_file)
-            if not override_path.exists():
-                console.print(
-                    f"[red]Error:[/red] Override file not found: {override_file}"
-                )
-                raise typer.Exit(1)
-
-
         # Confirm deployment (only in interactive mode)
         console.print("\n[bold]Deployment Summary:[/bold]")
         console.print(f"  Manifest: {manifest}")
@@ -325,8 +312,6 @@ def deploy(
         console.print(f"  Namespace: {namespace}")
         if tag:
             console.print(f"  Image Tag: {tag}")
-        if override_file:
-            console.print(f"  Override File: {override_file}")
 
         if interactive:
             proceed = questionary.confirm("Proceed with deployment?").ask()
@@ -355,7 +340,6 @@ def deploy(
             cluster_name=cluster,
             namespace=namespace,
             deploy_overrides=deploy_overrides,
-            override_file_path=override_file,
             environment_name=environment,
         )
 

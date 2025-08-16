@@ -44,7 +44,7 @@ environments:
         account_id: # TODO: Fill in
     helm_overrides: 
       # This is used to override the global helm values.yaml file in the agentex-agent helm charts
-      replicas: 2
+      replicaCount: 2
       resources:
         requests:
           cpu: "500m"
@@ -54,7 +54,7 @@ environments:
           memory: "2Gi"
       temporal:
         enabled: true
-        replicas: 2
+        replicaCount: 2
         resources:
           requests:
             cpu: "500m"
