@@ -6,9 +6,9 @@ with clear error messages and best practices enforcement.
 """
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentsConfig
+from agentex.lib.sdk.config.environment_config import AgentEnvironmentsConfig, AgentEnvironmentConfig
 from agentex.lib.utils.logging import make_logger
 
 logger = make_logger(__name__)
@@ -43,7 +43,7 @@ def validate_environments_config(
     """
     # Check for required environments
     if required_environments:
-        missing_envs = []
+        missing_envs: List[str] = []
         for env_name in required_environments:
             if env_name not in environments_config.environments:
                 missing_envs.append(env_name)
@@ -65,7 +65,7 @@ def validate_environments_config(
             ) from e
 
 
-def _validate_single_environment_config(env_name: str, env_config) -> None:
+def _validate_single_environment_config(env_name: str, env_config: AgentEnvironmentConfig) -> None:
     """
     Validate a single environment configuration.
     
@@ -76,22 +76,21 @@ def _validate_single_environment_config(env_name: str, env_config) -> None:
     Raises:
         ValueError: If validation fails
     """
-    # Validate namespace naming conventions
-    namespace = env_config.kubernetes.namespace
-    if not namespace:
-        raise ValueError("Kubernetes namespace cannot be empty")
-    
-    # Check for common namespace naming issues
-    if namespace != namespace.lower():
-        logger.warning(
-            f"Namespace '{namespace}' contains uppercase letters. "
-            "Kubernetes namespaces should be lowercase."
-        )
-    
-    if namespace.startswith('-') or namespace.endswith('-'):
-        raise ValueError(
-            f"Namespace '{namespace}' cannot start or end with hyphens"
-        )
+    # Validate namespace naming conventions if kubernetes config exists
+    if env_config.kubernetes and env_config.kubernetes.namespace:
+        namespace = env_config.kubernetes.namespace
+        
+        # Check for common namespace naming issues
+        if namespace != namespace.lower():
+            logger.warning(
+                f"Namespace '{namespace}' contains uppercase letters. "
+                "Kubernetes namespaces should be lowercase."
+            )
+        
+        if namespace.startswith('-') or namespace.endswith('-'):
+            raise ValueError(
+                f"Namespace '{namespace}' cannot start or end with hyphens"
+            )
     
     # Validate auth principal
     principal = env_config.auth.principal
@@ -112,7 +111,7 @@ def _validate_single_environment_config(env_name: str, env_config) -> None:
         _validate_helm_overrides(env_config.helm_overrides)
 
 
-def _validate_helm_overrides(helm_overrides: dict) -> None:
+def _validate_helm_overrides(helm_overrides: Dict[str, Any]) -> None:
     """
     Validate helm override configuration.
     
@@ -130,7 +129,7 @@ def _validate_helm_overrides(helm_overrides: dict) -> None:
             if 'requests' in resources or 'limits' in resources:
                 for resource_type in ['requests', 'limits']:
                     if resource_type in resources:
-                        resource_config = resources[resource_type]
+                        resource_config: Any = resources[resource_type]
                         if isinstance(resource_config, dict):
                             # Check for valid resource specifications
                             for key, value in resource_config.items():

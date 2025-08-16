@@ -19,6 +19,11 @@ from agentex.lib.cli.handlers.deploy_handlers import (
     InputDeployOverrides,
     deploy_agent,
 )
+from agentex.lib.sdk.config.validation import (
+    validate_manifest_and_environments, 
+    EnvironmentsValidationError,
+    generate_helpful_error_message
+)
 from agentex.lib.cli.utils.cli_utils import handle_questionary_cancellation
 from agentex.lib.cli.utils.kubectl_utils import (
     check_and_switch_cluster_context,
@@ -272,24 +277,21 @@ def deploy(
             console.print(f"[red]Error:[/red] Manifest file not found: {manifest}")
             raise typer.Exit(1)
 
-        # Validate environments.yaml exists
-        environments_file = manifest_path.parent / "environments.yaml"
-        if not environments_file.exists():
-            console.print(f"[red]Error:[/red] environments.yaml not found next to {manifest}")
-            console.print("\n💡 To create one:")
-            console.print("   agentex agents init-environments")
-            console.print("\n📋 Why required:")
-            console.print("   Environment-specific settings (auth, namespace, resources)")
-            console.print("   must be separated from global manifest for proper isolation.")
-            raise typer.Exit(1)
-
-        # Load and validate environment configuration
+        # Validate manifest and environments configuration
         try:
-            from agentex.lib.sdk.config.environment_config import AgentEnvironmentsConfig
-            environments_config = AgentEnvironmentsConfig.from_yaml(str(environments_file))
+            _, environments_config = validate_manifest_and_environments(
+                str(manifest_path), 
+                required_environment=environment
+            )
             agent_env_config = environments_config.get_config_for_env(environment)
+            console.print(f"[green]✓[/green] Environment config validated: {environment}")
+            
+        except EnvironmentsValidationError as e:
+            error_msg = generate_helpful_error_message(e, "Environment validation failed")
+            console.print(f"[red]Configuration Error:[/red]\n{error_msg}")
+            raise typer.Exit(1)
         except Exception as e:
-            console.print(f"[red]Error:[/red] Failed to load environment config: {e}")
+            console.print(f"[red]Error:[/red] Failed to validate configuration: {e}")
             raise typer.Exit(1)
 
         # Load manifest for credential validation
