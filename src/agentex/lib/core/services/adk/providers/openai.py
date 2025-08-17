@@ -655,6 +655,7 @@ class OpenAIService:
                                 
                                 reasoning_content = ReasoningContent(
                                     author="agent",
+                                    style="static",
                                     summary=[summary.text for summary in reasoning_item.summary],
                                     content=[content.text for content in reasoning_item.content] if hasattr(reasoning_item, "content") and reasoning_item.content else None,
                                     type="reasoning",
