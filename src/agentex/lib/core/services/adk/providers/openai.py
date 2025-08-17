@@ -656,7 +656,7 @@ class OpenAIService:
                                 reasoning_content = ReasoningContent(
                                     author="agent",
                                     summary=[summary.text for summary in reasoning_item.summary],
-                                    content=[content.text for content in reasoning_item.content] if hasattr(reasoning_item, "content") else None,
+                                    content=[content.text for content in reasoning_item.content] if hasattr(reasoning_item, "content") and reasoning_item.content else None,
                                 )
 
                                 # Create reasoning content using streaming context (immediate completion)

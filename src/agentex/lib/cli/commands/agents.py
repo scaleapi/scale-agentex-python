@@ -248,14 +248,14 @@ def deploy(
     cluster: str = typer.Option(
         ..., help="Target cluster name (must match kubectl context)"
     ),
-    environment: str = typer.Option(
-        ..., help="Environment name (dev, prod, etc.) - must be defined in environments.yaml"
-    ),
     manifest: str = typer.Option("manifest.yaml", help="Path to the manifest file"),
     namespace: str | None = typer.Option(
         None,
         help="Override Kubernetes namespace (defaults to namespace from environments.yaml)",
     ),
+    environment: str | None = typer.Option(
+        None, help="Environment name (dev, prod, etc.) - must be defined in environments.yaml. If not provided, the namespace must be set explicitly."
+    ),    
     tag: str | None = typer.Option(None, help="Override the image tag for deployment"),
     repository: str | None = typer.Option(
         None, help="Override the repository for deployment"
@@ -279,12 +279,16 @@ def deploy(
 
         # Validate manifest and environments configuration
         try:
-            _, environments_config = validate_manifest_and_environments(
-                str(manifest_path), 
-                required_environment=environment
-            )
-            agent_env_config = environments_config.get_config_for_env(environment)
-            console.print(f"[green]✓[/green] Environment config validated: {environment}")
+            if environment:
+                _, environments_config = validate_manifest_and_environments(
+                    str(manifest_path), 
+                    required_environment=environment
+                )
+                agent_env_config = environments_config.get_config_for_env(environment)
+                console.print(f"[green]✓[/green] Environment config validated: {environment}")
+            else:
+                agent_env_config = None
+                console.print(f"[yellow]⚠[/yellow] No environment provided, skipping environment-specific config")
             
         except EnvironmentsValidationError as e:
             error_msg = generate_helpful_error_message(e, "Environment validation failed")
@@ -298,13 +302,15 @@ def deploy(
         manifest_obj = AgentManifest.from_yaml(str(manifest_path))
 
         # Use namespace from environment config if not overridden
-        if not namespace:
+        if not namespace and agent_env_config:
             namespace_from_config = agent_env_config.kubernetes.namespace if agent_env_config.kubernetes else None
             if namespace_from_config:
                 console.print(f"[blue]ℹ[/blue] Using namespace from environments.yaml: {namespace_from_config}")
                 namespace = namespace_from_config
             else:
                 raise DeploymentError(f"No namespace found in environments.yaml for environment: {environment}, and not passed in as --namespace")
+        elif not namespace:
+            raise DeploymentError("No namespace provided, and not passed in as --namespace and no environment provided to read from an environments.yaml file")
 
         # Confirm deployment (only in interactive mode)
         console.print("\n[bold]Deployment Summary:[/bold]")

@@ -160,8 +160,6 @@ def validate_environments_yaml_file(file_path: str) -> AgentEnvironmentsConfig:
     except FileNotFoundError:
         raise EnvironmentsValidationError(
             f"environments.yaml not found: {file_path}\n\n"
-            "💡 To create one:\n"
-            "   agentex agents init-environments\n\n"
             "📋 Why required:\n"
             "   Environment-specific settings (auth, namespace, resources)\n"
             "   must be separated from global manifest for proper isolation.",
@@ -230,9 +228,8 @@ def generate_helpful_error_message(error: Exception, context: str = "") -> str:
         if "environments.yaml" in base_msg:
             base_msg += (
                 "\n\n🔧 Troubleshooting:\n"
-                "1. Create environments.yaml: agentex agents init-environments\n"
-                "2. Check file location: should be next to manifest.yaml\n"
-                "3. Verify file permissions"
+                "1. Check file location: should be next to manifest.yaml\n"
+                "2. Verify file permissions"
             )
     elif "user_id" in base_msg.lower():
         base_msg += (
