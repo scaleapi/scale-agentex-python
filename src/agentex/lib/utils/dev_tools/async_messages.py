@@ -9,10 +9,8 @@ import json
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from yaspin.core import Yaspin
-
 from agentex import Agentex
-from agentex.types import Task, TaskMessage, TextContent, ToolRequestContent, ToolResponseContent
+from agentex.types import Task, TaskMessage, TextContent, ToolRequestContent, ToolResponseContent, ReasoningContent
 from agentex.types.task_message_update import (
     TaskMessageUpdate,
     StreamTaskMessageStart,
@@ -25,7 +23,6 @@ from agentex.types.text_delta import TextDelta
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
-from yaspin import yaspin
 
 
 def print_task_message(
@@ -47,6 +44,13 @@ def print_task_message(
     # Skip empty messages
     if isinstance(message.content, TextContent) and not message.content.content.strip():
         return
+    
+    # Skip empty reasoning messages
+    if isinstance(message.content, ReasoningContent):
+        has_summary = message.content.summary and any(s for s in message.content.summary if s)
+        has_content = message.content.content and any(c for c in message.content.content if c)
+        if not has_summary and not has_content:
+            return
     
     timestamp = message.created_at.strftime("%m/%d/%Y %H:%M:%S") if message.created_at else "N/A"
     
@@ -103,6 +107,26 @@ def print_task_message(
                 content = f"✅ **Tool Response: {tool_name}**\n\n{tool_response}"
         
         content_type = "tool_response"
+    elif isinstance(message.content, ReasoningContent):
+        # Format reasoning content
+        reasoning_parts = []
+        
+        # Add summary if available
+        if message.content.summary:
+            # Join summaries with double newline for better formatting
+            summary_text = "\n\n".join(s for s in message.content.summary if s)
+            if summary_text:
+                reasoning_parts.append(summary_text)
+        
+        # Add full reasoning content if available
+        if message.content.content:
+            content_text = "\n\n".join(c for c in message.content.content if c)
+            if content_text:
+                reasoning_parts.append(content_text)
+        
+        # Format reasoning content (we already checked it's not empty at the top)
+        content = "🧠 **Reasoning**\n\n" + "\n\n".join(reasoning_parts)
+        content_type = "reasoning"
     else:
         content = f"{type(message.content).__name__}: {message.content}"
         content_type = "other"
@@ -116,6 +140,8 @@ def print_task_message(
             border_style = "yellow"
         elif content_type == "tool_response":
             border_style = "bright_green"
+        elif content_type == "reasoning":
+            border_style = "bright_magenta"
         else:
             border_style = author_color
             
@@ -123,6 +149,8 @@ def print_task_message(
         console.print(panel)
     else:
         title = f"{message.content.author.upper()} [{timestamp}]"
+        if content_type == "reasoning":
+            title = f"🧠 REASONING [{timestamp}]"
         print(f"{title}\n{content}\n")
 
 
@@ -280,9 +308,6 @@ def subscribe_to_async_task_messages(
     try:
         # Use stream_events_by_name to subscribe to TaskMessageUpdate events for this task
         # This doesn't require knowing the agent_id, just the task name
-        
-        # Track active streaming spinners per message index
-        active_spinners: dict[int, Yaspin] = {}  # index -> yaspin spinner object
             
         with client.tasks.with_streaming_response.stream_events_by_name(
             task_name=task.name,
@@ -298,61 +323,45 @@ def subscribe_to_async_task_messages(
                             task_message_update_data = json.loads(task_message_update_json)
                             
                             # Deserialize the discriminated union TaskMessageUpdate based on the "type" field
-                            message_type = task_message_update_data.get("type", "unknown")
+                            message_type = task_message_update_data.get("type")
+                            if message_type is None:
+                                message_type = "unknown"
                             
                             # Handle different message types for streaming progress
                             if message_type == "start":
                                 task_message_update = StreamTaskMessageStart.model_validate(task_message_update_data)
-                                index = task_message_update.index or 0
-                                
-                                # Start a yaspin spinner for this message
-                                if print_messages and index not in active_spinners:
-                                    spinner = yaspin(text="🔄 Agent responding...")
-                                    spinner.start()
-                                    active_spinners[index] = spinner
+                                # Simply pass - no spinner
                                     
                             elif message_type == "delta":
                                 task_message_update = StreamTaskMessageDelta.model_validate(task_message_update_data)
-                                index = task_message_update.index or 0
-                                
-                                # Spinner continues running (no update needed for HTML) or if spinner has not been created yet, create it
-                                if print_messages and index not in active_spinners:
-                                    spinner = yaspin(text="🔄 Agent responding...")
-                                    spinner.start()
-                                    active_spinners[index] = spinner
+                                # Simply pass - no spinner
                                 
                             elif message_type == "full":
                                 task_message_update = StreamTaskMessageFull.model_validate(task_message_update_data)
-                                index = task_message_update.index or 0
-                                
-                                # Stop spinner and show message
-                                if index in active_spinners:
-                                    active_spinners[index].stop()
-                                    del active_spinners[index]
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
+                                    print(f"DEBUG: Retrieved 'full' message type={type(finished_message.content).__name__}, content_len={len(finished_message.content.content) if hasattr(finished_message.content, 'content') else 'N/A'}")
                                     messages_to_return.append(finished_message)
                                     print_task_message(finished_message, print_messages, rich_print)
                                 
                             elif message_type == "done":
                                 task_message_update = StreamTaskMessageDone.model_validate(task_message_update_data)
-                                index = task_message_update.index or 0
-                                
-                                # Stop spinner and show message
-                                if index in active_spinners:
-                                    active_spinners[index].stop()
-                                    del active_spinners[index]
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
+                                    print(f"DEBUG: Retrieved 'done' message type={type(finished_message.content).__name__}, content_len={len(finished_message.content.content) if hasattr(finished_message.content, 'content') else 'N/A'}")
                                     messages_to_return.append(finished_message)
                                     print_task_message(finished_message, print_messages, rich_print)
                                 
                             # Ignore "connected" message type
                             elif message_type == "connected":
                                 pass
+                            elif message_type == "unknown":
+                                # Silently ignore unknown types to avoid cluttering output
+                                pass
                             else:
+                                # Only print if it's a genuinely unexpected type
                                 if print_messages:
                                     print(f"Unknown TaskMessageUpdate type: {message_type}")
                                 
@@ -368,10 +377,7 @@ def subscribe_to_async_task_messages(
                             print(f"Raw data: {task_message_update_str.strip()}")
                         continue
             finally:
-                # Stop any remaining spinners when we're done
-                for spinner in active_spinners.values():
-                    spinner.stop()
-                active_spinners.clear()
+                pass  # No spinners to clean up
                     
     except Exception as e:
         # Handle timeout gracefully

@@ -112,6 +112,7 @@ class LiteLLMService:
                         update=StreamTaskMessageFull(
                             parent_task_message=streaming_context.task_message,
                             content=final_content,
+                            type="full",
                         ),
                     )
                 else:
@@ -221,7 +222,8 @@ class LiteLLMService:
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageDelta(
                                     parent_task_message=streaming_context.task_message,
-                                    delta=TextDelta(text_delta=delta),
+                                    delta=TextDelta(text_delta=delta, type="text"),
+                                    type="delta",
                                 ),
                             )
                             heartbeat_if_in_workflow("content chunk streamed")
@@ -244,6 +246,7 @@ class LiteLLMService:
                         update=StreamTaskMessageFull(
                             parent_task_message=streaming_context.task_message,
                             content=final_content,
+                            type="full",
                         ),
                     )
 

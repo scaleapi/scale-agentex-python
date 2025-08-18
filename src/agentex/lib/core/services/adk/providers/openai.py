@@ -325,6 +325,7 @@ class OpenAIService:
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
                                     content=text_content,
+                                    type="full",
                                 ),
                             )
 
@@ -349,6 +350,7 @@ class OpenAIService:
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
                                     content=tool_request_content,
+                                    type="full",
                                 ),
                             )
 
@@ -372,6 +374,7 @@ class OpenAIService:
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
                                     content=tool_response_content,
+                                    type="full",
                                 ),
                             )
 
@@ -657,37 +660,61 @@ class OpenAIService:
                                         ),
                                     )
                             
+                            elif event.item.type == "message":
+                                # Handle message items - these are the actual text responses
+                                # Skip for now, will be handled by streaming deltas
+                                logger.info(f"Received message item with id: {event.item.raw_item.id if hasattr(event.item, 'raw_item') and hasattr(event.item.raw_item, 'id') else 'unknown'}")
+                                pass
+                                
                             elif event.item.type == "reasoning_item":
-                                # Handle reasoning items
+                                # Handle reasoning items  
                                 reasoning_item = event.item.raw_item
                                 
-                                reasoning_content = ReasoningContent(
-                                    author="agent",
-                                    style="static",
-                                    summary=[summary.text for summary in reasoning_item.summary],
-                                    content=[content.text for content in reasoning_item.content] if hasattr(reasoning_item, "content") and reasoning_item.content else None,
-                                    type="reasoning",
-                                )
-
-                                # Create reasoning content using streaming context (immediate completion)
-                                async with (
-                                    self.streaming_service.streaming_task_message_context(
-                                        task_id=task_id,
-                                        initial_content=reasoning_content,
-                                    ) as streaming_context
-                                ):
-                                    # The message has already been persisted, but we still need to send an update
-                                    await streaming_context.stream_update(
-                                        update=StreamTaskMessageFull(
-                                            parent_task_message=streaming_context.task_message,
-                                            content=reasoning_content,
-                                        ),
+                                # Extract summaries
+                                summaries = []
+                                if hasattr(reasoning_item, "summary") and reasoning_item.summary:
+                                    for summary in reasoning_item.summary:
+                                        if hasattr(summary, "text") and summary.text:
+                                            summaries.append(summary.text)
+                                
+                                # Extract content
+                                contents = []
+                                if hasattr(reasoning_item, "content") and reasoning_item.content:
+                                    for content in reasoning_item.content:
+                                        if hasattr(content, "text") and content.text:
+                                            contents.append(content.text)
+                                
+                                # Only create reasoning message if we have content
+                                if summaries or contents:
+                                    reasoning_content = ReasoningContent(
+                                        author="agent",
+                                        style="static",
+                                        summary=summaries,
+                                        content=contents if contents else None,
+                                        type="reasoning",
                                     )
+
+                                    # Create reasoning content using streaming context (immediate completion)
+                                    async with (
+                                        self.streaming_service.streaming_task_message_context(
+                                            task_id=task_id,
+                                            initial_content=reasoning_content,
+                                        ) as streaming_context
+                                    ):
+                                        # The message has already been persisted, but we still need to send an update
+                                        await streaming_context.stream_update(
+                                            update=StreamTaskMessageFull(
+                                                parent_task_message=streaming_context.task_message,
+                                                content=reasoning_content,
+                                                type="full",
+                                            ),
+                                        )
 
                         elif event.type == "raw_response_event":
                             if isinstance(event.data, ResponseTextDeltaEvent):
                                 # Handle text delta
                                 item_id = event.data.item_id
+                                logger.debug(f"Text delta for item_id={item_id}, delta_len={len(event.data.delta) if event.data.delta else 0}")
 
                                 # Check if we already have a streaming context for this item
                                 if item_id not in item_id_to_streaming_context:
@@ -713,7 +740,8 @@ class OpenAIService:
                                 await streaming_context.stream_update(
                                     update=StreamTaskMessageDelta(
                                         parent_task_message=streaming_context.task_message,
-                                        delta=TextDelta(text_delta=event.data.delta),
+                                        delta=TextDelta(text_delta=event.data.delta, type="text"),
+                                        type="delta",
                                     ),
                                 )
 
@@ -731,6 +759,8 @@ class OpenAIService:
                                             author="agent",
                                             summary=[],
                                             content=[],
+                                            type="reasoning",
+                                            style="active",
                                         ),
                                     )
                                     # Open the streaming context
@@ -750,7 +780,9 @@ class OpenAIService:
                                         delta=ReasoningSummaryDelta(
                                             summary_index=summary_index,
                                             summary_delta=event.data.delta,
+                                            type="reasoning_summary",
                                         ),
+                                        type="delta",
                                     ),
                                 )
 
@@ -768,6 +800,8 @@ class OpenAIService:
                                             author="agent",
                                             summary=[],
                                             content=[],
+                                            type="reasoning",
+                                            style="active",
                                         ),
                                     )
                                     # Open the streaming context
@@ -787,7 +821,9 @@ class OpenAIService:
                                         delta=ReasoningContentDelta(
                                             content_index=content_index,
                                             content_delta=event.data.delta,
+                                            type="reasoning_content",
                                         ),
+                                        type="delta",
                                     ),
                                 )
 
