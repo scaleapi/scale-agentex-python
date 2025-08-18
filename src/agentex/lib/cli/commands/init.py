@@ -65,6 +65,7 @@ def create_project_structure(
         ".dockerignore.j2": ".dockerignore",
         "manifest.yaml.j2": "manifest.yaml",
         "README.md.j2": "README.md",
+        "environments.yaml.j2": "environments.yaml",
     }
 
     # Add package management file based on uv choice

@@ -34,11 +34,31 @@ class BaseModel(PydanticBaseModel):
 
 def recursive_model_dump(obj: Any) -> Any:
     if isinstance(obj, PydanticBaseModel):
-        # Serialize BaseModel to dict
-        return obj.model_dump(mode="json")
+        # Get the model data as dict and recursively process each field
+        # This allows us to handle non-serializable objects like functions
+        try:
+            return obj.model_dump(mode="json")
+        except Exception:
+            # If model_dump fails (e.g., due to functions), manually process
+            model_dict = {}
+            for field_name in obj.__class__.model_fields:
+                field_value = getattr(obj, field_name)
+                model_dict[field_name] = recursive_model_dump(field_value)
+            return model_dict
     elif isinstance(obj, datetime):
         # Serialize datetime to ISO format string
         return obj.isoformat()
+    elif callable(obj):
+        # Serialize functions and other callable objects
+        if hasattr(obj, "__name__"):
+            func_name = obj.__name__
+        else:
+            func_name = str(obj)
+
+        if hasattr(obj, "__module__"):
+            return f"<function {obj.__module__}.{func_name}>"
+        else:
+            return f"<function {func_name}>"
     elif isinstance(obj, Mapping):
         # Recursively serialize dictionary values
         return {k: recursive_model_dump(v) for k, v in obj.items()}

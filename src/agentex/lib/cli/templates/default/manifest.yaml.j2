@@ -75,6 +75,10 @@ agent:
   # Optional: Credentials mapping
   # Maps Kubernetes secrets to environment variables
   # Common credentials include:
+  credentials:
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
   # credentials:
   #   - env_var_name: OPENAI_API_KEY
   #     secret_name: openai-api-key

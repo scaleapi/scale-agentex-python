@@ -19,6 +19,11 @@ from agentex.lib.cli.handlers.deploy_handlers import (
     InputDeployOverrides,
     deploy_agent,
 )
+from agentex.lib.sdk.config.validation import (
+    validate_manifest_and_environments, 
+    EnvironmentsValidationError,
+    generate_helpful_error_message
+)
 from agentex.lib.cli.utils.cli_utils import handle_questionary_cancellation
 from agentex.lib.cli.utils.kubectl_utils import (
     check_and_switch_cluster_context,
@@ -246,14 +251,14 @@ def deploy(
     manifest: str = typer.Option("manifest.yaml", help="Path to the manifest file"),
     namespace: str | None = typer.Option(
         None,
-        help="Kubernetes namespace to deploy to (required in non-interactive mode)",
+        help="Override Kubernetes namespace (defaults to namespace from environments.yaml)",
     ),
+    environment: str | None = typer.Option(
+        None, help="Environment name (dev, prod, etc.) - must be defined in environments.yaml. If not provided, the namespace must be set explicitly."
+    ),    
     tag: str | None = typer.Option(None, help="Override the image tag for deployment"),
     repository: str | None = typer.Option(
         None, help="Override the repository for deployment"
-    ),
-    override_file: str | None = typer.Option(
-        None, help="Path to override configuration file"
     ),
     interactive: bool = typer.Option(
         True, "--interactive/--no-interactive", help="Enable interactive prompts"
@@ -272,45 +277,49 @@ def deploy(
             console.print(f"[red]Error:[/red] Manifest file not found: {manifest}")
             raise typer.Exit(1)
 
-        # In non-interactive mode, require namespace
-        if not interactive and not namespace:
-            console.print(
-                "[red]Error:[/red] --namespace is required in non-interactive mode"
-            )
-            raise typer.Exit(1)
-
-        # Get namespace if not provided (only in interactive mode)
-        if not namespace:
-            namespace = questionary.text(
-                "Enter Kubernetes namespace:", default="default"
-            ).ask()
-            namespace = handle_questionary_cancellation(namespace, "namespace input")
-
-            if not namespace:
-                console.print("Deployment cancelled")
-                raise typer.Exit(0)
-
-        # Validate override file exists if provided
-        if override_file:
-            override_path = Path(override_file)
-            if not override_path.exists():
-                console.print(
-                    f"[red]Error:[/red] Override file not found: {override_file}"
+        # Validate manifest and environments configuration
+        try:
+            if environment:
+                _, environments_config = validate_manifest_and_environments(
+                    str(manifest_path), 
+                    required_environment=environment
                 )
-                raise typer.Exit(1)
+                agent_env_config = environments_config.get_config_for_env(environment)
+                console.print(f"[green]✓[/green] Environment config validated: {environment}")
+            else:
+                agent_env_config = None
+                console.print(f"[yellow]⚠[/yellow] No environment provided, skipping environment-specific config")
+            
+        except EnvironmentsValidationError as e:
+            error_msg = generate_helpful_error_message(e, "Environment validation failed")
+            console.print(f"[red]Configuration Error:[/red]\n{error_msg}")
+            raise typer.Exit(1)
+        except Exception as e:
+            console.print(f"[red]Error:[/red] Failed to validate configuration: {e}")
+            raise typer.Exit(1)
 
         # Load manifest for credential validation
         manifest_obj = AgentManifest.from_yaml(str(manifest_path))
 
+        # Use namespace from environment config if not overridden
+        if not namespace and agent_env_config:
+            namespace_from_config = agent_env_config.kubernetes.namespace if agent_env_config.kubernetes else None
+            if namespace_from_config:
+                console.print(f"[blue]ℹ[/blue] Using namespace from environments.yaml: {namespace_from_config}")
+                namespace = namespace_from_config
+            else:
+                raise DeploymentError(f"No namespace found in environments.yaml for environment: {environment}, and not passed in as --namespace")
+        elif not namespace:
+            raise DeploymentError("No namespace provided, and not passed in as --namespace and no environment provided to read from an environments.yaml file")
+
         # Confirm deployment (only in interactive mode)
         console.print("\n[bold]Deployment Summary:[/bold]")
         console.print(f"  Manifest: {manifest}")
+        console.print(f"  Environment: {environment}")
         console.print(f"  Cluster: {cluster}")
         console.print(f"  Namespace: {namespace}")
         if tag:
             console.print(f"  Image Tag: {tag}")
-        if override_file:
-            console.print(f"  Override File: {override_file}")
 
         if interactive:
             proceed = questionary.confirm("Proceed with deployment?").ask()
@@ -339,7 +348,7 @@ def deploy(
             cluster_name=cluster,
             namespace=namespace,
             deploy_overrides=deploy_overrides,
-            override_file_path=override_file,
+            environment_name=environment,
         )
 
         # Use the already loaded manifest object
