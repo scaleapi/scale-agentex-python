@@ -25,8 +25,15 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
         )
         self._spans: dict[str, SGPSpan] = {}
 
+    def _add_source_to_span(self, span: Span) -> None:
+        if span.data is None:
+            span.data = {}
+        span.data["source"] = "agentex"
+
     @override
     def on_span_start(self, span: Span) -> None:
+        self._add_source_to_span(span)
+        
         sgp_span = create_span(
             name=span.name,
             span_id=span.id,
@@ -50,6 +57,7 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             )
             return
 
+        self._add_source_to_span(span)
         sgp_span.output = span.output
         sgp_span.metadata = span.data
         sgp_span.end_time = span.end_time.isoformat()
@@ -71,8 +79,14 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             else None
         )
 
+    def _add_source_to_span(self, span: Span) -> None:
+        if span.data is None:
+            span.data = {}
+        span.data["source"] = "agentex"
+
     @override
     async def on_span_start(self, span: Span) -> None:
+        self._add_source_to_span(span)
         sgp_span = create_span(
             name=span.name,
             span_id=span.id,
@@ -101,6 +115,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             )
             return
 
+        self._add_source_to_span(span)
         sgp_span.output = span.output
         sgp_span.metadata = span.data
         sgp_span.end_time = span.end_time.isoformat()
