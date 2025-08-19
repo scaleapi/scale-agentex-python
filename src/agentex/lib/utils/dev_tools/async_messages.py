@@ -341,7 +341,6 @@ def subscribe_to_async_task_messages(
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
-                                    print(f"DEBUG: Retrieved 'full' message type={type(finished_message.content).__name__}, content_len={len(finished_message.content.content) if hasattr(finished_message.content, 'content') else 'N/A'}")
                                     messages_to_return.append(finished_message)
                                     print_task_message(finished_message, print_messages, rich_print)
                                 
@@ -350,7 +349,6 @@ def subscribe_to_async_task_messages(
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
-                                    print(f"DEBUG: Retrieved 'done' message type={type(finished_message.content).__name__}, content_len={len(finished_message.content.content) if hasattr(finished_message.content, 'content') else 'N/A'}")
                                     messages_to_return.append(finished_message)
                                     print_task_message(finished_message, print_messages, rich_print)
                                 

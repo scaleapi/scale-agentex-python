@@ -92,7 +92,6 @@ class DeltaAccumulator:
             text_content_str = "".join(
                 [delta.text_delta or "" for delta in text_deltas]
             )
-            logger.info(f"Converting text deltas: {len(text_deltas)} deltas, total length: {len(text_content_str)}")
             return TextContent(
                 author="agent",
                 content=text_content_str,
@@ -156,6 +155,7 @@ class DeltaAccumulator:
                     summary=summary_list,
                     content=content_list if content_list else None,
                     type="reasoning",
+                    style="static",
                 )
             else:
                 # Return empty text content instead of empty reasoning

@@ -124,7 +124,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
                     # Include reasoning items in the response (IDs, summaries)
                     # response_include=["reasoning.encrypted_content"],
                     # Ask the model to include a short reasoning summary
-                    reasoning=Reasoning(effort="high", summary="detailed"),
+                    reasoning=Reasoning(effort="medium", summary="detailed"),
                 )
             )
             self._state.input_list = run_result.final_input_list

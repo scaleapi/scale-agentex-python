@@ -662,59 +662,51 @@ class OpenAIService:
                             
                             elif event.item.type == "message":
                                 # Handle message items - these are the actual text responses
-                                # Skip for now, will be handled by streaming deltas
-                                logger.info(f"Received message item with id: {event.item.raw_item.id if hasattr(event.item, 'raw_item') and hasattr(event.item.raw_item, 'id') else 'unknown'}")
-                                pass
+                                # We need to create a streaming context for these to be displayed
+                                message_item = event.item.raw_item
+                                
+                                # Create a streaming context that will be populated by text deltas
+                                streaming_context = self.streaming_service.streaming_task_message_context(
+                                    task_id=task_id,
+                                    initial_content=TextContent(
+                                        author="agent",
+                                        content="",
+                                    ),
+                                )
+                                # Open the streaming context and store it with the item ID
+                                item_id_to_streaming_context[
+                                    message_item.id
+                                ] = await streaming_context.open()
+                                unclosed_item_ids.add(message_item.id)
                                 
                             elif event.item.type == "reasoning_item":
                                 # Handle reasoning items  
                                 reasoning_item = event.item.raw_item
                                 
-                                # Extract summaries
-                                summaries = []
-                                if hasattr(reasoning_item, "summary") and reasoning_item.summary:
-                                    for summary in reasoning_item.summary:
-                                        if hasattr(summary, "text") and summary.text:
-                                            summaries.append(summary.text)
+                                # Create an empty reasoning context that will be filled by deltas
+                                # just like we do for message items
+                                empty_reasoning_content = ReasoningContent(
+                                    author="agent",
+                                    style="static",
+                                    summary=[],
+                                    content=None,
+                                    type="reasoning",
+                                )
                                 
-                                # Extract content
-                                contents = []
-                                if hasattr(reasoning_item, "content") and reasoning_item.content:
-                                    for content in reasoning_item.content:
-                                        if hasattr(content, "text") and content.text:
-                                            contents.append(content.text)
-                                
-                                # Only create reasoning message if we have content
-                                if summaries or contents:
-                                    reasoning_content = ReasoningContent(
-                                        author="agent",
-                                        style="static",
-                                        summary=summaries,
-                                        content=contents if contents else None,
-                                        type="reasoning",
-                                    )
-
-                                    # Create reasoning content using streaming context (immediate completion)
-                                    async with (
-                                        self.streaming_service.streaming_task_message_context(
-                                            task_id=task_id,
-                                            initial_content=reasoning_content,
-                                        ) as streaming_context
-                                    ):
-                                        # The message has already been persisted, but we still need to send an update
-                                        await streaming_context.stream_update(
-                                            update=StreamTaskMessageFull(
-                                                parent_task_message=streaming_context.task_message,
-                                                content=reasoning_content,
-                                                type="full",
-                                            ),
-                                        )
+                                streaming_context = self.streaming_service.streaming_task_message_context(
+                                    task_id=task_id,
+                                    initial_content=empty_reasoning_content,
+                                )
+                                # Open the context and store it
+                                item_id_to_streaming_context[
+                                    reasoning_item.id
+                                ] = await streaming_context.open()
+                                unclosed_item_ids.add(reasoning_item.id)
 
                         elif event.type == "raw_response_event":
                             if isinstance(event.data, ResponseTextDeltaEvent):
                                 # Handle text delta
                                 item_id = event.data.item_id
-                                logger.debug(f"Text delta for item_id={item_id}, delta_len={len(event.data.delta) if event.data.delta else 0}")
 
                                 # Check if we already have a streaming context for this item
                                 if item_id not in item_id_to_streaming_context:
@@ -861,19 +853,25 @@ class OpenAIService:
 
                             elif isinstance(event.data, ResponseCompletedEvent):
                                 # All items complete, finish all remaining streaming contexts for this session
-                                for item_id in unclosed_item_ids:
-                                    streaming_context = item_id_to_streaming_context[
-                                        item_id
-                                    ]
-                                    await streaming_context.close()
-                                    unclosed_item_ids.remove(item_id)
+                                # Create a copy to avoid modifying set during iteration
+                                remaining_items = list(unclosed_item_ids)
+                                for item_id in remaining_items:
+                                    if item_id in unclosed_item_ids:  # Check if still unclosed
+                                        streaming_context = item_id_to_streaming_context[
+                                            item_id
+                                        ]
+                                        await streaming_context.close()
+                                        unclosed_item_ids.remove(item_id)
 
                 finally:
                     # Cleanup: ensure all streaming contexts for this session are properly finished
-                    for item_id in unclosed_item_ids:
-                        streaming_context = item_id_to_streaming_context[item_id]
-                        await streaming_context.close()
-                        unclosed_item_ids.remove(item_id)
+                    # Create a copy to avoid modifying set during iteration
+                    remaining_items = list(unclosed_item_ids)
+                    for item_id in remaining_items:
+                        if item_id in unclosed_item_ids:  # Check if still unclosed
+                            streaming_context = item_id_to_streaming_context[item_id]
+                            await streaming_context.close()
+                            unclosed_item_ids.remove(item_id)
 
                 if span:
                     span.output = {
