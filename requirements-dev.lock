@@ -53,6 +53,8 @@ click==8.2.1
     # via litellm
     # via typer
     # via uvicorn
+cloudpickle==3.1.1
+    # via agentex-sdk
 colorama==0.4.6
     # via griffe
 colorlog==6.7.0
@@ -179,9 +181,10 @@ oauthlib==3.3.1
     # via kubernetes
     # via requests-oauthlib
 openai==1.99.9
+    # via agentex-sdk
     # via litellm
     # via openai-agents
-openai-agents==0.2.6
+openai-agents==0.2.7
     # via agentex-sdk
 packaging==23.2
     # via huggingface-hub
