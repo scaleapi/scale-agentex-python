@@ -305,6 +305,7 @@ class OpenAIService:
                         text_content = TextContent(
                             author="agent",
                             content=item.raw_item.content[0].text,
+                            format="markdown",
                         )
                         # Create message for the final result using streaming context
                         async with (
@@ -689,6 +690,7 @@ class OpenAIService:
                                         initial_content=TextContent(
                                             author="agent",
                                             content="",
+                                            format="markdown",
                                         ),
                                     )
                                     # Open the streaming context

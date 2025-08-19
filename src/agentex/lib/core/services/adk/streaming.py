@@ -34,9 +34,11 @@ def _get_stream_topic(task_id: str) -> str:
 
 
 class DeltaAccumulator:
-    def __init__(self):
+    def __init__(self, text_format: Literal["markdown", "plain", "code"] | None = None):
         self._accumulated_deltas: list[TaskMessageDelta] = []
         self._delta_type: Literal["text", "data", "tool_request", "tool_response"] | None = None
+        # Used as a hint to the accumulator to determine the format of the final content, only used for TextDelta
+        self._text_format = text_format
 
     def add_delta(self, delta: TaskMessageDelta):
         if self._delta_type is None:
@@ -68,6 +70,7 @@ class DeltaAccumulator:
             return TextContent(
                 author="agent",
                 content=text_content_str,
+                format=self._text_format or "plain",
             )
         elif self._delta_type == "data":
             # Type assertion: we know all deltas are DataDelta when _delta_type is DATA
@@ -133,7 +136,9 @@ class StreamingTaskMessageContext:
         self._agentex_client = agentex_client
         self._streaming_service = streaming_service
         self._is_closed = False
-        self._delta_accumulator = DeltaAccumulator()
+        self._delta_accumulator = DeltaAccumulator(
+            text_format=initial_content.format if isinstance(initial_content, TextContent) else None
+        )
 
     async def __aenter__(self) -> "StreamingTaskMessageContext":
         return await self.open()
