@@ -9,6 +9,8 @@ import json
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from yaspin.core import Yaspin
+
 from agentex import Agentex
 from agentex.types import Task, TaskMessage, TextContent, ToolRequestContent, ToolResponseContent, ReasoningContent
 from agentex.types.task_message_update import (
@@ -23,6 +25,7 @@ from agentex.types.text_delta import TextDelta
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
+from yaspin import yaspin
 
 
 def print_task_message(
@@ -308,6 +311,9 @@ def subscribe_to_async_task_messages(
     try:
         # Use stream_events_by_name to subscribe to TaskMessageUpdate events for this task
         # This doesn't require knowing the agent_id, just the task name
+        
+        # Track active streaming spinners per message index
+        active_spinners: dict[int, Yaspin] = {}  # index -> yaspin spinner object
             
         with client.tasks.with_streaming_response.stream_events_by_name(
             task_name=task.name,
@@ -323,21 +329,37 @@ def subscribe_to_async_task_messages(
                             task_message_update_data = json.loads(task_message_update_json)
                             
                             # Deserialize the discriminated union TaskMessageUpdate based on the "type" field
-                            message_type = task_message_update_data.get("type")
-                            if message_type is None:
-                                message_type = "unknown"
+                            message_type = task_message_update_data.get("type", "unknown")
                             
                             # Handle different message types for streaming progress
                             if message_type == "start":
                                 task_message_update = StreamTaskMessageStart.model_validate(task_message_update_data)
-                                # Simply pass - no spinner
+                                index = task_message_update.index or 0
+                                
+                                # Start a yaspin spinner for this message
+                                if print_messages and index not in active_spinners:
+                                    spinner = yaspin(text="🔄 Agent responding...")
+                                    spinner.start()
+                                    active_spinners[index] = spinner
                                     
                             elif message_type == "delta":
                                 task_message_update = StreamTaskMessageDelta.model_validate(task_message_update_data)
-                                # Simply pass - no spinner
+                                index = task_message_update.index or 0
+                                
+                                # Spinner continues running (no update needed for HTML) or if spinner has not been created yet, create it
+                                if print_messages and index not in active_spinners:
+                                    spinner = yaspin(text="🔄 Agent responding...")
+                                    spinner.start()
+                                    active_spinners[index] = spinner
                                 
                             elif message_type == "full":
                                 task_message_update = StreamTaskMessageFull.model_validate(task_message_update_data)
+                                index = task_message_update.index or 0
+                                
+                                # Stop spinner and show message
+                                if index in active_spinners:
+                                    active_spinners[index].stop()
+                                    del active_spinners[index]
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
@@ -346,6 +368,12 @@ def subscribe_to_async_task_messages(
                                 
                             elif message_type == "done":
                                 task_message_update = StreamTaskMessageDone.model_validate(task_message_update_data)
+                                index = task_message_update.index or 0
+                                
+                                # Stop spinner and show message
+                                if index in active_spinners:
+                                    active_spinners[index].stop()
+                                    del active_spinners[index]
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
@@ -355,11 +383,7 @@ def subscribe_to_async_task_messages(
                             # Ignore "connected" message type
                             elif message_type == "connected":
                                 pass
-                            elif message_type == "unknown":
-                                # Silently ignore unknown types to avoid cluttering output
-                                pass
                             else:
-                                # Only print if it's a genuinely unexpected type
                                 if print_messages:
                                     print(f"Unknown TaskMessageUpdate type: {message_type}")
                                 
@@ -375,7 +399,10 @@ def subscribe_to_async_task_messages(
                             print(f"Raw data: {task_message_update_str.strip()}")
                         continue
             finally:
-                pass  # No spinners to clean up
+                # Stop any remaining spinners when we're done
+                for spinner in active_spinners.values():
+                    spinner.stop()
+                active_spinners.clear()
                     
     except Exception as e:
         # Handle timeout gracefully

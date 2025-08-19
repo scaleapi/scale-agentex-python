@@ -630,6 +630,7 @@ class OpenAIService:
                                         update=StreamTaskMessageFull(
                                             parent_task_message=streaming_context.task_message,
                                             content=tool_request_content,
+                                            type="full",
                                         ),
                                     )
 
@@ -657,6 +658,7 @@ class OpenAIService:
                                         update=StreamTaskMessageFull(
                                             parent_task_message=streaming_context.task_message,
                                             content=tool_response_content,
+                                            type="full",
                                         ),
                                     )
                             
