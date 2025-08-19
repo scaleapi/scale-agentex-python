@@ -11,6 +11,7 @@ from .shared import DeleteResponse as DeleteResponse
 from .acp_type import AcpType as AcpType
 from .data_delta import DataDelta as DataDelta
 from .text_delta import TextDelta as TextDelta
+from .text_format import TextFormat as TextFormat
 from .data_content import DataContent as DataContent
 from .task_message import TaskMessage as TaskMessage
 from .text_content import TextContent as TextContent
