@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Iterable, Optional
 from typing_extensions import Literal, Required, TypedDict
 
+from .text_format import TextFormat
 from .message_style import MessageStyle
 from .message_author import MessageAuthor
 
@@ -38,7 +39,7 @@ class TextContentParam(TypedDict, total=False):
     attachments: Optional[Iterable[Attachment]]
     """Optional list of file attachments with structured metadata."""
 
-    format: Literal["markdown", "plain", "code"]
+    format: TextFormat
     """The format of the message.
 
     This is used by the client to determine how to display the message.

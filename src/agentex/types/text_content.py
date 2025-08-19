@@ -4,6 +4,7 @@ from typing import List, Optional
 from typing_extensions import Literal
 
 from .._models import BaseModel
+from .text_format import TextFormat
 from .message_style import MessageStyle
 from .message_author import MessageAuthor
 
@@ -37,7 +38,7 @@ class TextContent(BaseModel):
     attachments: Optional[List[Attachment]] = None
     """Optional list of file attachments with structured metadata."""
 
-    format: Optional[Literal["markdown", "plain", "code"]] = None
+    format: Optional[TextFormat] = None
     """The format of the message.
 
     This is used by the client to determine how to display the message.
