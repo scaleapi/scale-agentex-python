@@ -38,6 +38,18 @@ Most of the SDK is generated code. Modifications to code will be persisted betwe
 result in merge conflicts between manual patches and changes from the generator. The generator will never
 modify the contents of the `src/agentex/lib/` and `examples/` directories.
 
+To use your editable install, you need to point the `agentex-sdk` dependency in your agent's `pyproject.toml` to your local `agentex-python/` repo, e.g.:
+```toml
+dependencies = [
+    "agentex-sdk @ file:///<path-to>/agentex-python", # replace "agentex-sdk>=..."
+    ...
+]
+
+# add this to allow referencing local package
+[tool.hatch.metadata]
+allow-direct-references = true
+```
+
 ## Adding and running examples
 
 All files in the `examples/` directory are not modified by the generator and can be freely edited or added to.
