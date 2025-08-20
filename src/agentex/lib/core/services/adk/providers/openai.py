@@ -664,46 +664,17 @@ class OpenAIService:
                             
                             elif event.item.type == "message":
                                 # Handle message items - these are the actual text responses
-                                # We need to create a streaming context for these to be displayed
+                                # Streaming context will be created when we receive the first delta
                                 message_item = event.item.raw_item
-                                
-                                # Create a streaming context that will be populated by text deltas
-                                streaming_context = self.streaming_service.streaming_task_message_context(
-                                    task_id=task_id,
-                                    initial_content=TextContent(
-                                        author="agent",
-                                        content="",
-                                    ),
-                                )
-                                # Open the streaming context and store it with the item ID
-                                item_id_to_streaming_context[
-                                    message_item.id
-                                ] = await streaming_context.open()
-                                unclosed_item_ids.add(message_item.id)
+                                # Just track the item ID for now
+                                # The streaming context will be created on first delta
                                 
                             elif event.item.type == "reasoning_item":
                                 # Handle reasoning items  
+                                # Streaming context will be created when we receive the first delta
                                 reasoning_item = event.item.raw_item
-                                
-                                # Create an empty reasoning context that will be filled by deltas
-                                # just like we do for message items
-                                empty_reasoning_content = ReasoningContent(
-                                    author="agent",
-                                    style="static",
-                                    summary=[],
-                                    content=None,
-                                    type="reasoning",
-                                )
-                                
-                                streaming_context = self.streaming_service.streaming_task_message_context(
-                                    task_id=task_id,
-                                    initial_content=empty_reasoning_content,
-                                )
-                                # Open the context and store it
-                                item_id_to_streaming_context[
-                                    reasoning_item.id
-                                ] = await streaming_context.open()
-                                unclosed_item_ids.add(reasoning_item.id)
+                                # Just track the item ID for now
+                                # The streaming context will be created on first delta
 
                         elif event.type == "raw_response_event":
                             if isinstance(event.data, ResponseTextDeltaEvent):
