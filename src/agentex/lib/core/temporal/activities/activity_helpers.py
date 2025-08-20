@@ -20,10 +20,6 @@ class ActivityHelpers:
         heartbeat_timeout: timedelta | None = None,
         retry_policy: RetryPolicy | None = None,
     ) -> Any:
-        if start_to_close_timeout is None:
-            start_to_close_timeout = timedelta(seconds=10)
-        if retry_policy is None:
-            retry_policy = RetryPolicy(maximum_attempts=0)
 
         response = await workflow.execute_activity(
             activity=activity_name,
