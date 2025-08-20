@@ -8,11 +8,11 @@ from agentex.lib.core.services.adk.streaming import StreamingTaskMessageContext
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.acp import CancelTaskParams, CreateTaskParams, SendEventParams
 from agentex.lib.types.fastacp import AgenticACPConfig
-from agentex.lib.types.task_message_updates import (
+from agentex.types.task_message_update import (
     StreamTaskMessageDelta, 
     StreamTaskMessageFull,
-    TextDelta,
 )
+from agentex.types.task_message_delta import TextDelta
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.types.text_content import TextContent
