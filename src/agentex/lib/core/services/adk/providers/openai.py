@@ -11,6 +11,7 @@ from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseFunctionToolCall,
     ResponseOutputItemDoneEvent,
+    ResponseReasoningSummaryPartDoneEvent,
     ResponseTextDeltaEvent,
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseReasoningSummaryTextDoneEvent,
@@ -325,7 +326,7 @@ class OpenAIService:
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
                                     content=text_content,
-                                    
+                                    type="full",
                                 ),
                             )
 
@@ -350,7 +351,7 @@ class OpenAIService:
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
                                     content=tool_request_content,
-                                    
+                                    type="full",
                                 ),
                             )
 
@@ -373,8 +374,8 @@ class OpenAIService:
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
-                                    content=tool_response_content
-                                    
+                                    content=tool_response_content,
+                                    type="full",
                                 ),
                             )
 
@@ -629,8 +630,8 @@ class OpenAIService:
                                     await streaming_context.stream_update(
                                         update=StreamTaskMessageFull(
                                             parent_task_message=streaming_context.task_message,
-                                            content=tool_request_content
-                                            
+                                            content=tool_request_content,
+                                            type="full",
                                         ),
                                     )
 
@@ -657,24 +658,10 @@ class OpenAIService:
                                     await streaming_context.stream_update(
                                         update=StreamTaskMessageFull(
                                             parent_task_message=streaming_context.task_message,
-                                            content=tool_response_content
-                                            
+                                            content=tool_response_content,
+                                            type="full",
                                         ),
                                     )
-                            
-                            elif event.item.type == "message":
-                                # Handle message items - these are the actual text responses
-                                # Streaming context will be created when we receive the first delta
-                                message_item = event.item.raw_item
-                                # Just track the item ID for now
-                                # The streaming context will be created on first delta
-                                
-                            elif event.item.type == "reasoning_item":
-                                # Handle reasoning items  
-                                # Streaming context will be created when we receive the first delta
-                                reasoning_item = event.item.raw_item
-                                # Just track the item ID for now
-                                # The streaming context will be created on first delta
 
                         elif event.type == "raw_response_event":
                             if isinstance(event.data, ResponseTextDeltaEvent):
@@ -792,35 +779,29 @@ class OpenAIService:
                                     ),
                                 )
 
-
-
-
-
                             elif isinstance(event.data, ResponseReasoningSummaryTextDoneEvent):
                                 # Handle reasoning summary text completion
                                 item_id = event.data.item_id
                                 summary_index = event.data.summary_index
 
-                                # Finish the streaming context for this reasoning item
-                                if item_id in item_id_to_streaming_context and item_id in unclosed_item_ids:
-                                    streaming_context = item_id_to_streaming_context[
-                                        item_id
-                                    ]
-                                    await streaming_context.close()
-                                    unclosed_item_ids.remove(item_id)
+                                # We do NOT close the streaming context here as there can be multiple
+                                # reasoning summaries. The context will be closed when the entire
+                                # output item is done (ResponseOutputItemDoneEvent)
 
+                                # You would think they would use the event ResponseReasoningSummaryPartDoneEvent
+                                # to close the streaming context, but they do!!!
+                                # They output both a ResponseReasoningSummaryTextDoneEvent and a ResponseReasoningSummaryPartDoneEvent
+                                # I have no idea why they do this.
+    
                             elif isinstance(event.data, ResponseReasoningTextDoneEvent):
                                 # Handle reasoning content text completion
                                 item_id = event.data.item_id
                                 content_index = event.data.content_index
 
-                                # Finish the streaming context for this reasoning item
-                                if item_id in item_id_to_streaming_context and item_id in unclosed_item_ids:
-                                    streaming_context = item_id_to_streaming_context[
-                                        item_id
-                                    ]
-                                    await streaming_context.close()
-                                    unclosed_item_ids.remove(item_id)
+                                # We do NOT close the streaming context here as there can be multiple
+                                # reasoning content texts. The context will be closed when the entire
+                                # output item is done (ResponseOutputItemDoneEvent)
+
 
                             elif isinstance(event.data, ResponseOutputItemDoneEvent):
                                 # Handle item completion
@@ -832,29 +813,32 @@ class OpenAIService:
                                         item_id
                                     ]
                                     await streaming_context.close()
-                                    unclosed_item_ids.remove(item_id)
+                                    if item_id in unclosed_item_ids:
+                                        unclosed_item_ids.remove(item_id)
 
                             elif isinstance(event.data, ResponseCompletedEvent):
                                 # All items complete, finish all remaining streaming contexts for this session
                                 # Create a copy to avoid modifying set during iteration
                                 remaining_items = list(unclosed_item_ids)
                                 for item_id in remaining_items:
-                                    if item_id in unclosed_item_ids:  # Check if still unclosed
+                                    if (item_id in unclosed_item_ids and
+                                            item_id in item_id_to_streaming_context):  # Check if still unclosed
                                         streaming_context = item_id_to_streaming_context[
                                             item_id
                                         ]
                                         await streaming_context.close()
-                                        unclosed_item_ids.remove(item_id)
+                                        unclosed_item_ids.discard(item_id)
 
                 finally:
                     # Cleanup: ensure all streaming contexts for this session are properly finished
                     # Create a copy to avoid modifying set during iteration
                     remaining_items = list(unclosed_item_ids)
                     for item_id in remaining_items:
-                        if item_id in unclosed_item_ids:  # Check if still unclosed
+                        if (item_id in unclosed_item_ids and
+                                item_id in item_id_to_streaming_context):  # Check if still unclosed
                             streaming_context = item_id_to_streaming_context[item_id]
                             await streaming_context.close()
-                            unclosed_item_ids.remove(item_id)
+                            unclosed_item_ids.discard(item_id)
 
                 if span:
                     span.output = {
