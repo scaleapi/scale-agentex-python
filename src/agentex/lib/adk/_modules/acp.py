@@ -23,7 +23,7 @@ from agentex.types.task_message_content import TaskMessageContent
 
 logger = make_logger(__name__)
 
-DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
+DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=0)
 
 
 class ACPModule:

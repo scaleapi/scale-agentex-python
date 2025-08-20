@@ -1,6 +1,6 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import Optional
+from typing import Dict, Optional
 from datetime import datetime
 from typing_extensions import Literal
 
@@ -15,6 +15,8 @@ class Task(BaseModel):
     created_at: Optional[datetime] = None
 
     name: Optional[str] = None
+
+    params: Optional[Dict[str, object]] = None
 
     status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT"]] = None
 
