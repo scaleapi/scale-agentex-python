@@ -241,7 +241,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
                     # Ask the model to include a short reasoning summary
                     reasoning=Reasoning(effort="medium", summary="detailed"),
                 ),
-                tools=[CALCULATOR_TOOL],
+                # tools=[CALCULATOR_TOOL],
             )
             if self._state:
                 # Update the state with the final input list if available

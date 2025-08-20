@@ -830,16 +830,26 @@ class OpenAIService:
                                 item_id = event.data.item_id
                                 summary_index = event.data.summary_index
 
-                                # Note: We don't close the streaming context here since there might be more deltas
-                                # The context will be closed when the reasoning item is completely done
+                                # Finish the streaming context for this reasoning item
+                                if item_id in item_id_to_streaming_context and item_id in unclosed_item_ids:
+                                    streaming_context = item_id_to_streaming_context[
+                                        item_id
+                                    ]
+                                    await streaming_context.close()
+                                    unclosed_item_ids.remove(item_id)
 
                             elif isinstance(event.data, ResponseReasoningTextDoneEvent):
                                 # Handle reasoning content text completion
                                 item_id = event.data.item_id
                                 content_index = event.data.content_index
 
-                                # Note: We don't close the streaming context here since there might be more deltas
-                                # The context will be closed when the reasoning item is completely done
+                                # Finish the streaming context for this reasoning item
+                                if item_id in item_id_to_streaming_context and item_id in unclosed_item_ids:
+                                    streaming_context = item_id_to_streaming_context[
+                                        item_id
+                                    ]
+                                    await streaming_context.close()
+                                    unclosed_item_ids.remove(item_id)
 
                             elif isinstance(event.data, ResponseOutputItemDoneEvent):
                                 # Handle item completion
