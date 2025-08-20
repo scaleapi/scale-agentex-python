@@ -325,7 +325,7 @@ class OpenAIService:
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
                                     content=text_content,
-                                    type="full",
+                                    
                                 ),
                             )
 
@@ -350,7 +350,7 @@ class OpenAIService:
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
                                     content=tool_request_content,
-                                    type="full",
+                                    
                                 ),
                             )
 
@@ -367,14 +367,14 @@ class OpenAIService:
                         async with (
                             self.streaming_service.streaming_task_message_context(
                                 task_id=task_id,
-                                initial_content=tool_response_content,
+                                initial_content=tool_response_content
                             ) as streaming_context
                         ):
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
-                                    content=tool_response_content,
-                                    type="full",
+                                    content=tool_response_content
+                                    
                                 ),
                             )
 
@@ -629,8 +629,8 @@ class OpenAIService:
                                     await streaming_context.stream_update(
                                         update=StreamTaskMessageFull(
                                             parent_task_message=streaming_context.task_message,
-                                            content=tool_request_content,
-                                            type="full",
+                                            content=tool_request_content
+                                            
                                         ),
                                     )
 
@@ -650,15 +650,15 @@ class OpenAIService:
                                 async with (
                                     self.streaming_service.streaming_task_message_context(
                                         task_id=task_id,
-                                        initial_content=tool_response_content,
+                                        initial_content=tool_response_content
                                     ) as streaming_context
                                 ):
                                     # The message has already been persisted, but we still need to send an update
                                     await streaming_context.stream_update(
                                         update=StreamTaskMessageFull(
                                             parent_task_message=streaming_context.task_message,
-                                            content=tool_response_content,
-                                            type="full",
+                                            content=tool_response_content
+                                            
                                         ),
                                     )
                             
