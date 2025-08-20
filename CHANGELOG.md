@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.4.5 (2025-08-20)
+
+Full Changelog: [v0.4.4...v0.4.5](https://github.com/scaleapi/agentex-python/compare/v0.4.4...v0.4.5)
+
+### Features
+
+* **api:** manual updates ([34a53aa](https://github.com/scaleapi/agentex-python/commit/34a53aa28b8f862d74dd1603d92b7dd5dd28ddb1))
+
+
+### Bug Fixes
+
+* enable FunctionTool serialization for Temporal worker nodes ([c9eb040](https://github.com/scaleapi/agentex-python/commit/c9eb04002825195187cd58f34c9185349a63566e))
+* **tools:** handle callable objects in model serialization to facilitate tool calling ([4e9bb87](https://github.com/scaleapi/agentex-python/commit/4e9bb87d7faa2c2e1643893a168f7c6affd2809d))
+
+
+### Chores
+
+* demonstrate FunctionTool use in a (temporal) tutorial ([3a72043](https://github.com/scaleapi/agentex-python/commit/3a7204333c328fab8ba0f1d31fd26994ea176ecf))
+
 ## 0.4.4 (2025-08-17)
 
 Full Changelog: [v0.4.3...v0.4.4](https://github.com/scaleapi/agentex-python/compare/v0.4.3...v0.4.4)
