@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any, List, cast
 
 from agentex import AsyncAgentex
 from agentex.lib.core.tracing.tracer import AsyncTracer
@@ -78,7 +78,7 @@ class ACPService:
         task_name: str | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
-    ) -> TaskMessage:
+    ) -> List[TaskMessage]:
         trace = self._tracer.trace(trace_id=trace_id)
         async with trace.span(
             parent_id=parent_span_id,
@@ -115,10 +115,17 @@ class ACPService:
             else:
                 raise ValueError("Either agent_name or agent_id must be provided")
 
-            task_message = TaskMessage.model_validate(json_rpc_response.result)
+            task_messages: List[TaskMessage] = []
+            if isinstance(json_rpc_response.result, list):
+                for message in json_rpc_response.result:
+                    task_message = TaskMessage.model_validate(message)
+                    task_messages.append(task_message)
+            else:
+                task_messages = [TaskMessage.model_validate(json_rpc_response.result)]
+
             if span:
-                span.output = task_message.model_dump()
-            return task_message
+                span.output = [task_message.model_dump() for task_message in task_messages]
+            return task_messages
 
     async def event_send(
         self,
