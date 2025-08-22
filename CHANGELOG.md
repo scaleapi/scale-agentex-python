@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.7 (2025-08-22)
+
+Full Changelog: [v0.4.6...v0.4.7](https://github.com/scaleapi/agentex-python/compare/v0.4.6...v0.4.7)
+
+### Chores
+
+* update github action ([677e95d](https://github.com/scaleapi/agentex-python/commit/677e95de075b7031cfc4971d7d09769daaa5b2af))
+
 ## 0.4.6 (2025-08-20)
 
 Full Changelog: [v0.4.5...v0.4.6](https://github.com/scaleapi/agentex-python/compare/v0.4.5...v0.4.6)
