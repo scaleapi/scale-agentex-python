@@ -90,10 +90,12 @@ async def handle_message_send(
     ):
         if chunk and chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
             yield StreamTaskMessageDelta(
+                type="delta",
                 index=message_index,
                 delta=TextDelta(text_delta=chunk.choices[0].delta.content or ""),
             )
 
     yield StreamTaskMessageDone(
+        type="done",
         index=message_index,
     )

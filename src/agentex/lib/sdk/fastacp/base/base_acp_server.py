@@ -332,7 +332,7 @@ class BaseACPServer(FastAPI):
 
                 async def async_generator(task_message_content_list: list[TaskMessageContent]):
                     for i, task_message_content in enumerate(task_message_content_list):
-                        yield StreamTaskMessageFull(index=i, content=task_message_content)
+                        yield StreamTaskMessageFull(type="full", index=i, content=task_message_content)
 
                 return async_generator(task_message_content_list)
 
