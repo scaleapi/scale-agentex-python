@@ -1,6 +1,7 @@
 from datetime import timedelta
-from typing import Any
+from typing import Any, List
 
+from agentex.types import Event
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex
@@ -58,7 +59,7 @@ class ACPModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
-    ):
+    ) -> Task:
         """
         Create a new task.
 
@@ -111,7 +112,7 @@ class ACPModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
-    ):
+    ) -> Event:
         """
         Send an event to a task.
 
@@ -152,8 +153,8 @@ class ACPModule:
 
     async def send_message(
         self,
-        task_id: str,
         content: TaskMessageContent,
+        task_id: str | None = None,
         agent_id: str | None = None,
         agent_name: str | None = None,
         trace_id: str | None = None,
@@ -161,7 +162,7 @@ class ACPModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
-    ):
+    ) -> List[TaskMessage]:
         """
         Send a message to a task.
 
@@ -209,7 +210,7 @@ class ACPModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
-    ):
+    ) -> Task:
         """
         Cancel a task.
 

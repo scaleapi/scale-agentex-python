@@ -116,6 +116,7 @@ class ACPService:
                 raise ValueError("Either agent_name or agent_id must be provided")
 
             task_messages: List[TaskMessage] = []
+            logger.info(f"json_rpc_response: {json_rpc_response}")
             if isinstance(json_rpc_response.result, list):
                 for message in json_rpc_response.result:
                     task_message = TaskMessage.model_validate(message)

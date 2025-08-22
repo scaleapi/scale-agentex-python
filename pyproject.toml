@@ -39,7 +39,7 @@ dependencies = [
     "pytest-asyncio>=1.0.0",
     "scale-gp-beta==0.1.0a20",
     "ipykernel>=6.29.5",
-    "openai==1.99.9", # anything higher than 1.99.9 breaks litellm - https://github.com/BerriAI/litellm/issues/13711 
+    "openai==1.99.9", # anything higher than 1.99.9 breaks litellm - https://github.com/BerriAI/litellm/issues/13711
     "cloudpickle>=3.1.1",
 ]
 requires-python = ">= 3.12,<4"

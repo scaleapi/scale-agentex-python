@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any
+from typing import Any, List
 
 from temporalio import activity
 
@@ -61,7 +61,7 @@ class ACPActivities:
         )
 
     @activity.defn(name=ACPActivityName.MESSAGE_SEND)
-    async def message_send(self, params: MessageSendParams) -> TaskMessage:
+    async def message_send(self, params: MessageSendParams) -> List[TaskMessage]:
         return await self._acp_service.message_send(
             agent_id=params.agent_id,
             agent_name=params.agent_name,

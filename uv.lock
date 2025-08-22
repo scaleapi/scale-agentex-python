@@ -4,7 +4,7 @@ requires-python = ">=3.12, <4"
 
 [[package]]
 name = "agentex-sdk"
-version = "0.4.4"
+version = "0.4.8"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -75,7 +75,7 @@ requires-dist = [
     { name = "kubernetes", specifier = ">=25.0.0,<29.0.0" },
     { name = "litellm", specifier = ">=1.66.0,<2" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.4.1" },
-    { name = "openai", specifier = ">=1.99.9" },
+    { name = "openai", specifier = "==1.99.9" },
     { name = "openai-agents", specifier = "==0.2.7" },
     { name = "pydantic", specifier = ">=2.0.0,<3" },
     { name = "pytest", specifier = ">=8.4.0" },
