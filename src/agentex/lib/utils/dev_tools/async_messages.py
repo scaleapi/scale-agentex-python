@@ -12,7 +12,7 @@ from typing import List, Optional
 from yaspin.core import Yaspin
 
 from agentex import Agentex
-from agentex.types import Task, TaskMessage, TextContent, ToolRequestContent, ToolResponseContent
+from agentex.types import Task, TaskMessage, TextContent, ToolRequestContent, ToolResponseContent, ReasoningContent
 from agentex.types.task_message_update import (
     TaskMessageUpdate,
     StreamTaskMessageStart,
@@ -47,6 +47,13 @@ def print_task_message(
     # Skip empty messages
     if isinstance(message.content, TextContent) and not message.content.content.strip():
         return
+    
+    # Skip empty reasoning messages
+    if isinstance(message.content, ReasoningContent):
+        has_summary = message.content.summary and any(s for s in message.content.summary if s)
+        has_content = message.content.content and any(c for c in message.content.content if c)
+        if not has_summary and not has_content:
+            return
     
     timestamp = message.created_at.strftime("%m/%d/%Y %H:%M:%S") if message.created_at else "N/A"
     
@@ -103,6 +110,26 @@ def print_task_message(
                 content = f"✅ **Tool Response: {tool_name}**\n\n{tool_response}"
         
         content_type = "tool_response"
+    elif isinstance(message.content, ReasoningContent):
+        # Format reasoning content
+        reasoning_parts = []
+        
+        # Add summary if available
+        if message.content.summary:
+            # Join summaries with double newline for better formatting
+            summary_text = "\n\n".join(s for s in message.content.summary if s)
+            if summary_text:
+                reasoning_parts.append(summary_text)
+        
+        # Add full reasoning content if available
+        if message.content.content:
+            content_text = "\n\n".join(c for c in message.content.content if c)
+            if content_text:
+                reasoning_parts.append(content_text)
+        
+        # Format reasoning content (we already checked it's not empty at the top)
+        content = "🧠 **Reasoning**\n\n" + "\n\n".join(reasoning_parts)
+        content_type = "reasoning"
     else:
         content = f"{type(message.content).__name__}: {message.content}"
         content_type = "other"
@@ -116,6 +143,8 @@ def print_task_message(
             border_style = "yellow"
         elif content_type == "tool_response":
             border_style = "bright_green"
+        elif content_type == "reasoning":
+            border_style = "bright_magenta"
         else:
             border_style = author_color
             
@@ -123,6 +152,8 @@ def print_task_message(
         console.print(panel)
     else:
         title = f"{message.content.author.upper()} [{timestamp}]"
+        if content_type == "reasoning":
+            title = f"🧠 REASONING [{timestamp}]"
         print(f"{title}\n{content}\n")
 
 

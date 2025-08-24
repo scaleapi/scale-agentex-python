@@ -234,14 +234,14 @@ class At010AgentChatWorkflow(BaseWorkflow):
                     "to provide accurate and well-reasoned responses."
                 ),
                 parent_span_id=span.id if span else None,
-                model="o4-mini",
+                model="gpt-5-mini",
                 model_settings=ModelSettings(
                     # Include reasoning items in the response (IDs, summaries)
                     # response_include=["reasoning.encrypted_content"],
                     # Ask the model to include a short reasoning summary
-                    reasoning=Reasoning(effort="medium", summary="auto"),
+                    reasoning=Reasoning(effort="medium", summary="detailed"),
                 ),
-                tools=[CALCULATOR_TOOL],
+                # tools=[CALCULATOR_TOOL],
             )
             if self._state:
                 # Update the state with the final input list if available

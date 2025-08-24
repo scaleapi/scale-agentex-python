@@ -5,7 +5,8 @@ from agentex.lib import adk
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.acp import SendMessageParams
 from agentex.lib.types.llm_messages import AssistantMessage, LLMConfig, SystemMessage, UserMessage
-from agentex.lib.types.task_message_updates import StreamTaskMessageDelta, StreamTaskMessageDone, StreamTaskMessageFull, TaskMessageUpdate, TextDelta
+from agentex.types.task_message_update import StreamTaskMessageDelta, StreamTaskMessageDone, StreamTaskMessageFull, TaskMessageUpdate
+from agentex.types.task_message_delta import TextDelta
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.types.task_message_content import TaskMessageContent, TextContent
 
@@ -89,10 +90,12 @@ async def handle_message_send(
     ):
         if chunk and chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
             yield StreamTaskMessageDelta(
+                type="delta",
                 index=message_index,
                 delta=TextDelta(text_delta=chunk.choices[0].delta.content or ""),
             )
 
     yield StreamTaskMessageDone(
+        type="done",
         index=message_index,
     )
