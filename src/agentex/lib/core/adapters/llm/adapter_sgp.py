@@ -11,10 +11,14 @@ logger = make_logger(__name__)
 
 
 class SGPLLMGateway(LLMGateway):
-    def __init__(self, sgp_api_key: str | None = None):
-        self.sync_client = SGPClient(api_key=os.environ.get("SGP_API_KEY", sgp_api_key))
+    def __init__(self, sgp_api_key: str | None = None, sgp_account_id: str | None = None):
+        self.sync_client = SGPClient(
+            api_key=os.environ.get("SGP_API_KEY", sgp_api_key),
+            account_id=os.environ.get("SGP_ACCOUNT_ID", sgp_account_id)
+        )
         self.async_client = AsyncSGPClient(
-            api_key=os.environ.get("SGP_API_KEY", sgp_api_key)
+            api_key=os.environ.get("SGP_API_KEY", sgp_api_key),
+            account_id=os.environ.get("SGP_ACCOUNT_ID", sgp_account_id)
         )
 
     def completion(self, *args, **kwargs) -> Completion:
