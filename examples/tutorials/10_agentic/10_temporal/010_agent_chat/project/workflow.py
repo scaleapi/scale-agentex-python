@@ -23,6 +23,7 @@ from agentex.types.text_content import TextContent
 from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (  # noqa: E501
     FunctionTool,
     TemporalInputGuardrail,
+    TemporalOutputGuardrail,
 )
 from agents.guardrail import GuardrailFunctionOutput
 from agents import Agent
@@ -126,6 +127,22 @@ async def calculator(context: RunContextWrapper, args: str) -> str:
         return f"Error: An unexpected error occurred: {str(e)}"
 
 
+"""
+Guardrails for Testing:
+- Input Guardrails:
+  - Spaghetti: Blocks any mention of "spaghetti" in user messages
+  - Soup: Blocks any mention of "soup" in user messages
+- Output Guardrails:
+  - Pizza: Blocks the AI from mentioning "pizza" in responses
+  - Sushi: Blocks the AI from mentioning "sushi" in responses
+
+To test:
+- Input: "Tell me about spaghetti" or "What's your favorite soup?"
+- Output: Ask "What are popular Italian foods?" (might trigger pizza guardrail)
+         or "What are popular Japanese foods?" (might trigger sushi guardrail)
+"""
+
+
 # Define the spaghetti guardrail function
 async def check_spaghetti_guardrail(
     ctx: RunContextWrapper[None],
@@ -156,17 +173,166 @@ async def check_spaghetti_guardrail(
             "checked_text": (
                 input_text[:200] + "..."
                 if len(input_text) > 200 else input_text
-            )
+            ),
+            "rejection_message": (
+                "I'm sorry, but I cannot process messages about spaghetti. "
+                "This guardrail was put in place for demonstration purposes. "
+                "Please ask me about something else!"
+            ) if contains_spaghetti else None
         },
         tripwire_triggered=contains_spaghetti
     )
 
 
-# Create the input guardrail
+# Define soup input guardrail function
+async def check_soup_guardrail(
+    ctx: RunContextWrapper[None],
+    agent: Agent,
+    input: str | list
+) -> GuardrailFunctionOutput:
+    """
+    A guardrail that checks if 'soup' is mentioned in the input.
+    """
+    # Convert input to string to check
+    input_text = ""
+    if isinstance(input, str):
+        input_text = input.lower()
+    elif isinstance(input, list):
+        # For list of messages, check all user messages
+        for msg in input:
+            if isinstance(msg, dict) and msg.get("role") == "user":
+                content = msg.get("content", "")
+                if isinstance(content, str):
+                    input_text += " " + content.lower()
+
+    # Check if soup is mentioned
+    contains_soup = "soup" in input_text
+
+    return GuardrailFunctionOutput(
+        output_info={
+            "contains_soup": contains_soup,
+            "checked_text": (
+                input_text[:200] + "..."
+                if len(input_text) > 200 else input_text
+            ),
+            "rejection_message": (
+                "I'm sorry, but I cannot process messages about soup. "
+                "This is a demonstration guardrail for testing purposes. "
+                "Please ask about something other than soup!"
+            ) if contains_soup else None
+        },
+        tripwire_triggered=contains_soup
+    )
+
+
+# Create the input guardrails
 SPAGHETTI_GUARDRAIL = TemporalInputGuardrail(
     guardrail_function=check_spaghetti_guardrail,
     name="spaghetti_guardrail"
 )
+
+SOUP_GUARDRAIL = TemporalInputGuardrail(
+    guardrail_function=check_soup_guardrail,
+    name="soup_guardrail"
+)
+
+
+# Define pizza output guardrail function
+async def check_pizza_guardrail(
+    ctx: RunContextWrapper[None],
+    agent: Agent,
+    output: str
+) -> GuardrailFunctionOutput:
+    """
+    An output guardrail that prevents mentioning pizza.
+    """
+    output_text = output.lower() if isinstance(output, str) else ""
+    contains_pizza = "pizza" in output_text
+    
+    return GuardrailFunctionOutput(
+        output_info={
+            "contains_pizza": contains_pizza,
+            "rejection_message": (
+                "I cannot provide this response as it mentions pizza. "
+                "Due to content policies, I need to avoid discussing pizza. "
+                "Let me provide a different response."
+            ) if contains_pizza else None
+        },
+        tripwire_triggered=contains_pizza
+    )
+
+
+# Define sushi output guardrail function
+async def check_sushi_guardrail(
+    ctx: RunContextWrapper[None],
+    agent: Agent,
+    output: str
+) -> GuardrailFunctionOutput:
+    """
+    An output guardrail that prevents mentioning sushi.
+    """
+    output_text = output.lower() if isinstance(output, str) else ""
+    contains_sushi = "sushi" in output_text
+    
+    return GuardrailFunctionOutput(
+        output_info={
+            "contains_sushi": contains_sushi,
+            "rejection_message": (
+                "I cannot mention sushi in my response. "
+                "This guardrail prevents discussions about sushi for demonstration purposes. "
+                "Please let me provide information about other topics."
+            ) if contains_sushi else None
+        },
+        tripwire_triggered=contains_sushi
+    )
+
+
+# Create the output guardrails
+PIZZA_GUARDRAIL = TemporalOutputGuardrail(
+    guardrail_function=check_pizza_guardrail,
+    name="pizza_guardrail"
+)
+
+SUSHI_GUARDRAIL = TemporalOutputGuardrail(
+    guardrail_function=check_sushi_guardrail,
+    name="sushi_guardrail"
+)
+
+
+# Example output guardrail function (kept for reference)
+async def check_output_length_guardrail(
+    ctx: RunContextWrapper[None],
+    agent: Agent,
+    output: str
+) -> GuardrailFunctionOutput:
+    """
+    A simple output guardrail that checks if the response is too long.
+    """
+    # Check the length of the output
+    max_length = 1000  # Maximum allowed characters
+    is_too_long = len(output) > max_length if isinstance(output, str) else False
+    
+    return GuardrailFunctionOutput(
+        output_info={
+            "output_length": len(output) if isinstance(output, str) else 0,
+            "max_length": max_length,
+            "is_too_long": is_too_long,
+            "rejection_message": (
+                f"I'm sorry, but my response is too long ({len(output)} characters). "
+                f"Please ask a more specific question so I can provide a concise answer "
+                f"(max {max_length} characters)."
+            ) if is_too_long else None
+        },
+        tripwire_triggered=is_too_long
+    )
+
+
+# Uncomment to use the output guardrail
+# from agentex.lib.core.temporal.activities.adk.providers.openai_activities import TemporalOutputGuardrail
+# OUTPUT_LENGTH_GUARDRAIL = TemporalOutputGuardrail(
+#     guardrail_function=check_output_length_guardrail,
+#     name="output_length_guardrail"
+# )
 
 
 # Create the calculator tool
@@ -292,7 +458,8 @@ class At010AgentChatWorkflow(BaseWorkflow):
                     reasoning=Reasoning(effort="medium", summary="detailed"),
                 ),
                 tools=[CALCULATOR_TOOL],
-                input_guardrails=[SPAGHETTI_GUARDRAIL],
+                input_guardrails=[SPAGHETTI_GUARDRAIL, SOUP_GUARDRAIL],
+                output_guardrails=[PIZZA_GUARDRAIL, SUSHI_GUARDRAIL],
             )
             
             # Update state with the final input list from result

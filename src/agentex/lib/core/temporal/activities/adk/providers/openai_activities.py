@@ -10,7 +10,7 @@ from pydantic import Field, PrivateAttr
 import cloudpickle
 from agents import RunContextWrapper, RunResult, RunResultStreaming
 from agents.guardrail import InputGuardrail, OutputGuardrail
-from agents.exceptions import InputGuardrailTripwireTriggered
+from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from agents.mcp import MCPServerStdio, MCPServerStdioParams
 from agents.model_settings import ModelSettings as OAIModelSettings
 from agents.tool import FunctionTool as OAIFunctionTool
@@ -425,11 +425,34 @@ class OpenAIActivities:
             return self._to_serializable_run_result(result)
         except InputGuardrailTripwireTriggered as e:
             # Handle guardrail trigger gracefully
-            rejection_message = (
-                "I'm sorry, but I cannot process messages about spaghetti. "
-                "This guardrail was put in place for demonstration purposes. "
-                "Please ask me about something else!"
+            rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
+            
+            # Try to extract rejection message from the guardrail result
+            if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                    rejection_message = output_info['rejection_message']
+            
+            # Build the final input list with the rejection message
+            final_input_list = list(params.input_list or [])
+            final_input_list.append({
+                "role": "assistant",
+                "content": rejection_message
+            })
+            
+            return SerializableRunResult(
+                final_output=rejection_message,
+                final_input_list=final_input_list
             )
+        except OutputGuardrailTripwireTriggered as e:
+            # Handle output guardrail trigger gracefully
+            rejection_message = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
+            
+            # Try to extract rejection message from the guardrail result
+            if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                    rejection_message = output_info['rejection_message']
             
             # Build the final input list with the rejection message
             final_input_list = list(params.input_list or [])
@@ -479,11 +502,34 @@ class OpenAIActivities:
             return self._to_serializable_run_result_streaming(result)
         except InputGuardrailTripwireTriggered as e:
             # Handle guardrail trigger gracefully
-            rejection_message = (
-                "I'm sorry, but I cannot process messages about spaghetti. "
-                "This guardrail was put in place for demonstration purposes. "
-                "Please ask me about something else!"
+            rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
+            
+            # Try to extract rejection message from the guardrail result
+            if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                    rejection_message = output_info['rejection_message']
+            
+            # Build the final input list with the rejection message
+            final_input_list = list(params.input_list or [])
+            final_input_list.append({
+                "role": "assistant",
+                "content": rejection_message
+            })
+            
+            return SerializableRunResultStreaming(
+                final_output=rejection_message,
+                final_input_list=final_input_list
             )
+        except OutputGuardrailTripwireTriggered as e:
+            # Handle output guardrail trigger gracefully
+            rejection_message = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
+            
+            # Try to extract rejection message from the guardrail result
+            if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                    rejection_message = output_info['rejection_message']
             
             # Build the final input list with the rejection message
             final_input_list = list(params.input_list or [])

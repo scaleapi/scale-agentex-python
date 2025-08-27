@@ -6,7 +6,7 @@ from typing import Any, Literal
 from agents import Agent, Runner, RunResult, RunResultStreaming
 from agents.agent import StopAtTools, ToolsToFinalOutputFunction
 from agents.guardrail import InputGuardrail, OutputGuardrail
-from agents.exceptions import InputGuardrailTripwireTriggered
+from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from agents.mcp import MCPServerStdio
 from mcp import StdioServerParameters
 from openai.types.responses import (
@@ -870,11 +870,58 @@ class OpenAIService:
 
                 except InputGuardrailTripwireTriggered as e:
                     # Handle guardrail trigger by sending a rejection message
-                    rejection_message = (
-                        "I'm sorry, but I cannot process messages about spaghetti. "
-                        "This guardrail was put in place for demonstration purposes. "
-                        "Please ask me about something else!"
-                    )
+                    rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
+                    
+                    # Try to extract rejection message from the guardrail result
+                    if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                        output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                        if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                            rejection_message = output_info['rejection_message']
+                        elif hasattr(e.guardrail_result, 'guardrail'):
+                            # Fall back to using guardrail name if no custom message
+                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, 'name', None)
+                            if triggered_guardrail_name:
+                                rejection_message = f"I'm sorry, but I cannot process this request. The '{triggered_guardrail_name}' guardrail was triggered."
+                    
+                    # Create and send the rejection message as a TaskMessage
+                    async with (
+                        self.streaming_service.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=TextContent(
+                                author="agent",
+                                content=rejection_message,
+                            ),
+                        ) as streaming_context
+                    ):
+                        # Send the full message
+                        await streaming_context.stream_update(
+                            update=StreamTaskMessageFull(
+                                parent_task_message=streaming_context.task_message,
+                                content=TextContent(
+                                    author="agent",
+                                    content=rejection_message,
+                                ),
+                                type="full",
+                            ),
+                        )
+                    
+                    # Re-raise to let the activity handle it
+                    raise
+                
+                except OutputGuardrailTripwireTriggered as e:
+                    # Handle output guardrail trigger by sending a rejection message
+                    rejection_message = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
+                    
+                    # Try to extract rejection message from the guardrail result
+                    if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                        output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                        if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                            rejection_message = output_info['rejection_message']
+                        elif hasattr(e.guardrail_result, 'guardrail'):
+                            # Fall back to using guardrail name if no custom message
+                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, 'name', None)
+                            if triggered_guardrail_name:
+                                rejection_message = f"I'm sorry, but I cannot provide this response. The '{triggered_guardrail_name}' guardrail was triggered."
                     
                     # Create and send the rejection message as a TaskMessage
                     async with (
