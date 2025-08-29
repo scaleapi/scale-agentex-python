@@ -42,12 +42,13 @@ from agentex.lib.core.temporal.activities.adk.utils.templating_activities import
 from agentex.lib.core.tracing import AsyncTracer
 
 
-def get_all_activities(sgp_client=None):
+def get_all_activities(sgp_client=None, exclude_platforms=None):
     """
     Returns a list of all standard activity functions that can be directly passed to worker.run().
 
     Args:
         sgp_client: Optional SGP client instance. If not provided, SGP activities will not be included.
+        exclude_platforms: Optional list of platform names to exclude activities for (e.g., ["openai", "litellm"])
 
     Returns:
         list: A list of activity functions ready to be passed to worker.run()
@@ -154,9 +155,12 @@ def get_all_activities(sgp_client=None):
     ## Utils
     templating_activities = TemplatingActivities(templating_service=templating_service)
 
+    # Initialize exclude_platforms
+    exclude_platforms = exclude_platforms or []
+    
     # Build list of standard activities
     activities = [
-        # Core activities
+        # Core activities (always included)
         ## Messages activities
         messages_activities.create_message,
         messages_activities.update_message,
@@ -188,18 +192,26 @@ def get_all_activities(sgp_client=None):
         acp_activities.message_send,
         acp_activities.event_send,
         acp_activities.task_cancel,
-        # Providers
-        ## LiteLLM activities
-        litellm_activities.chat_completion,
-        litellm_activities.chat_completion_auto_send,
-        litellm_activities.chat_completion_stream_auto_send,
-        ## OpenAI activities
-        openai_activities.run_agent,
-        openai_activities.run_agent_auto_send,
-        openai_activities.run_agent_streamed_auto_send,
         # Utils
         templating_activities.render_jinja,
     ]
+    
+    # Conditionally include provider activities based on exclusions
+    ## LiteLLM activities
+    if "litellm" not in exclude_platforms:
+        activities.extend([
+            litellm_activities.chat_completion,
+            litellm_activities.chat_completion_auto_send,
+            litellm_activities.chat_completion_stream_auto_send,
+        ])
+    
+    ## OpenAI activities
+    if "openai" not in exclude_platforms:
+        activities.extend([
+            openai_activities.run_agent,
+            openai_activities.run_agent_auto_send,
+            openai_activities.run_agent_streamed_auto_send,
+        ])
 
     # SGP activities
     if sgp_client is not None:

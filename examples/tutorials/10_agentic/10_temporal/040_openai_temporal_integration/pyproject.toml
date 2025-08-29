@@ -1,0 +1,29 @@
+[project]
+name = "at010-openai-temporal-integration"
+version = "0.1.0"
+description = "Simplified OpenAI agent using temporal<>OpenAI<>Agentex platform integration"
+requires-python = ">=3.11"
+dependencies = [
+    "agentex-sdk",
+    "debugpy>=1.8.15", 
+    "scale-gp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+    "flake8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["project"]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88 

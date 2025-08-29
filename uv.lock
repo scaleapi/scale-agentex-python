@@ -1,10 +1,10 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12, <4"
 
 [[package]]
 name = "agentex-sdk"
-version = "0.4.8"
+version = "0.4.10"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -89,7 +89,7 @@ requires-dist = [
     { name = "scale-gp", specifier = ">=0.1.0a59" },
     { name = "scale-gp-beta", specifier = "==0.1.0a20" },
     { name = "sniffio" },
-    { name = "temporalio", specifier = ">=1.10.0,<2" },
+    { name = "temporalio", extras = ["openai"], specifier = ">=1.10.0,<2" },
     { name = "typer", specifier = ">=0.16,<0.17" },
     { name = "typing-extensions", specifier = ">=4.10,<5" },
     { name = "tzdata", specifier = ">=2025.2" },

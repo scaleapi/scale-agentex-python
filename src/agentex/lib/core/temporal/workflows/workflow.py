@@ -22,5 +22,6 @@ class BaseWorkflow(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    @workflow.run
     async def on_task_create(self, params: CreateTaskParams) -> None:
         raise NotImplementedError

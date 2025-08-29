@@ -1,0 +1,119 @@
+# Agent Manifest Configuration
+# ---------------------------
+# This file defines how your agent should be built and deployed.
+
+# Build Configuration
+# ------------------
+# The build config defines what gets packaged into your agent's Docker image.
+build:
+  context:
+    # Root directory for the build context
+    root: ../  # Keep this as the default root
+
+    # Paths to include in the Docker build context
+    # Must include your agent's directory (your custom agent code)
+    include_paths:
+      - 040_openai_temporal_integration
+
+    # Path to your agent's Dockerfile
+    # This defines how your agent's image is built from the context
+    # Relative to the root directory
+    dockerfile: 040_openai_temporal_integration/Dockerfile
+
+    # Path to your agent's .dockerignore
+    # Filters unnecessary files from the build context
+    dockerignore: 040_openai_temporal_integration/.dockerignore
+
+
+# Local Development Configuration
+# -----------------------------
+# Only used when running the agent locally
+local_development:
+  agent:
+    port: 8000  # Port where your local ACP server is running
+    host_address: host.docker.internal  # Host address for Docker networking
+
+  # File paths for local development (relative to this manifest.yaml)
+  paths:
+    # Path to ACP server file
+    acp: project/acp.py
+    
+    # Path to temporal worker file
+    worker: project/run_worker.py
+
+
+# Agent Configuration
+# -----------------
+agent:
+  # Type of agent - either sync or agentic
+  acp_type: agentic
+
+  # Unique name for your agent
+  # Used for task routing and monitoring
+  name: at040-openai-temporal-integration
+
+  # Description of what your agent does
+  # Helps with documentation and discovery
+  description: "Simplified OpenAI agent chat using agent platform integration"
+
+  # Temporal workflow configuration
+  # This enables your agent to run as a Temporal workflow for long-running tasks
+  temporal:
+    enabled: true
+    workflows:
+      # Name of the workflow class
+      # Must match the @workflow.defn name in your workflow.py
+      - name: at040-openai-temporal-integration
+
+        # Queue name for task distribution
+        # Used by Temporal to route tasks to your agent
+        # Convention: <agent_name>_task_queue
+        queue_name: 040_openai_temporal_integration_queue
+
+  # Optional: Credentials mapping
+  # Maps Kubernetes secrets to environment variables
+  # Common credentials include:
+  credentials:
+    - env_var_name: OPENAI_API_KEY
+      secret_name: openai-api-key
+      secret_key: api-key
+  
+  # Optional: Set Environment variables for running your agent locally as well 
+  # as for deployment later on
+  # env:
+  #   - name: OPENAI_BASE_URL
+  #     value: "https://api.openai.com/v1"
+  #   - name: ACCOUNT_ID
+  #     value: "your_account_id_here"  
+
+
+# Deployment Configuration
+# -----------------------
+# Configuration for deploying your agent to Kubernetes clusters
+deployment:
+  # Container image configuration
+  image:
+    repository: "" # Update with your container registry
+    tag: "latest"  # Default tag, should be versioned in production
+
+  imagePullSecrets:
+    - name: my-registry-secret  # Update with your image pull secret name
+
+  # Global deployment settings that apply to all clusters
+  # These can be overridden using --override-file with custom configuration files
+  global:
+    agent:
+      name: "at040-openai-temporal-integration"
+      description: "Simplified OpenAI agent chat using agent platform integration"
+    
+    # Default replica count
+    replicaCount: 1
+    
+    # Default resource requirements
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

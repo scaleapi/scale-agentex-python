@@ -90,6 +90,8 @@ class AgentexWorker:
         max_workers: int = 10,
         max_concurrent_activities: int = 10,
         health_check_port: int = 80,
+        agent_platform: str = None,
+        platform_config: dict = None,
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -98,6 +100,14 @@ class AgentexWorker:
         self.health_check_server_running = False
         self.healthy = False
         self.health_check_port = health_check_port
+        self.agent_platform = agent_platform
+        self.platform_config = platform_config or {}
+        
+        # Get execution strategy for platform if specified
+        self.execution_strategy = None
+        if agent_platform:
+            from agentex.lib.core.temporal.agent_platforms import AgentPlatformRegistry
+            self.execution_strategy = AgentPlatformRegistry.get_strategy(agent_platform)
 
     async def run(
         self,
@@ -115,22 +125,40 @@ class AgentexWorker:
         if debug_enabled:
             logger.info("🐛 [WORKER] Temporal debug mode enabled - deadlock detection disabled")
         
+        # Configure activities based on platform
+        final_activities = activities
+        if self.agent_platform:
+            from agentex.lib.core.temporal.activities import get_all_activities
+            # Use platform-optimized activity list if no activities explicitly provided
+            if not activities:
+                final_activities = get_all_activities(exclude_platforms=[self.agent_platform])
+                logger.info(f"Using platform-optimized activities, excluding: {self.agent_platform}")
+        
+        # Get platform-specific worker configuration
+        worker_config = {}
+        if self.execution_strategy:
+            platform_worker_config = self.execution_strategy.get_worker_config(self.platform_config)
+            worker_config.update(platform_worker_config)
+            logger.debug(f"Applied {self.agent_platform} platform configuration to worker")
+        
         worker = Worker(
             client=temporal_client,
             task_queue=self.task_queue,
             activity_executor=ThreadPoolExecutor(max_workers=self.max_workers),
             workflows=[workflow],
-            activities=activities,
+            activities=final_activities,
             workflow_runner=UnsandboxedWorkflowRunner(),
             max_concurrent_activities=self.max_concurrent_activities,
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
+            **worker_config,  # Apply platform-specific configuration
         )
 
-        logger.info(f"Starting workers for task queue: {self.task_queue}")
+        platform_info = f" (platform: {self.agent_platform})" if self.agent_platform else ""
+        logger.info(f"Starting workers for task queue: {self.task_queue}{platform_info}")
         # Eagerly set the worker status to healthy
         self.healthy = True
-        logger.info(f"Running workers for task queue: {self.task_queue}")
+        logger.info(f"Running workers for task queue: {self.task_queue}{platform_info}")
         await worker.run()
 
     async def _health_check(self):
