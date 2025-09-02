@@ -5,13 +5,14 @@ from typing import Any, Literal
 
 from agents import Agent, Runner, RunResult, RunResultStreaming
 from agents.agent import StopAtTools, ToolsToFinalOutputFunction
+from agents.guardrail import InputGuardrail, OutputGuardrail
+from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from agents.mcp import MCPServerStdio
 from mcp import StdioServerParameters
 from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseFunctionToolCall,
     ResponseOutputItemDoneEvent,
-    ResponseReasoningSummaryPartDoneEvent,
     ResponseTextDeltaEvent,
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseReasoningSummaryTextDoneEvent,
@@ -104,6 +105,8 @@ class OpenAIService:
             | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
     ) -> RunResult:
         """
         Run an agent without streaming or TaskMessage creation.
@@ -122,8 +125,12 @@ class OpenAIService:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
-            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
-
+            mcp_timeout_seconds: Optional param to set the timeout threshold 
+                for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on 
+                initial user input.
+            output_guardrails: Optional list of output guardrails to run on 
+                final agent output.
         Returns:
             SerializableRunResult: The result of the agent run.
         """
@@ -174,6 +181,10 @@ class OpenAIService:
                     agent_kwargs["model_settings"] = (
                         model_settings.to_oai_model_settings()
                     )
+                if input_guardrails is not None:
+                    agent_kwargs["input_guardrails"] = input_guardrails
+                if output_guardrails is not None:
+                    agent_kwargs["output_guardrails"] = output_guardrails
 
                 agent = Agent(**agent_kwargs)
 
@@ -214,6 +225,8 @@ class OpenAIService:
             | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
     ) -> RunResult:
         """
         Run an agent with automatic TaskMessage creation.
@@ -234,7 +247,8 @@ class OpenAIService:
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
             mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
-
+            input_guardrails: Optional list of input guardrails to run on initial user input.
+            output_guardrails: Optional list of output guardrails to run on final agent output.
         Returns:
             SerializableRunResult: The result of the agent run.
         """
@@ -290,6 +304,10 @@ class OpenAIService:
                     agent_kwargs["model_settings"] = (
                         model_settings.to_oai_model_settings()
                     )
+                if input_guardrails is not None:
+                    agent_kwargs["input_guardrails"] = input_guardrails
+                if output_guardrails is not None:
+                    agent_kwargs["output_guardrails"] = output_guardrails
 
                 agent = Agent(**agent_kwargs)
 
@@ -402,6 +420,8 @@ class OpenAIService:
             | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled but no TaskMessage creation.
@@ -420,8 +440,12 @@ class OpenAIService:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
-            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
-
+            mcp_timeout_seconds: Optional param to set the timeout threshold 
+                for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on 
+                initial user input.
+            output_guardrails: Optional list of output guardrails to run on 
+                final agent output.
         Returns:
             RunResultStreaming: The result of the agent run with streaming.
         """
@@ -471,6 +495,10 @@ class OpenAIService:
                     agent_kwargs["model_settings"] = (
                         model_settings.to_oai_model_settings()
                     )
+                if input_guardrails is not None:
+                    agent_kwargs["input_guardrails"] = input_guardrails
+                if output_guardrails is not None:
+                    agent_kwargs["output_guardrails"] = output_guardrails
 
                 agent = Agent(**agent_kwargs)
 
@@ -511,6 +539,8 @@ class OpenAIService:
             | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
@@ -530,7 +560,12 @@ class OpenAIService:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
-            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            mcp_timeout_seconds: Optional param to set the timeout threshold 
+                for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on 
+                initial user input.
+            output_guardrails: Optional list of output guardrails to run on 
+                final agent output.
 
         Returns:
             RunResultStreaming: The result of the agent run with streaming.
@@ -589,6 +624,10 @@ class OpenAIService:
                     agent_kwargs["model_settings"] = (
                         model_settings.to_oai_model_settings()
                     )
+                if input_guardrails is not None:
+                    agent_kwargs["input_guardrails"] = input_guardrails
+                if output_guardrails is not None:
+                    agent_kwargs["output_guardrails"] = output_guardrails
 
                 agent = Agent(**agent_kwargs)
 
@@ -828,6 +867,86 @@ class OpenAIService:
                                         ]
                                         await streaming_context.close()
                                         unclosed_item_ids.discard(item_id)
+
+                except InputGuardrailTripwireTriggered as e:
+                    # Handle guardrail trigger by sending a rejection message
+                    rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
+                    
+                    # Try to extract rejection message from the guardrail result
+                    if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                        output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                        if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                            rejection_message = output_info['rejection_message']
+                        elif hasattr(e.guardrail_result, 'guardrail'):
+                            # Fall back to using guardrail name if no custom message
+                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, 'name', None)
+                            if triggered_guardrail_name:
+                                rejection_message = f"I'm sorry, but I cannot process this request. The '{triggered_guardrail_name}' guardrail was triggered."
+                    
+                    # Create and send the rejection message as a TaskMessage
+                    async with (
+                        self.streaming_service.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=TextContent(
+                                author="agent",
+                                content=rejection_message,
+                            ),
+                        ) as streaming_context
+                    ):
+                        # Send the full message
+                        await streaming_context.stream_update(
+                            update=StreamTaskMessageFull(
+                                parent_task_message=streaming_context.task_message,
+                                content=TextContent(
+                                    author="agent",
+                                    content=rejection_message,
+                                ),
+                                type="full",
+                            ),
+                        )
+                    
+                    # Re-raise to let the activity handle it
+                    raise
+                
+                except OutputGuardrailTripwireTriggered as e:
+                    # Handle output guardrail trigger by sending a rejection message
+                    rejection_message = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
+                    
+                    # Try to extract rejection message from the guardrail result
+                    if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                        output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                        if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                            rejection_message = output_info['rejection_message']
+                        elif hasattr(e.guardrail_result, 'guardrail'):
+                            # Fall back to using guardrail name if no custom message
+                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, 'name', None)
+                            if triggered_guardrail_name:
+                                rejection_message = f"I'm sorry, but I cannot provide this response. The '{triggered_guardrail_name}' guardrail was triggered."
+                    
+                    # Create and send the rejection message as a TaskMessage
+                    async with (
+                        self.streaming_service.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=TextContent(
+                                author="agent",
+                                content=rejection_message,
+                            ),
+                        ) as streaming_context
+                    ):
+                        # Send the full message
+                        await streaming_context.stream_update(
+                            update=StreamTaskMessageFull(
+                                parent_task_message=streaming_context.task_message,
+                                content=TextContent(
+                                    author="agent",
+                                    content=rejection_message,
+                                ),
+                                type="full",
+                            ),
+                        )
+                    
+                    # Re-raise to let the activity handle it
+                    raise
 
                 finally:
                     # Cleanup: ensure all streaming contexts for this session are properly finished

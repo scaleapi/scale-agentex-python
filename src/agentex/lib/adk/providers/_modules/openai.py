@@ -4,6 +4,7 @@ from typing import Any, Literal
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agents import Agent, RunResult, RunResultStreaming
 from agents.agent import StopAtTools, ToolsToFinalOutputFunction
+from agents.guardrail import InputGuardrail, OutputGuardrail
 from agents.agent_output import AgentOutputSchemaBase
 from agents.model_settings import ModelSettings
 from agents.tool import Tool
@@ -84,6 +85,9 @@ class OpenAIModule:
             | StopAtTools
             | ToolsToFinalOutputFunction
         ) = "run_llm_again",
+        mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
     ) -> SerializableRunResult | RunResult:
         """
         Run an agent without streaming or TaskMessage creation.
@@ -107,6 +111,9 @@ class OpenAIModule:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on initial user input.
+            output_guardrails: Optional list of output guardrails to run on final agent output.
 
         Returns:
             Union[SerializableRunResult, RunResult]: SerializableRunResult when in Temporal, RunResult otherwise.
@@ -126,6 +133,9 @@ class OpenAIModule:
                 tools=tools,
                 output_type=output_type,
                 tool_use_behavior=tool_use_behavior,
+                mcp_timeout_seconds=mcp_timeout_seconds,
+                input_guardrails=input_guardrails,
+                output_guardrails=output_guardrails,
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=OpenAIActivityName.RUN_AGENT,
@@ -150,6 +160,9 @@ class OpenAIModule:
                 tools=tools,
                 output_type=output_type,
                 tool_use_behavior=tool_use_behavior,
+                mcp_timeout_seconds=mcp_timeout_seconds,
+                input_guardrails=input_guardrails,
+                output_guardrails=output_guardrails,
             )
 
     async def run_agent_auto_send(
@@ -175,6 +188,9 @@ class OpenAIModule:
             | StopAtTools
             | ToolsToFinalOutputFunction
         ) = "run_llm_again",
+        mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
     ) -> SerializableRunResult | RunResult:
         """
         Run an agent with automatic TaskMessage creation.
@@ -197,6 +213,9 @@ class OpenAIModule:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on initial user input.
+            output_guardrails: Optional list of output guardrails to run on final agent output.
 
         Returns:
             Union[SerializableRunResult, RunResult]: SerializableRunResult when in Temporal, RunResult otherwise.
@@ -217,6 +236,9 @@ class OpenAIModule:
                 tools=tools,
                 output_type=output_type,
                 tool_use_behavior=tool_use_behavior,
+                mcp_timeout_seconds=mcp_timeout_seconds,
+                input_guardrails=input_guardrails,
+                output_guardrails=output_guardrails,
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=OpenAIActivityName.RUN_AGENT_AUTO_SEND,
@@ -242,6 +264,9 @@ class OpenAIModule:
                 tools=tools,
                 output_type=output_type,
                 tool_use_behavior=tool_use_behavior,
+                mcp_timeout_seconds=mcp_timeout_seconds,
+                input_guardrails=input_guardrails,
+                output_guardrails=output_guardrails,
             )
 
     async def run_agent_streamed(
@@ -263,6 +288,9 @@ class OpenAIModule:
             | StopAtTools
             | ToolsToFinalOutputFunction
         ) = "run_llm_again",
+        mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled but no TaskMessage creation.
@@ -289,6 +317,9 @@ class OpenAIModule:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on initial user input.
+            output_guardrails: Optional list of output guardrails to run on final agent output.
 
         Returns:
             RunResultStreaming: The result of the agent run with streaming.
@@ -318,6 +349,9 @@ class OpenAIModule:
             tools=tools,
             output_type=output_type,
             tool_use_behavior=tool_use_behavior,
+            mcp_timeout_seconds=mcp_timeout_seconds,
+            input_guardrails=input_guardrails,
+            output_guardrails=output_guardrails,
         )
 
     async def run_agent_streamed_auto_send(
@@ -344,6 +378,8 @@ class OpenAIModule:
             | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
     ) -> SerializableRunResultStreaming | RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
@@ -364,6 +400,8 @@ class OpenAIModule:
             model: Optional model to use.
             model_settings: Optional model settings.
             tools: Optional list of tools.
+            input_guardrails: Optional list of input guardrails to run on initial user input.
+            output_guardrails: Optional list of output guardrails to run on final agent output.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
             mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
@@ -388,6 +426,8 @@ class OpenAIModule:
                 output_type=output_type,
                 tool_use_behavior=tool_use_behavior,
                 mcp_timeout_seconds=mcp_timeout_seconds,
+                input_guardrails=input_guardrails,
+                output_guardrails=output_guardrails,
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=OpenAIActivityName.RUN_AGENT_STREAMED_AUTO_SEND,
@@ -414,4 +454,6 @@ class OpenAIModule:
                 output_type=output_type,
                 tool_use_behavior=tool_use_behavior,
                 mcp_timeout_seconds=mcp_timeout_seconds,
+                input_guardrails=input_guardrails,
+                output_guardrails=output_guardrails,
             )
