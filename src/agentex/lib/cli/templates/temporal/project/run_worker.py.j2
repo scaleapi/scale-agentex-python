@@ -1,4 +1,7 @@
 import asyncio
+import importlib.util
+import sys
+from pathlib import Path
 
 from agentex.lib.core.temporal.activities import get_all_activities
 from agentex.lib.core.temporal.workers.worker import AgentexWorker
@@ -14,6 +17,29 @@ environment_variables = EnvironmentVariables.refresh()
 logger = make_logger(__name__)
 
 
+def load_custom_activities():
+    """Load custom activities from project/activities.py if it exists"""
+    activities_path = Path(__file__).parent / "activities.py"
+    custom_activities = []
+    
+    if activities_path.exists():
+        logger.info(f"Loading custom activities from {activities_path}")
+        spec = importlib.util.spec_from_file_location("project.activities", activities_path)
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            sys.modules["project.activities"] = module
+            spec.loader.exec_module(module)
+            
+            # Find all activity functions (decorated with @activity.defn)
+            for name in dir(module):
+                obj = getattr(module, name)
+                if callable(obj) and hasattr(obj, "__temporal_activity_definition__"):
+                    custom_activities.append(obj)
+                    logger.info(f"  - Registered custom activity: {name}")
+    
+    return custom_activities
+
+
 async def main():
     # Setup debug mode if enabled
     setup_debug_if_enabled()
@@ -22,13 +48,18 @@ async def main():
     if task_queue_name is None:
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")
 
+    # Load all activities (both core and custom)
+    all_activities = get_all_activities()
+    custom_activities = load_custom_activities()
+    all_activities.extend(custom_activities)
+    
     # Create a worker with automatic tracing
     worker = AgentexWorker(
         task_queue=task_queue_name,
     )
 
     await worker.run(
-        activities=get_all_activities(),
+        activities=all_activities,
         workflow={{ workflow_class }},
     )
 
