@@ -283,6 +283,9 @@ result = await workflow.execute_activity(
     heartbeat_timeout=timedelta(minutes=1),         # Optional: heartbeat monitoring
     retry_policy=RetryPolicy(maximum_attempts=3)    # Optional: retry policy
 )
+
+# Don't forget to register your custom activities in run_worker.py:
+# all_activities = get_all_activities() + [your_custom_activity_function]
 ```
 
 ### Integration with External Services
