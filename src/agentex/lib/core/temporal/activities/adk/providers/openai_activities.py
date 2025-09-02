@@ -3,12 +3,14 @@ import base64
 from collections.abc import Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from enum import Enum
-from typing import Any, Literal, Optional, override
+from typing import Any, Literal, Optional
 
 from pydantic import Field, PrivateAttr
 
 import cloudpickle
 from agents import RunContextWrapper, RunResult, RunResultStreaming
+from agents.guardrail import InputGuardrail, OutputGuardrail
+from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from agents.mcp import MCPServerStdio, MCPServerStdioParams
 from agents.model_settings import ModelSettings as OAIModelSettings
 from agents.tool import FunctionTool as OAIFunctionTool
@@ -16,7 +18,6 @@ from mcp import StdioServerParameters
 from openai.types.responses.response_includable import ResponseIncludable
 from openai.types.shared.reasoning import Reasoning
 from temporalio import activity
-
 from agentex.lib.core.services.adk.providers.openai import OpenAIService
 
 # Local imports
@@ -133,6 +134,150 @@ class FunctionTool(BaseModelWithTraceParams):
         return OAIFunctionTool(**data)
 
 
+class TemporalInputGuardrail(BaseModelWithTraceParams):
+    """Temporal-compatible wrapper for InputGuardrail with function 
+    serialization."""
+    name: str
+    _guardrail_function: Callable = PrivateAttr()
+    guardrail_function_serialized: str = Field(
+        default="",
+        description=(
+            "Serialized guardrail function. Set automatically during initialization. "
+            "Pass `guardrail_function` to the constructor instead."
+        ),
+    )
+
+    def __init__(
+        self,
+        *,
+        guardrail_function: Optional[Callable] = None,
+        **data,
+    ):
+        """Initialize with function serialization support for Temporal."""
+        super().__init__(**data)
+        if not guardrail_function:
+            if not self.guardrail_function_serialized:
+                raise ValueError(
+                    "One of `guardrail_function` or "
+                    "`guardrail_function_serialized` should be set"
+                )
+            else:
+                guardrail_function = self._deserialize_callable(
+                    self.guardrail_function_serialized
+                )
+        else:
+            self.guardrail_function_serialized = self._serialize_callable(
+                guardrail_function
+            )
+        
+        self._guardrail_function = guardrail_function
+
+    @classmethod
+    def _deserialize_callable(cls, serialized: str) -> Callable:
+        encoded = serialized.encode()
+        serialized_bytes = base64.b64decode(encoded)
+        return cloudpickle.loads(serialized_bytes)
+
+    @classmethod
+    def _serialize_callable(cls, func: Callable) -> str:
+        serialized_bytes = cloudpickle.dumps(func)
+        encoded = base64.b64encode(serialized_bytes)
+        return encoded.decode()
+
+    @property
+    def guardrail_function(self) -> Callable:
+        if (self._guardrail_function is None and 
+                self.guardrail_function_serialized):
+            self._guardrail_function = self._deserialize_callable(
+                self.guardrail_function_serialized
+            )
+        return self._guardrail_function
+    
+    @guardrail_function.setter
+    def guardrail_function(self, value: Callable):
+        self.guardrail_function_serialized = self._serialize_callable(value)
+        self._guardrail_function = value
+
+    def to_oai_input_guardrail(self) -> InputGuardrail:
+        """Convert to OpenAI InputGuardrail."""
+        return InputGuardrail(
+            guardrail_function=self.guardrail_function,
+            name=self.name
+        )
+
+
+class TemporalOutputGuardrail(BaseModelWithTraceParams):
+    """Temporal-compatible wrapper for OutputGuardrail with function 
+    serialization."""
+    name: str
+    _guardrail_function: Callable = PrivateAttr()
+    guardrail_function_serialized: str = Field(
+        default="",
+        description=(
+            "Serialized guardrail function. Set automatically during initialization. "
+            "Pass `guardrail_function` to the constructor instead."
+        ),
+    )
+
+    def __init__(
+        self,
+        *,
+        guardrail_function: Optional[Callable] = None,
+        **data,
+    ):
+        """Initialize with function serialization support for Temporal."""
+        super().__init__(**data)
+        if not guardrail_function:
+            if not self.guardrail_function_serialized:
+                raise ValueError(
+                    "One of `guardrail_function` or "
+                    "`guardrail_function_serialized` should be set"
+                )
+            else:
+                guardrail_function = self._deserialize_callable(
+                    self.guardrail_function_serialized
+                )
+        else:
+            self.guardrail_function_serialized = self._serialize_callable(
+                guardrail_function
+            )
+        
+        self._guardrail_function = guardrail_function
+
+    @classmethod
+    def _deserialize_callable(cls, serialized: str) -> Callable:
+        encoded = serialized.encode()
+        serialized_bytes = base64.b64decode(encoded)
+        return cloudpickle.loads(serialized_bytes)
+
+    @classmethod
+    def _serialize_callable(cls, func: Callable) -> str:
+        serialized_bytes = cloudpickle.dumps(func)
+        encoded = base64.b64encode(serialized_bytes)
+        return encoded.decode()
+
+    @property
+    def guardrail_function(self) -> Callable:
+        if (self._guardrail_function is None and 
+                self.guardrail_function_serialized):
+            self._guardrail_function = self._deserialize_callable(
+                self.guardrail_function_serialized
+            )
+        return self._guardrail_function
+    
+    @guardrail_function.setter
+    def guardrail_function(self, value: Callable):
+        self.guardrail_function_serialized = self._serialize_callable(value)
+        self._guardrail_function = value
+
+    def to_oai_output_guardrail(self) -> OutputGuardrail:
+        """Convert to OpenAI OutputGuardrail."""
+        return OutputGuardrail(
+            guardrail_function=self.guardrail_function,
+            name=self.name
+        )
+
+
 class ModelSettings(BaseModelWithTraceParams):
     temperature: float | None = None
     top_p: float | None = None
@@ -172,6 +317,8 @@ class RunAgentParams(BaseModelWithTraceParams):
     output_type: Any = None
     tool_use_behavior: Literal["run_llm_again", "stop_on_first_tool"] = "run_llm_again"
     mcp_timeout_seconds: int | None = None
+    input_guardrails: list[TemporalInputGuardrail] | None = None
+    output_guardrails: list[TemporalOutputGuardrail] | None = None
 
 
 class RunAgentAutoSendParams(RunAgentParams):
@@ -214,6 +361,15 @@ class OpenAIActivities:
     @activity.defn(name=OpenAIActivityName.RUN_AGENT)
     async def run_agent(self, params: RunAgentParams) -> SerializableRunResult:
         """Run an agent without streaming or TaskMessage creation."""
+        # Convert Temporal guardrails to OpenAI guardrails
+        input_guardrails = None
+        if params.input_guardrails:
+            input_guardrails = [g.to_oai_input_guardrail() for g in params.input_guardrails]
+        
+        output_guardrails = None
+        if params.output_guardrails:
+            output_guardrails = [g.to_oai_output_guardrail() for g in params.output_guardrails]
+        
         result = await self._openai_service.run_agent(
             input_list=params.input_list,
             mcp_server_params=params.mcp_server_params,
@@ -228,6 +384,8 @@ class OpenAIActivities:
             tools=params.tools,
             output_type=params.output_type,
             tool_use_behavior=params.tool_use_behavior,
+            input_guardrails=input_guardrails,
+            output_guardrails=output_guardrails,
         )
         return self._to_serializable_run_result(result)
 
@@ -236,46 +394,154 @@ class OpenAIActivities:
         self, params: RunAgentAutoSendParams
     ) -> SerializableRunResult:
         """Run an agent with automatic TaskMessage creation."""
-        result = await self._openai_service.run_agent_auto_send(
-            task_id=params.task_id,
-            input_list=params.input_list,
-            mcp_server_params=params.mcp_server_params,
-            agent_name=params.agent_name,
-            agent_instructions=params.agent_instructions,
-            trace_id=params.trace_id,
-            parent_span_id=params.parent_span_id,
-            handoff_description=params.handoff_description,
-            handoffs=params.handoffs,
-            model=params.model,
-            model_settings=params.model_settings,
-            tools=params.tools,
-            output_type=params.output_type,
-            tool_use_behavior=params.tool_use_behavior,
-        )
-        return self._to_serializable_run_result(result)
+        # Convert Temporal guardrails to OpenAI guardrails
+        input_guardrails = None
+        if params.input_guardrails:
+            input_guardrails = [g.to_oai_input_guardrail() for g in params.input_guardrails]
+        
+        output_guardrails = None
+        if params.output_guardrails:
+            output_guardrails = [g.to_oai_output_guardrail() for g in params.output_guardrails]
+        
+        try:
+            result = await self._openai_service.run_agent_auto_send(
+                task_id=params.task_id,
+                input_list=params.input_list,
+                mcp_server_params=params.mcp_server_params,
+                agent_name=params.agent_name,
+                agent_instructions=params.agent_instructions,
+                trace_id=params.trace_id,
+                parent_span_id=params.parent_span_id,
+                handoff_description=params.handoff_description,
+                handoffs=params.handoffs,
+                model=params.model,
+                model_settings=params.model_settings,
+                tools=params.tools,
+                output_type=params.output_type,
+                tool_use_behavior=params.tool_use_behavior,
+                input_guardrails=input_guardrails,
+                output_guardrails=output_guardrails,
+            )
+            return self._to_serializable_run_result(result)
+        except InputGuardrailTripwireTriggered as e:
+            # Handle guardrail trigger gracefully
+            rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
+            
+            # Try to extract rejection message from the guardrail result
+            if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                    rejection_message = output_info['rejection_message']
+            
+            # Build the final input list with the rejection message
+            final_input_list = list(params.input_list or [])
+            final_input_list.append({
+                "role": "assistant",
+                "content": rejection_message
+            })
+            
+            return SerializableRunResult(
+                final_output=rejection_message,
+                final_input_list=final_input_list
+            )
+        except OutputGuardrailTripwireTriggered as e:
+            # Handle output guardrail trigger gracefully
+            rejection_message = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
+            
+            # Try to extract rejection message from the guardrail result
+            if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                    rejection_message = output_info['rejection_message']
+            
+            # Build the final input list with the rejection message
+            final_input_list = list(params.input_list or [])
+            final_input_list.append({
+                "role": "assistant",
+                "content": rejection_message
+            })
+            
+            return SerializableRunResult(
+                final_output=rejection_message,
+                final_input_list=final_input_list
+            )
 
     @activity.defn(name=OpenAIActivityName.RUN_AGENT_STREAMED_AUTO_SEND)
     async def run_agent_streamed_auto_send(
         self, params: RunAgentStreamedAutoSendParams
     ) -> SerializableRunResultStreaming:
         """Run an agent with streaming and automatic TaskMessage creation."""
-        result = await self._openai_service.run_agent_streamed_auto_send(
-            task_id=params.task_id,
-            input_list=params.input_list,
-            mcp_server_params=params.mcp_server_params,
-            agent_name=params.agent_name,
-            agent_instructions=params.agent_instructions,
-            trace_id=params.trace_id,
-            parent_span_id=params.parent_span_id,
-            handoff_description=params.handoff_description,
-            handoffs=params.handoffs,
-            model=params.model,
-            model_settings=params.model_settings,
-            tools=params.tools,
-            output_type=params.output_type,
-            tool_use_behavior=params.tool_use_behavior,
-        )
-        return self._to_serializable_run_result_streaming(result)
+        # Convert Temporal guardrails to OpenAI guardrails
+        input_guardrails = None
+        if params.input_guardrails:
+            input_guardrails = [g.to_oai_input_guardrail() for g in params.input_guardrails]
+        
+        output_guardrails = None
+        if params.output_guardrails:
+            output_guardrails = [g.to_oai_output_guardrail() for g in params.output_guardrails]
+        
+        try:
+            result = await self._openai_service.run_agent_streamed_auto_send(
+                task_id=params.task_id,
+                input_list=params.input_list,
+                mcp_server_params=params.mcp_server_params,
+                agent_name=params.agent_name,
+                agent_instructions=params.agent_instructions,
+                trace_id=params.trace_id,
+                parent_span_id=params.parent_span_id,
+                handoff_description=params.handoff_description,
+                handoffs=params.handoffs,
+                model=params.model,
+                model_settings=params.model_settings,
+                tools=params.tools,
+                output_type=params.output_type,
+                tool_use_behavior=params.tool_use_behavior,
+                input_guardrails=input_guardrails,
+                output_guardrails=output_guardrails,
+            )
+            return self._to_serializable_run_result_streaming(result)
+        except InputGuardrailTripwireTriggered as e:
+            # Handle guardrail trigger gracefully
+            rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
+            
+            # Try to extract rejection message from the guardrail result
+            if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                    rejection_message = output_info['rejection_message']
+            
+            # Build the final input list with the rejection message
+            final_input_list = list(params.input_list or [])
+            final_input_list.append({
+                "role": "assistant",
+                "content": rejection_message
+            })
+            
+            return SerializableRunResultStreaming(
+                final_output=rejection_message,
+                final_input_list=final_input_list
+            )
+        except OutputGuardrailTripwireTriggered as e:
+            # Handle output guardrail trigger gracefully
+            rejection_message = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
+            
+            # Try to extract rejection message from the guardrail result
+            if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
+                output_info = getattr(e.guardrail_result.output, 'output_info', {})
+                if isinstance(output_info, dict) and 'rejection_message' in output_info:
+                    rejection_message = output_info['rejection_message']
+            
+            # Build the final input list with the rejection message
+            final_input_list = list(params.input_list or [])
+            final_input_list.append({
+                "role": "assistant",
+                "content": rejection_message
+            })
+            
+            return SerializableRunResultStreaming(
+                final_output=rejection_message,
+                final_input_list=final_input_list
+            )
 
     @staticmethod
     def _to_serializable_run_result(result: RunResult) -> SerializableRunResult:
