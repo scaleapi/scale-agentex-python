@@ -1,5 +1,4 @@
 # Standard library imports
-import json
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, Literal
 
@@ -11,7 +10,8 @@ from agents.mcp import MCPServerStdio
 from mcp import StdioServerParameters
 from openai.types.responses import (
     ResponseCompletedEvent,
-    ResponseFunctionToolCall,
+    ResponseFunctionWebSearch,
+    ResponseCodeInterpreterToolCall,
     ResponseOutputItemDoneEvent,
     ResponseTextDeltaEvent,
     ResponseReasoningSummaryTextDeltaEvent,
@@ -85,6 +85,86 @@ class OpenAIService:
         self.streaming_service = streaming_service
         self.tracer = tracer
 
+    def _extract_tool_call_info(
+        self, tool_call_item: Any
+    ) -> tuple[str, str, dict[str, Any]]:
+        """
+        Extract call_id, tool_name, and tool_arguments from a tool call item.
+
+        Args:
+            tool_call_item: The tool call item to process
+
+        Returns:
+            A tuple of (call_id, tool_name, tool_arguments)
+        """
+        # Generic handling for different tool call types
+        # Try 'call_id' first, then 'id', then generate placeholder
+        if hasattr(tool_call_item, 'call_id'):
+            call_id = tool_call_item.call_id
+        elif hasattr(tool_call_item, 'id'):
+            call_id = tool_call_item.id
+        else:
+            call_id = f"unknown_call_{id(tool_call_item)}"
+            logger.warning(
+                f"Warning: Tool call item {type(tool_call_item)} has "
+                f"neither 'call_id' nor 'id' attribute, using placeholder: "
+                f"{call_id}"
+            )
+
+        if isinstance(tool_call_item, ResponseFunctionWebSearch):
+            tool_name = "web_search"
+            tool_arguments = {
+                "action": tool_call_item.action.model_dump(),
+                "status": tool_call_item.status
+            }
+        elif isinstance(tool_call_item, ResponseCodeInterpreterToolCall):
+            tool_name = "code_interpreter"
+            tool_arguments = {
+                "code": tool_call_item.code,
+                "status": tool_call_item.status
+            }
+        else:
+            # Generic handling for any tool call type
+            tool_name = getattr(tool_call_item, 'name', type(tool_call_item).__name__)
+            tool_arguments = tool_call_item.model_dump()
+            
+        return call_id, tool_name, tool_arguments
+
+    def _extract_tool_response_info(
+        self, tool_call_map: dict[str, Any], tool_output_item: Any
+    ) -> tuple[str, str, str]:
+        """
+        Extract call_id, tool_name, and content from a tool output item.
+
+        Args:
+            tool_call_map: Map of call_ids to tool_call items
+            tool_output_item: The tool output item to process
+
+        Returns:
+            A tuple of (call_id, tool_name, content)
+        """
+        # Extract call_id and content from the tool_output_item
+        # Handle both dictionary access and attribute access
+        if hasattr(tool_output_item, 'get') and callable(tool_output_item.get):
+            # Dictionary-like access
+            call_id = tool_output_item["call_id"]
+            content = tool_output_item["output"]
+        else:
+            # Attribute access for structured objects
+            call_id = getattr(tool_output_item, 'call_id', None)
+            content = getattr(tool_output_item, 'output', None)
+
+        # Get the name from the tool call map using generic approach
+        tool_call = tool_call_map[call_id]
+        if hasattr(tool_call, "name"):
+            tool_name = getattr(tool_call, "name")
+        elif hasattr(tool_call, "type"):
+            tool_name = getattr(tool_call, "type")
+        else:
+            tool_name = type(tool_call).__name__
+
+        return call_id, tool_name, content
+
     async def run_agent(
         self,
         input_list: list[dict[str, Any]],
@@ -107,6 +187,7 @@ class OpenAIService:
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
+        max_turns: int | None = None,
     ) -> RunResult:
         """
         Run an agent without streaming or TaskMessage creation.
@@ -131,6 +212,8 @@ class OpenAIService:
                 initial user input.
             output_guardrails: Optional list of output guardrails to run on 
                 final agent output.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
         Returns:
             SerializableRunResult: The result of the agent run.
         """
@@ -152,6 +235,7 @@ class OpenAIService:
                 "tools": tools,
                 "output_type": output_type,
                 "tool_use_behavior": tool_use_behavior,
+                "max_turns": max_turns,
             },
         ) as span:
             heartbeat_if_in_workflow("run agent")
@@ -159,7 +243,9 @@ class OpenAIService:
             async with mcp_server_context(
                 mcp_server_params, mcp_timeout_seconds
             ) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
+                tools = [
+                    tool.to_oai_function_tool()for tool in tools
+                ] if tools else []
                 handoffs = (
                     [Agent(**handoff.model_dump()) for handoff in handoffs]
                     if handoffs
@@ -189,7 +275,10 @@ class OpenAIService:
                 agent = Agent(**agent_kwargs)
 
                 # Run without streaming
-                result = await Runner.run(starting_agent=agent, input=input_list)
+                if max_turns is not None:
+                    result = await Runner.run(starting_agent=agent, input=input_list, max_turns=max_turns)
+                else:
+                    result = await Runner.run(starting_agent=agent, input=input_list)
 
                 if span:
                     span.output = {
@@ -227,6 +316,7 @@ class OpenAIService:
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
+        max_turns: int | None = None,
     ) -> RunResult:
         """
         Run an agent with automatic TaskMessage creation.
@@ -249,6 +339,7 @@ class OpenAIService:
             mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
             input_guardrails: Optional list of input guardrails to run on initial user input.
             output_guardrails: Optional list of output guardrails to run on final agent output.
+            max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
         Returns:
             SerializableRunResult: The result of the agent run.
         """
@@ -276,6 +367,7 @@ class OpenAIService:
                 "tools": tools,
                 "output_type": output_type,
                 "tool_use_behavior": tool_use_behavior,
+                "max_turns": max_turns,
             },
         ) as span:
             heartbeat_if_in_workflow("run agent auto send")
@@ -312,7 +404,10 @@ class OpenAIService:
                 agent = Agent(**agent_kwargs)
 
                 # Run without streaming
-                result = await Runner.run(starting_agent=agent, input=input_list)
+                if max_turns is not None:
+                    result = await Runner.run(starting_agent=agent, input=input_list, max_turns=max_turns)
+                else:
+                    result = await Runner.run(starting_agent=agent, input=input_list)
 
                 if span:
                     span.output = {
@@ -325,7 +420,7 @@ class OpenAIService:
                         "final_output": result.final_output,
                     }
 
-                tool_call_map: dict[str, ResponseFunctionToolCall] = {}
+                tool_call_map: dict[str, Any] = {}
 
                 for item in result.new_items:
                     if item.type == "message_output_item":
@@ -349,13 +444,17 @@ class OpenAIService:
                             )
 
                     elif item.type == "tool_call_item":
-                        tool_call_map[item.raw_item.call_id] = item.raw_item
+                        tool_call_item = item.raw_item
+                        
+                        # Extract tool call information using the helper method
+                        call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
+                        tool_call_map[call_id] = tool_call_item
 
                         tool_request_content = ToolRequestContent(
                             author="agent",
-                            tool_call_id=item.raw_item.call_id,
-                            name=item.raw_item.name,
-                            arguments=json.loads(item.raw_item.arguments),
+                            tool_call_id=call_id,
+                            name=tool_name,
+                            arguments=tool_arguments,
                         )
 
                         # Create tool request using streaming context
@@ -376,11 +475,16 @@ class OpenAIService:
                     elif item.type == "tool_call_output_item":
                         tool_output_item = item.raw_item
 
+                        # Extract tool response information using the helper method
+                        call_id, tool_name, content = self._extract_tool_response_info(
+                            tool_call_map, tool_output_item
+                        )
+
                         tool_response_content = ToolResponseContent(
                             author="agent",
-                            tool_call_id=tool_output_item["call_id"],
-                            name=tool_call_map[tool_output_item["call_id"]].name,
-                            content=tool_output_item["output"],
+                            tool_call_id=call_id,
+                            name=tool_name,
+                            content=content,
                         )
                         # Create tool response using streaming context
                         async with (
@@ -422,6 +526,7 @@ class OpenAIService:
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
+        max_turns: int | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled but no TaskMessage creation.
@@ -446,6 +551,8 @@ class OpenAIService:
                 initial user input.
             output_guardrails: Optional list of output guardrails to run on 
                 final agent output.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
         Returns:
             RunResultStreaming: The result of the agent run with streaming.
         """
@@ -467,6 +574,7 @@ class OpenAIService:
                 "tools": tools,
                 "output_type": output_type,
                 "tool_use_behavior": tool_use_behavior,
+                "max_turns": max_turns,
             },
         ) as span:
             heartbeat_if_in_workflow("run agent streamed")
@@ -503,7 +611,10 @@ class OpenAIService:
                 agent = Agent(**agent_kwargs)
 
                 # Run with streaming (but no TaskMessage creation)
-                result = Runner.run_streamed(starting_agent=agent, input=input_list)
+                if max_turns is not None:
+                    result = Runner.run_streamed(starting_agent=agent, input=input_list, max_turns=max_turns)
+                else:
+                    result = Runner.run_streamed(starting_agent=agent, input=input_list)
 
                 if span:
                     span.output = {
@@ -541,6 +652,7 @@ class OpenAIService:
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
+        max_turns: int | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
@@ -566,6 +678,8 @@ class OpenAIService:
                 initial user input.
             output_guardrails: Optional list of output guardrails to run on 
                 final agent output.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
 
         Returns:
             RunResultStreaming: The result of the agent run with streaming.
@@ -575,7 +689,7 @@ class OpenAIService:
         if self.agentex_client is None:
             raise ValueError("Agentex client must be provided for auto_send methods")
 
-        tool_call_map: dict[str, ResponseFunctionToolCall] = {}
+        tool_call_map: dict[str, Any] = {}
 
         trace = self.tracer.trace(trace_id)
         redacted_params = redact_mcp_server_params(mcp_server_params)
@@ -596,6 +710,7 @@ class OpenAIService:
                 "tools": tools,
                 "output_type": output_type,
                 "tool_use_behavior": tool_use_behavior,
+                "max_turns": max_turns,
             },
         ) as span:
             heartbeat_if_in_workflow("run agent streamed auto send")
@@ -632,7 +747,10 @@ class OpenAIService:
                 agent = Agent(**agent_kwargs)
 
                 # Run with streaming
-                result = Runner.run_streamed(starting_agent=agent, input=input_list)
+                if max_turns is not None:
+                    result = Runner.run_streamed(starting_agent=agent, input=input_list, max_turns=max_turns)
+                else:
+                    result = Runner.run_streamed(starting_agent=agent, input=input_list)
 
                 item_id_to_streaming_context: dict[
                     str, StreamingTaskMessageContext
@@ -649,13 +767,16 @@ class OpenAIService:
                         if event.type == "run_item_stream_event":
                             if event.item.type == "tool_call_item":
                                 tool_call_item = event.item.raw_item
-                                tool_call_map[tool_call_item.call_id] = tool_call_item
+                                
+                                # Extract tool call information using the helper method
+                                call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
+                                tool_call_map[call_id] = tool_call_item
 
                                 tool_request_content = ToolRequestContent(
                                     author="agent",
-                                    tool_call_id=tool_call_item.call_id,
-                                    name=tool_call_item.name,
-                                    arguments=json.loads(tool_call_item.arguments),
+                                    tool_call_id=call_id,
+                                    name=tool_name,
+                                    arguments=tool_arguments,
                                 )
 
                                 # Create tool request using streaming context (immediate completion)
@@ -677,13 +798,16 @@ class OpenAIService:
                             elif event.item.type == "tool_call_output_item":
                                 tool_output_item = event.item.raw_item
 
+                                # Extract tool response information using the helper method
+                                call_id, tool_name, content = self._extract_tool_response_info(
+                                    tool_call_map, tool_output_item
+                                )
+
                                 tool_response_content = ToolResponseContent(
                                     author="agent",
-                                    tool_call_id=tool_output_item["call_id"],
-                                    name=tool_call_map[
-                                        tool_output_item["call_id"]
-                                    ].name,
-                                    content=tool_output_item["output"],
+                                    tool_call_id=call_id,
+                                    name=tool_name,
+                                    content=content,
                                 )
 
                                 # Create tool response using streaming context (immediate completion)
