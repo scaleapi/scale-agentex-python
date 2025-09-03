@@ -74,8 +74,8 @@ class OpenAIExecutionStrategy(AgentExecutionStrategy):
     """OpenAI Agents SDK execution strategy"""
     
     def __init__(self):
-        from agentex.lib.core.services.adk.providers.openai import OpenAIService
-        self.openai_service = OpenAIService()
+        # No dependencies needed - we use OpenAI Agents SDK directly
+        pass
     
     @property
     def platform_name(self) -> str:
@@ -89,43 +89,34 @@ class OpenAIExecutionStrategy(AgentExecutionStrategy):
         trace_id: str = None
     ) -> str:
         """
-        Execute OpenAI agent using direct Agent SDK integration.
+        Execute OpenAI agent using Temporal activity for proper async context.
         
-        This bypasses the existing run_agent_streamed_auto_send activity to use
-        the OpenAI Agents SDK directly for better performance and durability.
+        OpenAI Agents SDK requires full async context which isn't available in 
+        Temporal workflow execution. We need to run it as an activity.
         """
         try:
-            # Import OpenAI Agents SDK
-            from agents import Agent, Runner
+            from temporalio import workflow
             
-            # Create agent from config
-            agent = Agent(**agent_config)
+            # Execute OpenAI agent as a Temporal activity for proper async context
+            logger.debug(f"Executing OpenAI agent activity for task {task_id} with input: {user_input[:100]}...")
             
-            # Execute agent with user input
-            logger.debug(f"Executing OpenAI agent for task {task_id} with input: {user_input[:100]}...")
-            result = await Runner.run(starting_agent=agent, input=user_input)
-            
-            # Extract final output
-            output = result.final_output if hasattr(result, 'final_output') else str(result)
+            result = await workflow.execute_activity(
+                activity="openai_agent_execution",
+                arg={"agent_config": agent_config, "user_input": user_input, "task_id": task_id},
+                start_to_close_timeout=workflow.timedelta(minutes=5),
+            )
             
             logger.debug(f"OpenAI agent execution completed for task {task_id}")
-            return output
+            return result
             
-        except ImportError as e:
-            logger.error(f"OpenAI Agents SDK not available: {e}")
-            raise RuntimeError("OpenAI Agents SDK is required for OpenAI strategy") from e
         except Exception as e:
             logger.error(f"OpenAI agent execution failed for task {task_id}: {e}")
             raise
     
     async def create_agent_from_config(self, config: Dict[str, Any]) -> Any:
         """Create OpenAI Agent instance from configuration"""
-        try:
-            from agents import Agent
-            return Agent(**config)
-        except ImportError as e:
-            logger.error(f"OpenAI Agents SDK not available: {e}")
-            raise RuntimeError("OpenAI Agents SDK is required for OpenAI strategy") from e
+        from agents import Agent
+        return Agent(**config)
     
     def get_worker_config(self, platform_config: Dict[str, Any]) -> Dict[str, Any]:
         """

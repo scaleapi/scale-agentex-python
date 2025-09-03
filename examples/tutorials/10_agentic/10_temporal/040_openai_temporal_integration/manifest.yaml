@@ -30,7 +30,7 @@ build:
 # Only used when running the agent locally
 local_development:
   agent:
-    port: 8000  # Port where your local ACP server is running
+    port: 18000  # Port where your local ACP server is running
     host_address: host.docker.internal  # Host address for Docker networking
 
   # File paths for local development (relative to this manifest.yaml)

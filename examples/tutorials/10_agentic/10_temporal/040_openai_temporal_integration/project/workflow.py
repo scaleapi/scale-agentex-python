@@ -19,6 +19,7 @@ from temporalio import workflow
 
 from agentex.lib.core.temporal.agent_platforms.workflow import OpenAIAgentWorkflow
 from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.types.acp import CreateTaskParams
 from agents import Agent
 
 environment_variables = EnvironmentVariables.refresh()
@@ -35,6 +36,11 @@ class At040OpenAITemporalIntegration(OpenAIAgentWorkflow):
     This replaces the complex manual orchestration with a simple
     agent configuration approach.
     """
+    
+    @workflow.run
+    async def on_task_create(self, params: CreateTaskParams) -> None:
+        """Task creation handler - delegates to platform base class"""
+        await super().on_task_create(params)
     
     async def create_agent(self) -> Agent:
         """

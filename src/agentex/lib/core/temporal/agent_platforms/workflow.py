@@ -24,7 +24,12 @@ class AgentPlatformWorkflow(BaseWorkflow):
     # Set by subclass to specify execution strategy
     execution_strategy: Optional[AgentExecutionStrategy] = None
     
-    def __init__(self, display_name: str):
+    def __init__(self):
+        # Get display name from environment variables like existing workflows
+        from agentex.lib.environment_variables import EnvironmentVariables
+        env_vars = EnvironmentVariables.refresh()
+        display_name = env_vars.AGENT_NAME if env_vars.AGENT_NAME else "Agent Platform Workflow"
+        
         super().__init__(display_name)
         self._agent = None
         self._agent_config = None
@@ -44,9 +49,32 @@ class AgentPlatformWorkflow(BaseWorkflow):
         Extract agent configuration from the created agent.
         
         This can be overridden by subclasses for custom config extraction.
+        Handles serialization of complex types for Temporal activities.
         """
         if self._agent is None:
             return {}
+        
+        # For OpenAI Agents, we need to store the constructor arguments
+        # rather than the agent instance itself
+        if hasattr(self._agent, '__class__') and self._agent.__class__.__name__ == 'Agent':
+            # Extract OpenAI Agent constructor parameters
+            config = {}
+            for attr in ['name', 'model', 'instructions', 'tools', 'handoffs', 'handoff_description']:
+                if hasattr(self._agent, attr):
+                    value = getattr(self._agent, attr)
+                    config[attr] = value
+            
+            # Handle model_settings specially - ensure it's serializable
+            if hasattr(self._agent, 'model_settings') and self._agent.model_settings:
+                model_settings = self._agent.model_settings
+                if hasattr(model_settings, 'model_dump'):
+                    config['model_settings'] = model_settings.model_dump()
+                elif hasattr(model_settings, '__dict__'):
+                    config['model_settings'] = vars(model_settings)
+                else:
+                    config['model_settings'] = model_settings
+            
+            return config
         
         # If agent is already a config dict, return it
         if isinstance(self._agent, dict):
@@ -162,22 +190,27 @@ class AgentPlatformWorkflow(BaseWorkflow):
 class OpenAIAgentWorkflow(AgentPlatformWorkflow):
     """Convenience base class for OpenAI agent workflows"""
     
-    def __init__(self, display_name: str):
-        super().__init__(display_name)
+    def __init__(self):
+        super().__init__()
         self.execution_strategy = AgentPlatformRegistry.get_strategy("openai")
+    
+    @workflow.run
+    async def on_task_create(self, params: CreateTaskParams) -> None:
+        """Task creation handler - delegates to platform base class"""
+        await super().on_task_create(params)
 
 
 class LangChainAgentWorkflow(AgentPlatformWorkflow):
     """Convenience base class for LangChain agent workflows (future)"""
     
-    def __init__(self, display_name: str):
-        super().__init__(display_name)
+    def __init__(self):
+        super().__init__()
         self.execution_strategy = AgentPlatformRegistry.get_strategy("langchain")
 
 
 class CrewAIAgentWorkflow(AgentPlatformWorkflow):
     """Convenience base class for CrewAI agent workflows (future)"""
     
-    def __init__(self, display_name: str):
-        super().__init__(display_name)
+    def __init__(self):
+        super().__init__()
         self.execution_strategy = AgentPlatformRegistry.get_strategy("crewai")

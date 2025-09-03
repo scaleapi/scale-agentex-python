@@ -1,6 +1,6 @@
-# Simplified OpenAI Agent Chat - Agent Platform Integration
+# OpenAI Temporal Integration Tutorial
 
-This tutorial demonstrates the new **Agent Platform Integration** for Agentex that dramatically simplifies agent development while preserving all Agentex infrastructure benefits.
+This tutorial demonstrates the **Agent Platform Integration** for Agentex that provides a streamlined approach to agent development while maintaining full Agentex infrastructure compatibility.
 
 ## Before vs After Comparison
 
@@ -13,31 +13,30 @@ This tutorial demonstrates the new **Agent Platform Integration** for Agentex th
 | **Error handling** | Manual try/catch and retry logic | Built-in recovery |
 | **ACP integration** | Manual message creation/sending | Automatic via bridge |
 
-## Key Benefits
+## Key Features
 
-### 🚀 **Dramatically Reduced Complexity**
-- **90% reduction in code** - from 277 lines to ~30 lines
-- **No manual orchestration** - agent execution is automatically durable
-- **No activity definitions** - tool calls are automatically temporal activities
+### **Reduced Complexity**
+- Simplified codebase: from 277 lines to ~30 lines
+- Automatic agent execution durability
+- Built-in tool call orchestration
 
-### 🔧 **Preserved Agentex Infrastructure**
-- **ACP protocol compatibility** - external clients unchanged
-- **Kubernetes deployment** - same Helm charts and configs
-- **Multi-tenant hosting** - same agent discovery and routing
-- **Authentication & monitoring** - same observability stack
+### **Infrastructure Compatibility**
+- Full ACP protocol compatibility
+- Existing deployment configurations work unchanged
+- Same authentication and monitoring systems
+- Multi-tenant hosting support maintained
 
-### 🎯 **Platform Agnostic Design**
-- **OpenAI Agents SDK** - this tutorial (implemented)
-- **LangChain** - future extension point
-- **CrewAI** - future extension point
-- **Custom frameworks** - extensible via strategy pattern
+### **Platform Extensibility**
+- OpenAI Agents SDK integration (implemented)
+- Extensible architecture for LangChain, CrewAI
+- Strategy pattern for custom frameworks
 
 ## Implementation Details
 
 ### Workflow Definition
 ```python
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
-class SimplifiedOpenAIChatAgent(OpenAIAgentWorkflow):
+class At040OpenAITemporalIntegration(OpenAIAgentWorkflow):
     async def create_agent(self) -> Agent:
         return Agent(
             name="Tool-Enabled Assistant",
@@ -51,41 +50,41 @@ class SimplifiedOpenAIChatAgent(OpenAIAgentWorkflow):
 ```python
 worker = AgentexWorker(
     task_queue=environment_variables.WORKFLOW_TASK_QUEUE,
-    agent_platform="openai",  # Automatic optimization
+    agent_platform="openai",  # Platform optimization
 )
-await worker.run(activities=[], workflow=SimplifiedOpenAIChatAgent)
+await worker.run(activities=[], workflow=At040OpenAITemporalIntegration)
 ```
 
-## Architecture Benefits
+## Technical Architecture
 
-### Automatic Durability
-- **Agent executions** become Temporal activities automatically
-- **Tool calls** are durable with automatic retries
-- **Conversation state** persists across workflow restarts
+### Durability Features
+- Agent executions are automatically temporal activities
+- Tool calls include built-in retry mechanisms
+- Conversation state persists across workflow restarts
 
-### Performance Optimizations  
-- **Activity exclusion** - OpenAI provider activities automatically excluded
-- **Direct SDK integration** - bypasses activity overhead for simple cases
-- **Platform-specific configuration** - optimized worker settings per platform
+### Performance Features
+- Automatic exclusion of unused provider activities
+- Direct SDK integration reduces overhead
+- Platform-specific worker configuration
 
-### Future Extensibility
-- **Strategy pattern** - easy to add new agent platforms
-- **Unified interface** - same workflow pattern across all platforms
-- **Agentex compatibility** - seamless integration with existing infrastructure
+### Extensibility
+- Strategy pattern for adding new agent platforms
+- Consistent workflow interface across platforms
+- Full compatibility with existing Agentex infrastructure
 
 ## Running the Tutorial
 
 1. **Set environment variables:**
    ```bash
-   export WORKFLOW_NAME="simplified-openai-chat"
-   export WORKFLOW_TASK_QUEUE="simplified_openai_chat_queue"
-   export AGENT_NAME="simplified-openai-chat"
+   export WORKFLOW_NAME="at040-openai-temporal-integration"
+   export WORKFLOW_TASK_QUEUE="040_openai_temporal_integration_queue"
+   export AGENT_NAME="at040-openai-temporal-integration"
    export OPENAI_API_KEY="your-openai-api-key"
    ```
 
-2. **Start the worker:**
+2. **Run the agent:**
    ```bash
-   python project/run_worker.py
+   uv run agentex agents run --manifest manifest.yaml
    ```
 
 3. **Test via ACP API:**
@@ -95,29 +94,29 @@ await worker.run(activities=[], workflow=SimplifiedOpenAIChatAgent)
      -d '{
        "method": "task/create",
        "params": {
-         "agent_name": "simplified-openai-chat"
+         "agent_name": "at040-openai-temporal-integration"
        }
      }'
    ```
 
-## Migration Guide
+## Migration from Manual Approach
 
-To migrate from the complex manual approach to this simplified approach:
+To migrate from the manual orchestration pattern (010_agent_chat):
 
-1. **Replace workflow inheritance:**
-   - From: `BaseWorkflow` 
-   - To: `OpenAIAgentWorkflow` (or other platform workflow)
+1. **Update workflow inheritance:**
+   - Change from: `BaseWorkflow` 
+   - Change to: `OpenAIAgentWorkflow`
 
-2. **Replace manual orchestration:**
-   - From: Manual `adk.providers.openai.run_agent_streamed_auto_send()`
-   - To: Simple `create_agent()` implementation
+2. **Replace orchestration code:**
+   - Remove: Manual `adk.providers.openai.run_agent_streamed_auto_send()` calls
+   - Add: `create_agent()` method implementation
 
 3. **Update worker configuration:**
-   - Add: `agent_platform="openai"` parameter
-   - Remove: Manual activity registration
+   - Add: `agent_platform="openai"` parameter to `AgentexWorker`
+   - Activities: Use empty list `[]` for automatic optimization
 
-4. **Remove manual activities:**
-   - Delete: Custom `@activity.defn` wrappers
-   - Keep: Core business logic in simple functions
+4. **Simplify activity management:**
+   - Remove: Custom `@activity.defn` wrapper functions
+   - Retain: Core business logic as regular functions
 
-This approach maintains 100% compatibility with existing Agentex infrastructure while dramatically simplifying development.
+This maintains full compatibility with existing Agentex infrastructure.

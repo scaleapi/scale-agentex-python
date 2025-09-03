@@ -212,6 +212,18 @@ def get_all_activities(sgp_client=None, exclude_platforms=None):
             openai_activities.run_agent_auto_send,
             openai_activities.run_agent_streamed_auto_send,
         ])
+    else:
+        # When excluding OpenAI provider activities, include agent platform activities
+        from agentex.lib.core.temporal.agent_platforms import (
+            openai_agent_execution,
+            langchain_agent_execution,
+            crewai_agent_execution,
+        )
+        activities.extend([
+            openai_agent_execution,
+            langchain_agent_execution,
+            crewai_agent_execution,
+        ])
 
     # SGP activities
     if sgp_client is not None:
