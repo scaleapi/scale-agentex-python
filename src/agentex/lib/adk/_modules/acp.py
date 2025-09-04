@@ -59,6 +59,7 @@ class ACPModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+        request: dict[str, Any] | None = None,
     ) -> Task:
         """
         Create a new task.
@@ -71,6 +72,7 @@ class ACPModule:
             start_to_close_timeout: The start to close timeout for the task.
             heartbeat_timeout: The heartbeat timeout for the task.
             retry_policy: The retry policy for the task.
+            request: Additional request context including headers to forward to the agent.
 
         Returns:
             The task entry.
@@ -85,6 +87,7 @@ class ACPModule:
                     params=params,
                     trace_id=trace_id,
                     parent_span_id=parent_span_id,
+                    request=request,
                 ),
                 response_type=Task,
                 start_to_close_timeout=start_to_close_timeout,
@@ -99,6 +102,7 @@ class ACPModule:
                 params=params,
                 trace_id=trace_id,
                 parent_span_id=parent_span_id,
+                request=request,
             )
 
     async def send_event(
@@ -112,15 +116,22 @@ class ACPModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+        request: dict[str, Any] | None = None,
     ) -> Event:
         """
         Send an event to a task.
 
         Args:
             task_id: The ID of the task to send the event to.
-            data: The data to send to the event.
+            content: The content to send to the event.
             agent_id: The ID of the agent to send the event to.
             agent_name: The name of the agent to send the event to.
+            trace_id: The trace ID for the event.
+            parent_span_id: The parent span ID for the event.
+            start_to_close_timeout: The start to close timeout for the event.
+            heartbeat_timeout: The heartbeat timeout for the event.
+            retry_policy: The retry policy for the event.
+            request: Additional request context including headers to forward to the agent.
 
         Returns:
             The event entry.
@@ -135,6 +146,7 @@ class ACPModule:
                     content=content,
                     trace_id=trace_id,
                     parent_span_id=parent_span_id,
+                    request=request,
                 ),
                 response_type=None,
                 start_to_close_timeout=start_to_close_timeout,
@@ -149,6 +161,7 @@ class ACPModule:
                 content=content,
                 trace_id=trace_id,
                 parent_span_id=parent_span_id,
+                request=request,
             )
 
     async def send_message(
@@ -162,15 +175,22 @@ class ACPModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+        request: dict[str, Any] | None = None,
     ) -> List[TaskMessage]:
         """
         Send a message to a task.
 
         Args:
-            task_id: The ID of the task to send the message to.
             content: The task message content to send to the task.
+            task_id: The ID of the task to send the message to.
             agent_id: The ID of the agent to send the message to.
             agent_name: The name of the agent to send the message to.
+            trace_id: The trace ID for the message.
+            parent_span_id: The parent span ID for the message.
+            start_to_close_timeout: The start to close timeout for the message.
+            heartbeat_timeout: The heartbeat timeout for the message.
+            retry_policy: The retry policy for the message.
+            request: Additional request context including headers to forward to the agent.
 
         Returns:
             The message entry.
@@ -185,6 +205,7 @@ class ACPModule:
                     content=content,
                     trace_id=trace_id,
                     parent_span_id=parent_span_id,
+                    request=request,
                 ),
                 response_type=TaskMessage,
                 start_to_close_timeout=start_to_close_timeout,
@@ -199,6 +220,7 @@ class ACPModule:
                 content=content,
                 trace_id=trace_id,
                 parent_span_id=parent_span_id,
+                request=request,
             )
 
     async def cancel_task(
@@ -212,6 +234,7 @@ class ACPModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+        request: dict[str, Any] | None = None,
     ) -> Task:
         """
         Cancel a task by sending cancel request to the agent that owns the task.
@@ -226,6 +249,7 @@ class ACPModule:
             start_to_close_timeout: The start to close timeout for the task.
             heartbeat_timeout: The heartbeat timeout for the task.
             retry_policy: The retry policy for the task.
+            request: Additional request context including headers to forward to the agent.
 
         Returns:
             The task entry.
@@ -244,6 +268,7 @@ class ACPModule:
                     agent_name=agent_name,
                     trace_id=trace_id,
                     parent_span_id=parent_span_id,
+                    request=request,
                 ),
                 response_type=None,
                 start_to_close_timeout=start_to_close_timeout,
@@ -258,4 +283,5 @@ class ACPModule:
                 agent_name=agent_name,
                 trace_id=trace_id,
                 parent_span_id=parent_span_id,
+                request=request,
             )
