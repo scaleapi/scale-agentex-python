@@ -45,6 +45,8 @@ class EventSendParams(BaseModelWithTraceParams):
 class TaskCancelParams(BaseModelWithTraceParams):
     task_id: str | None = None
     task_name: str | None = None
+    agent_id: str | None = None
+    agent_name: str | None = None
 
 
 class ACPActivities:
@@ -83,4 +85,8 @@ class ACPActivities:
         return await self._acp_service.task_cancel(
             task_id=params.task_id,
             task_name=params.task_name,
+            agent_id=params.agent_id,
+            agent_name=params.agent_name,
+            trace_id=params.trace_id,
+            parent_span_id=params.parent_span_id,
         )
