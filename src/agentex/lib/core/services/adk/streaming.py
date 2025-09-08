@@ -1,20 +1,23 @@
 import json
-from typing import Literal, cast
+from typing import Literal
 
 from agentex import AsyncAgentex
 from agentex.lib.core.adapters.streams.port import StreamRepository
-from agentex.lib.types.task_message_updates import (
+from agentex.types.task_message_update import (
     TaskMessageDelta, 
     TaskMessageUpdate,
-    TextDelta,
-    DataDelta,
-    ToolRequestDelta,
-    ToolResponseDelta,
-    StreamTaskMessage,
     StreamTaskMessageStart,
     StreamTaskMessageDelta,
     StreamTaskMessageFull,
     StreamTaskMessageDone,
+)
+from agentex.types.task_message_delta import (
+    TextDelta,
+    DataDelta,
+    ToolRequestDelta,
+    ToolResponseDelta,
+    ReasoningSummaryDelta,
+    ReasoningContentDelta,
 )
 from agentex.lib.utils.logging import make_logger
 from agentex.types.data_content import DataContent
@@ -25,6 +28,7 @@ from agentex.types.task_message import (
 from agentex.types.text_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
+from agentex.types.reasoning_content import ReasoningContent
 
 logger = make_logger(__name__)
 
@@ -36,7 +40,10 @@ def _get_stream_topic(task_id: str) -> str:
 class DeltaAccumulator:
     def __init__(self):
         self._accumulated_deltas: list[TaskMessageDelta] = []
-        self._delta_type: Literal["text", "data", "tool_request", "tool_response"] | None = None
+        self._delta_type: Literal["text", "data", "tool_request", "tool_response", "reasoning"] | None = None
+        # For reasoning, we need to track both summary and content deltas
+        self._reasoning_summaries: dict[int, str] = {}
+        self._reasoning_contents: dict[int, str] = {}
 
     def add_delta(self, delta: TaskMessageDelta):
         if self._delta_type is None:
@@ -48,15 +55,35 @@ class DeltaAccumulator:
                 self._delta_type = "tool_request"
             elif delta.type == "tool_response":
                 self._delta_type = "tool_response"
+            elif delta.type in ["reasoning_summary", "reasoning_content"]:
+                self._delta_type = "reasoning"
             else:
                 raise ValueError(f"Unknown delta type: {delta.type}")
         else:
-            if self._delta_type != delta.type:
+            # For reasoning, we allow both summary and content deltas
+            if self._delta_type == "reasoning":
+                if delta.type not in ["reasoning_summary", "reasoning_content"]:
+                    raise ValueError(
+                        f"Expected reasoning delta but got: {delta.type}"
+                    )
+            elif self._delta_type != delta.type:
                 raise ValueError(
                     f"Delta type mismatch: {self._delta_type} != {delta.type}"
                 )
 
-        self._accumulated_deltas.append(delta)
+        # Handle reasoning deltas specially
+        if delta.type == "reasoning_summary":
+            if isinstance(delta, ReasoningSummaryDelta):
+                if delta.summary_index not in self._reasoning_summaries:
+                    self._reasoning_summaries[delta.summary_index] = ""
+                self._reasoning_summaries[delta.summary_index] += delta.summary_delta or ""
+        elif delta.type == "reasoning_content":
+            if isinstance(delta, ReasoningContentDelta):
+                if delta.content_index not in self._reasoning_contents:
+                    self._reasoning_contents[delta.content_index] = ""
+                self._reasoning_contents[delta.content_index] += delta.content_delta or ""
+        else:
+            self._accumulated_deltas.append(delta)
 
     def convert_to_content(self) -> TaskMessageContent:
         if self._delta_type == "text":
@@ -107,7 +134,7 @@ class DeltaAccumulator:
             # Type assertion: we know all deltas are ToolResponseDelta when _delta_type is TOOL_RESPONSE
             tool_response_deltas = [delta for delta in self._accumulated_deltas if isinstance(delta, ToolResponseDelta)]
             tool_response_content_str = "".join(
-                [delta.tool_response_delta or "" for delta in tool_response_deltas]
+                [delta.content_delta or "" for delta in tool_response_deltas]
             )
             return ToolResponseContent(
                 author="agent",
@@ -115,6 +142,27 @@ class DeltaAccumulator:
                 name=tool_response_deltas[0].name,
                 content=tool_response_content_str,
             )
+        elif self._delta_type == "reasoning":
+            # Convert accumulated reasoning deltas to ReasoningContent
+            # Sort by index to maintain order
+            summary_list = [self._reasoning_summaries[i] for i in sorted(self._reasoning_summaries.keys()) if self._reasoning_summaries[i]]
+            content_list = [self._reasoning_contents[i] for i in sorted(self._reasoning_contents.keys()) if self._reasoning_contents[i]]
+            
+            # Only return reasoning content if we have non-empty summaries or content
+            if summary_list or content_list:
+                return ReasoningContent(
+                    author="agent",
+                    summary=summary_list,
+                    content=content_list if content_list else None,
+                    type="reasoning",
+                    style="static",
+                )
+            else:
+                # Return empty text content instead of empty reasoning
+                return TextContent(
+                    author="agent",
+                    content="",
+                )
         else:
             raise ValueError(f"Unknown delta type: {self._delta_type}")
 
@@ -154,6 +202,7 @@ class StreamingTaskMessageContext:
         start_event = StreamTaskMessageStart(
             parent_task_message=self.task_message,
             content=self.initial_content,
+            type="start",
         )
         await self._streaming_service.stream_update(start_event)
 
@@ -168,11 +217,19 @@ class StreamingTaskMessageContext:
             return self.task_message  # Already done
 
         # Send the DONE event
-        done_event = StreamTaskMessageDone(parent_task_message=self.task_message)
+        done_event = StreamTaskMessageDone(
+            parent_task_message=self.task_message,
+            type="done",
+        )
         await self._streaming_service.stream_update(done_event)
 
         # Update the task message with the final content
-        if self._delta_accumulator._accumulated_deltas:
+        has_deltas = (
+            self._delta_accumulator._accumulated_deltas or 
+            self._delta_accumulator._reasoning_summaries or 
+            self._delta_accumulator._reasoning_contents
+        )
+        if has_deltas:
             self.task_message.content = self._delta_accumulator.convert_to_content()
 
         await self._agentex_client.messages.update(
@@ -187,8 +244,8 @@ class StreamingTaskMessageContext:
         return self.task_message
 
     async def stream_update(
-        self, update: StreamTaskMessage
-    ) -> StreamTaskMessage | None:
+        self, update: TaskMessageUpdate
+    ) -> TaskMessageUpdate | None:
         """Stream an update to the repository."""
         if self._is_closed:
             raise ValueError("Context is already done")

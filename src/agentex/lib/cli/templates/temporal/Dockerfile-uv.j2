@@ -15,8 +15,10 @@ RUN apt-get update && apt-get install -y \
     gcc \
     cmake \
     netcat-openbsd \
+    nodejs \
+    npm \ 
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/**
 
 # Install tctl (Temporal CLI)
 RUN curl -L https://github.com/temporalio/tctl/releases/download/v1.18.1/tctl_1.18.1_linux_arm64.tar.gz -o /tmp/tctl.tar.gz && \

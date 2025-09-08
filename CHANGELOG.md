@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.4.10 (2025-08-24)
+
+Full Changelog: [v0.4.9...v0.4.10](https://github.com/scaleapi/agentex-python/compare/v0.4.9...v0.4.10)
+
+## 0.4.9 (2025-08-22)
+
+Full Changelog: [v0.4.8...v0.4.9](https://github.com/scaleapi/agentex-python/compare/v0.4.8...v0.4.9)
+
+## 0.4.8 (2025-08-22)
+
+Full Changelog: [v0.4.7...v0.4.8](https://github.com/scaleapi/agentex-python/compare/v0.4.7...v0.4.8)
+
+## 0.4.7 (2025-08-22)
+
+Full Changelog: [v0.4.6...v0.4.7](https://github.com/scaleapi/agentex-python/compare/v0.4.6...v0.4.7)
+
+### Chores
+
+* update github action ([677e95d](https://github.com/scaleapi/agentex-python/commit/677e95de075b7031cfc4971d7d09769daaa5b2af))
+
+## 0.4.6 (2025-08-20)
+
+Full Changelog: [v0.4.5...v0.4.6](https://github.com/scaleapi/agentex-python/compare/v0.4.5...v0.4.6)
+
+### Features
+
+* **api:** api update ([7b4c80a](https://github.com/scaleapi/agentex-python/commit/7b4c80acb502c29df63a3d66a1b29b653d2e3cf5))
+
+
+### Chores
+
+* generate release ([0836e4a](https://github.com/scaleapi/agentex-python/commit/0836e4a632e8f3aa0cd05fc6b61581f8c8be9bcd))
+
+## 0.4.5 (2025-08-20)
+
+Full Changelog: [v0.4.4...v0.4.5](https://github.com/scaleapi/agentex-python/compare/v0.4.4...v0.4.5)
+
+### Features
+
+* **api:** manual updates ([34a53aa](https://github.com/scaleapi/agentex-python/commit/34a53aa28b8f862d74dd1603d92b7dd5dd28ddb1))
+
+
+### Bug Fixes
+
+* enable FunctionTool serialization for Temporal worker nodes ([c9eb040](https://github.com/scaleapi/agentex-python/commit/c9eb04002825195187cd58f34c9185349a63566e))
+* **tools:** handle callable objects in model serialization to facilitate tool calling ([4e9bb87](https://github.com/scaleapi/agentex-python/commit/4e9bb87d7faa2c2e1643893a168f7c6affd2809d))
+
+
+### Chores
+
+* demonstrate FunctionTool use in a (temporal) tutorial ([3a72043](https://github.com/scaleapi/agentex-python/commit/3a7204333c328fab8ba0f1d31fd26994ea176ecf))
+
 ## 0.4.4 (2025-08-17)
 
 Full Changelog: [v0.4.3...v0.4.4](https://github.com/scaleapi/agentex-python/compare/v0.4.3...v0.4.4)
