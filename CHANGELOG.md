@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.12 (2025-09-08)
+
+Full Changelog: [v0.4.11...v0.4.12](https://github.com/scaleapi/agentex-python/compare/v0.4.11...v0.4.12)
+
+### ⚠ BREAKING CHANGES
+
+* task_cancel now requires explicit agent_name/agent_id parameter to identify which agent owns the task being cancelled
+
+### Bug Fixes
+
+* task cancellation architectural bug ([f9a72a9](https://github.com/scaleapi/agentex-python/commit/f9a72a94f96afe86d3cc80f4f85ea368279d4517))
+
 ## 0.4.11 (2025-09-04)
 
 Full Changelog: [v0.4.10...v0.4.11](https://github.com/scaleapi/agentex-python/compare/v0.4.10...v0.4.11)
