@@ -1,3 +1,8 @@
+import inspect
+import json
+import os
+from pathlib import Path
+
 from typing import Literal
 from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
@@ -8,6 +13,7 @@ from agentex.lib.types.fastacp import (
     BaseACPConfig,
     SyncACPConfig,
 )
+from agentex.lib.utils.logging import make_logger
 
 # Add new mappings between ACP types and configs here
 # Add new mappings between ACP types and implementations here
@@ -16,6 +22,7 @@ AGENTIC_ACP_IMPLEMENTATIONS: dict[Literal["temporal", "base"], type[BaseACPServe
     "base": AgenticBaseACP,
 }
 
+logger = make_logger(__name__)
 
 class FastACP:
     """Factory for creating FastACP instances
@@ -52,6 +59,22 @@ class FastACP:
             return implementation_class.create(**kwargs)
 
     @staticmethod
+    def maybe_get_build_info() -> None:
+        """If a build-info.json file is present, load it and set the AGENT_COMMIT and AGENT_CODE_URL environment variables"""
+        acp_root = Path(inspect.stack()[1].filename).resolve().parents[0]
+        build_info_path = acp_root / "build-info.json"
+        if build_info_path.exists():
+            try:
+                with open(build_info_path, "r") as f:
+                    build_info = json.load(f)
+                    if build_info.get("agent_commit"):
+                        os.environ["AGENT_COMMIT"] = build_info.get("agent_commit")
+                    if build_info.get("agent_repo") and build_info.get("agent_path"):
+                        os.environ["AGENT_CODE_URL"] = build_info.get("agent_repo") + "/" + build_info.get("agent_path")
+            except Exception as e:
+                logger.error(f"Error loading build info: {e}")
+
+    @staticmethod
     def create(
         acp_type: Literal["sync", "agentic"], config: BaseACPConfig | None = None, **kwargs
     ) -> BaseACPServer | SyncACP | AgenticBaseACP | TemporalACP:
@@ -63,6 +86,8 @@ class FastACP:
             **kwargs: Additional configuration parameters
         """ 
 
+        FastACP.maybe_get_build_info()
+        
         if acp_type == "sync":
             sync_config = config if isinstance(config, SyncACPConfig) else None
             return FastACP.create_sync_acp(sync_config, **kwargs)

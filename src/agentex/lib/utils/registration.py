@@ -44,6 +44,11 @@ async def register_agent(env_vars: EnvironmentVariables):
     if env_vars.AGENT_ID:
         registration_data["agent_id"] = env_vars.AGENT_ID
 
+    if env_vars.AGENT_COMMIT:
+        registration_data["commit_hash"] = env_vars.AGENT_COMMIT
+    if env_vars.AGENT_CODE_URL:
+        registration_data["code_url"] = env_vars.AGENT_CODE_URL
+
     # Make the registration request
     registration_url = f"{env_vars.AGENTEX_BASE_URL.rstrip('/')}/agents/register"
     # Retry logic with configurable attempts and delay
