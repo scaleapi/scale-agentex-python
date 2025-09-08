@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.4.12 (2025-09-08)
+
+Full Changelog: [v0.4.11...v0.4.12](https://github.com/scaleapi/agentex-python/compare/v0.4.11...v0.4.12)
+
+### ⚠ BREAKING CHANGES
+
+* task_cancel now requires explicit agent_name/agent_id parameter to identify which agent owns the task being cancelled
+
+### Bug Fixes
+
+* task cancellation architectural bug ([f9a72a9](https://github.com/scaleapi/agentex-python/commit/f9a72a94f96afe86d3cc80f4f85ea368279d4517))
+
+## 0.4.11 (2025-09-04)
+
+Full Changelog: [v0.4.10...v0.4.11](https://github.com/scaleapi/agentex-python/compare/v0.4.10...v0.4.11)
+
+### Features
+
+* Guardrail support ([e3e9bf9](https://github.com/scaleapi/agentex-python/commit/e3e9bf9dd6cf16b9a783638690d4a31914be8139))
+* improve future compat with pydantic v3 ([f0d8624](https://github.com/scaleapi/agentex-python/commit/f0d86244065c88bb2777db8fabeb1921e7e01116))
+* multiple guardrails ([ea8f98a](https://github.com/scaleapi/agentex-python/commit/ea8f98a973ba486e854cf14528a88eb73a203cf8))
+* **templates:** add custom activity timeout guidance for temporal agents ([7658256](https://github.com/scaleapi/agentex-python/commit/765825680132677ea0351f2a9410f472ee754906))
+* **types:** replace List[str] with SequenceNotStr in params ([f319781](https://github.com/scaleapi/agentex-python/commit/f3197818637574cd92b2c1f710679155eddf5af7))
+
+
+### Bug Fixes
+
+* Adding new example for guardrails instead of using 10_agentic ([15dc44b](https://github.com/scaleapi/agentex-python/commit/15dc44b333a977564c9974cc089d5ef578840714))
+* avoid newer type syntax ([6b5c82a](https://github.com/scaleapi/agentex-python/commit/6b5c82aab9ebcf755575b641aced2b77a13a71c3))
+
+
+### Chores
+
+* **internal:** add Sequence related utils ([496034d](https://github.com/scaleapi/agentex-python/commit/496034db4d6cba361c1f392a4bb86f6ab057e878))
+* **internal:** change ci workflow machines ([7445d94](https://github.com/scaleapi/agentex-python/commit/7445d94cb860f92911ec97ecd951149557956c6a))
+* **internal:** move mypy configurations to `pyproject.toml` file ([e96cd34](https://github.com/scaleapi/agentex-python/commit/e96cd34629d5ea173446c3184fbfe28bd2b370a0))
+* **internal:** update pyright exclude list ([d952430](https://github.com/scaleapi/agentex-python/commit/d952430ab4cbc41bca06010bbcfea3eeb022073e))
+
 ## 0.4.10 (2025-08-24)
 
 Full Changelog: [v0.4.9...v0.4.10](https://github.com/scaleapi/agentex-python/compare/v0.4.9...v0.4.10)

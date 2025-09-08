@@ -229,9 +229,12 @@ def merge_deployment_configs(
                 all_env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64.value] = encoded_principal
             else:
                 raise DeploymentError(f"Auth principal unable to be encoded for agent_env_config: {agent_env_config}")
-                
+        
+        logger.info(f"Defined agent helm overrides: {agent_env_config.helm_overrides}")
+        logger.info(f"Before-merge helm values: {helm_values}")
         if agent_env_config.helm_overrides:
             _deep_merge(helm_values, agent_env_config.helm_overrides)
+        logger.info(f"After-merge helm values: {helm_values}")
 
     # Set final environment variables
     # Environment variable precedence: manifest -> environments.yaml -> secrets (highest)

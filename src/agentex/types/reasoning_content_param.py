@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 from typing_extensions import Literal, Required, TypedDict
 
+from .._types import SequenceNotStr
 from .message_style import MessageStyle
 from .message_author import MessageAuthor
 
@@ -18,10 +19,10 @@ class ReasoningContentParam(TypedDict, total=False):
     `tool`.
     """
 
-    summary: Required[List[str]]
+    summary: Required[SequenceNotStr[str]]
     """A list of short reasoning summaries"""
 
-    content: Optional[List[str]]
+    content: Optional[SequenceNotStr[str]]
     """The reasoning content or chain-of-thought text"""
 
     style: MessageStyle

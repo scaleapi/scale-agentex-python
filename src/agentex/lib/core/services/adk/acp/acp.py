@@ -180,9 +180,19 @@ class ACPService:
         self,
         task_id: str | None = None,
         task_name: str | None = None,
+        agent_id: str | None = None,
+        agent_name: str | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
-    ) -> Task:
+    ) -> Task:        
+        # Require agent identification
+        if not agent_name and not agent_id:
+            raise ValueError("Either agent_name or agent_id must be provided to identify the agent that owns the task")
+            
+        # Require task identification
+        if not task_name and not task_id:
+            raise ValueError("Either task_name or task_id must be provided to identify the task to cancel")
+        
         trace = self._tracer.trace(trace_id=trace_id)
         async with trace.span(
             parent_id=parent_span_id,
@@ -190,27 +200,32 @@ class ACPService:
             input={
                 "task_id": task_id,
                 "task_name": task_name,
+                "agent_id": agent_id,
+                "agent_name": agent_name,
             },
         ) as span:
             heartbeat_if_in_workflow("task cancel")
+            
+            # Build params for the agent (task identification)
+            params = {}
+            if task_id:
+                params["task_id"] = task_id
             if task_name:
+                params["task_name"] = task_name
+            
+            # Send cancel request to the correct agent
+            if agent_name:
                 json_rpc_response = await self._agentex_client.agents.rpc_by_name(
-                    agent_name=task_name,
+                    agent_name=agent_name,
                     method="task/cancel",
-                    params={
-                        "task_name": task_name,
-                    },
+                    params=params,
                 )
-            elif task_id:
+            else:  # agent_id is provided (validated above)
                 json_rpc_response = await self._agentex_client.agents.rpc(
-                    agent_id=task_id,
+                    agent_id=agent_id,
                     method="task/cancel",
-                    params={
-                        "task_id": task_id,
-                    },
+                    params=params,
                 )
-            else:
-                raise ValueError("Either task_name or task_id must be provided")
 
             task_entry = Task.model_validate(json_rpc_response.result)
             if span:

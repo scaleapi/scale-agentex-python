@@ -205,6 +205,8 @@ class ACPModule:
         self,
         task_id: str | None = None,
         task_name: str | None = None,
+        agent_id: str | None = None,
+        agent_name: str | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=5),
@@ -212,11 +214,13 @@ class ACPModule:
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
     ) -> Task:
         """
-        Cancel a task.
+        Cancel a task by sending cancel request to the agent that owns the task.
 
         Args:
-            task_id: The ID of the task to cancel.
-            task_name: The name of the task to cancel.
+            task_id: ID of the task to cancel.
+            task_name: Name of the task to cancel.
+            agent_id: ID of the agent that owns the task.
+            agent_name: Name of the agent that owns the task.
             trace_id: The trace ID for the task.
             parent_span_id: The parent span ID for the task.
             start_to_close_timeout: The start to close timeout for the task.
@@ -225,6 +229,10 @@ class ACPModule:
 
         Returns:
             The task entry.
+            
+        Raises:
+            ValueError: If neither agent_name nor agent_id is provided,
+                       or if neither task_name nor task_id is provided
         """
         if in_temporal_workflow():
             return await ActivityHelpers.execute_activity(
@@ -232,6 +240,8 @@ class ACPModule:
                 request=TaskCancelParams(
                     task_id=task_id,
                     task_name=task_name,
+                    agent_id=agent_id,
+                    agent_name=agent_name,
                     trace_id=trace_id,
                     parent_span_id=parent_span_id,
                 ),
@@ -244,6 +254,8 @@ class ACPModule:
             return await self._acp_service.task_cancel(
                 task_id=task_id,
                 task_name=task_name,
+                agent_id=agent_id,
+                agent_name=agent_name,
                 trace_id=trace_id,
                 parent_span_id=parent_span_id,
             )

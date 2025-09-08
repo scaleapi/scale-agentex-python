@@ -262,14 +262,30 @@ class MyWorkflow(BaseWorkflow):
 ```
 
 ### Custom Activities
-Add custom activities for external operations:
+Add custom activities for external operations. **Important**: Always specify appropriate timeouts (recommended: 10 minutes):
 
 ```python
 # In project/activities.py
-@activity.defn
+from datetime import timedelta
+from temporalio import activity
+from temporalio.common import RetryPolicy
+
+@activity.defn(name="call_external_api")
 async def call_external_api(data):
     # HTTP requests, database operations, etc.
     pass
+
+# In your workflow, call it with a timeout:
+result = await workflow.execute_activity(
+    "call_external_api",
+    data,
+    start_to_close_timeout=timedelta(minutes=10),  # Recommended: 10 minute timeout
+    heartbeat_timeout=timedelta(minutes=1),         # Optional: heartbeat monitoring
+    retry_policy=RetryPolicy(maximum_attempts=3)    # Optional: retry policy
+)
+
+# Don't forget to register your custom activities in run_worker.py:
+# all_activities = get_all_activities() + [your_custom_activity_function]
 ```
 
 ### Integration with External Services

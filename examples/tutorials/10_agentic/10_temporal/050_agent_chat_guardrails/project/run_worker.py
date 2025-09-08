@@ -6,7 +6,8 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.environment_variables import EnvironmentVariables
 
-from project.workflow import {{ workflow_class }}
+from project.workflow import At050AgentChatGuardrailsWorkflow
+
 
 
 environment_variables = EnvironmentVariables.refresh()
@@ -22,16 +23,14 @@ async def main():
     if task_queue_name is None:
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")
 
-    all_activities = get_all_activities() + []  # add your own activities here
-    
     # Create a worker with automatic tracing
     worker = AgentexWorker(
         task_queue=task_queue_name,
     )
-
+    
     await worker.run(
-        activities=all_activities,
-        workflow={{ workflow_class }},
+        activities=get_all_activities(),
+        workflow=At050AgentChatGuardrailsWorkflow,
     )
 
 if __name__ == "__main__":
