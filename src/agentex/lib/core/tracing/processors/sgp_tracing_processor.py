@@ -82,7 +82,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
     def _add_source_to_span(self, span: Span) -> None:
         if span.data is None:
             span.data = {}
-        span.data["source"] = "agentex"
+        span.data["__source__"] = "agentex"
 
     @override
     async def on_span_start(self, span: Span) -> None:
