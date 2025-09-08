@@ -35,9 +35,7 @@ class EnvVarKeys(str, Enum):
     # Auth Configuration
     AUTH_PRINCIPAL_B64 = "AUTH_PRINCIPAL_B64"
     # Build Information
-    AGENT_COMMIT = "AGENT_COMMIT"
-    # The URL of the agent's source code
-    AGENT_CODE_URL = "AGENT_CODE_URL"
+    BUILD_INFO_PATH = "BUILD_INFO_PATH"
 
 
 class Environment(str, Enum):
@@ -68,8 +66,7 @@ class EnvironmentVariables(BaseModel):
     WORKFLOW_NAME: str | None = None
     AUTH_PRINCIPAL_B64: str | None = None
     # Build Information
-    AGENT_COMMIT: str | None = None
-    AGENT_CODE_URL: str | None = None
+    BUILD_INFO_PATH: str | None = None
 
     @classmethod
     def refresh(cls) -> EnvironmentVariables:

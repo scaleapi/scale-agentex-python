@@ -59,20 +59,12 @@ class FastACP:
             return implementation_class.create(**kwargs)
 
     @staticmethod
-    def maybe_get_build_info() -> None:
-        """If a build-info.json file is present, load it and set the AGENT_COMMIT and AGENT_CODE_URL environment variables"""
-        acp_root = Path(inspect.stack()[1].filename).resolve().parents[0]
+    def locate_build_info_path() -> None:
+        """If a build-info.json file is present, set the BUILD_INFO_PATH environment variable"""
+        acp_root = Path(inspect.stack()[2].filename).resolve().parents[0]
         build_info_path = acp_root / "build-info.json"
         if build_info_path.exists():
-            try:
-                with open(build_info_path, "r") as f:
-                    build_info = json.load(f)
-                    if build_info.get("agent_commit"):
-                        os.environ["AGENT_COMMIT"] = build_info.get("agent_commit")
-                    if build_info.get("agent_repo") and build_info.get("agent_path"):
-                        os.environ["AGENT_CODE_URL"] = build_info.get("agent_repo") + "/" + build_info.get("agent_path")
-            except Exception as e:
-                logger.error(f"Error loading build info: {e}")
+            os.environ["BUILD_INFO_PATH"] = str(build_info_path)
 
     @staticmethod
     def create(
@@ -86,7 +78,7 @@ class FastACP:
             **kwargs: Additional configuration parameters
         """ 
 
-        FastACP.maybe_get_build_info()
+        FastACP.locate_build_info_path()
         
         if acp_type == "sync":
             sync_config = config if isinstance(config, SyncACPConfig) else None
