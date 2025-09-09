@@ -232,7 +232,7 @@ class TasksResource(SyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
     ) -> Stream[object]:
         """
-        Stream message updates for a task by its unique ID.
+        Stream events for a task by its unique ID.
 
         Args:
           extra_headers: Send extra headers
@@ -267,7 +267,7 @@ class TasksResource(SyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
     ) -> Stream[object]:
         """
-        Stream message updates for a task by its unique name.
+        Stream events for a task by its unique name.
 
         Args:
           extra_headers: Send extra headers
@@ -497,7 +497,7 @@ class AsyncTasksResource(AsyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
     ) -> AsyncStream[object]:
         """
-        Stream message updates for a task by its unique ID.
+        Stream events for a task by its unique ID.
 
         Args:
           extra_headers: Send extra headers
@@ -532,7 +532,7 @@ class AsyncTasksResource(AsyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
     ) -> AsyncStream[object]:
         """
-        Stream message updates for a task by its unique name.
+        Stream events for a task by its unique name.
 
         Args:
           extra_headers: Send extra headers
