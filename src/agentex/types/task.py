@@ -22,4 +22,6 @@ class Task(BaseModel):
 
     status_reason: Optional[str] = None
 
+    task_metadata: Optional[Dict[str, object]] = None
+
     updated_at: Optional[datetime] = None
