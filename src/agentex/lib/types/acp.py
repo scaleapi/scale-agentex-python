@@ -25,6 +25,7 @@ class CreateTaskParams(BaseModel):
         agent: The agent that the task was sent to.
         task: The task to be created.
         params: The parameters for the task as inputted by the user.
+        request: Additional request context including headers forwarded to this agent.
     """
 
     agent: Agent = Field(..., description="The agent that the task was sent to")
@@ -32,6 +33,10 @@ class CreateTaskParams(BaseModel):
     params: dict[str, Any] | None = Field(
         None,
         description="The parameters for the task as inputted by the user",
+    )
+    request: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional request context including headers forwarded to this agent",
     )
 
 
@@ -43,6 +48,7 @@ class SendMessageParams(BaseModel):
         task: The task that the message was sent to.
         content: The message that was sent to the agent.
         stream: Whether to stream the message back to the agentex server from the agent.
+        request: Additional request context including headers forwarded to this agent.
     """
 
     agent: Agent = Field(..., description="The agent that the message was sent to")
@@ -54,6 +60,10 @@ class SendMessageParams(BaseModel):
         False,
         description="Whether to stream the message back to the agentex server from the agent",
     )
+    request: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional request context including headers forwarded to this agent",
+    )
 
 
 class SendEventParams(BaseModel):
@@ -63,11 +73,16 @@ class SendEventParams(BaseModel):
         agent: The agent that the event was sent to.
         task: The task that the message was sent to.
         event: The event that was sent to the agent.
+        request: Additional request context including headers forwarded to this agent.
     """
 
     agent: Agent = Field(..., description="The agent that the event was sent to")
     task: Task = Field(..., description="The task that the message was sent to")
     event: Event = Field(..., description="The event that was sent to the agent")
+    request: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional request context including headers forwarded to this agent",
+    )
 
 
 class CancelTaskParams(BaseModel):
@@ -76,10 +91,15 @@ class CancelTaskParams(BaseModel):
     Attributes:
         agent: The agent that the task was sent to.
         task: The task that was cancelled.
+        request: Additional request context including headers forwarded to this agent.
     """
 
     agent: Agent = Field(..., description="The agent that the task was sent to")
     task: Task = Field(..., description="The task that was cancelled")
+    request: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional request context including headers forwarded to this agent",
+    )
 
 
 RPC_SYNC_METHODS = [
