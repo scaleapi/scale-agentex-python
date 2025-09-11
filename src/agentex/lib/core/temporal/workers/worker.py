@@ -103,6 +103,7 @@ class AgentexWorker:
     async def run(
         self,
         activities: list[Callable],
+        *,
         workflow: type,
     ) -> None: ...
     
@@ -110,12 +111,14 @@ class AgentexWorker:
     async def run(
         self,
         activities: list[Callable],
+        *,
         workflows: list[type],
     ) -> None: ...
 
     async def run(
         self,
         activities: list[Callable],
+        *,
         workflow: type | None = None,
         workflows: list[type] | None = None,
     ):
