@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+from datetime import datetime
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
@@ -97,6 +98,7 @@ class BaseACPServer(FastAPI):
     async def _handle_jsonrpc(self, request: Request):
         """Main JSON-RPC endpoint handler"""
         rpc_request = None
+        logger.info(f"[base_acp_server] received request: {datetime.now()}")
         try:
             data = await request.json()
             rpc_request = JSONRPCRequest(**data)

@@ -7,6 +7,7 @@ from typing import AsyncGenerator, Generator, Union, Optional
 from typing_extensions import Literal
 
 import httpx
+from pydantic import ValidationError
 
 from ..types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
 from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
@@ -1073,6 +1074,8 @@ class AsyncAgentsResource(AsyncAPIResource):
           except json.JSONDecodeError:
             # Skip invalid JSON lines
             continue
+          except ValidationError:
+            raise ValueError(f"Invalid SendMessageStreamResponse returned: {line}")
     
     async def send_event(
       self,
