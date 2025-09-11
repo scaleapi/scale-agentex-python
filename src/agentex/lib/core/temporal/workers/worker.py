@@ -133,6 +133,9 @@ class AgentexWorker:
         if debug_enabled:
             logger.info("🐛 [WORKER] Temporal debug mode enabled - deadlock detection disabled")
         
+        if workflow is None and workflows is None:
+            raise ValueError("Either workflow or workflows must be provided")
+        
         worker = Worker(
             client=temporal_client,
             task_queue=self.task_queue,
