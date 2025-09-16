@@ -22,7 +22,7 @@ logger = make_logger(__name__)
 console = Console()
 
 TEMPORAL_WORKER_KEY = "temporal-worker"
-AGENTEX_AGENTS_HELM_CHART_VERSION = "0.1.7-v3-beta"
+AGENTEX_AGENTS_HELM_CHART_VERSION = "0.1.7-v4-beta"
 
 
 class InputDeployOverrides(BaseModel):
