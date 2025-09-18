@@ -8,7 +8,7 @@ from typing_extensions import Literal
 import httpx
 
 from ..types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
-from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
+from .._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
 from .._utils import maybe_transform, async_maybe_transform
 from .._compat import cached_property
 from .._resource import SyncAPIResource, AsyncAPIResource
@@ -56,7 +56,7 @@ class AgentsResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Agent:
         """
         Get an agent by its unique ID.
@@ -83,13 +83,13 @@ class AgentsResource(SyncAPIResource):
     def list(
         self,
         *,
-        task_id: Optional[str] | NotGiven = NOT_GIVEN,
+        task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentListResponse:
         """
         List all registered agents, optionally filtered by query parameters.
@@ -126,7 +126,7 @@ class AgentsResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> DeleteResponse:
         """
         Delete an agent by its unique ID.
@@ -159,7 +159,7 @@ class AgentsResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> DeleteResponse:
         """
         Delete an agent by its unique name.
@@ -192,7 +192,7 @@ class AgentsResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Agent:
         """
         Get an agent by its unique name.
@@ -222,14 +222,14 @@ class AgentsResource(SyncAPIResource):
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
         params: agent_rpc_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        id: Union[int, str, None] | Omit = omit,
+        jsonrpc: Literal["2.0"] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
@@ -270,14 +270,14 @@ class AgentsResource(SyncAPIResource):
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
         params: agent_rpc_by_name_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        id: Union[int, str, None] | Omit = omit,
+        jsonrpc: Literal["2.0"] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique name.
@@ -342,7 +342,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Agent:
         """
         Get an agent by its unique ID.
@@ -369,13 +369,13 @@ class AsyncAgentsResource(AsyncAPIResource):
     async def list(
         self,
         *,
-        task_id: Optional[str] | NotGiven = NOT_GIVEN,
+        task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentListResponse:
         """
         List all registered agents, optionally filtered by query parameters.
@@ -412,7 +412,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> DeleteResponse:
         """
         Delete an agent by its unique ID.
@@ -445,7 +445,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> DeleteResponse:
         """
         Delete an agent by its unique name.
@@ -478,7 +478,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Agent:
         """
         Get an agent by its unique name.
@@ -508,14 +508,14 @@ class AsyncAgentsResource(AsyncAPIResource):
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
         params: agent_rpc_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        id: Union[int, str, None] | Omit = omit,
+        jsonrpc: Literal["2.0"] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
@@ -556,14 +556,14 @@ class AsyncAgentsResource(AsyncAPIResource):
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
         params: agent_rpc_by_name_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        id: Union[int, str, None] | Omit = omit,
+        jsonrpc: Literal["2.0"] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique name.
