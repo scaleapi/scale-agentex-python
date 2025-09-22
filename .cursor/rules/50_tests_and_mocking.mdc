@@ -1,0 +1,16 @@
+---
+description: Testing workflow and mock server details
+globs: "tests/**, scripts/test, scripts/mock"
+alwaysApply: true
+---
+
+Testing:
+
+- Run tests with `rye run pytest` or `./scripts/test`
+- To run a specific test: `rye run pytest path/to/test_file.py::TestClass::test_method -v`
+- A mock server is automatically started for tests on port 4010
+
+When writing tests:
+
+- Prefer deterministic unit tests that do not depend on external services
+- Use the mock server and fixtures provided in the repository

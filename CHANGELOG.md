@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.16 (2025-09-16)
+
+Full Changelog: [v0.4.15...v0.4.16](https://github.com/scaleapi/agentex-python/compare/v0.4.15...v0.4.16)
+
+## 0.4.15 (2025-09-16)
+
+Full Changelog: [v0.4.14...v0.4.15](https://github.com/scaleapi/agentex-python/compare/v0.4.14...v0.4.15)
+
+## 0.4.14 (2025-09-16)
+
+Full Changelog: [v0.4.13...v0.4.14](https://github.com/scaleapi/agentex-python/compare/v0.4.13...v0.4.14)
+
+### Features
+
+* add previous_response_id parameter to OpenAI module ([7a78844](https://github.com/scaleapi/agentex-python/commit/7a78844f9efbfac606c7e52d1f469db0728c9e56))
+
+## 0.4.13 (2025-09-12)
+
+Full Changelog: [v0.4.12...v0.4.13](https://github.com/scaleapi/agentex-python/compare/v0.4.12...v0.4.13)
+
+### Features
+
+* **api:** api update ([0102183](https://github.com/scaleapi/agentex-python/commit/0102183a8f5a23dbdaf905ffbe7ffbcf59bf7b21))
+* **api:** api update ([8a6edb1](https://github.com/scaleapi/agentex-python/commit/8a6edb13046ca24bf6c45fc018e32de498d48869))
+
 ## 0.4.12 (2025-09-08)
 
 Full Changelog: [v0.4.11...v0.4.12](https://github.com/scaleapi/agentex-python/compare/v0.4.11...v0.4.12)

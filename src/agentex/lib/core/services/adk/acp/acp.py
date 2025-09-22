@@ -9,6 +9,10 @@ from agentex.types.task import Task
 from agentex.types.task_message import TaskMessage
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.types.task_message_content_param import TaskMessageContentParam
+from agentex.types.agent_rpc_params import (
+    ParamsCancelTaskRequest as RpcParamsCancelTaskRequest,
+    ParamsSendEventRequest as RpcParamsSendEventRequest,
+)
 
 logger = make_logger(__name__)
 
@@ -30,6 +34,7 @@ class ACPService:
         params: dict[str, Any] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
+        request: dict[str, Any] | None = None,
     ) -> Task:
         trace = self._tracer.trace(trace_id=trace_id)
         async with trace.span(
@@ -43,6 +48,10 @@ class ACPService:
             },
         ) as span:
             heartbeat_if_in_workflow("task create")
+            
+            # Extract headers from request; pass-through to agent
+            extra_headers = request.get("headers") if request else None
+            
             if agent_name:
                 json_rpc_response = await self._agentex_client.agents.rpc_by_name(
                     agent_name=agent_name,
@@ -51,6 +60,7 @@ class ACPService:
                         "name": name,
                         "params": params,
                     },
+                    extra_headers=extra_headers,
                 )
             elif agent_id:
                 json_rpc_response = await self._agentex_client.agents.rpc(
@@ -60,6 +70,7 @@ class ACPService:
                         "name": name,
                         "params": params,
                     },
+                    extra_headers=extra_headers,
                 )
             else:
                 raise ValueError("Either agent_name or agent_id must be provided")
@@ -78,6 +89,7 @@ class ACPService:
         task_name: str | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
+        request: dict[str, Any] | None = None,
     ) -> List[TaskMessage]:
         trace = self._tracer.trace(trace_id=trace_id)
         async with trace.span(
@@ -92,6 +104,10 @@ class ACPService:
             },
         ) as span:
             heartbeat_if_in_workflow("message send")
+            
+            # Extract headers from request; pass-through to agent
+            extra_headers = request.get("headers") if request else None
+            
             if agent_name:
                 json_rpc_response = await self._agentex_client.agents.rpc_by_name(
                     agent_name=agent_name,
@@ -101,6 +117,7 @@ class ACPService:
                         "content": cast(TaskMessageContentParam, content.model_dump()),
                         "stream": False,
                     },
+                    extra_headers=extra_headers,
                 )
             elif agent_id:
                 json_rpc_response = await self._agentex_client.agents.rpc(
@@ -111,12 +128,13 @@ class ACPService:
                         "content": cast(TaskMessageContentParam, content.model_dump()),
                         "stream": False,
                     },
+                    extra_headers=extra_headers,
                 )
             else:
                 raise ValueError("Either agent_name or agent_id must be provided")
 
             task_messages: List[TaskMessage] = []
-            logger.info(f"json_rpc_response: {json_rpc_response}")
+            logger.info("json_rpc_response: %s", json_rpc_response)
             if isinstance(json_rpc_response.result, list):
                 for message in json_rpc_response.result:
                     task_message = TaskMessage.model_validate(message)
@@ -137,6 +155,7 @@ class ACPService:
         task_name: str | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
+        request: dict[str, Any] | None = None,
     ) -> Event:
         trace = self._tracer.trace(trace_id=trace_id)
         async with trace.span(
@@ -146,27 +165,33 @@ class ACPService:
                 "agent_id": agent_id,
                 "agent_name": agent_name,
                 "task_id": task_id,
+                "task_name": task_name,
                 "content": content,
             },
         ) as span:
             heartbeat_if_in_workflow("event send")
+            
+            # Extract headers from request; pass-through to agent
+            extra_headers = request.get("headers") if request else None
+            
+            rpc_event_params: RpcParamsSendEventRequest = {
+                "task_id": task_id,
+                "task_name": task_name,
+                "content": cast(TaskMessageContentParam, content.model_dump()),
+            }
             if agent_name:
                 json_rpc_response = await self._agentex_client.agents.rpc_by_name(
                     agent_name=agent_name,
                     method="event/send",
-                    params={
-                        "task_id": task_id,
-                        "content": cast(TaskMessageContentParam, content.model_dump()),
-                    },
+                    params=rpc_event_params,
+                    extra_headers=extra_headers,
                 )
             elif agent_id:
                 json_rpc_response = await self._agentex_client.agents.rpc(
                     agent_id=agent_id,
                     method="event/send",
-                    params={
-                        "task_id": task_id,
-                        "content": cast(TaskMessageContentParam, content.model_dump()),
-                    },
+                    params=rpc_event_params,
+                    extra_headers=extra_headers,
                 )
             else:
                 raise ValueError("Either agent_name or agent_id must be provided")
@@ -184,7 +209,27 @@ class ACPService:
         agent_name: str | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
-    ) -> Task:        
+        request: dict[str, Any] | None = None,
+    ) -> Task:
+        """
+        Cancel a task by sending cancel request to the agent that owns the task.
+        
+        Args:
+            task_id: ID of the task to cancel (passed to agent in params)
+            task_name: Name of the task to cancel (passed to agent in params)  
+            agent_id: ID of the agent that owns the task
+            agent_name: Name of the agent that owns the task
+            trace_id: Trace ID for tracing
+            parent_span_id: Parent span ID for tracing
+            request: Additional request context including headers to forward to the agent
+            
+        Returns:
+            Task entry representing the cancelled task
+            
+        Raises:
+            ValueError: If neither agent_name nor agent_id is provided,
+                       or if neither task_name nor task_id is provided
+        """
         # Require agent identification
         if not agent_name and not agent_id:
             raise ValueError("Either agent_name or agent_id must be provided to identify the agent that owns the task")
@@ -192,7 +237,6 @@ class ACPService:
         # Require task identification
         if not task_name and not task_id:
             raise ValueError("Either task_name or task_id must be provided to identify the task to cancel")
-        
         trace = self._tracer.trace(trace_id=trace_id)
         async with trace.span(
             parent_id=parent_span_id,
@@ -206,8 +250,11 @@ class ACPService:
         ) as span:
             heartbeat_if_in_workflow("task cancel")
             
+            # Extract headers from request; pass-through to agent
+            extra_headers = request.get("headers") if request else None
+            
             # Build params for the agent (task identification)
-            params = {}
+            params: RpcParamsCancelTaskRequest = {}
             if task_id:
                 params["task_id"] = task_id
             if task_name:
@@ -219,12 +266,15 @@ class ACPService:
                     agent_name=agent_name,
                     method="task/cancel",
                     params=params,
+                    extra_headers=extra_headers,
                 )
             else:  # agent_id is provided (validated above)
+                assert agent_id is not None
                 json_rpc_response = await self._agentex_client.agents.rpc(
                     agent_id=agent_id,
                     method="task/cancel",
                     params=params,
+                    extra_headers=extra_headers,
                 )
 
             task_entry = Task.model_validate(json_rpc_response.result)

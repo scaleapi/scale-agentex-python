@@ -1,6 +1,6 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import Optional
+from typing import Dict, Optional
 from datetime import datetime
 from typing_extensions import Literal
 
@@ -28,6 +28,12 @@ class Agent(BaseModel):
 
     updated_at: datetime
     """The timestamp when the agent was last updated"""
+
+    registered_at: Optional[datetime] = None
+    """The timestamp when the agent was last registered"""
+
+    registration_metadata: Optional[Dict[str, object]] = None
+    """The metadata for the agent's registration."""
 
     status: Optional[Literal["Pending", "Building", "Ready", "Failed", "Unknown"]] = None
     """The status of the action, indicating if it's building, ready, failed, etc."""

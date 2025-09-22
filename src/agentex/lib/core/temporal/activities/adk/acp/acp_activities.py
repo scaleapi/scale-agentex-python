@@ -26,6 +26,7 @@ class TaskCreateParams(BaseModelWithTraceParams):
     agent_id: str | None = None
     agent_name: str | None = None
     params: dict[str, Any] | None = None
+    request: dict[str, Any] | None = None
 
 
 class MessageSendParams(BaseModelWithTraceParams):
@@ -33,6 +34,7 @@ class MessageSendParams(BaseModelWithTraceParams):
     agent_name: str | None = None
     task_id: str | None = None
     content: TaskMessageContent
+    request: dict[str, Any] | None = None
 
 
 class EventSendParams(BaseModelWithTraceParams):
@@ -40,6 +42,7 @@ class EventSendParams(BaseModelWithTraceParams):
     agent_name: str | None = None
     task_id: str | None = None
     content: TaskMessageContent
+    request: dict[str, Any] | None = None
 
 
 class TaskCancelParams(BaseModelWithTraceParams):
@@ -47,6 +50,7 @@ class TaskCancelParams(BaseModelWithTraceParams):
     task_name: str | None = None
     agent_id: str | None = None
     agent_name: str | None = None
+    request: dict[str, Any] | None = None
 
 
 class ACPActivities:
@@ -60,6 +64,9 @@ class ACPActivities:
             agent_id=params.agent_id,
             agent_name=params.agent_name,
             params=params.params,
+            trace_id=params.trace_id,
+            parent_span_id=params.parent_span_id,
+            request=params.request,
         )
 
     @activity.defn(name=ACPActivityName.MESSAGE_SEND)
@@ -69,6 +76,9 @@ class ACPActivities:
             agent_name=params.agent_name,
             task_id=params.task_id,
             content=params.content,
+            trace_id=params.trace_id,
+            parent_span_id=params.parent_span_id,
+            request=params.request,
         )
 
     @activity.defn(name=ACPActivityName.EVENT_SEND)
@@ -78,6 +88,9 @@ class ACPActivities:
             agent_name=params.agent_name,
             task_id=params.task_id,
             content=params.content,
+            trace_id=params.trace_id,
+            parent_span_id=params.parent_span_id,
+            request=params.request,
         )
 
     @activity.defn(name=ACPActivityName.TASK_CANCEL)
@@ -89,4 +102,5 @@ class ACPActivities:
             agent_name=params.agent_name,
             trace_id=params.trace_id,
             parent_span_id=params.parent_span_id,
+            request=params.request,
         )
