@@ -260,8 +260,10 @@ def merge_deployment_configs(
         helm_values["global"]["imagePullSecrets"] = pull_secrets
         helm_values["imagePullSecrets"] = pull_secrets
 
-    # Add dynamic ACP command based on manifest configuration
-    add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
+    # Add dynamic ACP command based on manifest configuration if command is not set in helm overrides
+    helm_overrides_command = agent_env_config and agent_env_config.helm_overrides and "command" in agent_env_config.helm_overrides
+    if not helm_overrides_command:
+        add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
     
     print("Deploying with the following helm values: ", helm_values)
     return helm_values
