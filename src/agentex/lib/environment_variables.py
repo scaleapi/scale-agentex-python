@@ -32,6 +32,8 @@ class EnvVarKeys(str, Enum):
     # Workflow Configuration
     WORKFLOW_NAME = "WORKFLOW_NAME"
     WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
+    # Temporal Worker Configuration
+    HEALTH_CHECK_PORT = "HEALTH_CHECK_PORT"
     # Auth Configuration
     AUTH_PRINCIPAL_B64 = "AUTH_PRINCIPAL_B64"
 
@@ -62,6 +64,9 @@ class EnvironmentVariables(BaseModel):
     # Workflow Configuration
     WORKFLOW_TASK_QUEUE: str | None = None
     WORKFLOW_NAME: str | None = None
+    # Temporal Worker Configuration
+    HEALTH_CHECK_PORT: int = 80
+    # Auth Configuration
     AUTH_PRINCIPAL_B64: str | None = None
 
     @classmethod
