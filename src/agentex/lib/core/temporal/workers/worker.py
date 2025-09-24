@@ -89,7 +89,7 @@ class AgentexWorker:
         task_queue,
         max_workers: int = 10,
         max_concurrent_activities: int = 10,
-        health_check_port: int = int(os.environ.get("HEALTH_CHECK_PORT", "80")),
+        health_check_port: int = int(os.environ.get("HEALTH_CHECK_PORT")),
     ):
         self.task_queue = task_queue
         self.activity_handles = []
