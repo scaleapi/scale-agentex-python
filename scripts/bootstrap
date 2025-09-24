@@ -4,7 +4,7 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-if ! command -v rye >/dev/null 2>&1 && [ -f "Brewfile" ] && [ "$(uname -s)" = "Darwin" ]; then
+if ! command -v uv >/dev/null 2>&1 && [ -f "Brewfile" ] && [ "$(uname -s)" = "Darwin" ]; then
   brew bundle check >/dev/null 2>&1 || {
     echo "==> Installing Homebrew dependencies…"
     brew bundle
@@ -13,7 +13,4 @@ fi
 
 echo "==> Installing Python dependencies…"
 
-# experimental uv support makes installations significantly faster
-rye config --set-bool behavior.use-uv=true
-
-rye sync --all-features
+uv sync --all-extras --group dev

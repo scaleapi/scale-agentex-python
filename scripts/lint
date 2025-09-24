@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "==> Running lints"
-rye run lint
+uv run task lint
 
 echo "==> Making sure it imports"
-rye run python -c 'import agentex'
+uv run python -c 'import agentex'
