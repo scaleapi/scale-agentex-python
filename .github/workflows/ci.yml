@@ -20,17 +20,9 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     steps:
       - uses: actions/checkout@v4
-
-      - uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --all-extras --group dev
-
-      - name: Run lints
-        run: uv run task ci-lint
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras --group dev
+      - run: uv run task ci-lint
 
   build:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
@@ -42,17 +34,9 @@ jobs:
     runs-on: ${{ github.repository == 'stainless-sdks/agentex-sdk-python' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --all-extras --group dev
-
-      - name: Run build
-        run: uv run task ci-build
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --all-extras --group dev
+      - run: uv run task ci-build
 
       - name: Get GitHub OIDC Token
         if: github.repository == 'stainless-sdks/agentex-sdk-python'
@@ -77,13 +61,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Bootstrap
-        run: uv run task bootstrap
-
-      - name: Run tests
-        run: uv run task ci-test
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run task bootstrap
+      - run: uv run task ci-test

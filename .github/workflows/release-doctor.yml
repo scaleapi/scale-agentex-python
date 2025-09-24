@@ -16,6 +16,10 @@ jobs:
 
       - name: Check release environment
         run: |
-          bash ./bin/check-release-environment
+          if [ -z "$PYPI_TOKEN" ]; then
+            echo "Error: The PYPI_TOKEN secret has not been set. Please set it in either this repository's secrets or your organization secrets."
+            exit 1
+          fi
+          echo "The environment is ready to push releases!"
         env:
           PYPI_TOKEN: ${{ secrets.AGENTEX_PYPI_TOKEN || secrets.PYPI_TOKEN }}
