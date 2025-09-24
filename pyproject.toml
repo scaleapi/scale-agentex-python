@@ -33,14 +33,9 @@ dependencies = [
     "mcp[cli]>=1.4.1",
     "scale-gp>=0.1.0a59",
     "openai-agents==0.2.7", # 0.2.3 bug - https://github.com/openai/openai-agents-python/issues/1276
+    "cloudpickle>=3.1.1",
     "tzlocal>=5.3.1",
     "tzdata>=2025.2",
-    "pytest>=8.4.0",
-    "pytest-asyncio>=1.0.0",
-    "scale-gp-beta==0.1.0a20",
-    "ipykernel>=6.29.5",
-    "openai==1.99.9", # anything higher than 1.99.9 breaks litellm - https://github.com/BerriAI/litellm/issues/13711
-    "cloudpickle>=3.1.1",
 ]
 requires-python = ">= 3.12,<4"
 classifiers = [
@@ -78,25 +73,28 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "pyright==1.1.399",
-    "mypy",
-    "respx",
-    "pytest",
-    "pytest-asyncio",
-    "ruff",
-    "time-machine",
-    "nox",
     "dirty-equals>=0.6.0",
-    "importlib-metadata>=6.7.0",
-    "rich>=13.7.1",
-    "nest_asyncio==1.6.0",
-    "pytest-xdist>=3.6.1",
     "debugpy>=1.8.15",
+    "importlib-metadata>=6.7.0",
     "ipywidgets>=8.1.7",
+    "ipykernel>=6.29.5",
+    "mypy",
     "nbstripout>=0.8.1",
-    "yaspin>=3.1.0",
-    "taskipy>=1.12.0",
+    "nest_asyncio==1.6.0",
+    "nox",
+    "openai==1.99.9", # anything higher than 1.99.9 breaks litellm - https://github.com/BerriAI/litellm/issues/13711
     "pre-commit>=3.5.0",
+    "pyright==1.1.399",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-xdist>=3.6.1",
+    "respx",
+    "rich>=13.7.1",
+    "ruff",
+    "scale-gp-beta==0.1.0a20",
+    "taskipy>=1.12.0",
+    "time-machine",
+    "yaspin>=3.1.0",
 ]
 
 [tool.taskipy.tasks]
@@ -124,7 +122,6 @@ test = { cmd = "./scripts/test", help = "Run tests with mock server" }
 mock = { cmd = "./scripts/mock", help = "Start mock API server" }
 
 # === DEVELOPMENT SETUP ===
-bootstrap = { cmd = "uv sync --all-extras --group dev", help = "Set up development environment" }
 setup-pre-commit = { cmd = "pre-commit install", help = "Install pre-commit hooks" }
 
 # === CI-SPECIFIC TASKS ===
