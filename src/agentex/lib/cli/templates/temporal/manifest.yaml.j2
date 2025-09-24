@@ -89,6 +89,10 @@ agent:
         # Convention: <agent_name>_task_queue
         queue_name: {{ queue_name }}
 
+    # Optional: Health check port for temporal worker
+    # Defaults to 80 if not specified
+    # health_check_port: 8080
+
   # Optional: Credentials mapping
   # Maps Kubernetes secrets to environment variables
   # Common credentials include:
