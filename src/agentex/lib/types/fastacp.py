@@ -1,6 +1,7 @@
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from agentex.lib.core.clients.temporal.utils import validate_client_plugins
 
 
 class BaseACPConfig(BaseModel):
@@ -43,12 +44,21 @@ class TemporalACPConfig(AgenticACPConfig):
     Attributes:
         type: The type of ACP implementation
         temporal_address: The address of the temporal server
+        plugins: List of Temporal client plugins
     """
 
     type: Literal["temporal"] = Field(default="temporal", frozen=True)
     temporal_address: str = Field(
         default="temporal-frontend.temporal.svc.cluster.local:7233", frozen=True
     )
+    plugins: list[Any] = Field(default=[], frozen=True)
+    
+    @field_validator("plugins")
+    @classmethod
+    def validate_plugins(cls, v: list[Any]) -> list[Any]:
+        """Validate that all plugins are valid Temporal client plugins."""
+        validate_client_plugins(v)
+        return v
 
 
 class AgenticBaseACPConfig(AgenticACPConfig):
