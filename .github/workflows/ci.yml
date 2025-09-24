@@ -21,19 +21,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-        env:
-          RYE_VERSION: '0.44.0'
-          RYE_INSTALL_OPTION: '--yes'
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
 
       - name: Install dependencies
-        run: rye sync --all-features
+        run: uv sync --all-extras --group dev
 
       - name: Run lints
-        run: ./scripts/lint
+        run: uv run task ci-lint
 
   build:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
@@ -46,19 +43,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-        env:
-          RYE_VERSION: '0.44.0'
-          RYE_INSTALL_OPTION: '--yes'
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
 
       - name: Install dependencies
-        run: rye sync --all-features
+        run: uv sync --all-extras --group dev
 
       - name: Run build
-        run: rye build
+        run: uv run task ci-build
 
       - name: Get GitHub OIDC Token
         if: github.repository == 'stainless-sdks/agentex-sdk-python'
@@ -83,16 +77,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-        env:
-          RYE_VERSION: '0.44.0'
-          RYE_INSTALL_OPTION: '--yes'
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
 
       - name: Bootstrap
-        run: ./scripts/bootstrap
+        run: uv run task bootstrap
 
       - name: Run tests
-        run: ./scripts/test
+        run: uv run task ci-test

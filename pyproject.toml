@@ -96,23 +96,41 @@ dev = [
     "nbstripout>=0.8.1",
     "yaspin>=3.1.0",
     "taskipy>=1.12.0",
+    "pre-commit>=3.5.0",
 ]
 
 [tool.taskipy.tasks]
-format = { cmd = "task format:ruff && task format:docs && task fix:ruff && task format:ruff", help = "Format code with ruff and docs" }
-"format:docs" = { cmd = "python scripts/utils/ruffen-docs.py README.md api.md", help = "Format documentation" }
-"format:ruff" = { cmd = "ruff format", help = "Format code with ruff" }
+# === ATOMIC TASKS (building blocks) ===
+"format-ruff" = { cmd = "ruff format", help = "Format code with ruff" }
+"format-docs" = { cmd = "python scripts/utils/ruffen-docs.py README.md api.md", help = "Format documentation" }
+"check-ruff" = { cmd = "ruff check .", help = "Check code with ruff" }
+"fix-ruff" = { cmd = "ruff check --fix .", help = "Fix ruff issues automatically" }
+"check-types-pyright" = { cmd = "pyright", help = "Run pyright type checker" }
+"check-types-mypy" = { cmd = "mypy .", help = "Run mypy type checker" }
+"check-importable" = { cmd = "python -c 'import agentex'", help = "Check that agentex can be imported" }
 
-lint = { cmd = "task check:ruff && task typecheck && task check:importable", help = "Run all linting checks" }
-"check:ruff" = { cmd = "ruff check .", help = "Check code with ruff" }
-"fix:ruff" = { cmd = "ruff check --fix .", help = "Fix ruff issues automatically" }
+# === COMPOSITE TASKS with hooks ===
+format = { cmd = "task format-ruff", help = "Format code with ruff and docs" }
+post_format = "task format-docs"
 
-"check:importable" = { cmd = "python -c 'import agentex'", help = "Check that agentex can be imported" }
+typecheck = { cmd = "task check-types-pyright", help = "Run type checking" }
+post_typecheck = "task check-types-mypy"
 
-typecheck = { cmd = "task typecheck:pyright && task typecheck:mypy", help = "Run type checking" }
-"typecheck:pyright" = { cmd = "pyright", help = "Run pyright type checker" }
-"typecheck:verify-types" = { cmd = "pyright --verifytypes agentex --ignoreexternal", help = "Verify types" }
-"typecheck:mypy" = { cmd = "mypy .", help = "Run mypy type checker" }
+lint = { cmd = "task check-ruff", help = "Run all linting checks" }
+post_lint = "task typecheck && task check-importable"
+
+# === SCRIPT DELEGATION (complex operations) ===
+bootstrap = { cmd = "./scripts/bootstrap", help = "Set up development environment" }
+test = { cmd = "./scripts/test", help = "Run tests with mock server" }
+mock = { cmd = "./scripts/mock", help = "Start mock API server" }
+
+# === DEVELOPMENT SETUP ===
+setup-pre-commit = { cmd = "pre-commit install", help = "Install pre-commit hooks" }
+
+# === CI-SPECIFIC TASKS ===
+ci-lint = { cmd = "task lint", help = "Run linting for CI" }
+ci-test = { cmd = "task test", help = "Run tests for CI" }
+ci-build = { cmd = "uv build", help = "Build package for CI" }
 
 [tool.hatch.build]
 include = [
