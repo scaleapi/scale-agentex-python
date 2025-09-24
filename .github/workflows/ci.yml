@@ -62,5 +62,5 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v6
-      - run: uv run task bootstrap
+      - run: uv sync --all-extras --group dev
       - run: uv run task ci-test

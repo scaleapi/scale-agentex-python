@@ -6,7 +6,7 @@ We use [UV](https://docs.astral.sh/uv/) for fast, modern Python package manageme
 
 ```sh
 # Setup environment and dependencies
-$ uv run task bootstrap
+$ uv sync --all-extras --group dev
 
 # Install pre-commit hooks
 $ uv run task setup-pre-commit
@@ -122,7 +122,6 @@ $ uv run task --list
 ```
 
 Key tasks:
-- `bootstrap` - Set up development environment
 - `format` - Format code with Ruff and documentation
 - `lint` - Run all checks (Ruff + type checking + import validation)
 - `test` - Run tests with mock server orchestration

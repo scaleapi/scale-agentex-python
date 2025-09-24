@@ -6,8 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Package Management
 - Use `uv` for dependency management
-- Run `uv run task bootstrap` to set up the environment
-- Or use `uv sync --all-extras --group dev` directly
+- Run `uv sync --all-extras --group dev` to set up the environment
 - Run `uv run task setup-pre-commit` to install pre-commit hooks
 
 Both the main repo and individual tutorials use `uv` for consistency.
