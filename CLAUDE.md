@@ -13,14 +13,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Both the main repo and individual tutorials use `uv` for consistency.
 
 #### Testing
-- Run tests: `uv run pytest` or `./scripts/test`
+- Run tests: `uv run task test` (with mock server) or `uv run pytest` (direct)
 - Run specific test: `uv run pytest path/to/test_file.py::TestClass::test_method -v`
 - Mock server is automatically started for tests, runs on port 4010
 
 #### Linting and Formatting
-- Format code: `uv run task format` or `./scripts/format`
+- Format code: `uv run task format`
   * The repository is still in flux, so running format might accidentally change files that aren't part of your scope of changes. So always run `uv run task format` with additional arguments to constrain the formatting to the files that you are modifying.
-- Lint code: `uv run task lint` or `./scripts/lint`
+- Lint code: `uv run task lint`
 - Type check: `uv run task typecheck` (runs both pyright and mypy)
 
 ### Building and Running

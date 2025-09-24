@@ -120,11 +120,11 @@ lint = { cmd = "task check-ruff", help = "Run all linting checks" }
 post_lint = "task typecheck && task check-importable"
 
 # === SCRIPT DELEGATION (complex operations) ===
-bootstrap = { cmd = "./scripts/bootstrap", help = "Set up development environment" }
 test = { cmd = "./scripts/test", help = "Run tests with mock server" }
 mock = { cmd = "./scripts/mock", help = "Start mock API server" }
 
 # === DEVELOPMENT SETUP ===
+bootstrap = { cmd = "uv sync --all-extras --group dev", help = "Set up development environment" }
 setup-pre-commit = { cmd = "pre-commit install", help = "Install pre-commit hooks" }
 
 # === CI-SPECIFIC TASKS ===
