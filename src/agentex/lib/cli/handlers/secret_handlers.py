@@ -131,7 +131,7 @@ def interactive_secret_input(secret_name: str, secret_key: str) -> str:
         return handle_questionary_cancellation(result, "text input")
 
 
-def get_secret(name: str, namespace: str, context: str | None = None) -> dict:
+def get_secret(name: str, namespace: str, context: str | None = None) -> dict[str, Any]:
     """Get details about a secret"""
     v1 = get_k8s_client(context)
 
@@ -173,7 +173,7 @@ def delete_secret(name: str, namespace: str, context: str | None = None) -> None
 
 def get_kubernetes_secrets_by_type(
     namespace: str, context: str | None = None
-) -> dict[str, list[dict]]:
+) -> dict[str, list[dict[str, Any]]]:
     """List metadata about secrets in the namespace"""
     v1 = get_k8s_client(context)
 
