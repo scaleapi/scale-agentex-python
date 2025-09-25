@@ -293,10 +293,10 @@ def deploy(
         except EnvironmentsValidationError as e:
             error_msg = generate_helpful_error_message(e, "Environment validation failed")
             console.print(f"[red]Configuration Error:[/red]\n{error_msg}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
         except Exception as e:
             console.print(f"[red]Error:[/red] Failed to validate configuration: {e}")
-            raise typer.Exit(1)
+            raise typer.Exit(1) from e
 
         # Load manifest for credential validation
         manifest_obj = AgentManifest.from_yaml(str(manifest_path))

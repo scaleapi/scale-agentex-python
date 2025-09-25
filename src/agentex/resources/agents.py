@@ -1081,8 +1081,8 @@ class AsyncAgentsResource(AsyncAPIResource):
           except json.JSONDecodeError:
             # Skip invalid JSON lines
             continue
-          except ValidationError:
-            raise ValueError(f"Invalid SendMessageStreamResponse returned: {line}")
+          except ValidationError as e:
+            raise ValueError(f"Invalid SendMessageStreamResponse returned: {line}") from e
     
     async def send_event(
       self,

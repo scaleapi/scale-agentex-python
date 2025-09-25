@@ -199,19 +199,17 @@ async def handle_task_event_send(params: SendEventParams) -> None:
         logger.error(f"❌ Task cancelled: {e}")
         reset_to_ready = False
     finally:
-        if not reset_to_ready:
-            return
-        
-        # Always set status back to READY when done processing
-        try:
-            await adk.agent_task_tracker.update(
-                tracker_id=tracker.id,
-                status=Status.READY.value,
-                status_reason="Completed event processing - ready for new events"
-            )
-            logger.info(f"🟢 Set status back to READY - agent available for new events")
-        except Exception as e:
-            logger.error(f"❌ Error setting status back to READY: {e}")
+        if reset_to_ready:
+            # Always set status back to READY when done processing
+            try:
+                await adk.agent_task_tracker.update(
+                    tracker_id=tracker.id,
+                    status=Status.READY.value,
+                    status_reason="Completed event processing - ready for new events"
+                )
+                logger.info(f"🟢 Set status back to READY - agent available for new events")
+            except Exception as e:
+                logger.error(f"❌ Error setting status back to READY: {e}")
 
 
 @acp.on_task_cancel
