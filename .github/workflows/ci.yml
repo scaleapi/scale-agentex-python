@@ -20,7 +20,7 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.fork
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: ./.github/actions/setup-uv
       - run: uv sync --all-extras --group dev
       - run: uv run task ci-lint
 
@@ -34,7 +34,7 @@ jobs:
     runs-on: ${{ github.repository == 'stainless-sdks/agentex-sdk-python' && 'depot-ubuntu-24.04' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: ./.github/actions/setup-uv
       - run: uv sync --all-extras --group dev
       - run: uv run task ci-build
 
@@ -61,6 +61,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: ./.github/actions/setup-uv
       - run: uv sync --all-extras --group dev
       - run: uv run task ci-test
