@@ -1,8 +1,7 @@
 import json
-from typing import Any
+from typing import Any, override
 
 import pytest
-from typing import override
 from pydantic import ValidationError
 
 from src.agentex.lib.core.temporal.activities.adk.providers.openai_activities import (  # type: ignore[import-untyped]

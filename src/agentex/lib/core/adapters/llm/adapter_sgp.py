@@ -1,6 +1,6 @@
 import os
-from collections.abc import Generator, AsyncGenerator
 from typing import override
+from collections.abc import Generator, AsyncGenerator
 
 from scale_gp import SGPClient, AsyncSGPClient
 

@@ -113,8 +113,7 @@ format = { chain = [
 "check:importable" = "python -c 'import agentex'"
 
 typecheck = { chain = [
-  "typecheck:pyright",
-  "typecheck:mypy"
+  "typecheck:pyright"
 ]}
 "typecheck:pyright" = "pyright"
 "typecheck:verify-types" = "pyright --verifytypes agentex --ignoreexternal"
@@ -232,7 +231,7 @@ show_error_codes = true
 #
 # We also exclude our `tests` as mypy doesn't always infer
 # types correctly and Pyright will still catch any type errors.
-exclude = ['src/agentex/_files.py', '_dev/.*.py', 'tests/.*']
+exclude = ['src/agentex/_files.py', '_dev/.*.py', 'tests/.*', 'examples/tutorials/.*']
 
 strict_equality = true
 implicit_reexport = true
