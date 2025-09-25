@@ -38,6 +38,8 @@ class TemplatingService:
         Returns:
             The rendered template as a string
         """
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to TemplatingService")
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,

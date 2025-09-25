@@ -32,13 +32,13 @@ class _StubAsyncTracer:
 
 class _StubTracer(_StubAsyncTracer):
     pass
-tracer_stub.AsyncTracer = _StubAsyncTracer
-tracer_stub.Tracer = _StubTracer
+tracer_stub.AsyncTracer = _StubAsyncTracer  # type: ignore[attr-defined]
+tracer_stub.Tracer = _StubTracer  # type: ignore[attr-defined]
 sys.modules["agentex.lib.core.tracing.tracer"] = tracer_stub
 
 tracing_pkg_stub = types.ModuleType("agentex.lib.core.tracing")
-tracing_pkg_stub.AsyncTracer = _StubAsyncTracer
-tracing_pkg_stub.Tracer = _StubTracer
+tracing_pkg_stub.AsyncTracer = _StubAsyncTracer  # type: ignore[attr-defined]
+tracing_pkg_stub.Tracer = _StubTracer  # type: ignore[attr-defined]
 sys.modules["agentex.lib.core.tracing"] = tracing_pkg_stub
 
 from agentex.lib.core.services.adk.acp.acp import ACPService
