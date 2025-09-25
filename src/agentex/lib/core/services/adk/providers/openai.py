@@ -1,51 +1,51 @@
 # Standard library imports
-from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, Literal
+from contextlib import AsyncExitStack, asynccontextmanager
 
+from mcp import StdioServerParameters
 from agents import Agent, Runner, RunResult, RunResultStreaming
+from pydantic import BaseModel
+from agents.mcp import MCPServerStdio
 from agents.agent import StopAtTools, ToolsToFinalOutputFunction
 from agents.guardrail import InputGuardrail, OutputGuardrail
 from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
-from agents.mcp import MCPServerStdio
-from mcp import StdioServerParameters
 from openai.types.responses import (
     ResponseCompletedEvent,
-    ResponseFunctionWebSearch,
-    ResponseCodeInterpreterToolCall,
-    ResponseOutputItemDoneEvent,
     ResponseTextDeltaEvent,
-    ResponseReasoningSummaryTextDeltaEvent,
-    ResponseReasoningSummaryTextDoneEvent,
-    ResponseReasoningTextDeltaEvent,
+    ResponseFunctionWebSearch,
+    ResponseOutputItemDoneEvent,
     ResponseReasoningTextDoneEvent,
+    ResponseCodeInterpreterToolCall,
+    ResponseReasoningTextDeltaEvent,
+    ResponseReasoningSummaryTextDoneEvent,
+    ResponseReasoningSummaryTextDeltaEvent,
 )
-from pydantic import BaseModel
 
 # Local imports
 from agentex import AsyncAgentex
+from agentex.lib.utils import logging
+from agentex.lib.utils.mcp import redact_mcp_server_params
+from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.task_message_delta import (
+    TextDelta,
+    ReasoningContentDelta,
+    ReasoningSummaryDelta,
+)
+from agentex.types.task_message_update import (
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+)
+from agentex.types.task_message_content import (
+    TextContent,
+    ReasoningContent,
+    ToolRequestContent,
+    ToolResponseContent,
+)
 from agentex.lib.core.services.adk.streaming import (
     StreamingService,
     StreamingTaskMessageContext,
 )
-from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
-    StreamTaskMessageFull,
-)
-from agentex.types.task_message_delta import (
-    TextDelta,
-    ReasoningSummaryDelta,
-    ReasoningContentDelta,
-)
-from agentex.types.task_message_content import (
-    ReasoningContent,
-    TextContent,
-    ToolRequestContent,
-    ToolResponseContent,
-)
-from agentex.lib.utils import logging
-from agentex.lib.utils.mcp import redact_mcp_server_params
-from agentex.lib.utils.temporal import heartbeat_if_in_workflow
 
 logger = logging.make_logger(__name__)
 
@@ -147,9 +147,9 @@ class OpenAIService:
         # Get the name from the tool call map using generic approach
         tool_call = tool_call_map[call_id]
         if hasattr(tool_call, "name"):
-            tool_name = getattr(tool_call, "name")
+            tool_name = tool_call.name
         elif hasattr(tool_call, "type"):
-            tool_name = getattr(tool_call, "type")
+            tool_name = tool_call.type
         else:
             tool_name = type(tool_call).__name__
 

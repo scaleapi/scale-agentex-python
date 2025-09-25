@@ -1,8 +1,8 @@
 import httpx
 
 from agentex import AsyncAgentex
-from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.environment_variables import EnvironmentVariables
 
 logger = make_logger(__name__)
 

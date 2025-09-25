@@ -1,15 +1,14 @@
 from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.types.task_message_content import TaskMessageContent
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
-from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
 from agentex.lib.core.services.adk.streaming import (
     StreamingService,
     StreamingTaskMessageContext,
 )
-from agentex.types.task_message_content import TaskMessageContent
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
 
 logger = make_logger(__name__)
 

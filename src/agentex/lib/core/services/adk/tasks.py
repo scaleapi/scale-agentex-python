@@ -1,8 +1,8 @@
 from agentex import AsyncAgentex
-from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task import Task
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
 
 logger = make_logger(__name__)
 

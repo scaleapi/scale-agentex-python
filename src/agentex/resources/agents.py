@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import AsyncGenerator, Generator, Union, Optional
+from typing import Union, Optional, Generator, AsyncGenerator
 from typing_extensions import Literal
 
 import httpx
@@ -22,7 +22,14 @@ from .._response import (
 )
 from ..types.agent import Agent
 from .._base_client import make_request_options
-from ..types.agent_rpc_response import AgentRpcResponse, CancelTaskResponse, CreateTaskResponse, SendEventResponse, SendMessageResponse, SendMessageStreamResponse
+from ..types.agent_rpc_response import (
+    AgentRpcResponse,
+    SendEventResponse,
+    CancelTaskResponse,
+    CreateTaskResponse,
+    SendMessageResponse,
+    SendMessageStreamResponse,
+)
 from ..types.agent_list_response import AgentListResponse
 from ..types.shared.delete_response import DeleteResponse
 

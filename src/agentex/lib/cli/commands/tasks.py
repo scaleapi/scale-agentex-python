@@ -3,8 +3,8 @@ from rich import print_json
 from rich.console import Console
 
 from agentex import Agentex
-from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows
 
 logger = make_logger(__name__)
 console = Console()

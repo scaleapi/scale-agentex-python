@@ -1,28 +1,23 @@
 # Orchestrator Agent - Coordinates the multi-agent content creation workflow
 
+import sys
 import json
+from pathlib import Path
 
 from agentex.lib import adk
-from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
 from agentex.lib.types.fastacp import AgenticACPConfig
-from agentex.lib.types.acp import CancelTaskParams, CreateTaskParams, SendEventParams
-from agentex.types.text_content import TextContent
 from agentex.lib.utils.logging import make_logger
-
-import sys
-from pathlib import Path
+from agentex.types.text_content import TextContent
+from agentex.lib.sdk.fastacp.fastacp import FastACP
 
 # Add the current directory to the Python path to enable imports
 current_dir = Path(__file__).parent
 if str(current_dir) not in sys.path:
     sys.path.append(str(current_dir))
 
-from state_machines.content_workflow import (
-    ContentWorkflowStateMachine, 
-    WorkflowData,
-    ContentWorkflowState
-)
-from models import OrchestratorRequest, CreatorResponse, CriticResponse, FormatterResponse
+from models import CriticResponse, CreatorResponse, FormatterResponse, OrchestratorRequest
+from state_machines.content_workflow import WorkflowData, ContentWorkflowState, ContentWorkflowStateMachine
 
 logger = make_logger(__name__)
 

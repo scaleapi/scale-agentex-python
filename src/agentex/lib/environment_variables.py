@@ -5,9 +5,9 @@ import os
 from enum import Enum
 from pathlib import Path
 
-from agentex.lib.utils.logging import make_logger
 from dotenv import load_dotenv
 
+from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

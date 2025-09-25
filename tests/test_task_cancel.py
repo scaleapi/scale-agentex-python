@@ -1,6 +1,7 @@
 """Tests for task cancellation bug fix."""
 
 import os
+
 import pytest
 
 from agentex import AsyncAgentex

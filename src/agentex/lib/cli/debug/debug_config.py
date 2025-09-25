@@ -4,7 +4,6 @@ Debug configuration models for AgentEx CLI debugging.
 
 import socket
 from enum import Enum
-from typing import Optional
 
 from agentex.lib.utils.model_utils import BaseModel
 

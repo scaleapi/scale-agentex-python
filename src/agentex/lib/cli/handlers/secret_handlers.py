@@ -1,28 +1,19 @@
-import base64
 import json
-from collections import defaultdict
-from pathlib import Path
+import base64
 from typing import Any
+from pathlib import Path
+from collections import defaultdict
 
-import questionary
-import typer
 import yaml
-from kubernetes.client.rest import ApiException
+import typer
+import questionary
 from rich.console import Console
+from kubernetes.client.rest import ApiException
 
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.types.credentials import CredentialMapping
 from agentex.lib.cli.utils.cli_utils import handle_questionary_cancellation
 from agentex.lib.cli.utils.kubectl_utils import get_k8s_client
-from agentex.lib.cli.utils.kubernetes_secrets_utils import (
-    KUBERNETES_SECRET_TO_MANIFEST_KEY,
-    KUBERNETES_SECRET_TYPE_DOCKERCONFIGJSON,
-    KUBERNETES_SECRET_TYPE_OPAQUE,
-    VALID_SECRET_TYPES,
-    create_image_pull_secret_with_data,
-    create_secret_with_data,
-    get_secret_data,
-    update_image_pull_secret_with_data,
-    update_secret_with_data,
-)
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.sdk.config.deployment_config import (
@@ -30,8 +21,17 @@ from agentex.lib.sdk.config.deployment_config import (
     ImagePullSecretConfig,
     InjectedSecretsValues,
 )
-from agentex.lib.types.credentials import CredentialMapping
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.kubernetes_secrets_utils import (
+    VALID_SECRET_TYPES,
+    KUBERNETES_SECRET_TYPE_OPAQUE,
+    KUBERNETES_SECRET_TO_MANIFEST_KEY,
+    KUBERNETES_SECRET_TYPE_DOCKERCONFIGJSON,
+    get_secret_data,
+    create_secret_with_data,
+    update_secret_with_data,
+    create_image_pull_secret_with_data,
+    update_image_pull_secret_with_data,
+)
 
 logger = make_logger(__name__)
 console = Console()

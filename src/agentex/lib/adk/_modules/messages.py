@@ -2,24 +2,23 @@ from datetime import timedelta
 
 from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
-from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
-from agentex.lib.core.services.adk.messages import MessagesService
-from agentex.lib.core.services.adk.streaming import StreamingService
-from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
-from agentex.lib.core.temporal.activities.adk.messages_activities import (
-    CreateMessageParams,
-    CreateMessagesBatchParams,
-    ListMessagesParams,
-    MessagesActivityName,
-    UpdateMessageParams,
-    UpdateMessagesBatchParams,
-)
-from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.types.task_message import TaskMessage, TaskMessageContent
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.types.task_message import TaskMessage, TaskMessageContent
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.services.adk.messages import MessagesService
+from agentex.lib.core.services.adk.streaming import StreamingService
+from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
+from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
+from agentex.lib.core.temporal.activities.adk.messages_activities import (
+    ListMessagesParams,
+    CreateMessageParams,
+    UpdateMessageParams,
+    MessagesActivityName,
+    CreateMessagesBatchParams,
+    UpdateMessagesBatchParams,
+)
 
 logger = make_logger(__name__)
 

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from python_on_whales import DockerException, docker
 from rich.console import Console
+from python_on_whales import DockerException, docker
 
-from agentex.lib.cli.handlers.run_handlers import RunError
-from agentex.lib.cli.handlers.run_handlers import run_agent as _run_agent
 from agentex.lib.cli.debug import DebugConfig
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.handlers.run_handlers import RunError, run_agent as _run_agent
+from agentex.lib.sdk.config.agent_manifest import AgentManifest
 
 logger = make_logger(__name__)
 console = Console()
@@ -129,9 +128,9 @@ def build_agent(
 
 def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
     """Run an agent locally from the given manifest"""
-    import asyncio
-    import signal
     import sys
+    import signal
+    import asyncio
 
     # Flag to track if we're shutting down
     shutting_down = False

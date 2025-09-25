@@ -1,6 +1,7 @@
 import json
-import pytest
 from typing import Any
+
+import pytest
 
 from src.agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
     FunctionTool,

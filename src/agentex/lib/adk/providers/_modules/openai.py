@@ -1,34 +1,33 @@
-from datetime import timedelta
 from typing import Any, Literal
+from datetime import timedelta
 
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from mcp import StdioServerParameters
 from agents import Agent, RunResult, RunResultStreaming
+from agents.tool import Tool
 from agents.agent import StopAtTools, ToolsToFinalOutputFunction
 from agents.guardrail import InputGuardrail, OutputGuardrail
+from temporalio.common import RetryPolicy
 from agents.agent_output import AgentOutputSchemaBase
 from agents.model_settings import ModelSettings
-from agents.tool import Tool
-from mcp import StdioServerParameters
-from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
-from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
-from agentex.lib.core.services.adk.providers.openai import OpenAIService
-from agentex.lib.core.services.adk.streaming import StreamingService
-from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
-from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
-    OpenAIActivityName,
-    RunAgentAutoSendParams,
-    RunAgentParams,
-    RunAgentStreamedAutoSendParams,
-)
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.temporal import in_temporal_workflow
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.types.agent_results import (
     SerializableRunResult,
     SerializableRunResultStreaming,
 )
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.services.adk.streaming import StreamingService
+from agentex.lib.core.services.adk.providers.openai import OpenAIService
+from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
+from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
+from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+    RunAgentParams,
+    OpenAIActivityName,
+    RunAgentAutoSendParams,
+    RunAgentStreamedAutoSendParams,
+)
 
 logger = make_logger(__name__)
 

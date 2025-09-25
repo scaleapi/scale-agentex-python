@@ -3,10 +3,11 @@
 Simple script to test agent RPC endpoints using the actual schemas.
 """
 
-import httpx
 import json
 import uuid
 import asyncio
+
+import httpx
 
 # Configuration
 BASE_URL = "http://localhost:5003"

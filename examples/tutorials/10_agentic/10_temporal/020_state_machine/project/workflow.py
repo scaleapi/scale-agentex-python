@@ -4,15 +4,14 @@ from typing import override
 from temporalio import workflow
 
 from agentex.lib import adk
-from agentex.lib.types.acp import CreateTaskParams, SendEventParams
-from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
-from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.types.acp import SendEventParams, CreateTaskParams
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.sdk.state_machine.state import State
-
-from project.state_machines.deep_research import DeepResearchStateMachine, DeepResearchState, DeepResearchData
+from project.state_machines.deep_research import DeepResearchData, DeepResearchState, DeepResearchStateMachine
+from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from project.workflows.deep_research.clarify_user_query import ClarifyUserQueryWorkflow
 from project.workflows.deep_research.waiting_for_user_input import WaitingForUserInputWorkflow
 from project.workflows.deep_research.performing_deep_research import PerformingDeepResearchWorkflow

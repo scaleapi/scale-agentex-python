@@ -2,19 +2,18 @@ from datetime import timedelta
 
 from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
-from agentex.lib.core.services.adk.events import EventsService
-from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
-from agentex.lib.core.temporal.activities.adk.events_activities import (
-    EventsActivityName,
-    GetEventParams,
-    ListEventsParams,
-)
-from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.event import Event
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.core.services.adk.events import EventsService
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
+from agentex.lib.core.temporal.activities.adk.events_activities import (
+    GetEventParams,
+    ListEventsParams,
+    EventsActivityName,
+)
 
 logger = make_logger(__name__)
 

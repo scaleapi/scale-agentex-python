@@ -4,12 +4,12 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 from agentex.lib.types.acp import (
-    CancelTaskParams,
     RPCMethod,
     SendEventParams,
+    CancelTaskParams,
 )
+from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 
 
 class TestBaseACPServerInitialization:

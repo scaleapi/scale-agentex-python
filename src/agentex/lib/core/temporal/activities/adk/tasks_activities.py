@@ -2,10 +2,10 @@ from enum import Enum
 
 from temporalio import activity
 
-from agentex.lib.core.services.adk.tasks import TasksService
 from agentex.types.task import Task
 from agentex.lib.types.tracing import BaseModelWithTraceParams
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.services.adk.tasks import TasksService
 
 logger = make_logger(__name__)
 

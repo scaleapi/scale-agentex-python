@@ -1,6 +1,6 @@
 from temporalio.client import Client
+from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
 #     def default(self, o: Any) -> Any:

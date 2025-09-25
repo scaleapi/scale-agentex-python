@@ -3,17 +3,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+from agentex.lib.types.fastacp import (
+    SyncACPConfig,
+    AgenticACPConfig,
+    TemporalACPConfig,
+    AgenticBaseACPConfig,
+)
 from agentex.lib.sdk.fastacp.fastacp import FastACP
-from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
 from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
-from agentex.lib.types.fastacp import (
-    AgenticACPConfig,
-    AgenticBaseACPConfig,
-    SyncACPConfig,
-    TemporalACPConfig,
-)
+from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
 
 
 class TestFastACPInitialization:

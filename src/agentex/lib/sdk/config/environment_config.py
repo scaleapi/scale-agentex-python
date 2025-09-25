@@ -7,11 +7,11 @@ configurations that are separate from the main manifest.yaml file.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict, override
+from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, BaseModel, field_validator
 
 from agentex.lib.utils.model_utils import BaseModel as UtilsBaseModel
 

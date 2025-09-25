@@ -1,17 +1,17 @@
 from typing import override
 
 import scale_gp_beta.lib.tracing as tracing
-from scale_gp_beta import AsyncSGPClient, SGPClient
+from scale_gp_beta import SGPClient, AsyncSGPClient
 from scale_gp_beta.lib.tracing import create_span, flush_queue
 from scale_gp_beta.lib.tracing.span import Span as SGPSpan
 
-from agentex.lib.core.tracing.processors.tracing_processor_interface import (
-    AsyncTracingProcessor,
-    SyncTracingProcessor,
-)
 from agentex.types.span import Span
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.tracing.processors.tracing_processor_interface import (
+    SyncTracingProcessor,
+    AsyncTracingProcessor,
+)
 
 logger = make_logger(__name__)
 

@@ -1,8 +1,9 @@
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
-from agentex.lib.sdk.state_machine.state_workflow import StateWorkflow
 from agentex.lib.utils.logging import make_logger
-from typing import TYPE_CHECKING
+from agentex.lib.sdk.state_machine.state_workflow import StateWorkflow
 
 if TYPE_CHECKING:
     from agentex.lib.sdk.state_machine import StateMachine

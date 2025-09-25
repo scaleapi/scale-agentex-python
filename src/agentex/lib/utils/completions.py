@@ -1,12 +1,12 @@
 from copy import deepcopy
-from functools import reduce, singledispatch
 from typing import Any
+from functools import reduce, singledispatch
 
 from agentex.lib.types.llm_messages import (
-    Choice,
-    Completion,
     Delta,
+    Choice,
     ToolCall,
+    Completion,
     ToolCallRequest,
 )
 

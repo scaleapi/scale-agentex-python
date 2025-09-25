@@ -1,10 +1,10 @@
 import os
 import re
-from pathlib import Path
 from typing import Any, TypeVar
+from pathlib import Path
 
 import yaml
-from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateError
+from jinja2 import BaseLoader, Environment, TemplateError, StrictUndefined
 
 T = TypeVar("T")
 

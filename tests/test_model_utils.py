@@ -1,8 +1,9 @@
 import json
 from datetime import datetime
 
-from agentex.lib.utils.model_utils import recursive_model_dump
 from pydantic import BaseModel
+
+from agentex.lib.utils.model_utils import recursive_model_dump
 
 
 class SampleModel(BaseModel):

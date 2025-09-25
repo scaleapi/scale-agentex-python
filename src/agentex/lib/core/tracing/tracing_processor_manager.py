@@ -1,18 +1,18 @@
 from threading import Lock
 
-from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
-    AgentexAsyncTracingProcessor,
-    AgentexSyncTracingProcessor,
-)
+from agentex.lib.types.tracing import TracingProcessorConfig, AgentexTracingProcessorConfig
 from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
-    SGPAsyncTracingProcessor,
     SGPSyncTracingProcessor,
+    SGPAsyncTracingProcessor,
+)
+from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
+    AgentexSyncTracingProcessor,
+    AgentexAsyncTracingProcessor,
 )
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
-    AsyncTracingProcessor,
     SyncTracingProcessor,
+    AsyncTracingProcessor,
 )
-from agentex.lib.types.tracing import AgentexTracingProcessorConfig, TracingProcessorConfig
 
 
 class TracingProcessorManager:

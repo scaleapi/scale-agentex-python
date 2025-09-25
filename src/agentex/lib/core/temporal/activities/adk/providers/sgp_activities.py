@@ -2,10 +2,10 @@ from enum import Enum
 
 from temporalio import activity
 
-from agentex.lib.core.services.adk.providers.sgp import SGPService
 from agentex.lib.types.files import FileContentResponse
 from agentex.lib.types.tracing import BaseModelWithTraceParams
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.services.adk.providers.sgp import SGPService
 
 logger = make_logger(__name__)
 

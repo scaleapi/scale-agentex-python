@@ -6,26 +6,25 @@ to new streaming messages, handling mid-stream connections gracefully.
 """
 
 import json
-from datetime import datetime, timezone
 from typing import List, Optional
+from datetime import datetime, timezone
 
+from yaspin import yaspin
+from rich.panel import Panel
 from yaspin.core import Yaspin
+from rich.console import Console
+from rich.markdown import Markdown
 
 from agentex import Agentex
-from agentex.types import Task, TaskMessage, TextContent, ToolRequestContent, ToolResponseContent, ReasoningContent
+from agentex.types import Task, TaskMessage, TextContent, ReasoningContent, ToolRequestContent, ToolResponseContent
+from agentex.types.text_delta import TextDelta
 from agentex.types.task_message_update import (
     TaskMessageUpdate,
-    StreamTaskMessageStart,
-    StreamTaskMessageDelta,
+    StreamTaskMessageDone,
     StreamTaskMessageFull,
-    StreamTaskMessageDone
+    StreamTaskMessageDelta,
+    StreamTaskMessageStart,
 )
-from agentex.types.text_delta import TextDelta
-
-from rich.console import Console
-from rich.panel import Panel
-from rich.markdown import Markdown
-from yaspin import yaspin
 
 
 def print_task_message(

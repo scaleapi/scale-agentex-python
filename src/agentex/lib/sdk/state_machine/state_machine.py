@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
 from agentex.lib import adk
+from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.sdk.state_machine.state import State
 from agentex.lib.sdk.state_machine.state_workflow import StateWorkflow
-from agentex.lib.utils.model_utils import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 

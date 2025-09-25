@@ -1,13 +1,13 @@
 from typing import Any, Dict, override
 
-from agentex import Agentex, AsyncAgentex
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
-from agentex.lib.core.tracing.processors.tracing_processor_interface import (
-    AsyncTracingProcessor,
-    SyncTracingProcessor,
-)
+from agentex import Agentex
 from agentex.types.span import Span
 from agentex.lib.types.tracing import AgentexTracingProcessorConfig
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.tracing.processors.tracing_processor_interface import (
+    SyncTracingProcessor,
+    AsyncTracingProcessor,
+)
 
 
 class AgentexSyncTracingProcessor(SyncTracingProcessor):

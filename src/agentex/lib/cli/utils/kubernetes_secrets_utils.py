@@ -1,11 +1,11 @@
 import base64
 
 from kubernetes import client
-from kubernetes.client.rest import ApiException
 from rich.console import Console
+from kubernetes.client.rest import ApiException
 
-from agentex.lib.cli.utils.kubectl_utils import get_k8s_client
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.kubectl_utils import get_k8s_client
 
 logger = make_logger(__name__)
 console = Console()

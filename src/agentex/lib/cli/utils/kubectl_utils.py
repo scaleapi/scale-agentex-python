@@ -1,11 +1,11 @@
 import subprocess
 
 from kubernetes import client, config
-from kubernetes.client.rest import ApiException
 from rich.console import Console
+from kubernetes.client.rest import ApiException
 
-from agentex.lib.cli.utils.exceptions import DeploymentError
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.exceptions import DeploymentError
 
 logger = make_logger(__name__)
 console = Console()

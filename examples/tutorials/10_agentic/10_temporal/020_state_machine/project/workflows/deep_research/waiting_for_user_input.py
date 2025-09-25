@@ -1,8 +1,10 @@
 from typing import override
-from agentex.lib.sdk.state_machine import StateWorkflow, StateMachine
-from agentex.lib.utils.logging import make_logger
+
 from temporalio import workflow
 from project.state_machines.deep_research import DeepResearchData, DeepResearchState
+
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.sdk.state_machine import StateMachine, StateWorkflow
 
 logger = make_logger(__name__)
 
