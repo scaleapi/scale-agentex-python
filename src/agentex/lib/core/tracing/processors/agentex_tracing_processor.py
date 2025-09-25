@@ -11,7 +11,7 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 
 
 class AgentexSyncTracingProcessor(SyncTracingProcessor):
-    def __init__(self, config: AgentexTracingProcessorConfig):
+    def __init__(self, config: AgentexTracingProcessorConfig):  # noqa: ARG002
         self.client = Agentex()
 
     @override
@@ -65,7 +65,7 @@ class AgentexSyncTracingProcessor(SyncTracingProcessor):
 
 
 class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
-    def __init__(self, config: AgentexTracingProcessorConfig):
+    def __init__(self, config: AgentexTracingProcessorConfig):  # noqa: ARG002
         self.client = create_async_agentex_client()
 
     @override

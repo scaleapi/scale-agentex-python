@@ -33,7 +33,7 @@ class FastACP:
 
     @staticmethod
     # Note: the config is optional and not used right now but is there to be extended in the future
-    def create_sync_acp(config: SyncACPConfig | None = None, **kwargs) -> SyncACP:
+    def create_sync_acp(config: SyncACPConfig | None = None, **kwargs) -> SyncACP:  # noqa: ARG004
         """Create a SyncACP instance"""
         return SyncACP.create(**kwargs)
 

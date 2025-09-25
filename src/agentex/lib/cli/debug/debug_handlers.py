@@ -9,10 +9,11 @@ import asyncio
 from typing import TYPE_CHECKING, Dict
 from pathlib import Path
 
+import asyncio.subprocess
 from rich.console import Console
 
 if TYPE_CHECKING:
-    import asyncio.subprocess
+    pass
 
 from agentex.lib.utils.logging import make_logger
 

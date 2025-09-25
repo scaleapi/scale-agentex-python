@@ -1,7 +1,7 @@
 import httpx
 from scale_gp import SGPClient, SGPClientError
 
-from agentex import AsyncAgentex
+from agentex import AsyncAgentex  # noqa: F401
 from agentex.lib.core.tracing import AsyncTracer
 from agentex.lib.core.services.adk.state import StateService
 from agentex.lib.core.services.adk.tasks import TasksService

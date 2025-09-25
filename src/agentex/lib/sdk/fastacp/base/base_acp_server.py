@@ -73,7 +73,7 @@ class BaseACPServer(FastAPI):
 
     def get_lifespan_function(self):
         @asynccontextmanager
-        async def lifespan_context(app: FastAPI):
+        async def lifespan_context(app: FastAPI):  # noqa: ARG001
             env_vars = EnvironmentVariables.refresh()
             if env_vars.AGENTEX_BASE_URL:
                 await register_agent(env_vars)
