@@ -57,7 +57,7 @@ class TestRecursiveModelDump:
         """Test function serialization when module info is not available."""
 
         # Create a lambda function which might not have __module__
-        def lambda_like_func(x):
+        def lambda_like_func(x: int) -> int:
             return x * 2
 
         result = recursive_model_dump(lambda_like_func)
@@ -136,11 +136,11 @@ class TestRecursiveModelDump:
         result = recursive_model_dump(data)
 
         assert isinstance(result, dict)
-        nested_func = result["level1"]["level2"][0]["function"]
+        nested_func: str = result["level1"]["level2"][0]["function"]  # type: ignore[assignment]
         assert isinstance(nested_func, str)
         assert "another_function" in nested_func
 
-        nested_model = result["level1"]["level2"][0]["model"]
+        nested_model: dict[str, object] = result["level1"]["level2"][0]["model"]  # type: ignore[assignment]
         assert nested_model["name"] == "deep"
         assert nested_model["value"] == 300
 
