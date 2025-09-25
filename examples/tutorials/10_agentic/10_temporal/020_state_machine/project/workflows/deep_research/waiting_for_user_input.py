@@ -10,7 +10,7 @@ logger = make_logger(__name__)
 
 class WaitingForUserInputWorkflow(StateWorkflow):
     @override
-    async def execute(self, state_machine: StateMachine, state_machine_data: DeepResearchData = None) -> str:
+    async def execute(self, state_machine: StateMachine, state_machine_data: DeepResearchData | None = None) -> str:
         logger.info("ActorWaitingForUserInputWorkflow: waiting for user input...")
         def condition():
             current_state = state_machine.get_current_state()

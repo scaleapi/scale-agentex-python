@@ -66,7 +66,7 @@ custom_data_converter = dataclasses.replace(
 )
 
 
-async def get_temporal_client(temporal_address: str, metrics_url: str = None) -> Client:
+async def get_temporal_client(temporal_address: str, metrics_url: str | None = None) -> Client:
     if not metrics_url:
         client = await Client.connect(
             target_host=temporal_address, data_converter=custom_data_converter

@@ -24,9 +24,9 @@ def build_agent(
     repository_name: str | None,
     platforms: list[str],
     push: bool = False,
-    secret: str = None,
-    tag: str = None,
-    build_args: list[str] = None,
+    secret: str | None = None,
+    tag: str | None = None,
+    build_args: list[str] | None = None,
 ) -> str:
     """Build the agent locally and optionally push to registry
 

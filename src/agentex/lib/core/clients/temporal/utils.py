@@ -38,7 +38,7 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 # )
 
 
-async def get_temporal_client(temporal_address: str, metrics_url: str = None) -> Client:
+async def get_temporal_client(temporal_address: str, metrics_url: str | None = None) -> Client:
     if not metrics_url:
         client = await Client.connect(
             target_host=temporal_address,
