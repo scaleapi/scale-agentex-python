@@ -62,11 +62,19 @@ async def handle_event_send(params: SendEventParams):
     #########################################################
 
     task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
+    if not task_state:
+        raise ValueError("Task state not found - ensure task was properly initialized")
     state = StateModel.model_validate(task_state.state)
     state.turn_number += 1
 
     # Add the new user message to the message history
-    state.messages.append(UserMessage(content=params.event.content.content))
+    # Safely extract content from the event
+    content_text = ""
+    if hasattr(params.event.content, 'content'):
+        content_val = getattr(params.event.content, 'content', '')
+        if isinstance(content_val, str):
+            content_text = content_val
+    state.messages.append(UserMessage(content=content_text))
 
     #########################################################
     # 4. (👋) Create a tracing span.
@@ -122,7 +130,13 @@ async def handle_event_send(params: SendEventParams):
             parent_span_id=span.id if span else None,
         )
         
-        state.messages.append(AssistantMessage(content=task_message.content.content))
+        # Safely extract content from the task message
+        response_text = ""
+        if task_message.content and hasattr(task_message.content, 'content'):
+            content_val = getattr(task_message.content, 'content', '')
+            if isinstance(content_val, str):
+                response_text = content_val
+        state.messages.append(AssistantMessage(content=response_text))
         
         #########################################################
         # 8. Store the messages in the task state for the next turn
@@ -144,7 +158,8 @@ async def handle_event_send(params: SendEventParams):
 
         # (👋) You can store an arbitrary pydantic model or dictionary in the span output. The idea of a span is that it easily allows you to compare the input and output of a span to see what the wrapped function did.
         # In this case, the state is comprehensive and expressive, so we just store the change in state that occured.
-        span.output = state
+        if span:
+            span.output = state
 
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):

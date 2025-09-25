@@ -86,6 +86,8 @@ async def handle_event_send(params: SendEventParams):
 
     # Retrieve the task state. Each event is handled as a new turn, so we need to get the state for the current turn.
     task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
+    if not task_state:
+        raise ValueError("Task state not found - ensure task was properly initialized")
     state = StateModel.model_validate(task_state.state)
     state.turn_number += 1
 
@@ -149,7 +151,8 @@ async def handle_event_send(params: SendEventParams):
         )
 
         # Set the span output to the state for the next turn
-        span.output = state
+        if span:
+            span.output = state
 
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):

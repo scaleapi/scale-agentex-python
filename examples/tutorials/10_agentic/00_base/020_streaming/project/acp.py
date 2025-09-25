@@ -119,7 +119,7 @@ async def handle_event_send(params: SendEventParams):
     
     # Safely extract content from the task message
     response_text = ""
-    if hasattr(task_message.content, 'content'):
+    if task_message.content and hasattr(task_message.content, 'content'):
         content_val = getattr(task_message.content, 'content', '')
         if isinstance(content_val, str):
             response_text = content_val
