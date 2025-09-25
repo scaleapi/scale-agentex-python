@@ -176,10 +176,8 @@ filterwarnings = [
 ]
 
 [tool.pyright]
-# this enables practically every flag given by pyright.
-# there are a couple of flags that are still disabled by
-# default in strict mode as they are experimental and niche.
-typeCheckingMode = "strict"
+# Default to basic type checking, but override for specific directories
+typeCheckingMode = "basic"
 pythonVersion = "3.12"
 
 exclude = [
@@ -195,12 +193,18 @@ reportOverlappingOverload = false
 reportImportCycles = false
 reportPrivateUsage = false
 
-# Reduce noise from generated SDK code
-reportUnknownMemberType = false
-reportUnknownVariableType = false
-reportUnknownParameterType = false
-reportUnknownArgumentType = false
-reportMissingParameterType = false
+# Enable strict type checking only for hand-written code
+[[tool.pyright.executionEnvironments]]
+root = "src/agentex/lib"
+typeCheckingMode = "strict"
+
+[[tool.pyright.executionEnvironments]]
+root = "examples"
+typeCheckingMode = "strict"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+typeCheckingMode = "strict"
 
 [tool.mypy]
 pretty = true
