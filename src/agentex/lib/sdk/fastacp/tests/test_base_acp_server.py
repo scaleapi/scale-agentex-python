@@ -1,3 +1,4 @@
+# ruff: noqa: ARG001
 import asyncio
 from unittest.mock import patch
 

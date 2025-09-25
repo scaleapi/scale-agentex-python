@@ -6,10 +6,10 @@ Provides debug-enabled versions of ACP server and temporal worker startup.
 
 import sys
 import asyncio
+import asyncio.subprocess
 from typing import TYPE_CHECKING, Dict
 from pathlib import Path
 
-import asyncio.subprocess
 from rich.console import Console
 
 if TYPE_CHECKING:
