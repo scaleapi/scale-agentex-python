@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 
 from agentex import Agentex, AsyncAgentex
-from tests.utils import assert_matches_type
+from ..utils import assert_matches_type
 from agentex.types import Task, TaskListResponse
 from agentex.types.shared import DeleteResponse
 

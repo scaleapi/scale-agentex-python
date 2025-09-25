@@ -179,7 +179,6 @@ filterwarnings = [
 # Default to basic type checking, but override for specific directories
 typeCheckingMode = "basic"
 pythonVersion = "3.12"
-pythonPath = ["."]
 
 exclude = [
     "_dev",
