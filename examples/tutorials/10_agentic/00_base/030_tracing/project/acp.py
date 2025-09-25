@@ -132,8 +132,8 @@ async def handle_event_send(params: SendEventParams):
         
         # Safely extract content from the task message
         response_text = ""
-        if task_message.content and hasattr(task_message.content, 'content'):
-            content_val = getattr(task_message.content, 'content', '')
+        if task_message.content and hasattr(task_message.content, 'content'):  # type: ignore[union-attr]
+            content_val = getattr(task_message.content, 'content', '')  # type: ignore[union-attr]
             if isinstance(content_val, str):
                 response_text = content_val
         state.messages.append(AssistantMessage(content=response_text))
@@ -159,7 +159,7 @@ async def handle_event_send(params: SendEventParams):
         # (👋) You can store an arbitrary pydantic model or dictionary in the span output. The idea of a span is that it easily allows you to compare the input and output of a span to see what the wrapped function did.
         # In this case, the state is comprehensive and expressive, so we just store the change in state that occured.
         if span:
-            span.output = state
+            span.output = state  # type: ignore[misc]
 
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):

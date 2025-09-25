@@ -237,6 +237,8 @@ async def start_temporal_worker(
 async def stream_process_output(process: asyncio.subprocess.Process, prefix: str):
     """Stream process output with prefix"""
     try:
+        if process.stdout is None:
+            return
         while True:
             line = await process.stdout.readline()
             if not line:
@@ -292,11 +294,11 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
         manifest_dir = Path(manifest_path).parent
         if debug_config and debug_config.should_debug_acp():
             acp_process = await start_acp_server_debug(
-                file_paths["acp"], manifest.local_development.agent.port, agent_env, debug_config
+                file_paths["acp"], manifest.local_development.agent.port, agent_env, debug_config  # type: ignore[union-attr]
             )
         else:
             acp_process = await start_acp_server(
-                file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir
+                file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir  # type: ignore[union-attr]
             )
         process_manager.add_process(acp_process)
 
@@ -320,7 +322,7 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
             tasks.append(worker_task)
 
         console.print(
-            f"\n[green]✓ Agent running at: http://localhost:{manifest.local_development.agent.port}[/green]"
+            f"\n[green]✓ Agent running at: http://localhost:{manifest.local_development.agent.port}[/green]"  # type: ignore[union-attr]
         )
         console.print("[dim]Press Ctrl+C to stop[/dim]\n")
 
@@ -364,8 +366,8 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
         "REDIS_URL": "redis://localhost:6379",
         "AGENT_NAME": manifest.agent.name,
         "ACP_TYPE": manifest.agent.acp_type,
-        "ACP_URL": f"http://{manifest.local_development.agent.host_address}",
-        "ACP_PORT": str(manifest.local_development.agent.port),
+        "ACP_URL": f"http://{manifest.local_development.agent.host_address}",  # type: ignore[union-attr]
+        "ACP_PORT": str(manifest.local_development.agent.port),  # type: ignore[union-attr]
     }
 
     # Add authorization principal if set - for local development, auth is optional

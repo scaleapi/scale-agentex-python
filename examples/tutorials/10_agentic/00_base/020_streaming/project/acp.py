@@ -119,8 +119,8 @@ async def handle_event_send(params: SendEventParams):
     
     # Safely extract content from the task message
     response_text = ""
-    if task_message.content and hasattr(task_message.content, 'content'):
-        content_val = getattr(task_message.content, 'content', '')
+    if task_message.content and hasattr(task_message.content, 'content'):  # type: ignore[union-attr]
+        content_val = getattr(task_message.content, 'content', '')  # type: ignore[union-attr]
         if isinstance(content_val, str):
             response_text = content_val
     state.messages.append(AssistantMessage(content=response_text))
