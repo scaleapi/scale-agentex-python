@@ -52,7 +52,7 @@ class FastACP:
             # Extract temporal_address from config if it's a TemporalACPConfig
             temporal_config = kwargs.copy()
             if hasattr(config, "temporal_address"):
-                temporal_config["temporal_address"] = config.temporal_address
+                temporal_config["temporal_address"] = config.temporal_address  # type: ignore[attr-defined]
             return implementation_class.create(**temporal_config)
         else:
             return implementation_class.create(**kwargs)

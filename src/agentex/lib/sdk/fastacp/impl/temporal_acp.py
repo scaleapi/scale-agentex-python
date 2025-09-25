@@ -1,4 +1,4 @@
-from typing import Callable, AsyncGenerator
+from typing import Callable, AsyncGenerator, override
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -31,6 +31,7 @@ class TemporalACP(BaseACPServer):
         self._temporal_address = temporal_address
 
     @classmethod
+    @override
     def create(cls, temporal_address: str) -> "TemporalACP":
         logger.info("Initializing TemporalACP instance")
 
@@ -40,7 +41,7 @@ class TemporalACP(BaseACPServer):
         logger.info("TemporalACP instance initialized now")
         return temporal_acp
 
-    # This is to override the lifespan function of the base
+    @override
     def get_lifespan_function(self) -> Callable[[FastAPI], AsyncGenerator[None, None]]:
         @asynccontextmanager
         async def lifespan(app: FastAPI):
@@ -59,11 +60,12 @@ class TemporalACP(BaseACPServer):
                 )
 
             # Call parent lifespan for agent registration
-            async with super().get_lifespan_function()(app):
+            async with super().get_lifespan_function()(app):  # type: ignore[misc]
                 yield
 
         return lifespan
 
+    @override
     def _setup_handlers(self):
         """Set up the handlers for temporal workflow operations"""
 
@@ -71,17 +73,19 @@ class TemporalACP(BaseACPServer):
         async def handle_task_create(params: CreateTaskParams) -> None:
             """Default create task handler - logs the task"""
             logger.info(f"TemporalACP received task create rpc call for task {params.task.id}")
-            await self._temporal_task_service.submit_task(agent=params.agent, task=params.task, params=params.params)
+            if self._temporal_task_service is not None:
+                await self._temporal_task_service.submit_task(agent=params.agent, task=params.task, params=params.params)
 
         @self.on_task_event_send
         async def handle_event_send(params: SendEventParams) -> None:
             """Forward messages to running workflows via TaskService"""
             try:
-                await self._temporal_task_service.send_event(
-                    agent=params.agent,
-                    task=params.task,
-                    event=params.event,
-                )
+                if self._temporal_task_service is not None:
+                    await self._temporal_task_service.send_event(
+                        agent=params.agent,
+                        task=params.task,
+                        event=params.event,
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to send message: {e}")

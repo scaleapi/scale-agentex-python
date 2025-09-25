@@ -65,14 +65,14 @@ def build_agent(
         # Log build context information for debugging
         logger.info(f"Build context path: {build_context.path}")
         logger.info(
-            f"Dockerfile path: {build_context.path / build_context.dockerfile_path}"
+            f"Dockerfile path: {build_context.path / build_context.dockerfile_path}"  # type: ignore[operator]
         )
 
         try:
             # Prepare build arguments
             docker_build_kwargs = {
                 "context_path": str(build_context.path),
-                "file": str(build_context.path / build_context.dockerfile_path),
+                "file": str(build_context.path / build_context.dockerfile_path),  # type: ignore[operator]
                 "tags": [image_name],
                 "platforms": platforms,
             }
