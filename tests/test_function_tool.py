@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from src.agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
     FunctionTool,
@@ -225,7 +226,7 @@ class TestFunctionTool:
         )
 
         # This should raise an error during model validation due to invalid base64
-        with pytest.raises(Exception):  # Could be ValidationError or ValueError
+        with pytest.raises((ValidationError, ValueError)):
             FunctionTool.model_validate(serialized_data)
 
     def test_full_roundtrip_with_serialization(self):

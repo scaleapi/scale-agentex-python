@@ -37,7 +37,7 @@ class BatchProcessingUtils:
                 item = queue.get_nowait()
                 data_to_process.append(item)
                 items_dequeued += 1
-            except:
+            except Exception:
                 # Queue became empty while we were dequeuing
                 break
 
