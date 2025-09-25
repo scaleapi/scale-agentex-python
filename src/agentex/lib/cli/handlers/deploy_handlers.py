@@ -264,7 +264,7 @@ def merge_deployment_configs(
     if not helm_overrides_command:
         add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
     
-    print("Deploying with the following helm values: ", helm_values)
+    logger.info("Deploying with the following helm values: %s", helm_values)
     return helm_values
 
 

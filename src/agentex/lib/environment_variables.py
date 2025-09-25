@@ -79,13 +79,13 @@ class EnvironmentVariables(BaseModel):
             # Load global .env file first
             global_env_path = PROJECT_ROOT / ".env"
             if global_env_path.exists():
-                print(f"Loading global environment variables FROM: {global_env_path}")
+                logger.debug(f"Loading global environment variables FROM: {global_env_path}")
                 load_dotenv(dotenv_path=global_env_path, override=False)
 
             # Load local project .env.local file (takes precedence)
             local_env_path = Path.cwd().parent / ".env.local"
             if local_env_path.exists():
-                print(f"Loading local environment variables FROM: {local_env_path}")
+                logger.debug(f"Loading local environment variables FROM: {local_env_path}")
                 load_dotenv(dotenv_path=local_env_path, override=True)
 
         # Create kwargs dict with environment variables, using None for missing values

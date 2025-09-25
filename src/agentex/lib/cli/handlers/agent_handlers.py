@@ -140,11 +140,11 @@ def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
         nonlocal shutting_down
         if shutting_down:
             # If we're already shutting down and get another signal, force exit
-            print(f"\nForce exit on signal {signum}")
+            logger.info(f"Force exit on signal {signum}")
             sys.exit(1)
-        
+
         shutting_down = True
-        print(f"\nReceived signal {signum}, shutting down...")
+        logger.info(f"Received signal {signum}, shutting down...")
         raise KeyboardInterrupt()
     
     # Set up signal handling for the main thread
@@ -154,7 +154,7 @@ def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
     try:
         asyncio.run(_run_agent(manifest_path, debug_config))
     except KeyboardInterrupt:
-        print("Shutdown completed.")
+        logger.info("Shutdown completed.")
         sys.exit(0)
     except RunError as e:
         raise RuntimeError(str(e)) from e

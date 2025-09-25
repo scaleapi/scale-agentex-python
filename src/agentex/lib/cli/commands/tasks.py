@@ -22,7 +22,7 @@ def get(
     logger.info(f"Getting task: {task_id}")
     client = Agentex()
     task = client.tasks.retrieve(task_id=task_id)
-    print(f"Full Task {task_id}:")
+    logger.info(f"Full Task {task_id}:")
     print_json(data=task.to_dict())
 
 
