@@ -76,7 +76,14 @@ DUPLICATE_POLICY_TO_ID_REUSE_POLICY = {
 
 class TemporalClient:
     def __init__(self, temporal_client: Client | None = None):
-        self._client: Client = temporal_client
+        self._client: Client | None = temporal_client
+
+    @property
+    def client(self) -> Client:
+        """Get the temporal client, raising an error if not initialized."""
+        if self._client is None:
+            raise RuntimeError("Temporal client not initialized - ensure temporal_address is properly configured")
+        return self._client
 
     @classmethod
     async def create(cls, temporal_address: str):
@@ -100,7 +107,7 @@ class TemporalClient:
             temporal_address=temporal_address
         )
 
-    async def _get_temporal_client(self, temporal_address: str) -> Client:
+    async def _get_temporal_client(self, temporal_address: str) -> Client | None:
         if temporal_address in [
             "false",
             "False",
@@ -127,7 +134,7 @@ class TemporalClient:
         temporal_retry_policy = TemporalRetryPolicy(
             **retry_policy.model_dump(exclude_unset=True)
         )
-        workflow_handle = await self._client.start_workflow(
+        workflow_handle = await self.client.start_workflow(
             *args,
             retry_policy=temporal_retry_policy,
             task_timeout=task_timeout,
@@ -143,7 +150,7 @@ class TemporalClient:
         signal: str | Callable[[dict[str, Any] | list[Any] | str | int | float | bool | BaseModel], Any],
         payload: dict[str, Any] | list[Any] | str | int | float | bool | BaseModel,
     ) -> None:
-        handle = self._client.get_workflow_handle(workflow_id=workflow_id)
+        handle = self.client.get_workflow_handle(workflow_id=workflow_id)
         await handle.signal(signal, payload)
 
     async def query_workflow(
@@ -161,12 +168,12 @@ class TemporalClient:
         Returns:
             The result of the query
         """
-        handle = self._client.get_workflow_handle(workflow_id=workflow_id)
+        handle = self.client.get_workflow_handle(workflow_id=workflow_id)
         return await handle.query(query)
 
     async def get_workflow_status(self, workflow_id: str) -> WorkflowState:
         try:
-            handle = self._client.get_workflow_handle(workflow_id=workflow_id)
+            handle = self.client.get_workflow_handle(workflow_id=workflow_id)
             description = await handle.describe()
             return TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON[description.status]
         except RPCError as e:
@@ -179,7 +186,7 @@ class TemporalClient:
             raise
 
     async def terminate_workflow(self, workflow_id: str) -> None:
-        return await self._client.get_workflow_handle(workflow_id).terminate()
+        return await self.client.get_workflow_handle(workflow_id).terminate()
 
     async def cancel_workflow(self, workflow_id: str) -> None:
-        return await self._client.get_workflow_handle(workflow_id).cancel()
+        return await self.client.get_workflow_handle(workflow_id).cancel()

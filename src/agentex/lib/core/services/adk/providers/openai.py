@@ -141,8 +141,8 @@ class OpenAIService:
             content = tool_output_item["output"]
         else:
             # Attribute access for structured objects
-            call_id = getattr(tool_output_item, "call_id", None)
-            content = getattr(tool_output_item, "output", None)
+            call_id = getattr(tool_output_item, "call_id", "")
+            content = getattr(tool_output_item, "output", "")
 
         # Get the name from the tool call map using generic approach
         tool_call = tool_call_map[call_id]
@@ -208,6 +208,8 @@ class OpenAIService:
         """
         redacted_params = redact_mcp_server_params(mcp_server_params)
 
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
@@ -337,6 +339,8 @@ class OpenAIService:
 
         redacted_params = redact_mcp_server_params(mcp_server_params)
 
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,

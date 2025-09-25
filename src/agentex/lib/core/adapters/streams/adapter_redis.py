@@ -1,7 +1,7 @@
 import os
 import json
 import asyncio
-from typing import Any, Annotated
+from typing import Any, Annotated, override
 from collections.abc import AsyncIterator
 
 import redis.asyncio as redis
@@ -26,6 +26,7 @@ class RedisStreamRepository(StreamRepository):
         )
         self.redis = redis.from_url(self.redis_url)
 
+    @override
     async def send_event(self, topic: str, event: dict[str, Any]) -> str:
         """
         Send an event to a Redis stream.
@@ -55,6 +56,7 @@ class RedisStreamRepository(StreamRepository):
             logger.error(f"Error publishing to Redis stream {topic}: {e}")
             raise
 
+    @override
     async def subscribe(
         self, topic: str, last_id: str = "$"
     ) -> AsyncIterator[dict[str, Any]]:
@@ -108,6 +110,7 @@ class RedisStreamRepository(StreamRepository):
                 logger.error(f"Error reading from Redis stream: {e}")
                 await asyncio.sleep(1)  # Back off on errors
 
+    @override
     async def cleanup_stream(self, topic: str) -> None:
         """
         Clean up a Redis stream.
