@@ -1,5 +1,6 @@
-import httpx
 from typing import override
+
+import httpx
 
 from agentex import AsyncAgentex
 from agentex.lib.utils.logging import make_logger
