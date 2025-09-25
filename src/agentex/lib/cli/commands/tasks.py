@@ -1,4 +1,5 @@
 import typer
+from typing import Any
 from rich import print_json
 from rich.console import Console
 
@@ -54,7 +55,7 @@ def list_running(
     console.print(f"[green]Found {len(running_tasks)} running task(s) for agent '{agent_name}':[/green]")
     
     # Convert to dict with proper datetime serialization
-    serializable_tasks = []
+    serializable_tasks: list[dict[str, Any]] = []
     for task in running_tasks:
         try:
             # Use model_dump with mode='json' for proper datetime handling
