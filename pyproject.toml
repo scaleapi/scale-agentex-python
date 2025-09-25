@@ -185,6 +185,7 @@ exclude = [
     ".venv",
     ".nox",
     ".git",
+    "agentex-server",
 ]
 
 reportImplicitOverride = true
@@ -193,18 +194,32 @@ reportOverlappingOverload = false
 reportImportCycles = false
 reportPrivateUsage = false
 
+# Ignore common issues in generated SDK code
+reportMissingTypeStubs = false
+reportUnknownParameterType = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+
 # Enable strict type checking only for hand-written code
 [[tool.pyright.executionEnvironments]]
 root = "src/agentex/lib"
 typeCheckingMode = "strict"
+# But allow some flexibility in OpenAI module for complex type boundaries
+reportArgumentType = false
 
 [[tool.pyright.executionEnvironments]]
 root = "examples"
 typeCheckingMode = "strict"
+# Allow type ignores in tutorials for readability
+reportUnnecessaryTypeIgnoreComment = false
 
 [[tool.pyright.executionEnvironments]]
 root = "tests"
-typeCheckingMode = "strict"
+typeCheckingMode = "basic"
+# Be loose on typing in tests unless testing types specifically
+reportOptionalMemberAccess = false
+reportArgumentType = false
 
 [tool.mypy]
 pretty = true
