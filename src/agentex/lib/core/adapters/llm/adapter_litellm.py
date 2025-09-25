@@ -47,5 +47,5 @@ class LiteLLMGateway(LLMGateway):
         if not kwargs.get("stream"):
             raise ValueError("To use streaming, please set stream=True in the kwargs")
 
-        async for chunk in llm.acompletion(*args, **kwargs):
+        async for chunk in llm.acompletion(*args, **kwargs):  # type: ignore[misc]
             yield Completion.model_validate(chunk)

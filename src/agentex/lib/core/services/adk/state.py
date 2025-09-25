@@ -47,6 +47,10 @@ class StateService:
         parent_span_id: str | None = None,
     ) -> State | None:
         trace = self._tracer.trace(trace_id) if self._tracer else None
+        if trace is None:
+            # Handle case without tracing - implement the core logic here
+            return await self._agentex_client.states.retrieve(state_id)
+
         async with trace.span(
             parent_id=parent_span_id,
             name="get_state",

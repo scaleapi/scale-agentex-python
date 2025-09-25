@@ -59,7 +59,7 @@ def list_available_contexts() -> list[str]:
     """List all available kubectl contexts"""
     try:
         contexts, _ = config.list_kube_config_contexts()
-        return [ctx["name"] for ctx in contexts]
+        return [ctx["name"] for ctx in contexts]  # type: ignore[index]
     except Exception as e:
         raise DeploymentError(f"Failed to list kubectl contexts: {e}") from e
 

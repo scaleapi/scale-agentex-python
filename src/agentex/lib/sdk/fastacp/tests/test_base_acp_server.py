@@ -22,7 +22,7 @@ class TestBaseACPServerInitialization:
             server = BaseACPServer()
 
             # Check that FastAPI routes are set up
-            routes = [route.path for route in server.routes]
+            routes = [route.path for route in server.routes]  # type: ignore[attr-defined]
             assert "/healthz" in routes
             assert "/api" in routes
 

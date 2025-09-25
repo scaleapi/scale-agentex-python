@@ -116,7 +116,7 @@ class TasksModule:
                 heartbeat_timeout=heartbeat_timeout,
             )
         else:
-            return await self._tasks_service.delete_task(
+            return await self._tasks_service.delete_task(  # type: ignore[return-value]
                 task_id=task_id,
                 task_name=task_name,
                 trace_id=trace_id,

@@ -36,7 +36,7 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             output=span.output,
             metadata=span.data,
         )
-        sgp_span.start_time = span.start_time.isoformat()
+        sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
         sgp_span.flush(blocking=False)
 
         self._spans[span.id] = sgp_span
@@ -52,7 +52,7 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
 
         sgp_span.output = span.output  # type: ignore[assignment]
         sgp_span.metadata = span.data  # type: ignore[assignment]
-        sgp_span.end_time = span.end_time.isoformat()
+        sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
         sgp_span.flush(blocking=False)
 
     @override
@@ -82,11 +82,11 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             output=span.output,
             metadata=span.data,
         )
-        sgp_span.start_time = span.start_time.isoformat()
+        sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
 
         if self.disabled:
             return
-        await self.sgp_async_client.spans.upsert_batch(
+        await self.sgp_async_client.spans.upsert_batch(  # type: ignore[union-attr]
             items=[sgp_span.to_request_params()]
         )
 
@@ -103,17 +103,17 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
 
         sgp_span.output = span.output  # type: ignore[assignment]
         sgp_span.metadata = span.data  # type: ignore[assignment]
-        sgp_span.end_time = span.end_time.isoformat()
+        sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
 
         if self.disabled:
             return
-        await self.sgp_async_client.spans.upsert_batch(
+        await self.sgp_async_client.spans.upsert_batch(  # type: ignore[union-attr]
             items=[sgp_span.to_request_params()]
         )
 
     @override
     async def shutdown(self) -> None:
-        await self.sgp_async_client.spans.upsert_batch(
+        await self.sgp_async_client.spans.upsert_batch(  # type: ignore[union-attr]
             items=[sgp_span.to_request_params() for sgp_span in self._spans.values()]
         )
         self._spans.clear()

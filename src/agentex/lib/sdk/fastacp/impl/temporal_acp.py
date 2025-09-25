@@ -63,7 +63,7 @@ class TemporalACP(BaseACPServer):
             async with super().get_lifespan_function()(app):  # type: ignore[misc]
                 yield
 
-        return lifespan
+        return lifespan  # type: ignore[return-value]
 
     @override
     def _setup_handlers(self):
@@ -95,7 +95,8 @@ class TemporalACP(BaseACPServer):
         async def handle_cancel(params: CancelTaskParams) -> None:
             """Cancel running workflows via TaskService"""
             try:
-                await self._temporal_task_service.cancel(task_id=params.task.id)
+                if self._temporal_task_service is not None:
+                    await self._temporal_task_service.cancel(task_id=params.task.id)
             except Exception as e:
                 logger.error(f"Failed to cancel task: {e}")
                 raise

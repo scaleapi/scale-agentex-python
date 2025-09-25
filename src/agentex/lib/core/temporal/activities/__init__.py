@@ -204,7 +204,7 @@ def get_all_activities(sgp_client=None):
     # SGP activities
     if sgp_client is not None:
         sgp_all_activities = [
-            sgp_activities.download_file_content,
+            sgp_activities.download_file_content,  # type: ignore[union-attr]
         ]
         activities.extend(sgp_all_activities)
 

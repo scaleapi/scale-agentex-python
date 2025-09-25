@@ -91,7 +91,7 @@ class SGPService:
                 )
 
             # Record metadata for tracing
-            span.output = {
+            span.output = {  # type: ignore[union-attr]
                 "file_id": file_id,
                 "mime_type": result.mime_type,
                 "content_size": len(result.base64_content),

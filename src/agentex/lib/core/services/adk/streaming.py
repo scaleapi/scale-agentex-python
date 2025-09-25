@@ -265,7 +265,7 @@ class StreamingTaskMessageContext:
         elif isinstance(update, StreamTaskMessageFull):
             await self._agentex_client.messages.update(
                 task_id=self.task_id,
-                message_id=update.parent_task_message.id,
+                message_id=update.parent_task_message.id,  # type: ignore[union-attr]
                 content=update.content.model_dump(),
                 streaming_status="DONE",
             )
@@ -306,7 +306,7 @@ class StreamingService:
         Returns:
             True if event was streamed successfully, False otherwise
         """
-        stream_topic = _get_stream_topic(update.parent_task_message.task_id)
+        stream_topic = _get_stream_topic(update.parent_task_message.task_id)  # type: ignore[union-attr]
 
         try:
             await self._stream_repository.send_event(

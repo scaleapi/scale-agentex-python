@@ -2,9 +2,10 @@ import json
 from typing import Any
 
 import pytest
+from typing import override
 from pydantic import ValidationError
 
-from src.agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+from src.agentex.lib.core.temporal.activities.adk.providers.openai_activities import (  # type: ignore[import-untyped]
     FunctionTool,
 )
 
@@ -191,6 +192,7 @@ class TestFunctionTool:
             def __call__(self, context, args):
                 return "test"
 
+            @override
             def __getstate__(self):
                 raise Exception("Cannot serialize this object")
 

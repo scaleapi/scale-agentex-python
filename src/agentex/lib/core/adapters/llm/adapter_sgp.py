@@ -54,7 +54,5 @@ class SGPLLMGateway(LLMGateway):
         if not kwargs.get("stream"):
             raise ValueError("To use streaming, please set stream=True in the kwargs")
 
-        async for chunk in self.async_client.beta.chat.completions.create(
-            *args, **kwargs
-        ):
+        async for chunk in self.async_client.beta.chat.completions.create(*args, **kwargs):  # type: ignore[misc]
             yield Completion.model_validate(chunk)

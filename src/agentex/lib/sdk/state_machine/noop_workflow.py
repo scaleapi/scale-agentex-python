@@ -20,4 +20,4 @@ class NoOpWorkflow(StateWorkflow):
     async def execute(
         self, state_machine: "StateMachine", state_machine_data: BaseModel | None = None
     ) -> str:
-        pass
+        return state_machine.get_current_state()  # Stay in current state

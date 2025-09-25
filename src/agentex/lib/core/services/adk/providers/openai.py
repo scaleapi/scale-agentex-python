@@ -233,7 +233,7 @@ class OpenAIService:
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = [
-                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
                     for tool in tools
                 ] if tools else []
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
@@ -251,7 +251,7 @@ class OpenAIService:
                 }
                 if model_settings is not None:
                     agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
                         else model_settings
                     )
                 if input_guardrails is not None:
@@ -371,7 +371,7 @@ class OpenAIService:
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = [
-                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
                     for tool in tools
                 ] if tools else []
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
@@ -388,7 +388,7 @@ class OpenAIService:
                 }
                 if model_settings is not None:
                     agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
                         else model_settings
                     )
                 if input_guardrails is not None:
@@ -430,7 +430,7 @@ class OpenAIService:
                     if item.type == "message_output_item":
                         text_content = TextContent(
                             author="agent",
-                            content=item.raw_item.content[0].text,
+                            content=item.raw_item.content[0].text,  # type: ignore[union-attr]
                         )
                         # Create message for the final result using streaming context
                         async with self.streaming_service.streaming_task_message_context(
@@ -550,6 +550,8 @@ class OpenAIService:
         Returns:
             RunResultStreaming: The result of the agent run with streaming.
         """
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
         redacted_params = redact_mcp_server_params(mcp_server_params)
 
@@ -575,7 +577,7 @@ class OpenAIService:
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = [
-                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
                     for tool in tools
                 ] if tools else []
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
@@ -592,7 +594,7 @@ class OpenAIService:
                 }
                 if model_settings is not None:
                     agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
                         else model_settings
                     )
                 if input_guardrails is not None:
@@ -691,6 +693,8 @@ class OpenAIService:
 
         tool_call_map: dict[str, Any] = {}
 
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
         redacted_params = redact_mcp_server_params(mcp_server_params)
 
@@ -717,7 +721,7 @@ class OpenAIService:
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = [
-                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
                     for tool in tools
                 ] if tools else []
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
@@ -734,7 +738,7 @@ class OpenAIService:
                 }
                 if model_settings is not None:
                     agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
                         else model_settings
                     )
                 if input_guardrails is not None:

@@ -151,7 +151,7 @@ class TemporalClient:
         payload: dict[str, Any] | list[Any] | str | int | float | bool | BaseModel,
     ) -> None:
         handle = self.client.get_workflow_handle(workflow_id=workflow_id)
-        await handle.signal(signal, payload)
+        await handle.signal(signal, payload)  # type: ignore[misc]
 
     async def query_workflow(
         self,

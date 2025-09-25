@@ -99,7 +99,7 @@ class StateMachine(ABC, Generic[T]):
         if self._trace_transitions and span is not None:
             span.output = self.require_state_machine_data().model_dump()  # type: ignore[assignment]
             if span.data is not None:
-                span.data["output_state"] = next_state_name
+                span.data["output_state"] = next_state_name  # type: ignore[index]
             await adk.tracing.end_span(trace_id=self._task_id, span=span)
 
         await self.transition(next_state_name)
@@ -124,7 +124,7 @@ class StateMachine(ABC, Generic[T]):
         await self.transition(self._initial_state)
 
         if self._trace_transitions:
-            span.output = {"output_state": self._initial_state}
+            span.output = {"output_state": self._initial_state}  # type: ignore[assignment,union-attr]
             await adk.tracing.end_span(trace_id=self._task_id, span=span)
 
     def dump(self) -> dict[str, Any]:
@@ -174,7 +174,7 @@ class StateMachine(ABC, Generic[T]):
             state_machine_data = None
             if state_machine_data_dict is not None:
                 # Get the actual model type from the class's type parameters
-                model_type = cls.__orig_bases__[0].__args__[0]
+                model_type = cls.__orig_bases__[0].__args__[0]  # type: ignore[attr-defined]
                 state_machine_data = model_type.model_validate(state_machine_data_dict)
 
             # Create a new instance

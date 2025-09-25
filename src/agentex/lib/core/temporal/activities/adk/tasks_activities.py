@@ -40,7 +40,7 @@ class TasksActivities:
 
     @activity.defn(name=TasksActivityName.DELETE_TASK)
     async def delete_task(self, params: DeleteTaskParams) -> Task:
-        return await self._tasks_service.delete_task(
+        return await self._tasks_service.delete_task(  # type: ignore[return-value]
             task_id=params.task_id,
             task_name=params.task_name,
             trace_id=params.trace_id,
