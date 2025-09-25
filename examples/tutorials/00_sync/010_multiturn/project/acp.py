@@ -33,11 +33,11 @@ async def handle_message_send(
     # 0. Validate the message.
     #########################################################
 
-    if params.content.type != "text":
-        raise ValueError(f"Expected text message, got {params.content.type}")
+    if not hasattr(params.content, 'type') or params.content.type != "text":
+        raise ValueError(f"Expected text message, got {getattr(params.content, 'type', 'unknown')}")
 
-    if params.content.author != "user":
-        raise ValueError(f"Expected user message, got {params.content.author}")
+    if not hasattr(params.content, 'author') or params.content.author != "user":
+        raise ValueError(f"Expected user message, got {getattr(params.content, 'author', 'unknown')}")
     
     if not os.environ.get("OPENAI_API_KEY"):
         return TextContent(
@@ -74,9 +74,9 @@ async def handle_message_send(
     llm_messages = [
         SystemMessage(content=state.system_prompt),
         *[
-            UserMessage(content=message.content.content) if message.content.author == "user" else AssistantMessage(content=message.content.content)
+            UserMessage(content=getattr(message.content, 'content', '')) if getattr(message.content, 'author', None) == "user" else AssistantMessage(content=getattr(message.content, 'content', ''))
             for message in task_messages
-            if message.content.type == "text"
+            if getattr(message.content, 'type', None) == "text"
         ]
     ]
     
