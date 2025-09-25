@@ -12,7 +12,7 @@ from agentex.lib.types.llm_messages import (
 
 
 @singledispatch
-def _concat_chunks(a: None, b: Any):
+def _concat_chunks(_a: None, b: Any):
     return b
 
 

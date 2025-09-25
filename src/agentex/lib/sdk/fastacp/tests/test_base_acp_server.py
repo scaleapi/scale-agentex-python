@@ -141,7 +141,6 @@ class TestJSONRPCEndpointCore:
         data = response.json()
         assert data["jsonrpc"] == "2.0"
         assert data["id"] == "test-1"
-        print("DATA", data)
         # Should return immediate acknowledgment
         assert data["result"]["status"] == "processing"
 

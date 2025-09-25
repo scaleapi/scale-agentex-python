@@ -27,7 +27,7 @@ class BaseModel(PydanticBaseModel):
     def to_json(self, *args, **kwargs) -> str:
         return self.model_dump_json(*args, **kwargs)
 
-    def to_dict(self, *args, **kwargs) -> dict[str, Any]:
+    def to_dict(self, *_args, **_kwargs) -> dict[str, Any]:
         return recursive_model_dump(self)
 
 

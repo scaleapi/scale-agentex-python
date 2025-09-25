@@ -135,7 +135,7 @@ def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
     # Flag to track if we're shutting down
     shutting_down = False
 
-    def signal_handler(signum, frame):
+    def signal_handler(signum, _frame):
         """Handle signals by raising KeyboardInterrupt"""
         nonlocal shutting_down
         if shutting_down:
