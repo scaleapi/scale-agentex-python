@@ -1,5 +1,5 @@
 # ruff: noqa: I001
-from typing import Any
+from typing import Any, override
 import sys
 import types
 
@@ -17,7 +17,7 @@ tracer_stub = types.ModuleType("agentex.lib.core.tracing.tracer")
 class _StubSpan:
     async def __aenter__(self):
         return self
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: object) -> bool:
         return False
 
 class _StubTrace:
@@ -54,7 +54,7 @@ class DummySpan:
     async def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: object) -> bool:
         return False
 
 
@@ -128,13 +128,14 @@ async def test_header_forwarding() -> None:
 
 class TestServer(BaseACPServer):
     __test__ = False
+    @override
     def _setup_handlers(self):
         @self.on_message_send
-        async def handler(params: SendMessageParams):
+        async def handler(params: SendMessageParams):  # type: ignore[reportUnusedFunction]
             headers = (params.request or {}).get("headers", {})
             assert "x-agent-api-key" not in headers
             assert headers.get("x-user") == "a"
-            return TextContent(author="assistant", content="ok")
+            return TextContent(author="agent", content="ok")
 
 
 def test_excludes_agent_api_key_header():
