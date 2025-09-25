@@ -107,8 +107,10 @@ async def handle_event_send(params: SendEventParams):
 
     # Safely extract content from the event
     content_text = ""
-    if hasattr(params.event.content, 'content') and isinstance(params.event.content.content, str):
-        content_text = params.event.content.content
+    if hasattr(params.event.content, 'content'):
+        content_val = getattr(params.event.content, 'content', '')
+        if isinstance(content_val, str):
+            content_text = content_val
     state.messages.append(UserMessage(content=content_text))
 
     #########################################################
@@ -120,7 +122,9 @@ async def handle_event_send(params: SendEventParams):
         llm_config=LLMConfig(model="gpt-4o-mini", messages=state.messages),
         trace_id=params.task.id,
     )
-    response_content = chat_completion.choices[0].message.content or ""
+    response_content = ""
+    if chat_completion.choices[0].message:
+        response_content = chat_completion.choices[0].message.content or ""
     state.messages.append(AssistantMessage(content=response_content))
 
     #########################################################

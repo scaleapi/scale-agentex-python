@@ -92,8 +92,10 @@ async def handle_event_send(params: SendEventParams):
 
     # Safely extract content from the event
     content_text = ""
-    if hasattr(params.event.content, 'content') and isinstance(params.event.content.content, str):
-        content_text = params.event.content.content
+    if hasattr(params.event.content, 'content'):
+        content_val = getattr(params.event.content, 'content', '')
+        if isinstance(content_val, str):
+            content_text = content_val
     state.messages.append(UserMessage(content=content_text))
 
     #########################################################
@@ -117,8 +119,10 @@ async def handle_event_send(params: SendEventParams):
     
     # Safely extract content from the task message
     response_text = ""
-    if hasattr(task_message.content, 'content') and isinstance(task_message.content.content, str):
-        response_text = task_message.content.content
+    if hasattr(task_message.content, 'content'):
+        content_val = getattr(task_message.content, 'content', '')
+        if isinstance(content_val, str):
+            response_text = content_val
     state.messages.append(AssistantMessage(content=response_text))
 
     #########################################################

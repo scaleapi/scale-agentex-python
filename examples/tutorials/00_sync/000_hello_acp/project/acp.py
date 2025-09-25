@@ -23,8 +23,10 @@ async def handle_message_send(
     """Default message handler with streaming support"""
     # Extract content safely from the message
     message_text = ""
-    if hasattr(params.content, 'content') and isinstance(params.content.content, str):
-        message_text = params.content.content
+    if hasattr(params.content, 'content'):
+        content_val = getattr(params.content, 'content', '')
+        if isinstance(content_val, str):
+            message_text = content_val
 
     return TextContent(
         author="agent",
