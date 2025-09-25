@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from pydantic import BaseModel
 
@@ -16,6 +16,7 @@ class NoOpWorkflow(StateWorkflow):
     Workflow that does nothing. This is commonly used as a terminal state.
     """
 
+    @override
     async def execute(
         self, state_machine: "StateMachine", state_machine_data: BaseModel | None = None
     ) -> str:

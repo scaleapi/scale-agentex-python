@@ -232,8 +232,11 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                tools = [
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool
+                    for tool in tools
+                ] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
 
                 agent_kwargs = {
                     "name": agent_name,
@@ -364,8 +367,11 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent auto send")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                tools = [
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool
+                    for tool in tools
+                ] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -562,8 +568,11 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent streamed")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                tools = [
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool
+                    for tool in tools
+                ] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -698,8 +707,11 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent streamed auto send")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                tools = [
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool
+                    for tool in tools
+                ] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,

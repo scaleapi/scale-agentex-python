@@ -2,7 +2,7 @@ import os
 import uuid
 import datetime
 import dataclasses
-from typing import Any, overload
+from typing import Any, overload, override
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
@@ -31,6 +31,7 @@ logger = make_logger(__name__)
 
 
 class DateTimeJSONEncoder(AdvancedJSONEncoder):
+    @override
     def default(self, o: Any) -> Any:
         if isinstance(o, datetime.datetime):
             return o.isoformat()
@@ -38,6 +39,7 @@ class DateTimeJSONEncoder(AdvancedJSONEncoder):
 
 
 class DateTimeJSONTypeConverter(JSONTypeConverter):
+    @override
     def to_typed_value(
         self, hint: type, value: Any
     ) -> Any | None | _JSONTypeConverterUnhandled:
