@@ -61,7 +61,7 @@ MCP_SERVERS = [
 ]
 
 
-async def calculator(context: RunContextWrapper, args: str) -> str:
+async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG001
     """
     Simple calculator that can perform basic arithmetic operations.
 

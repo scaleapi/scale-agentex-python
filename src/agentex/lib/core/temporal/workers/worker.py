@@ -160,7 +160,7 @@ class AgentexWorker:
     async def start_health_check_server(self):
         if not self.health_check_server_running:
             app = web.Application()
-            app.router.add_get("/readyz", lambda request: self._health_check())
+            app.router.add_get("/readyz", lambda request: self._health_check())  # noqa: ARG005
 
             # Disable access logging
             runner = web.AppRunner(app, access_log=None)

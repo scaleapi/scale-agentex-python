@@ -1,3 +1,4 @@
+# ruff: noqa: ARG001
 import os
 import json
 from typing import Any, Dict, List, override
@@ -77,7 +78,7 @@ MCP_SERVERS = [
 ]
 
 
-async def calculator(context: RunContextWrapper, args: str) -> str:
+async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG001
     """
     Simple calculator that can perform basic arithmetic operations.
 

@@ -1,3 +1,4 @@
+# ruff: noqa: ARG002
 import json
 import asyncio
 from enum import Enum

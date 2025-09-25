@@ -176,7 +176,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
     ) -> RunResult:
         """
         Run an agent without streaming or TaskMessage creation.
@@ -303,7 +303,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
     ) -> RunResult:
         """
         Run an agent with automatic TaskMessage creation.
@@ -504,7 +504,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled but no TaskMessage creation.
@@ -630,7 +630,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
