@@ -82,13 +82,19 @@ async def handle_event_send(params: SendEventParams):
     #########################################################
 
     task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
+    if not task_state:
+        raise ValueError("Task state not found - ensure task was properly initialized")
     state = StateModel.model_validate(task_state.state)
 
     #########################################################
     # 6. Add the new user message to the message history
     #########################################################
 
-    state.messages.append(UserMessage(content=params.event.content.content))
+    # Safely extract content from the event
+    content_text = ""
+    if hasattr(params.event.content, 'content') and isinstance(params.event.content.content, str):
+        content_text = params.event.content.content
+    state.messages.append(UserMessage(content=content_text))
 
     #########################################################
     # 7. (👋) Call an LLM to respond to the user's message
@@ -109,7 +115,11 @@ async def handle_event_send(params: SendEventParams):
         trace_id=params.task.id,
     )
     
-    state.messages.append(AssistantMessage(content=task_message.content.content))
+    # Safely extract content from the task message
+    response_text = ""
+    if hasattr(task_message.content, 'content') and isinstance(task_message.content.content, str):
+        response_text = task_message.content.content
+    state.messages.append(AssistantMessage(content=response_text))
 
     #########################################################
     # 8. Store the messages in the task state for the next turn
