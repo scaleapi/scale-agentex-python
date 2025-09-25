@@ -68,7 +68,12 @@ class ClarifyUserQueryWorkflow(StateWorkflow):
                 trace_id=state_machine_data.task_id,
                 parent_span_id=state_machine_data.current_span.id,
             )
-            follow_up_question = task_message.content.content
+            # Safely extract content from task message
+            follow_up_question = ""
+            if task_message.content and hasattr(task_message.content, 'content'):
+                content_val = getattr(task_message.content, 'content', '')
+                if isinstance(content_val, str):
+                    follow_up_question = content_val
 
             # Update with follow-up question
             state_machine_data.follow_up_questions.append(follow_up_question)

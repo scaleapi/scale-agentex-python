@@ -72,7 +72,13 @@ class At020StateMachineWorkflow(BaseWorkflow):
                 # Check if we're in the middle of follow-up questions
                 if deep_research_data.n_follow_up_questions_to_ask > 0:
                     # User is responding to a follow-up question
-                    deep_research_data.follow_up_responses.append(message.content)
+                    # Safely extract content from message
+                    content_text = ""
+                    if hasattr(message, 'content'):
+                        content_val = getattr(message, 'content', '')
+                        if isinstance(content_val, str):
+                            content_text = content_val
+                    deep_research_data.follow_up_responses.append(content_text)
                     
                     # Add the Q&A to the agent input list as context
                     if deep_research_data.follow_up_questions:
@@ -115,11 +121,18 @@ class At020StateMachineWorkflow(BaseWorkflow):
             await self.state_machine.transition(DeepResearchState.CLARIFYING_USER_QUERY)
         
         # Echo back the user's message
+        # Safely extract content from message for display
+        message_content = ""
+        if hasattr(message, 'content'):
+            content_val = getattr(message, 'content', '')
+            if isinstance(content_val, str):
+                message_content = content_val
+
         await adk.messages.create(
             task_id=task.id,
             content=TextContent(
                 author="user",
-                content=message.content,
+                content=message_content,
             ),
             trace_id=task.id,
             parent_span_id=deep_research_data.current_span.id if deep_research_data.current_span else None,
