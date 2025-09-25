@@ -18,7 +18,12 @@ from agentex.lib.core.clients.temporal.utils import get_temporal_client
 
 logger = make_logger(__name__)
 
-DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
+DEFAULT_RETRY_POLICY = RetryPolicy(
+    maximum_attempts=1,
+    initial_interval=timedelta(seconds=1),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(minutes=10)
+)
 
 
 TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON = {

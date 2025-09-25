@@ -212,7 +212,7 @@ class TestConfigurationValidation:
         with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):
             # This should raise TypeError since config is required parameter
             with pytest.raises(TypeError):
-                FastACP.create_agentic_acp()
+                FastACP.create_agentic_acp()  # type: ignore[call-arg]
 
     def test_invalid_acp_type_string(self):
         """Test that invalid ACP type string raises ValueError"""

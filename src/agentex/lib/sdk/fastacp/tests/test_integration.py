@@ -49,7 +49,7 @@ class TestImplementationBehavior:
                 mock_temporal_instance.temporal_client = MagicMock()
                 mock_create.return_value = mock_temporal_instance
 
-                temporal_acp = await TemporalACP.create()
+                temporal_acp = await TemporalACP.create(temporal_address="localhost:7233")
 
                 assert temporal_acp == mock_temporal_instance
                 assert hasattr(temporal_acp, "temporal_client")

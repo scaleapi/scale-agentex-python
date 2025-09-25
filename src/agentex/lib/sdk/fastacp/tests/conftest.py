@@ -72,6 +72,8 @@ def sample_send_message_params(
             name="test-agent",
             description="test-agent",
             acp_type="sync",
+            created_at="2023-01-01T00:00:00Z",
+            updated_at="2023-01-01T00:00:00Z",
         ),
         task=sample_task,
         content=sample_message_content,
@@ -83,7 +85,7 @@ def sample_send_message_params(
 def sample_cancel_task_params() -> CancelTaskParams:
     """Fixture that provides sample CancelTaskParams"""
     return CancelTaskParams(
-        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync"),
+        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync", created_at="2023-01-01T00:00:00Z", updated_at="2023-01-01T00:00:00Z"),
         task=Task(id="test-task-123", agent_id="test-agent-456", status="running"),
     )
 
@@ -92,7 +94,7 @@ def sample_cancel_task_params() -> CancelTaskParams:
 def sample_create_task_params(sample_task: Task) -> CreateTaskParams:
     """Fixture that provides sample CreateTaskParams"""
     return CreateTaskParams(
-        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync"),
+        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync", created_at="2023-01-01T00:00:00Z", updated_at="2023-01-01T00:00:00Z"),
         task=sample_task,
         params={},
     )
