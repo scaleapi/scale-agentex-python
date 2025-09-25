@@ -250,7 +250,10 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')
+                        else model_settings
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -384,7 +387,10 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')
+                        else model_settings
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -585,7 +591,10 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')
+                        else model_settings
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -724,7 +733,10 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')
+                        else model_settings
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:

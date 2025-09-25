@@ -9,9 +9,9 @@ import json
 from typing import List, Optional
 from datetime import datetime, timezone
 
-from yaspin import yaspin
+from yaspin import yaspin  # type: ignore[import-untyped]
 from rich.panel import Panel
-from yaspin.core import Yaspin
+from yaspin.core import Yaspin  # type: ignore[import-untyped]
 from rich.console import Console
 from rich.markdown import Markdown
 

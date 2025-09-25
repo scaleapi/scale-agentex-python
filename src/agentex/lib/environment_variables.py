@@ -44,7 +44,7 @@ class Environment(str, Enum):
     PROD = "production"
 
 
-refreshed_environment_variables: "EnvironmentVariables" | None = None
+refreshed_environment_variables: EnvironmentVariables | None = None
 
 
 class EnvironmentVariables(BaseModel):

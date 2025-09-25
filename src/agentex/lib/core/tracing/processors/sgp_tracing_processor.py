@@ -50,8 +50,8 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             )
             return
 
-        sgp_span.output = span.output
-        sgp_span.metadata = span.data
+        sgp_span.output = span.output  # type: ignore[assignment]
+        sgp_span.metadata = span.data  # type: ignore[assignment]
         sgp_span.end_time = span.end_time.isoformat()
         sgp_span.flush(blocking=False)
 
@@ -101,8 +101,8 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             )
             return
 
-        sgp_span.output = span.output
-        sgp_span.metadata = span.data
+        sgp_span.output = span.output  # type: ignore[assignment]
+        sgp_span.metadata = span.data  # type: ignore[assignment]
         sgp_span.end_time = span.end_time.isoformat()
 
         if self.disabled:
