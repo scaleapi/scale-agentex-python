@@ -128,15 +128,15 @@ class OpenAIModule:
                 agent_name=agent_name,
                 agent_instructions=agent_instructions,
                 handoff_description=handoff_description,
-                handoffs=handoffs,
+                handoffs=handoffs,  # type: ignore[arg-type]
                 model=model,
-                model_settings=model_settings,
-                tools=tools,
+                model_settings=model_settings,  # type: ignore[arg-type]
+                tools=tools,  # type: ignore[arg-type]
                 output_type=output_type,
-                tool_use_behavior=tool_use_behavior,
+                tool_use_behavior=tool_use_behavior,  # type: ignore[arg-type]
                 mcp_timeout_seconds=mcp_timeout_seconds,
-                input_guardrails=input_guardrails,
-                output_guardrails=output_guardrails,
+                input_guardrails=input_guardrails,  # type: ignore[arg-type]
+                output_guardrails=output_guardrails,  # type: ignore[arg-type]
                 max_turns=max_turns,
                 previous_response_id=previous_response_id,
             )
@@ -237,15 +237,15 @@ class OpenAIModule:
                 agent_name=agent_name,
                 agent_instructions=agent_instructions,
                 handoff_description=handoff_description,
-                handoffs=handoffs,
+                handoffs=handoffs,  # type: ignore[arg-type]
                 model=model,
-                model_settings=model_settings,
-                tools=tools,
+                model_settings=model_settings,  # type: ignore[arg-type]
+                tools=tools,  # type: ignore[arg-type]
                 output_type=output_type,
-                tool_use_behavior=tool_use_behavior,
+                tool_use_behavior=tool_use_behavior,  # type: ignore[arg-type]
                 mcp_timeout_seconds=mcp_timeout_seconds,
-                input_guardrails=input_guardrails,
-                output_guardrails=output_guardrails,
+                input_guardrails=input_guardrails,  # type: ignore[arg-type]
+                output_guardrails=output_guardrails,  # type: ignore[arg-type]
                 max_turns=max_turns,
                 previous_response_id=previous_response_id,
             )
