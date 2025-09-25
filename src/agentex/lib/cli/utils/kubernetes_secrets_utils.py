@@ -172,11 +172,11 @@ def get_secret_data(
     v1 = get_k8s_client(context)
     try:
         secret = v1.read_namespaced_secret(name=name, namespace=namespace)
-        if secret.data:
+        if secret.data:  # type: ignore[union-attr]
             # Decode base64 data
             return {
                 key: base64.b64decode(value).decode("utf-8")
-                for key, value in secret.data.items()
+                for key, value in secret.data.items()  # type: ignore[union-attr]
             }
         return {}
     except ApiException as e:

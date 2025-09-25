@@ -138,9 +138,9 @@ def get_secret(name: str, namespace: str, context: str | None = None) -> dict[st
     try:
         secret = v1.read_namespaced_secret(name=name, namespace=namespace)
         return {
-            "name": secret.metadata.name,
+            "name": secret.metadata.name,  # type: ignore[union-attr]
             "namespace": namespace,
-            "created": secret.metadata.creation_timestamp.isoformat(),
+            "created": secret.metadata.creation_timestamp.isoformat(),  # type: ignore[union-attr]
             "exists": True,
         }
     except ApiException as e:
@@ -218,7 +218,7 @@ def sync_user_defined_secrets(
     cluster_secret_names = {secret["name"] for secret in found_secrets}
     # Get the secrets from the manifest
     agent_config: AgentConfig = manifest_obj.agent
-    manifest_credentials: list[CredentialMapping] = agent_config.credentials or []
+    manifest_credentials: list[CredentialMapping] = agent_config.credentials or []  # type: ignore[assignment]
 
     if not manifest_credentials:
         console.print("[yellow]No credentials found in manifest[/yellow]")
@@ -465,7 +465,7 @@ def sync_image_pull_secrets(
     }
 
     # Get the secrets from the manifest
-    deployment_config: DeploymentConfig = manifest_obj.deployment
+    deployment_config: DeploymentConfig = manifest_obj.deployment  # type: ignore[assignment]
     manifest_image_pull_secrets: list[ImagePullSecretConfig] = (
         deployment_config.imagePullSecrets or []
     )
