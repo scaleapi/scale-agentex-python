@@ -21,8 +21,13 @@ async def handle_message_send(
     params: SendMessageParams
 ) -> Union[TaskMessageContent, AsyncGenerator[TaskMessageUpdate, None]]:
     """Default message handler with streaming support"""
+    # Extract content safely from the message
+    message_text = ""
+    if hasattr(params.content, 'content') and isinstance(params.content.content, str):
+        message_text = params.content.content
+
     return TextContent(
         author="agent",
-        content=f"Hello! I've received your message. Here's a generic response, but in future tutorials we'll see how you can get me to intelligently respond to your message. This is what I heard you say: {params.content.content}",
+        content=f"Hello! I've received your message. Here's a generic response, but in future tutorials we'll see how you can get me to intelligently respond to your message. This is what I heard you say: {message_text}",
     )
 
