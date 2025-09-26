@@ -358,7 +358,6 @@ class OpenAIService:
             },
         ) as span:
             heartbeat_if_in_workflow("run agent auto send")
-
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
@@ -396,12 +395,9 @@ class OpenAIService:
                     result = await Runner.run(
                         starting_agent=agent, input=input_list, previous_response_id=previous_response_id
                     )
-                else:
-                    result = await Runner.run(starting_agent=agent, input=input_list)
-
-                if span:
-                    span.output = {
-                        "new_items": [
+                            item.raw_item.model_dump()
+                            if isinstance(item.raw_item, BaseModel)
+                            else item.raw_item
                             item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
                             for item in result.new_items
                         ],
@@ -431,7 +427,6 @@ class OpenAIService:
 
                     elif item.type == "tool_call_item":
                         tool_call_item = item.raw_item
-
                         # Extract tool call information using the helper method
                         call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
                         tool_call_map[call_id] = tool_call_item
@@ -557,9 +552,15 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent streamed")
 
-            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
+            async with mcp_server_context(
+                mcp_server_params, mcp_timeout_seconds
+            ) as servers:
                 tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                handoffs = (
+                    [Agent(**handoff.model_dump()) for handoff in handoffs]
+                    if handoffs
+                    else []
+                )
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -572,7 +573,9 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings()
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -600,7 +603,9 @@ class OpenAIService:
                 if span:
                     span.output = {
                         "new_items": [
-                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                            item.raw_item.model_dump()
+                            if isinstance(item.raw_item, BaseModel)
+                            else item.raw_item
                             for item in result.new_items
                         ],
                         "final_output": result.final_output,
@@ -733,7 +738,6 @@ class OpenAIService:
                         if event.type == "run_item_stream_event":
                             if event.item.type == "tool_call_item":
                                 tool_call_item = event.item.raw_item
-
                                 # Extract tool call information using the helper method
                                 call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
                                 tool_call_map[call_id] = tool_call_item
@@ -746,10 +750,12 @@ class OpenAIService:
                                 )
 
                                 # Create tool request using streaming context (immediate completion)
-                                async with self.streaming_service.streaming_task_message_context(
-                                    task_id=task_id,
-                                    initial_content=tool_request_content,
-                                ) as streaming_context:
+                                async with (
+                                    self.streaming_service.streaming_task_message_context(
+                                        task_id=task_id,
+                                        initial_content=tool_request_content,
+                                    ) as streaming_context
+                                ):
                                     # The message has already been persisted, but we still need to send an upda
                                     await streaming_context.stream_update(
                                         update=StreamTaskMessageFull(
@@ -775,9 +781,12 @@ class OpenAIService:
                                 )
 
                                 # Create tool response using streaming context (immediate completion)
-                                async with self.streaming_service.streaming_task_message_context(
-                                    task_id=task_id, initial_content=tool_response_content
-                                ) as streaming_context:
+                                async with (
+                                    self.streaming_service.streaming_task_message_context(
+                                        task_id=task_id,
+                                        initial_content=tool_response_content
+                                    ) as streaming_context
+                                ):
                                     # The message has already been persisted, but we still need to send an update
                                     await streaming_context.stream_update(
                                         update=StreamTaskMessageFull(
@@ -803,10 +812,14 @@ class OpenAIService:
                                         ),
                                     )
                                     # Open the streaming context
-                                    item_id_to_streaming_context[item_id] = await streaming_context.open()
+                                    item_id_to_streaming_context[
+                                        item_id
+                                    ] = await streaming_context.open()
                                     unclosed_item_ids.add(item_id)
                                 else:
-                                    streaming_context = item_id_to_streaming_context[item_id]
+                                    streaming_context = item_id_to_streaming_context[
+                                        item_id
+                                    ]
 
                                 # Stream the delta through the streaming service
                                 await streaming_context.stream_update(
@@ -836,10 +849,14 @@ class OpenAIService:
                                         ),
                                     )
                                     # Open the streaming context
-                                    item_id_to_streaming_context[item_id] = await streaming_context.open()
+                                    item_id_to_streaming_context[
+                                        item_id
+                                    ] = await streaming_context.open()
                                     unclosed_item_ids.add(item_id)
                                 else:
-                                    streaming_context = item_id_to_streaming_context[item_id]
+                                    streaming_context = item_id_to_streaming_context[
+                                        item_id
+                                    ]
 
                                 # Stream the summary delta through the streaming service
                                 await streaming_context.stream_update(
@@ -873,10 +890,14 @@ class OpenAIService:
                                         ),
                                     )
                                     # Open the streaming context
-                                    item_id_to_streaming_context[item_id] = await streaming_context.open()
+                                    item_id_to_streaming_context[
+                                        item_id
+                                    ] = await streaming_context.open()
                                     unclosed_item_ids.add(item_id)
                                 else:
-                                    streaming_context = item_id_to_streaming_context[item_id]
+                                    streaming_context = item_id_to_streaming_context[
+                                        item_id
+                                    ]
 
                                 # Stream the content delta through the streaming service
                                 await streaming_context.stream_update(
@@ -904,7 +925,6 @@ class OpenAIService:
                                 # to close the streaming context, but they do!!!
                                 # They output both a ResponseReasoningSummaryTextDoneEvent and a ResponseReasoningSummaryPartDoneEvent
                                 # I have no idea why they do this.
-
                             elif isinstance(event.data, ResponseReasoningTextDoneEvent):
                                 # Handle reasoning content text completion
                                 item_id = event.data.item_id
@@ -920,7 +940,9 @@ class OpenAIService:
 
                                 # Finish the streaming context (sends DONE event and updates message)
                                 if item_id in item_id_to_streaming_context:
-                                    streaming_context = item_id_to_streaming_context[item_id]
+                                    streaming_context = item_id_to_streaming_context[
+                                        item_id
+                                    ]
                                     await streaming_context.close()
                                     if item_id in unclosed_item_ids:
                                         unclosed_item_ids.remove(item_id)
@@ -930,17 +952,17 @@ class OpenAIService:
                                 # Create a copy to avoid modifying set during iteration
                                 remaining_items = list(unclosed_item_ids)
                                 for item_id in remaining_items:
-                                    if (
-                                        item_id in unclosed_item_ids and item_id in item_id_to_streaming_context
-                                    ):  # Check if still unclosed
-                                        streaming_context = item_id_to_streaming_context[item_id]
+                                    if (item_id in unclosed_item_ids and
+                                            item_id in item_id_to_streaming_context):  # Check if still unclosed
+                                        streaming_context = item_id_to_streaming_context[
+                                            item_id
+                                        ]
                                         await streaming_context.close()
                                         unclosed_item_ids.discard(item_id)
 
                 except InputGuardrailTripwireTriggered as e:
                     # Handle guardrail trigger by sending a rejection message
                     rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
-
                     # Try to extract rejection message from the guardrail result
                     if hasattr(e, "guardrail_result") and hasattr(e.guardrail_result, "output"):
                         output_info = getattr(e.guardrail_result.output, "output_info", {})
@@ -971,7 +993,6 @@ class OpenAIService:
                                 type="full",
                             ),
                         )
-
                     # Re-raise to let the activity handle it
                     raise
 
@@ -1009,7 +1030,6 @@ class OpenAIService:
                                 type="full",
                             ),
                         )
-
                     # Re-raise to let the activity handle it
                     raise
 
