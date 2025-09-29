@@ -71,11 +71,12 @@ DUPLICATE_POLICY_TO_ID_REUSE_POLICY = {
 
 
 class TemporalClient:
-    def __init__(self, temporal_client: Client | None = None):
+    def __init__(self, temporal_client: Client | None = None, plugins: list[Any] = []):
         self._client: Client = temporal_client
+        self._plugins = plugins
 
     @classmethod
-    async def create(cls, temporal_address: str):
+    async def create(cls, temporal_address: str, plugins: list[Any] = []):
         if temporal_address in [
             "false",
             "False",
@@ -88,8 +89,11 @@ class TemporalClient:
         ]:
             _client = None
         else:
-            _client = await get_temporal_client(temporal_address)
-        return cls(_client)
+            _client = await get_temporal_client(
+                temporal_address, 
+                plugins=plugins
+            )
+        return cls(_client, plugins)
 
     async def setup(self, temporal_address: str):
         self._client = await self._get_temporal_client(
@@ -109,7 +113,10 @@ class TemporalClient:
         ]:
             return None
         else:
-            return await get_temporal_client(temporal_address)
+            return await get_temporal_client(
+                temporal_address, 
+                plugins=self._plugins
+            )
 
     async def start_workflow(
         self,

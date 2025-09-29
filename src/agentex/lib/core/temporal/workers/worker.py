@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, overload
 
 from aiohttp import web
-from temporalio.client import Client
+from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.converter import (
     AdvancedJSONEncoder,
     CompositePayloadConverter,
@@ -19,6 +19,7 @@ from temporalio.converter import (
 )
 from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
 from temporalio.worker import (
+    Plugin as WorkerPlugin,
     UnsandboxedWorkflowRunner,
     Worker,
 )
@@ -65,11 +66,25 @@ custom_data_converter = dataclasses.replace(
     payload_converter_class=DateTimePayloadConverter,
 )
 
+def _validate_plugins(plugins: list) -> None:
+    """Validate that all items in the plugins list are valid Temporal plugins."""
+    for i, plugin in enumerate(plugins):
+        if not isinstance(plugin, (ClientPlugin, WorkerPlugin)):
+            raise TypeError(
+                f"Plugin at index {i} must be an instance of temporalio.client.Plugin "
+                f"or temporalio.worker.Plugin, got {type(plugin).__name__}"
+            )
 
-async def get_temporal_client(temporal_address: str, metrics_url: str = None) -> Client:
+
+
+async def get_temporal_client(temporal_address: str, metrics_url: str = None, plugins: list = []) -> Client:
+
+    if plugins != []: # We don't need to validate the plugins if they are empty
+        _validate_plugins(plugins)
+
     if not metrics_url:
         client = await Client.connect(
-            target_host=temporal_address, data_converter=custom_data_converter
+            target_host=temporal_address, data_converter=custom_data_converter, plugins=plugins
         )
     else:
         runtime = Runtime(
@@ -90,6 +105,7 @@ class AgentexWorker:
         max_workers: int = 10,
         max_concurrent_activities: int = 10,
         health_check_port: int = 80,
+        plugins: list = [],
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -98,6 +114,7 @@ class AgentexWorker:
         self.health_check_server_running = False
         self.healthy = False
         self.health_check_port = health_check_port
+        self.plugins = plugins
 
     @overload
     async def run(
@@ -126,6 +143,7 @@ class AgentexWorker:
         await self._register_agent()
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
+            plugins=self.plugins,
         )
         
         # Enable debug mode if AgentEx debug is enabled (disables deadlock detection)

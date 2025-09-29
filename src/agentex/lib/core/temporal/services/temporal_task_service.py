@@ -23,6 +23,7 @@ class TemporalTaskService:
         self._temporal_client = temporal_client
         self._env_vars = env_vars
 
+
     async def submit_task(self, agent: Agent, task: Task, params: dict[str, Any] | None) -> str:
         """
         Submit a task to the async runtime for execution.

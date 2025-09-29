@@ -1,9 +1,8 @@
 import inspect
-import json
 import os
 from pathlib import Path
 
-from typing import Literal
+from typing import Any, Literal
 from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
@@ -50,10 +49,12 @@ class FastACP:
         implementation_class = AGENTIC_ACP_IMPLEMENTATIONS[config.type]
         # Handle temporal-specific configuration
         if config.type == "temporal":
-            # Extract temporal_address from config if it's a TemporalACPConfig
+            # Extract temporal_address and plugins from config if it's a TemporalACPConfig
             temporal_config = kwargs.copy()
             if hasattr(config, "temporal_address"):
                 temporal_config["temporal_address"] = config.temporal_address
+            if hasattr(config, "plugins"):
+                temporal_config["plugins"] = config.plugins
             return implementation_class.create(**temporal_config)
         else:
             return implementation_class.create(**kwargs)
@@ -68,7 +69,9 @@ class FastACP:
 
     @staticmethod
     def create(
-        acp_type: Literal["sync", "agentic"], config: BaseACPConfig | None = None, **kwargs
+        acp_type: Literal["sync", "agentic"], 
+        config: BaseACPConfig | None = None, 
+        **kwargs
     ) -> BaseACPServer | SyncACP | AgenticBaseACP | TemporalACP:
         """Main factory method to create any ACP type
 

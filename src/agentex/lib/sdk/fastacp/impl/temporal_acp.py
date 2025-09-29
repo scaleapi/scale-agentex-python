@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Callable
+from typing import Any, AsyncGenerator, Callable
 
 from fastapi import FastAPI
 
@@ -24,18 +24,19 @@ class TemporalACP(BaseACPServer):
     """
 
     def __init__(
-        self, temporal_address: str, temporal_task_service: TemporalTaskService | None = None
+        self, temporal_address: str, temporal_task_service: TemporalTaskService | None = None, plugins: list[Any] | None = None
     ):
         super().__init__()
         self._temporal_task_service = temporal_task_service
         self._temporal_address = temporal_address
+        self._plugins = plugins or []
 
     @classmethod
-    def create(cls, temporal_address: str) -> "TemporalACP":
+    def create(cls, temporal_address: str, plugins: list[Any] | None = None) -> "TemporalACP":
         logger.info("Initializing TemporalACP instance")
 
         # Create instance without temporal client initially
-        temporal_acp = cls(temporal_address=temporal_address)
+        temporal_acp = cls(temporal_address=temporal_address, plugins=plugins)
         temporal_acp._setup_handlers()
         logger.info("TemporalACP instance initialized now")
         return temporal_acp
@@ -51,7 +52,8 @@ class TemporalACP(BaseACPServer):
             if self._temporal_task_service is None:
                 env_vars = EnvironmentVariables.refresh()
                 temporal_client = await TemporalClient.create(
-                    temporal_address=self._temporal_address
+                    temporal_address=self._temporal_address,
+                    plugins=self._plugins
                 )
                 self._temporal_task_service = TemporalTaskService(
                     temporal_client=temporal_client,
