@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.18 (2025-09-29)
+
+Full Changelog: [v0.4.16...v0.4.18](https://github.com/scaleapi/agentex-python/compare/v0.4.16...v0.4.18)
+
+### Bug Fixes
+
+* **openai.py:** Fix IndentationError that was introduced in 0.4.17 breaking agent deployments
+* Skip broken 0.4.17 release and jump directly to 0.4.18 with fixes
+* Resolve syntax errors in OpenAI provider that prevented module imports
+
+### Notes
+
+* Version 0.4.17 contained broken codegen changes that caused `IndentationError: unexpected indent` 
+* This release restores working functionality for users affected by the broken 0.4.17 release
+* Users should upgrade directly from 0.4.16 to 0.4.18, skipping 0.4.17
+
 ## 0.4.16 (2025-09-16)
 
 Full Changelog: [v0.4.15...v0.4.16](https://github.com/scaleapi/agentex-python/compare/v0.4.15...v0.4.16)
