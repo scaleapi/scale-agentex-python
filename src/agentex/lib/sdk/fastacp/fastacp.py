@@ -23,7 +23,6 @@ AGENTIC_ACP_IMPLEMENTATIONS: dict[Literal["temporal", "base"], type[BaseACPServe
 
 logger = make_logger(__name__)
 
-
 class FastACP:
     """Factory for creating FastACP instances
 
