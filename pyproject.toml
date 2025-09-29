@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.4.17"
+version = "0.4.16"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -86,6 +86,7 @@ dev-dependencies = [
     "dirty-equals>=0.6.0",
     "importlib-metadata>=6.7.0",
     "rich>=13.7.1",
+    "nest_asyncio==1.6.0",
     "pytest-xdist>=3.6.1",
     "debugpy>=1.8.15",
 ]
