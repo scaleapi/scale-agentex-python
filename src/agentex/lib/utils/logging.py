@@ -7,8 +7,6 @@ import os
 import ddtrace
 from ddtrace import tracer
 
-from agentex.lib.environment_variables import Environment, EnvironmentVariables
-
 _is_datadog_configured = bool(os.environ.get("DD_AGENT_HOST"))
 
 ctx_var_request_id = contextvars.ContextVar[str]("request_id")
@@ -56,8 +54,8 @@ def make_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
 
-    environment_variables = EnvironmentVariables.refresh()
-    if environment_variables.ENVIRONMENT != Environment.STAGING and environment_variables.ENVIRONMENT != Environment.PROD:
+    environment = os.getenv("ENVIRONMENT")
+    if environment == "local":
         console = Console()
         # Add the RichHandler to the logger to print colored text
         handler = RichHandler(
