@@ -1,22 +1,21 @@
 import os
-import subprocess
 import tempfile
-from pathlib import Path
+import subprocess
 from typing import Any
+from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import Field, BaseModel
 from rich.console import Console
 
-from agentex.lib.cli.utils.exceptions import DeploymentError, HelmError
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
-from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
-from agentex.lib.cli.utils.path_utils import calculate_docker_acp_module, PathResolutionError
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.exceptions import HelmError, DeploymentError
+from agentex.lib.cli.utils.path_utils import PathResolutionError, calculate_docker_acp_module
 from agentex.lib.environment_variables import EnvVarKeys
+from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
-
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
 
 logger = make_logger(__name__)
 console = Console()
@@ -265,7 +264,7 @@ def merge_deployment_configs(
     if not helm_overrides_command:
         add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
     
-    print("Deploying with the following helm values: ", helm_values)
+    console.print("Deploying with the following helm values: ", helm_values)
     return helm_values
 
 
