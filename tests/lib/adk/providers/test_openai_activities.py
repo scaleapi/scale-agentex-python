@@ -76,6 +76,60 @@ class TestOpenAIActivities:
             assert "max_turns" not in call_args.kwargs, "max_turns should not be passed when None"
 
     @pytest.mark.parametrize(
+        "previous_response_id,should_be_passed",
+        [
+            (None, False),
+            ("response_123", True),
+        ],
+    )
+    @patch("agents.Runner.run")
+    async def test_run_agent_previous_response_id(
+        self, mock_runner_run, previous_response_id, should_be_passed, sample_run_result
+    ):
+        """Test run_agent with previous_response_id parameter."""
+        from agentex.lib.core.temporal.activities.adk.providers.openai_activities import RunAgentParams
+
+        # Arrange
+        mock_runner_run.return_value = sample_run_result
+        mock_tracer = self._create_mock_tracer()
+        _, openai_activities, env = self._create_test_setup(mock_tracer)
+
+        # Create params with or without previous_response_id
+        params = RunAgentParams(
+            input_list=[{"role": "user", "content": "Hello, world!"}],
+            mcp_server_params=[],
+            agent_name="test_agent",
+            agent_instructions="You are a helpful assistant",
+            previous_response_id=previous_response_id,
+            trace_id="test-trace-id",
+            parent_span_id="test-span-id",
+        )
+
+        # Act
+        result = await env.run(openai_activities.run_agent, params)
+
+        # Assert - Result structure
+        self._assert_result_structure(result)
+
+        # Assert - Runner call
+        mock_runner_run.assert_called_once()
+        call_args = mock_runner_run.call_args
+
+        # Assert - Runner signature validation
+        self._assert_runner_call_signature(call_args)
+
+        # Assert - Previous response ID parameter handling
+        if should_be_passed:
+            assert "previous_response_id" in call_args.kwargs, (
+                f"previous_response_id should be passed when set to {previous_response_id}"
+            )
+            assert call_args.kwargs["previous_response_id"] == previous_response_id, (
+                f"previous_response_id value should be {previous_response_id}"
+            )
+        else:
+            assert "previous_response_id" not in call_args.kwargs, "previous_response_id should not be passed when None"
+
+    @pytest.mark.parametrize(
         "tools_case",
         [
             "no_tools",

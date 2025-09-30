@@ -1,28 +1,27 @@
 import os
-import subprocess
 import tempfile
-from pathlib import Path
+import subprocess
 from typing import Any
+from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import Field, BaseModel
 from rich.console import Console
 
-from agentex.lib.cli.utils.exceptions import DeploymentError, HelmError
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
-from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
-from agentex.lib.cli.utils.path_utils import calculate_docker_acp_module, PathResolutionError
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.exceptions import HelmError, DeploymentError
+from agentex.lib.cli.utils.path_utils import PathResolutionError, calculate_docker_acp_module
 from agentex.lib.environment_variables import EnvVarKeys
+from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
-
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
 
 logger = make_logger(__name__)
 console = Console()
 
 TEMPORAL_WORKER_KEY = "temporal-worker"
-AGENTEX_AGENTS_HELM_CHART_VERSION = "0.1.6-v1-beta"
+AGENTEX_AGENTS_HELM_CHART_VERSION = "0.1.7-v4-beta"
 
 
 class InputDeployOverrides(BaseModel):
@@ -46,7 +45,7 @@ def check_helm_installed() -> bool:
         return False
 
 
-def add_helm_repo() -> None:
+def add_helm_repo(helm_repository_name: str, helm_repository_url: str) -> None:
     """Add the agentex helm repository if not already added"""
     try:
         # Check if repo already exists
@@ -54,15 +53,15 @@ def add_helm_repo() -> None:
             ["helm", "repo", "list"], capture_output=True, text=True, check=True
         )
 
-        if "scale-egp" not in result.stdout:
+        if helm_repository_name not in result.stdout:
             console.print("Adding agentex helm repository...")
             subprocess.run(
                 [
                     "helm",
                     "repo",
                     "add",
-                    "scale-egp",
-                    "https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts",
+                    helm_repository_name,
+                    helm_repository_url,
                 ],
                 check=True,
             )
@@ -260,10 +259,12 @@ def merge_deployment_configs(
         helm_values["global"]["imagePullSecrets"] = pull_secrets
         helm_values["imagePullSecrets"] = pull_secrets
 
-    # Add dynamic ACP command based on manifest configuration
-    add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
+    # Add dynamic ACP command based on manifest configuration if command is not set in helm overrides
+    helm_overrides_command = agent_env_config and agent_env_config.helm_overrides and "command" in agent_env_config.helm_overrides
+    if not helm_overrides_command:
+        add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
     
-    print("Deploying with the following helm values: ", helm_values)
+    console.print("Deploying with the following helm values: ", helm_values)
     return helm_values
 
 
@@ -316,8 +317,14 @@ def deploy_agent(
         else:
             console.print(f"[yellow]⚠[/yellow] No environments.yaml found, skipping environment-specific config")
 
+    if agent_env_config:
+        helm_repository_name = agent_env_config.helm_repository_name
+        helm_repository_url = agent_env_config.helm_repository_url
+    else:
+        helm_repository_name = "scale-egp"
+        helm_repository_url = "https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts"
     # Add helm repository/update
-    add_helm_repo()
+    add_helm_repo(helm_repository_name, helm_repository_url)
 
     # Merge configurations
     helm_values = merge_deployment_configs(manifest, agent_env_config, deploy_overrides, manifest_path)
@@ -347,7 +354,7 @@ def deploy_agent(
                 "helm",
                 "upgrade",
                 release_name,
-                "scale-egp/agentex-agent",
+                f"{helm_repository_name}/agentex-agent",
                 "--version",
                 AGENTEX_AGENTS_HELM_CHART_VERSION,
                 "-f",
@@ -369,7 +376,7 @@ def deploy_agent(
                 "helm",
                 "install",
                 release_name,
-                "scale-egp/agentex-agent",
+                f"{helm_repository_name}/agentex-agent",
                 "--version",
                 AGENTEX_AGENTS_HELM_CHART_VERSION,
                 "-f",

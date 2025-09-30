@@ -85,9 +85,7 @@ class OpenAIService:
         self.streaming_service = streaming_service
         self.tracer = tracer
 
-    def _extract_tool_call_info(
-        self, tool_call_item: Any
-    ) -> tuple[str, str, dict[str, Any]]:
+    def _extract_tool_call_info(self, tool_call_item: Any) -> tuple[str, str, dict[str, Any]]:
         """
         Extract call_id, tool_name, and tool_arguments from a tool call item.
 
@@ -99,9 +97,9 @@ class OpenAIService:
         """
         # Generic handling for different tool call types
         # Try 'call_id' first, then 'id', then generate placeholder
-        if hasattr(tool_call_item, 'call_id'):
+        if hasattr(tool_call_item, "call_id"):
             call_id = tool_call_item.call_id
-        elif hasattr(tool_call_item, 'id'):
+        elif hasattr(tool_call_item, "id"):
             call_id = tool_call_item.id
         else:
             call_id = f"unknown_call_{id(tool_call_item)}"
@@ -113,26 +111,18 @@ class OpenAIService:
 
         if isinstance(tool_call_item, ResponseFunctionWebSearch):
             tool_name = "web_search"
-            tool_arguments = {
-                "action": tool_call_item.action.model_dump(),
-                "status": tool_call_item.status
-            }
+            tool_arguments = {"action": tool_call_item.action.model_dump(), "status": tool_call_item.status}
         elif isinstance(tool_call_item, ResponseCodeInterpreterToolCall):
             tool_name = "code_interpreter"
-            tool_arguments = {
-                "code": tool_call_item.code,
-                "status": tool_call_item.status
-            }
+            tool_arguments = {"code": tool_call_item.code, "status": tool_call_item.status}
         else:
             # Generic handling for any tool call type
-            tool_name = getattr(tool_call_item, 'name', type(tool_call_item).__name__)
+            tool_name = getattr(tool_call_item, "name", type(tool_call_item).__name__)
             tool_arguments = tool_call_item.model_dump()
-            
+
         return call_id, tool_name, tool_arguments
 
-    def _extract_tool_response_info(
-        self, tool_call_map: dict[str, Any], tool_output_item: Any
-    ) -> tuple[str, str, str]:
+    def _extract_tool_response_info(self, tool_call_map: dict[str, Any], tool_output_item: Any) -> tuple[str, str, str]:
         """
         Extract call_id, tool_name, and content from a tool output item.
 
@@ -145,14 +135,14 @@ class OpenAIService:
         """
         # Extract call_id and content from the tool_output_item
         # Handle both dictionary access and attribute access
-        if hasattr(tool_output_item, 'get') and callable(tool_output_item.get):
+        if hasattr(tool_output_item, "get") and callable(tool_output_item.get):
             # Dictionary-like access
             call_id = tool_output_item["call_id"]
             content = tool_output_item["output"]
         else:
             # Attribute access for structured objects
-            call_id = getattr(tool_output_item, 'call_id', None)
-            content = getattr(tool_output_item, 'output', None)
+            call_id = getattr(tool_output_item, "call_id", None)
+            content = getattr(tool_output_item, "output", None)
 
         # Get the name from the tool call map using generic approach
         tool_call = tool_call_map[call_id]
@@ -180,14 +170,13 @@ class OpenAIService:
         tools: list[BaseModel] | None = None,
         output_type: type[Any] | None = None,
         tool_use_behavior: (
-            Literal["run_llm_again", "stop_on_first_tool"]
-            | StopAtTools
-            | ToolsToFinalOutputFunction
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
+        previous_response_id: str | None = None,
     ) -> RunResult:
         """
         Run an agent without streaming or TaskMessage creation.
@@ -206,11 +195,11 @@ class OpenAIService:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
-            mcp_timeout_seconds: Optional param to set the timeout threshold 
+            mcp_timeout_seconds: Optional param to set the timeout threshold
                 for the MCP servers. Defaults to 5 seconds.
-            input_guardrails: Optional list of input guardrails to run on 
+            input_guardrails: Optional list of input guardrails to run on
                 initial user input.
-            output_guardrails: Optional list of output guardrails to run on 
+            output_guardrails: Optional list of output guardrails to run on
                 final agent output.
             mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
             max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
@@ -240,17 +229,9 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent")
 
-            async with mcp_server_context(
-                mcp_server_params, mcp_timeout_seconds
-            ) as servers:
-                tools = [
-                    tool.to_oai_function_tool()for tool in tools
-                ] if tools else []
-                handoffs = (
-                    [Agent(**handoff.model_dump()) for handoff in handoffs]
-                    if handoffs
-                    else []
-                )
+            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
+                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
 
                 agent_kwargs = {
                     "name": agent_name,
@@ -264,9 +245,7 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings()
-                    )
+                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -275,17 +254,26 @@ class OpenAIService:
                 agent = Agent(**agent_kwargs)
 
                 # Run without streaming
-                if max_turns is not None:
+                if max_turns is not None and previous_response_id is not None:
+                    result = await Runner.run(
+                        starting_agent=agent,
+                        input=input_list,
+                        max_turns=max_turns,
+                        previous_response_id=previous_response_id,
+                    )
+                elif max_turns is not None:
                     result = await Runner.run(starting_agent=agent, input=input_list, max_turns=max_turns)
+                elif previous_response_id is not None:
+                    result = await Runner.run(
+                        starting_agent=agent, input=input_list, previous_response_id=previous_response_id
+                    )
                 else:
                     result = await Runner.run(starting_agent=agent, input=input_list)
 
                 if span:
                     span.output = {
                         "new_items": [
-                            item.raw_item.model_dump()
-                            if isinstance(item.raw_item, BaseModel)
-                            else item.raw_item
+                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
                             for item in result.new_items
                         ],
                         "final_output": result.final_output,
@@ -309,14 +297,13 @@ class OpenAIService:
         tools: list[BaseModel] | None = None,
         output_type: type[Any] | None = None,
         tool_use_behavior: (
-            Literal["run_llm_again", "stop_on_first_tool"]
-            | StopAtTools
-            | ToolsToFinalOutputFunction
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
+        previous_response_id: str | None = None,
     ) -> RunResult:
         """
         Run an agent with automatic TaskMessage creation.
@@ -372,15 +359,9 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent auto send")
 
-            async with mcp_server_context(
-                mcp_server_params, mcp_timeout_seconds
-            ) as servers:
+            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = (
-                    [Agent(**handoff.model_dump()) for handoff in handoffs]
-                    if handoffs
-                    else []
-                )
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -393,9 +374,7 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings()
-                    )
+                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -404,17 +383,26 @@ class OpenAIService:
                 agent = Agent(**agent_kwargs)
 
                 # Run without streaming
-                if max_turns is not None:
+                if max_turns is not None and previous_response_id is not None:
+                    result = await Runner.run(
+                        starting_agent=agent,
+                        input=input_list,
+                        max_turns=max_turns,
+                        previous_response_id=previous_response_id,
+                    )
+                elif max_turns is not None:
                     result = await Runner.run(starting_agent=agent, input=input_list, max_turns=max_turns)
+                elif previous_response_id is not None:
+                    result = await Runner.run(
+                        starting_agent=agent, input=input_list, previous_response_id=previous_response_id
+                    )
                 else:
                     result = await Runner.run(starting_agent=agent, input=input_list)
 
                 if span:
                     span.output = {
                         "new_items": [
-                            item.raw_item.model_dump()
-                            if isinstance(item.raw_item, BaseModel)
-                            else item.raw_item
+                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
                             for item in result.new_items
                         ],
                         "final_output": result.final_output,
@@ -429,12 +417,10 @@ class OpenAIService:
                             content=item.raw_item.content[0].text,
                         )
                         # Create message for the final result using streaming context
-                        async with (
-                            self.streaming_service.streaming_task_message_context(
-                                task_id=task_id,
-                                initial_content=text_content,
-                            ) as streaming_context
-                        ):
+                        async with self.streaming_service.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=text_content,
+                        ) as streaming_context:
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
@@ -445,7 +431,7 @@ class OpenAIService:
 
                     elif item.type == "tool_call_item":
                         tool_call_item = item.raw_item
-                        
+
                         # Extract tool call information using the helper method
                         call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
                         tool_call_map[call_id] = tool_call_item
@@ -458,12 +444,10 @@ class OpenAIService:
                         )
 
                         # Create tool request using streaming context
-                        async with (
-                            self.streaming_service.streaming_task_message_context(
-                                task_id=task_id,
-                                initial_content=tool_request_content,
-                            ) as streaming_context
-                        ):
+                        async with self.streaming_service.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=tool_request_content,
+                        ) as streaming_context:
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
@@ -476,9 +460,7 @@ class OpenAIService:
                         tool_output_item = item.raw_item
 
                         # Extract tool response information using the helper method
-                        call_id, tool_name, content = self._extract_tool_response_info(
-                            tool_call_map, tool_output_item
-                        )
+                        call_id, tool_name, content = self._extract_tool_response_info(tool_call_map, tool_output_item)
 
                         tool_response_content = ToolResponseContent(
                             author="agent",
@@ -487,12 +469,9 @@ class OpenAIService:
                             content=content,
                         )
                         # Create tool response using streaming context
-                        async with (
-                            self.streaming_service.streaming_task_message_context(
-                                task_id=task_id,
-                                initial_content=tool_response_content
-                            ) as streaming_context
-                        ):
+                        async with self.streaming_service.streaming_task_message_context(
+                            task_id=task_id, initial_content=tool_response_content
+                        ) as streaming_context:
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageFull(
                                     parent_task_message=streaming_context.task_message,
@@ -519,14 +498,13 @@ class OpenAIService:
         tools: list[BaseModel] | None = None,
         output_type: type[Any] | None = None,
         tool_use_behavior: (
-            Literal["run_llm_again", "stop_on_first_tool"]
-            | StopAtTools
-            | ToolsToFinalOutputFunction
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
+        previous_response_id: str | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled but no TaskMessage creation.
@@ -545,11 +523,11 @@ class OpenAIService:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
-            mcp_timeout_seconds: Optional param to set the timeout threshold 
+            mcp_timeout_seconds: Optional param to set the timeout threshold
                 for the MCP servers. Defaults to 5 seconds.
-            input_guardrails: Optional list of input guardrails to run on 
+            input_guardrails: Optional list of input guardrails to run on
                 initial user input.
-            output_guardrails: Optional list of output guardrails to run on 
+            output_guardrails: Optional list of output guardrails to run on
                 final agent output.
             mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
             max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
@@ -579,15 +557,9 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent streamed")
 
-            async with mcp_server_context(
-                mcp_server_params, mcp_timeout_seconds
-            ) as servers:
+            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = (
-                    [Agent(**handoff.model_dump()) for handoff in handoffs]
-                    if handoffs
-                    else []
-                )
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -600,9 +572,7 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings()
-                    )
+                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -611,17 +581,26 @@ class OpenAIService:
                 agent = Agent(**agent_kwargs)
 
                 # Run with streaming (but no TaskMessage creation)
-                if max_turns is not None:
+                if max_turns is not None and previous_response_id is not None:
+                    result = Runner.run_streamed(
+                        starting_agent=agent,
+                        input=input_list,
+                        max_turns=max_turns,
+                        previous_response_id=previous_response_id,
+                    )
+                elif max_turns is not None:
                     result = Runner.run_streamed(starting_agent=agent, input=input_list, max_turns=max_turns)
+                elif previous_response_id is not None:
+                    result = Runner.run_streamed(
+                        starting_agent=agent, input=input_list, previous_response_id=previous_response_id
+                    )
                 else:
                     result = Runner.run_streamed(starting_agent=agent, input=input_list)
 
                 if span:
                     span.output = {
                         "new_items": [
-                            item.raw_item.model_dump()
-                            if isinstance(item.raw_item, BaseModel)
-                            else item.raw_item
+                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
                             for item in result.new_items
                         ],
                         "final_output": result.final_output,
@@ -645,14 +624,13 @@ class OpenAIService:
         tools: list[BaseModel] | None = None,
         output_type: type[Any] | None = None,
         tool_use_behavior: (
-            Literal["run_llm_again", "stop_on_first_tool"]
-            | StopAtTools
-            | ToolsToFinalOutputFunction
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
+        previous_response_id: str | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
@@ -672,11 +650,11 @@ class OpenAIService:
             tools: Optional list of tools.
             output_type: Optional output type.
             tool_use_behavior: Optional tool use behavior.
-            mcp_timeout_seconds: Optional param to set the timeout threshold 
+            mcp_timeout_seconds: Optional param to set the timeout threshold
                 for the MCP servers. Defaults to 5 seconds.
-            input_guardrails: Optional list of input guardrails to run on 
+            input_guardrails: Optional list of input guardrails to run on
                 initial user input.
-            output_guardrails: Optional list of output guardrails to run on 
+            output_guardrails: Optional list of output guardrails to run on
                 final agent output.
             mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
             max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
@@ -715,15 +693,9 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent streamed auto send")
 
-            async with mcp_server_context(
-                mcp_server_params, mcp_timeout_seconds
-            ) as servers:
+            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = (
-                    [Agent(**handoff.model_dump()) for handoff in handoffs]
-                    if handoffs
-                    else []
-                )
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -736,9 +708,7 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings()
-                    )
+                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -752,22 +722,18 @@ class OpenAIService:
                 else:
                     result = Runner.run_streamed(starting_agent=agent, input=input_list)
 
-                item_id_to_streaming_context: dict[
-                    str, StreamingTaskMessageContext
-                ] = {}
+                item_id_to_streaming_context: dict[str, StreamingTaskMessageContext] = {}
                 unclosed_item_ids: set[str] = set()
 
                 try:
                     # Process streaming events with TaskMessage creation
                     async for event in result.stream_events():
-                        heartbeat_if_in_workflow(
-                            "processing stream event with auto send"
-                        )
+                        heartbeat_if_in_workflow("processing stream event with auto send")
 
                         if event.type == "run_item_stream_event":
                             if event.item.type == "tool_call_item":
                                 tool_call_item = event.item.raw_item
-                                
+
                                 # Extract tool call information using the helper method
                                 call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
                                 tool_call_map[call_id] = tool_call_item
@@ -780,12 +746,10 @@ class OpenAIService:
                                 )
 
                                 # Create tool request using streaming context (immediate completion)
-                                async with (
-                                    self.streaming_service.streaming_task_message_context(
-                                        task_id=task_id,
-                                        initial_content=tool_request_content,
-                                    ) as streaming_context
-                                ):
+                                async with self.streaming_service.streaming_task_message_context(
+                                    task_id=task_id,
+                                    initial_content=tool_request_content,
+                                ) as streaming_context:
                                     # The message has already been persisted, but we still need to send an upda
                                     await streaming_context.stream_update(
                                         update=StreamTaskMessageFull(
@@ -811,12 +775,9 @@ class OpenAIService:
                                 )
 
                                 # Create tool response using streaming context (immediate completion)
-                                async with (
-                                    self.streaming_service.streaming_task_message_context(
-                                        task_id=task_id,
-                                        initial_content=tool_response_content
-                                    ) as streaming_context
-                                ):
+                                async with self.streaming_service.streaming_task_message_context(
+                                    task_id=task_id, initial_content=tool_response_content
+                                ) as streaming_context:
                                     # The message has already been persisted, but we still need to send an update
                                     await streaming_context.stream_update(
                                         update=StreamTaskMessageFull(
@@ -842,14 +803,10 @@ class OpenAIService:
                                         ),
                                     )
                                     # Open the streaming context
-                                    item_id_to_streaming_context[
-                                        item_id
-                                    ] = await streaming_context.open()
+                                    item_id_to_streaming_context[item_id] = await streaming_context.open()
                                     unclosed_item_ids.add(item_id)
                                 else:
-                                    streaming_context = item_id_to_streaming_context[
-                                        item_id
-                                    ]
+                                    streaming_context = item_id_to_streaming_context[item_id]
 
                                 # Stream the delta through the streaming service
                                 await streaming_context.stream_update(
@@ -879,14 +836,10 @@ class OpenAIService:
                                         ),
                                     )
                                     # Open the streaming context
-                                    item_id_to_streaming_context[
-                                        item_id
-                                    ] = await streaming_context.open()
+                                    item_id_to_streaming_context[item_id] = await streaming_context.open()
                                     unclosed_item_ids.add(item_id)
                                 else:
-                                    streaming_context = item_id_to_streaming_context[
-                                        item_id
-                                    ]
+                                    streaming_context = item_id_to_streaming_context[item_id]
 
                                 # Stream the summary delta through the streaming service
                                 await streaming_context.stream_update(
@@ -920,14 +873,10 @@ class OpenAIService:
                                         ),
                                     )
                                     # Open the streaming context
-                                    item_id_to_streaming_context[
-                                        item_id
-                                    ] = await streaming_context.open()
+                                    item_id_to_streaming_context[item_id] = await streaming_context.open()
                                     unclosed_item_ids.add(item_id)
                                 else:
-                                    streaming_context = item_id_to_streaming_context[
-                                        item_id
-                                    ]
+                                    streaming_context = item_id_to_streaming_context[item_id]
 
                                 # Stream the content delta through the streaming service
                                 await streaming_context.stream_update(
@@ -955,7 +904,7 @@ class OpenAIService:
                                 # to close the streaming context, but they do!!!
                                 # They output both a ResponseReasoningSummaryTextDoneEvent and a ResponseReasoningSummaryPartDoneEvent
                                 # I have no idea why they do this.
-    
+
                             elif isinstance(event.data, ResponseReasoningTextDoneEvent):
                                 # Handle reasoning content text completion
                                 item_id = event.data.item_id
@@ -965,16 +914,13 @@ class OpenAIService:
                                 # reasoning content texts. The context will be closed when the entire
                                 # output item is done (ResponseOutputItemDoneEvent)
 
-
                             elif isinstance(event.data, ResponseOutputItemDoneEvent):
                                 # Handle item completion
                                 item_id = event.data.item.id
 
                                 # Finish the streaming context (sends DONE event and updates message)
                                 if item_id in item_id_to_streaming_context:
-                                    streaming_context = item_id_to_streaming_context[
-                                        item_id
-                                    ]
+                                    streaming_context = item_id_to_streaming_context[item_id]
                                     await streaming_context.close()
                                     if item_id in unclosed_item_ids:
                                         unclosed_item_ids.remove(item_id)
@@ -984,39 +930,36 @@ class OpenAIService:
                                 # Create a copy to avoid modifying set during iteration
                                 remaining_items = list(unclosed_item_ids)
                                 for item_id in remaining_items:
-                                    if (item_id in unclosed_item_ids and
-                                            item_id in item_id_to_streaming_context):  # Check if still unclosed
-                                        streaming_context = item_id_to_streaming_context[
-                                            item_id
-                                        ]
+                                    if (
+                                        item_id in unclosed_item_ids and item_id in item_id_to_streaming_context
+                                    ):  # Check if still unclosed
+                                        streaming_context = item_id_to_streaming_context[item_id]
                                         await streaming_context.close()
                                         unclosed_item_ids.discard(item_id)
 
                 except InputGuardrailTripwireTriggered as e:
                     # Handle guardrail trigger by sending a rejection message
                     rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
-                    
+
                     # Try to extract rejection message from the guardrail result
-                    if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
-                        output_info = getattr(e.guardrail_result.output, 'output_info', {})
-                        if isinstance(output_info, dict) and 'rejection_message' in output_info:
-                            rejection_message = output_info['rejection_message']
-                        elif hasattr(e.guardrail_result, 'guardrail'):
+                    if hasattr(e, "guardrail_result") and hasattr(e.guardrail_result, "output"):
+                        output_info = getattr(e.guardrail_result.output, "output_info", {})
+                        if isinstance(output_info, dict) and "rejection_message" in output_info:
+                            rejection_message = output_info["rejection_message"]
+                        elif hasattr(e.guardrail_result, "guardrail"):
                             # Fall back to using guardrail name if no custom message
-                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, 'name', None)
+                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, "name", None)
                             if triggered_guardrail_name:
                                 rejection_message = f"I'm sorry, but I cannot process this request. The '{triggered_guardrail_name}' guardrail was triggered."
-                    
+
                     # Create and send the rejection message as a TaskMessage
-                    async with (
-                        self.streaming_service.streaming_task_message_context(
-                            task_id=task_id,
-                            initial_content=TextContent(
-                                author="agent",
-                                content=rejection_message,
-                            ),
-                        ) as streaming_context
-                    ):
+                    async with self.streaming_service.streaming_task_message_context(
+                        task_id=task_id,
+                        initial_content=TextContent(
+                            author="agent",
+                            content=rejection_message,
+                        ),
+                    ) as streaming_context:
                         # Send the full message
                         await streaming_context.stream_update(
                             update=StreamTaskMessageFull(
@@ -1028,35 +971,33 @@ class OpenAIService:
                                 type="full",
                             ),
                         )
-                    
+
                     # Re-raise to let the activity handle it
                     raise
-                
+
                 except OutputGuardrailTripwireTriggered as e:
                     # Handle output guardrail trigger by sending a rejection message
                     rejection_message = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
-                    
+
                     # Try to extract rejection message from the guardrail result
-                    if hasattr(e, 'guardrail_result') and hasattr(e.guardrail_result, 'output'):
-                        output_info = getattr(e.guardrail_result.output, 'output_info', {})
-                        if isinstance(output_info, dict) and 'rejection_message' in output_info:
-                            rejection_message = output_info['rejection_message']
-                        elif hasattr(e.guardrail_result, 'guardrail'):
+                    if hasattr(e, "guardrail_result") and hasattr(e.guardrail_result, "output"):
+                        output_info = getattr(e.guardrail_result.output, "output_info", {})
+                        if isinstance(output_info, dict) and "rejection_message" in output_info:
+                            rejection_message = output_info["rejection_message"]
+                        elif hasattr(e.guardrail_result, "guardrail"):
                             # Fall back to using guardrail name if no custom message
-                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, 'name', None)
+                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, "name", None)
                             if triggered_guardrail_name:
                                 rejection_message = f"I'm sorry, but I cannot provide this response. The '{triggered_guardrail_name}' guardrail was triggered."
-                    
+
                     # Create and send the rejection message as a TaskMessage
-                    async with (
-                        self.streaming_service.streaming_task_message_context(
-                            task_id=task_id,
-                            initial_content=TextContent(
-                                author="agent",
-                                content=rejection_message,
-                            ),
-                        ) as streaming_context
-                    ):
+                    async with self.streaming_service.streaming_task_message_context(
+                        task_id=task_id,
+                        initial_content=TextContent(
+                            author="agent",
+                            content=rejection_message,
+                        ),
+                    ) as streaming_context:
                         # Send the full message
                         await streaming_context.stream_update(
                             update=StreamTaskMessageFull(
@@ -1068,7 +1009,7 @@ class OpenAIService:
                                 type="full",
                             ),
                         )
-                    
+
                     # Re-raise to let the activity handle it
                     raise
 
@@ -1077,8 +1018,9 @@ class OpenAIService:
                     # Create a copy to avoid modifying set during iteration
                     remaining_items = list(unclosed_item_ids)
                     for item_id in remaining_items:
-                        if (item_id in unclosed_item_ids and
-                                item_id in item_id_to_streaming_context):  # Check if still unclosed
+                        if (
+                            item_id in unclosed_item_ids and item_id in item_id_to_streaming_context
+                        ):  # Check if still unclosed
                             streaming_context = item_id_to_streaming_context[item_id]
                             await streaming_context.close()
                             unclosed_item_ids.discard(item_id)
@@ -1086,9 +1028,7 @@ class OpenAIService:
                 if span:
                     span.output = {
                         "new_items": [
-                            item.raw_item.model_dump()
-                            if isinstance(item.raw_item, BaseModel)
-                            else item.raw_item
+                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
                             for item in result.new_items
                         ],
                         "final_output": result.final_output,

@@ -81,14 +81,13 @@ class OpenAIModule:
         tools: list[Tool] | None = None,
         output_type: type[Any] | AgentOutputSchemaBase | None = None,
         tool_use_behavior: (
-            Literal["run_llm_again", "stop_on_first_tool"]
-            | StopAtTools
-            | ToolsToFinalOutputFunction
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
+        previous_response_id: str | None = None,
     ) -> SerializableRunResult | RunResult:
         """
         Run an agent without streaming or TaskMessage creation.
@@ -116,6 +115,7 @@ class OpenAIModule:
             input_guardrails: Optional list of input guardrails to run on initial user input.
             output_guardrails: Optional list of output guardrails to run on final agent output.
             max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
+            previous_response_id: Optional previous response ID for conversation continuity.
 
         Returns:
             Union[SerializableRunResult, RunResult]: SerializableRunResult when in Temporal, RunResult otherwise.
@@ -139,6 +139,7 @@ class OpenAIModule:
                 input_guardrails=input_guardrails,
                 output_guardrails=output_guardrails,
                 max_turns=max_turns,
+                previous_response_id=previous_response_id,
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=OpenAIActivityName.RUN_AGENT,
@@ -167,6 +168,7 @@ class OpenAIModule:
                 input_guardrails=input_guardrails,
                 output_guardrails=output_guardrails,
                 max_turns=max_turns,
+                previous_response_id=previous_response_id,
             )
 
     async def run_agent_auto_send(
@@ -188,14 +190,13 @@ class OpenAIModule:
         tools: list[Tool] | None = None,
         output_type: type[Any] | AgentOutputSchemaBase | None = None,
         tool_use_behavior: (
-            Literal["run_llm_again", "stop_on_first_tool"]
-            | StopAtTools
-            | ToolsToFinalOutputFunction
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
+        previous_response_id: str | None = None,
     ) -> SerializableRunResult | RunResult:
         """
         Run an agent with automatic TaskMessage creation.
@@ -222,6 +223,7 @@ class OpenAIModule:
             input_guardrails: Optional list of input guardrails to run on initial user input.
             output_guardrails: Optional list of output guardrails to run on final agent output.
             max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
+            previous_response_id: Optional previous response ID for conversation continuity.
 
         Returns:
             Union[SerializableRunResult, RunResult]: SerializableRunResult when in Temporal, RunResult otherwise.
@@ -246,6 +248,7 @@ class OpenAIModule:
                 input_guardrails=input_guardrails,
                 output_guardrails=output_guardrails,
                 max_turns=max_turns,
+                previous_response_id=previous_response_id,
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=OpenAIActivityName.RUN_AGENT_AUTO_SEND,
@@ -275,6 +278,7 @@ class OpenAIModule:
                 input_guardrails=input_guardrails,
                 output_guardrails=output_guardrails,
                 max_turns=max_turns,
+                previous_response_id=previous_response_id,
             )
 
     async def run_agent_streamed(
@@ -292,14 +296,13 @@ class OpenAIModule:
         tools: list[Tool] | None = None,
         output_type: type[Any] | AgentOutputSchemaBase | None = None,
         tool_use_behavior: (
-            Literal["run_llm_again", "stop_on_first_tool"]
-            | StopAtTools
-            | ToolsToFinalOutputFunction
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
+        previous_response_id: str | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled but no TaskMessage creation.
@@ -330,6 +333,7 @@ class OpenAIModule:
             input_guardrails: Optional list of input guardrails to run on initial user input.
             output_guardrails: Optional list of output guardrails to run on final agent output.
             max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
+            previous_response_id: Optional previous response ID for conversation continuity.
 
         Returns:
             RunResultStreaming: The result of the agent run with streaming.
@@ -363,6 +367,7 @@ class OpenAIModule:
             input_guardrails=input_guardrails,
             output_guardrails=output_guardrails,
             max_turns=max_turns,
+            previous_response_id=previous_response_id,
         )
 
     async def run_agent_streamed_auto_send(
@@ -384,14 +389,13 @@ class OpenAIModule:
         tools: list[Tool] | None = None,
         output_type: type[Any] | AgentOutputSchemaBase | None = None,
         tool_use_behavior: (
-            Literal["run_llm_again", "stop_on_first_tool"]
-            | StopAtTools
-            | ToolsToFinalOutputFunction
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
         ) = "run_llm_again",
         mcp_timeout_seconds: int | None = None,
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
+        previous_response_id: str | None = None,
     ) -> SerializableRunResultStreaming | RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
@@ -418,6 +422,7 @@ class OpenAIModule:
             tool_use_behavior: Optional tool use behavior.
             mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
             max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
+            previous_response_id: Optional previous response ID for conversation continuity.
 
         Returns:
             Union[SerializableRunResultStreaming, RunResultStreaming]: SerializableRunResultStreaming when in Temporal, RunResultStreaming otherwise.
@@ -441,7 +446,7 @@ class OpenAIModule:
                 mcp_timeout_seconds=mcp_timeout_seconds,
                 input_guardrails=input_guardrails,
                 output_guardrails=output_guardrails,
-                max_turns=max_turns
+                max_turns=max_turns,
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=OpenAIActivityName.RUN_AGENT_STREAMED_AUTO_SEND,
@@ -471,4 +476,5 @@ class OpenAIModule:
                 input_guardrails=input_guardrails,
                 output_guardrails=output_guardrails,
                 max_turns=max_turns,
+                previous_response_id=previous_response_id,
             )

@@ -19,6 +19,16 @@ def get_auth_principal(env_vars: EnvironmentVariables):
     except Exception:
         return None
 
+def get_build_info(env_vars: EnvironmentVariables):
+    logger.info(f"Getting build info from {env_vars.BUILD_INFO_PATH}")
+    if not env_vars.BUILD_INFO_PATH:
+        return None
+    try:
+        with open(env_vars.BUILD_INFO_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
 async def register_agent(env_vars: EnvironmentVariables):
     """Register this agent with the Agentex server"""
     if not env_vars.AGENTEX_BASE_URL:
@@ -38,7 +48,8 @@ async def register_agent(env_vars: EnvironmentVariables):
         "description": description,
         "acp_url": full_acp_url,
         "acp_type": env_vars.ACP_TYPE,
-        "principal_context": get_auth_principal(env_vars)
+        "principal_context": get_auth_principal(env_vars),
+        "registration_metadata": get_build_info(env_vars)
     }
 
     if env_vars.AGENT_ID:

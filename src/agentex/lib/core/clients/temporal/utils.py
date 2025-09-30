@@ -1,4 +1,5 @@
-from temporalio.client import Client
+from typing import Any
+from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
 
@@ -38,12 +39,50 @@ from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
 # )
 
 
-async def get_temporal_client(temporal_address: str, metrics_url: str = None) -> Client:
+def validate_client_plugins(plugins: list[Any]) -> None:
+    """
+    Validate that all items in the plugins list are valid Temporal client plugins.
+    
+    Args:
+        plugins: List of plugins to validate
+        
+    Raises:
+        TypeError: If any plugin is not a valid ClientPlugin instance
+    """
+    for i, plugin in enumerate(plugins):
+        if not isinstance(plugin, ClientPlugin):
+            raise TypeError(
+                f"Plugin at index {i} must be an instance of temporalio.client.Plugin, "
+                f"got {type(plugin).__name__}. Note: WorkerPlugin is not valid for workflow clients."
+            )
+
+
+async def get_temporal_client(
+    temporal_address: str, 
+    metrics_url: str = None,
+    plugins: list[Any] = []
+) -> Client:
+    """
+    Create a Temporal client with plugin integration.
+    
+    Args:
+        temporal_address: Temporal server address
+        metrics_url: Optional metrics endpoint URL  
+        plugins: List of Temporal plugins to include
+        
+    Returns:
+        Configured Temporal client
+    """
+    # Validate plugins if any are provided
+    if plugins:
+        validate_client_plugins(plugins)
+        
     if not metrics_url:
         client = await Client.connect(
             target_host=temporal_address,
             # data_converter=custom_data_converter,
             data_converter=pydantic_data_converter,
+            plugins=plugins,
         )
     else:
         runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url)))
@@ -52,5 +91,6 @@ async def get_temporal_client(temporal_address: str, metrics_url: str = None) ->
             # data_converter=custom_data_converter,
             data_converter=pydantic_data_converter,
             runtime=runtime,
+            plugins=plugins,
         )
     return client

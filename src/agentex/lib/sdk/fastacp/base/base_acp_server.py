@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+from datetime import datetime
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
@@ -26,6 +27,10 @@ from agentex.types.task_message_content import TaskMessageContent
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.registration import register_agent
+from agentex.lib.sdk.fastacp.base.constants import (
+    FASTACP_HEADER_SKIP_EXACT,
+    FASTACP_HEADER_SKIP_PREFIXES,
+)
 
 logger = make_logger(__name__)
 
@@ -93,6 +98,7 @@ class BaseACPServer(FastAPI):
     async def _handle_jsonrpc(self, request: Request):
         """Main JSON-RPC endpoint handler"""
         rpc_request = None
+        logger.info(f"[base_acp_server] received request: {datetime.now()}")
         try:
             data = await request.json()
             rpc_request = JSONRPCRequest(**data)
@@ -128,9 +134,23 @@ class BaseACPServer(FastAPI):
                     ),
                 )
 
-            # Parse params into appropriate model based on method
+            # Extract application headers, excluding sensitive/transport headers per FASTACP_* rules
+            # Forward filtered headers via params.request.headers to agent handlers
+            custom_headers = {
+                key: value
+                for key, value in request.headers.items()
+                if key.lower() not in FASTACP_HEADER_SKIP_EXACT
+                and not any(key.lower().startswith(p) for p in FASTACP_HEADER_SKIP_PREFIXES)
+            }
+            
+            # Parse params into appropriate model based on method and include headers
             params_model = PARAMS_MODEL_BY_METHOD[method]
-            params = params_model.model_validate(rpc_request.params)
+            params_data = dict(rpc_request.params) if rpc_request.params else {}
+            
+            # Add custom headers to the request structure if any headers were provided
+            if custom_headers:
+                params_data["request"] = {"headers": custom_headers}
+            params = params_model.model_validate(params_data)
 
             if method in RPC_SYNC_METHODS:
                 handler = self._handlers[method]

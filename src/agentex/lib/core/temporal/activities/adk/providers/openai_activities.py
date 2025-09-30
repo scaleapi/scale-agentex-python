@@ -446,6 +446,7 @@ class RunAgentParams(BaseModelWithTraceParams):
     input_guardrails: list[TemporalInputGuardrail] | None = None
     output_guardrails: list[TemporalOutputGuardrail] | None = None
     max_turns: int | None = None
+    previous_response_id: str | None = None
 
 
 class RunAgentAutoSendParams(RunAgentParams):
@@ -515,6 +516,7 @@ class OpenAIActivities:
             output_guardrails=output_guardrails,
             mcp_timeout_seconds=params.mcp_timeout_seconds,
             max_turns=params.max_turns,
+            previous_response_id=params.previous_response_id,
         )
         return self._to_serializable_run_result(result)
 
@@ -550,6 +552,7 @@ class OpenAIActivities:
                 output_guardrails=output_guardrails,
                 mcp_timeout_seconds=params.mcp_timeout_seconds,
                 max_turns=params.max_turns,
+                previous_response_id=params.previous_response_id,
             )
             return self._to_serializable_run_result(result)
         except InputGuardrailTripwireTriggered as e:
@@ -622,6 +625,7 @@ class OpenAIActivities:
                 output_guardrails=output_guardrails,
                 mcp_timeout_seconds=params.mcp_timeout_seconds,
                 max_turns=params.max_turns,
+                previous_response_id=params.previous_response_id,
             )
             return self._to_serializable_run_result_streaming(result)
         except InputGuardrailTripwireTriggered as e:

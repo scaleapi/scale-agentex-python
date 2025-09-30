@@ -1,4 +1,8 @@
-from typing import Literal
+import inspect
+import os
+from pathlib import Path
+
+from typing import Any, Literal
 from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
@@ -8,6 +12,7 @@ from agentex.lib.types.fastacp import (
     BaseACPConfig,
     SyncACPConfig,
 )
+from agentex.lib.utils.logging import make_logger
 
 # Add new mappings between ACP types and configs here
 # Add new mappings between ACP types and implementations here
@@ -16,6 +21,7 @@ AGENTIC_ACP_IMPLEMENTATIONS: dict[Literal["temporal", "base"], type[BaseACPServe
     "base": AgenticBaseACP,
 }
 
+logger = make_logger(__name__)
 
 class FastACP:
     """Factory for creating FastACP instances
@@ -43,17 +49,29 @@ class FastACP:
         implementation_class = AGENTIC_ACP_IMPLEMENTATIONS[config.type]
         # Handle temporal-specific configuration
         if config.type == "temporal":
-            # Extract temporal_address from config if it's a TemporalACPConfig
+            # Extract temporal_address and plugins from config if it's a TemporalACPConfig
             temporal_config = kwargs.copy()
             if hasattr(config, "temporal_address"):
                 temporal_config["temporal_address"] = config.temporal_address
+            if hasattr(config, "plugins"):
+                temporal_config["plugins"] = config.plugins
             return implementation_class.create(**temporal_config)
         else:
             return implementation_class.create(**kwargs)
 
     @staticmethod
+    def locate_build_info_path() -> None:
+        """If a build-info.json file is present, set the BUILD_INFO_PATH environment variable"""
+        acp_root = Path(inspect.stack()[2].filename).resolve().parents[0]
+        build_info_path = acp_root / "build-info.json"
+        if build_info_path.exists():
+            os.environ["BUILD_INFO_PATH"] = str(build_info_path)
+
+    @staticmethod
     def create(
-        acp_type: Literal["sync", "agentic"], config: BaseACPConfig | None = None, **kwargs
+        acp_type: Literal["sync", "agentic"], 
+        config: BaseACPConfig | None = None, 
+        **kwargs
     ) -> BaseACPServer | SyncACP | AgenticBaseACP | TemporalACP:
         """Main factory method to create any ACP type
 
@@ -63,6 +81,8 @@ class FastACP:
             **kwargs: Additional configuration parameters
         """ 
 
+        FastACP.locate_build_info_path()
+        
         if acp_type == "sync":
             sync_config = config if isinstance(config, SyncACPConfig) else None
             return FastACP.create_sync_acp(sync_config, **kwargs)
