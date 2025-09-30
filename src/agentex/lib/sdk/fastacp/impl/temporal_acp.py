@@ -1,4 +1,4 @@
-from typing import Callable, AsyncGenerator, override
+from typing import Any, Callable, AsyncGenerator, override
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -24,19 +24,23 @@ class TemporalACP(BaseACPServer):
     """
 
     def __init__(
-        self, temporal_address: str, temporal_task_service: TemporalTaskService | None = None
+        self,
+        temporal_address: str,
+        temporal_task_service: TemporalTaskService | None = None,
+        plugins: list[Any] | None = None,
     ):
         super().__init__()
         self._temporal_task_service = temporal_task_service
         self._temporal_address = temporal_address
+        self._plugins = plugins or []
 
     @classmethod
     @override
-    def create(cls, temporal_address: str) -> "TemporalACP":
+    def create(cls, temporal_address: str, plugins: list[Any] | None = None) -> "TemporalACP":
         logger.info("Initializing TemporalACP instance")
 
         # Create instance without temporal client initially
-        temporal_acp = cls(temporal_address=temporal_address)
+        temporal_acp = cls(temporal_address=temporal_address, plugins=plugins)
         temporal_acp._setup_handlers()
         logger.info("TemporalACP instance initialized now")
         return temporal_acp
@@ -52,7 +56,7 @@ class TemporalACP(BaseACPServer):
             if self._temporal_task_service is None:
                 env_vars = EnvironmentVariables.refresh()
                 temporal_client = await TemporalClient.create(
-                    temporal_address=self._temporal_address
+                    temporal_address=self._temporal_address, plugins=self._plugins
                 )
                 self._temporal_task_service = TemporalTaskService(
                     temporal_client=temporal_client,
@@ -74,7 +78,9 @@ class TemporalACP(BaseACPServer):
             """Default create task handler - logs the task"""
             logger.info(f"TemporalACP received task create rpc call for task {params.task.id}")
             if self._temporal_task_service is not None:
-                await self._temporal_task_service.submit_task(agent=params.agent, task=params.task, params=params.params)
+                await self._temporal_task_service.submit_task(
+                    agent=params.agent, task=params.task, params=params.params
+                )
 
         @self.on_task_event_send
         async def handle_event_send(params: SendEventParams) -> None:

@@ -23,6 +23,7 @@ AGENTIC_ACP_IMPLEMENTATIONS: dict[Literal["temporal", "base"], type[BaseACPServe
 
 logger = make_logger(__name__)
 
+
 class FastACP:
     """Factory for creating FastACP instances
 
@@ -49,10 +50,12 @@ class FastACP:
         implementation_class = AGENTIC_ACP_IMPLEMENTATIONS[config.type]
         # Handle temporal-specific configuration
         if config.type == "temporal":
-            # Extract temporal_address from config if it's a TemporalACPConfig
+            # Extract temporal_address and plugins from config if it's a TemporalACPConfig
             temporal_config = kwargs.copy()
             if hasattr(config, "temporal_address"):
                 temporal_config["temporal_address"] = config.temporal_address  # type: ignore[attr-defined]
+            if hasattr(config, "plugins"):
+                temporal_config["plugins"] = config.plugins  # type: ignore[attr-defined]
             return implementation_class.create(**temporal_config)
         else:
             return implementation_class.create(**kwargs)
@@ -75,10 +78,10 @@ class FastACP:
             acp_type: Type of ACP to create ("sync" or "agentic")
             config: Configuration object. Required for agentic type.
             **kwargs: Additional configuration parameters
-        """ 
+        """
 
         FastACP.locate_build_info_path()
-        
+
         if acp_type == "sync":
             sync_config = config if isinstance(config, SyncACPConfig) else None
             return FastACP.create_sync_acp(sync_config, **kwargs)

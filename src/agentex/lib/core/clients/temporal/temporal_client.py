@@ -22,7 +22,7 @@ DEFAULT_RETRY_POLICY = RetryPolicy(
     maximum_attempts=1,
     initial_interval=timedelta(seconds=1),
     backoff_coefficient=2.0,
-    maximum_interval=timedelta(minutes=10)
+    maximum_interval=timedelta(minutes=10),
 )
 
 
@@ -40,8 +40,7 @@ TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON = {
     ),
     WorkflowExecutionStatus.FAILED: WorkflowState(
         status=TaskStatus.FAILED,
-        reason="Task encountered terminal failure. "
-        "Please contact support if retrying does not resolve the issue.",
+        reason="Task encountered terminal failure. Please contact support if retrying does not resolve the issue.",
         is_terminal=True,
     ),
     WorkflowExecutionStatus.RUNNING: WorkflowState(
@@ -75,8 +74,9 @@ DUPLICATE_POLICY_TO_ID_REUSE_POLICY = {
 
 
 class TemporalClient:
-    def __init__(self, temporal_client: Client | None = None):
+    def __init__(self, temporal_client: Client | None = None, plugins: list[Any] = []):
         self._client: Client | None = temporal_client
+        self._plugins = plugins
 
     @property
     def client(self) -> Client:
@@ -86,7 +86,7 @@ class TemporalClient:
         return self._client
 
     @classmethod
-    async def create(cls, temporal_address: str):
+    async def create(cls, temporal_address: str, plugins: list[Any] = []):
         if temporal_address in [
             "false",
             "False",
@@ -99,13 +99,11 @@ class TemporalClient:
         ]:
             _client = None
         else:
-            _client = await get_temporal_client(temporal_address)
-        return cls(_client)
+            _client = await get_temporal_client(temporal_address, plugins=plugins)
+        return cls(_client, plugins)
 
     async def setup(self, temporal_address: str):
-        self._client = await self._get_temporal_client(
-            temporal_address=temporal_address
-        )
+        self._client = await self._get_temporal_client(temporal_address=temporal_address)
 
     async def _get_temporal_client(self, temporal_address: str) -> Client | None:
         if temporal_address in [
@@ -120,7 +118,7 @@ class TemporalClient:
         ]:
             return None
         else:
-            return await get_temporal_client(temporal_address)
+            return await get_temporal_client(temporal_address, plugins=self._plugins)
 
     async def start_workflow(
         self,
@@ -131,9 +129,7 @@ class TemporalClient:
         execution_timeout: timedelta = timedelta(seconds=86400),
         **kwargs: Any,
     ) -> str:
-        temporal_retry_policy = TemporalRetryPolicy(
-            **retry_policy.model_dump(exclude_unset=True)
-        )
+        temporal_retry_policy = TemporalRetryPolicy(**retry_policy.model_dump(exclude_unset=True))
         workflow_handle = await self.client.start_workflow(
             *args,
             retry_policy=temporal_retry_policy,

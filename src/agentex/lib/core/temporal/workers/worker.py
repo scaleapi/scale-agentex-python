@@ -7,8 +7,9 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 
 from aiohttp import web
-from temporalio.client import Client
+from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.worker import (
+    Plugin as WorkerPlugin,
     Worker,
     UnsandboxedWorkflowRunner,
 )
@@ -40,9 +41,7 @@ class DateTimeJSONEncoder(AdvancedJSONEncoder):
 
 class DateTimeJSONTypeConverter(JSONTypeConverter):
     @override
-    def to_typed_value(
-        self, hint: type, value: Any
-    ) -> Any | None | _JSONTypeConverterUnhandled:
+    def to_typed_value(self, hint: type, value: Any) -> Any | None | _JSONTypeConverterUnhandled:
         if hint == datetime.datetime:
             return datetime.datetime.fromisoformat(value)
         return JSONTypeConverter.Unhandled
@@ -68,19 +67,31 @@ custom_data_converter = dataclasses.replace(
 )
 
 
-async def get_temporal_client(temporal_address: str, metrics_url: str | None = None) -> Client:
+def _validate_plugins(plugins: list) -> None:
+    """Validate that all items in the plugins list are valid Temporal plugins."""
+    for i, plugin in enumerate(plugins):
+        if not isinstance(plugin, (ClientPlugin, WorkerPlugin)):
+            raise TypeError(
+                f"Plugin at index {i} must be an instance of temporalio.client.Plugin "
+                f"or temporalio.worker.Plugin, got {type(plugin).__name__}"
+            )
+
+
+async def get_temporal_client(temporal_address: str, metrics_url: str | None = None, plugins: list = []) -> Client:
+    if plugins != []:  # We don't need to validate the plugins if they are empty
+        _validate_plugins(plugins)
+
     if not metrics_url:
         client = await Client.connect(
-            target_host=temporal_address, data_converter=custom_data_converter
+            target_host=temporal_address, data_converter=custom_data_converter, plugins=plugins
         )
     else:
-        runtime = Runtime(
-            telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url))
-        )
+        runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url)))
         client = await Client.connect(
             target_host=temporal_address,
             data_converter=custom_data_converter,
             runtime=runtime,
+            plugins=plugins,
         )
     return client
 
@@ -92,6 +103,7 @@ class AgentexWorker:
         max_workers: int = 10,
         max_concurrent_activities: int = 10,
         health_check_port: int = 80,
+        plugins: list = [],
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -100,6 +112,7 @@ class AgentexWorker:
         self.health_check_server_running = False
         self.healthy = False
         self.health_check_port = health_check_port
+        self.plugins = plugins
 
     @overload
     async def run(
@@ -108,7 +121,7 @@ class AgentexWorker:
         *,
         workflow: type,
     ) -> None: ...
-    
+
     @overload
     async def run(
         self,
@@ -128,16 +141,17 @@ class AgentexWorker:
         await self._register_agent()
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
+            plugins=self.plugins,
         )
-        
+
         # Enable debug mode if AgentEx debug is enabled (disables deadlock detection)
         debug_enabled = os.environ.get("AGENTEX_DEBUG_ENABLED", "false").lower() == "true"
         if debug_enabled:
             logger.info("🐛 [WORKER] Temporal debug mode enabled - deadlock detection disabled")
-        
+
         if workflow is None and workflows is None:
             raise ValueError("Either workflow or workflows must be provided")
-        
+
         worker = Worker(
             client=temporal_client,
             task_queue=self.task_queue,
@@ -171,27 +185,19 @@ class AgentexWorker:
             try:
                 site = web.TCPSite(runner, "0.0.0.0", self.health_check_port)
                 await site.start()
-                logger.info(
-                    f"Health check server running on http://0.0.0.0:{self.health_check_port}/readyz"
-                )
+                logger.info(f"Health check server running on http://0.0.0.0:{self.health_check_port}/readyz")
                 self.health_check_server_running = True
             except OSError as e:
-                logger.error(
-                    f"Failed to start health check server on port {self.health_check_port}: {e}"
-                )
+                logger.error(f"Failed to start health check server on port {self.health_check_port}: {e}")
                 # Try alternative port if default fails
                 try:
                     alt_port = self.health_check_port + 1
                     site = web.TCPSite(runner, "0.0.0.0", alt_port)
                     await site.start()
-                    logger.info(
-                        f"Health check server running on alternative port http://0.0.0.0:{alt_port}/readyz"
-                    )
+                    logger.info(f"Health check server running on alternative port http://0.0.0.0:{alt_port}/readyz")
                     self.health_check_server_running = True
                 except OSError as e:
-                    logger.error(
-                        f"Failed to start health check server on alternative port {alt_port}: {e}"
-                    )
+                    logger.error(f"Failed to start health check server on alternative port {alt_port}: {e}")
                     raise
 
     """
@@ -201,6 +207,7 @@ class AgentexWorker:
     doing this on the worker side is required to make sure that both share the API key
     which is returned on registration and used to authenticate the worker with the Agentex server.
     """
+
     async def _register_agent(self):
         env_vars = EnvironmentVariables.refresh()
         if env_vars and env_vars.AGENTEX_BASE_URL:

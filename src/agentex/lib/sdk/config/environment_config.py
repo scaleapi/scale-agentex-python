@@ -73,6 +73,14 @@ class AgentEnvironmentConfig(BaseModel):
         ..., 
         description="Authentication and authorization configuration"
     )
+    helm_repository_name: str = Field(
+        default="scale-egp", 
+        description="Helm repository name for the environment"
+    )
+    helm_repository_url: str = Field(
+        default="https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts", 
+        description="Helm repository url for the environment"
+    )
     helm_overrides: Dict[str, Any] = Field(
         default_factory=dict, 
         description="Helm chart value overrides for environment-specific tuning"
