@@ -1,18 +1,18 @@
 from threading import Lock
 
-from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
-    AgentexAsyncTracingProcessor,
-    AgentexSyncTracingProcessor,
-)
+from agentex.lib.types.tracing import TracingProcessorConfig, AgentexTracingProcessorConfig
 from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
-    SGPAsyncTracingProcessor,
     SGPSyncTracingProcessor,
+    SGPAsyncTracingProcessor,
+)
+from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
+    AgentexSyncTracingProcessor,
+    AgentexAsyncTracingProcessor,
 )
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
-    AsyncTracingProcessor,
     SyncTracingProcessor,
+    AsyncTracingProcessor,
 )
-from agentex.lib.types.tracing import AgentexTracingProcessorConfig, TracingProcessorConfig
 
 
 class TracingProcessorManager:
@@ -30,6 +30,7 @@ class TracingProcessorManager:
         self.sync_processors: list[SyncTracingProcessor] = []
         self.async_processors: list[AsyncTracingProcessor] = []
         self.lock = Lock()
+        self._initialized = False
 
     def add_processor_config(self, processor_config: TracingProcessorConfig) -> None:
         with self.lock:
@@ -43,10 +44,20 @@ class TracingProcessorManager:
             for processor_config in processor_configs:
                 self.add_processor_config(processor_config)
 
+    def _ensure_initialized(self):
+        """Lazily initialize the default Agentex processor on first use to avoid circular imports."""
+        if not self._initialized:
+            with self.lock:
+                if not self._initialized:  # Double-check inside lock
+                    self.add_processor_config(AgentexTracingProcessorConfig())
+                    self._initialized = True
+
     def get_sync_processors(self) -> list[SyncTracingProcessor]:
+        self._ensure_initialized()
         return self.sync_processors
 
     def get_async_processors(self) -> list[AsyncTracingProcessor]:
+        self._ensure_initialized()
         return self.async_processors
 
 
@@ -58,5 +69,5 @@ set_tracing_processor_configs = GLOBAL_TRACING_PROCESSOR_MANAGER.set_processor_c
 get_sync_tracing_processors = GLOBAL_TRACING_PROCESSOR_MANAGER.get_sync_processors
 get_async_tracing_processors = GLOBAL_TRACING_PROCESSOR_MANAGER.get_async_processors
 
-# Add the Agentex tracing processor by default
-add_tracing_processor_config(AgentexTracingProcessorConfig())
+# Note: The default Agentex tracing processor is initialized lazily on first use
+# to avoid circular import issues. See _ensure_initialized() method.
