@@ -20,7 +20,6 @@ class CustomJSONFormatter(json_log_formatter.JSONFormatter):
         extra["lineno"] = record.lineno
         extra["pathname"] = record.pathname
         extra["request_id"] = ctx_var_request_id.get(None)
-
         if _is_datadog_configured:
             extra["dd.trace_id"] = tracer.get_log_correlation_context().get("dd.trace_id", None) or getattr(
                 record, "dd.trace_id", 0

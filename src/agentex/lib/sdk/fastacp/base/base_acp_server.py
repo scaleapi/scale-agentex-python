@@ -46,6 +46,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Extract request ID from header or generate a new one if there isn't one
         request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+        logger.info(f"Request ID: {request_id}")
         # Store request ID in request state for access in handlers
         ctx_var_request_id.set(request_id)
         # Process request
