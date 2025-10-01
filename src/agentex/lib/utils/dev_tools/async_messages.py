@@ -394,15 +394,6 @@ def subscribe_to_async_task_messages(
                                     messages_to_return.append(finished_message)
                                     print_task_message(finished_message, print_messages, rich_print)
                                 
-                                # Clean stream termination - break on done event
-                                if print_messages:
-                                    console = Console(width=80) if rich_print else None
-                                    if console:
-                                        console.print("[dim]Stream ended - received 'done' event[/dim]")
-                                    else:
-                                        print("Stream ended - received 'done' event")
-                                break
-                                
                             # Ignore "connected" message type
                             elif message_type == "connected":
                                 pass

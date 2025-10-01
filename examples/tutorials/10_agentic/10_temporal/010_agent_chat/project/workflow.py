@@ -242,6 +242,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
                 ),
                 # tools=[CALCULATOR_TOOL],
             )
+            # Response is finished from agent
             if self._state:
                 # Update the state with the final input list if available
                 final_list = getattr(run_result, "final_input_list", None)
