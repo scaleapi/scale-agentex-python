@@ -323,6 +323,7 @@ def subscribe_to_async_task_messages(
             
             try:
                 for task_message_update_str in response.iter_text():
+                    # Save raw streaming data to file for debugging
                     try:
                         # Parse SSE format 
                         if task_message_update_str.strip().startswith('data: '):
@@ -334,6 +335,7 @@ def subscribe_to_async_task_messages(
 
                             # Handle different message types for streaming progress
                             if message_type == "start":
+                                print("Start message received" + task_message_update_str)
                                 task_message_update = StreamTaskMessageStart.model_validate(task_message_update_data)
                                 index = task_message_update.index or 0
                                 
@@ -354,6 +356,7 @@ def subscribe_to_async_task_messages(
                                     active_spinners[index] = spinner
                                 
                             elif message_type == "full":
+                                print("Full message received" + task_message_update_str)
                                 task_message_update = StreamTaskMessageFull.model_validate(task_message_update_data)
                                 index = task_message_update.index or 0
                                 
@@ -365,18 +368,13 @@ def subscribe_to_async_task_messages(
                                     if print_messages:
                                         print()
                                 
-                                # Use the content directly from the stream event, not from re-fetching
-                                # The stream has the full content, but re-fetching sometimes returns empty arrays
-                                if task_message_update.parent_task_message:
-                                    # Create a temporary message object with the stream content for display
-                                    display_message = task_message_update.parent_task_message
-                                    # Override the content with the stream's full content
-                                    display_message.content = task_message_update.content
-                                    
-                                    messages_to_return.append(display_message)
-                                    print_task_message(display_message, print_messages, rich_print)
+                                if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
+                                    finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
+                                    messages_to_return.append(finished_message)
+                                    print_task_message(finished_message, print_messages, rich_print)
                                 
                             elif message_type == "done":
+                                print("Done message received" + task_message_update_str)
                                 task_message_update = StreamTaskMessageDone.model_validate(task_message_update_data)
                                 index = task_message_update.index or 0
                                 

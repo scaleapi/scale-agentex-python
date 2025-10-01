@@ -20,7 +20,7 @@ from openai.types.responses import (
     ResponseTextDeltaEvent,
     ResponseReasoningSummaryPartAddedEvent,
     ResponseReasoningSummaryTextDeltaEvent,
-    ResponseContentPartDoneEvent,
+    ResponseReasoningSummaryPartDoneEvent,
     
 )
 from pydantic import BaseModel
@@ -729,10 +729,13 @@ class OpenAIService:
 
                 item_id_to_streaming_context: dict[str, StreamingTaskMessageContext] = {}
                 unclosed_item_ids: set[str] = set()
+                # Simple string to accumulate reasoning summary
+                current_reasoning_summary: str = ""
 
                 try:
                     # Process streaming events with TaskMessage creation
                     async for event in result.stream_events():
+                        
                         heartbeat_if_in_workflow("processing stream event with auto send")
                         if event.type == "run_item_stream_event":
                             # Tool calls are now handled via raw response events
@@ -826,8 +829,13 @@ class OpenAIService:
                                 )
                             # Reasoning step one: new summary part added
                             elif isinstance(event.data, ResponseReasoningSummaryPartAddedEvent):
+                                logger.info(f"DEBUG: ResponseReasoningSummaryPartAddedEvent: {event.data}")
                                 # We need to create a new streaming context for this reasoning item
                                 item_id = event.data.item_id
+                                
+                                # Reset the reasoning summary string
+                                current_reasoning_summary = ""
+                                
                                 streaming_context = self.streaming_service.streaming_task_message_context(
                                     task_id=task_id,
                                     initial_content=ReasoningContent(
@@ -846,16 +854,16 @@ class OpenAIService:
                             
                             # Reasoning step two: handling summary text delta
                             elif isinstance(event.data, ResponseReasoningSummaryTextDeltaEvent):
-                                item_id = event.data.item_id
-                                summary_index = event.data.summary_index
-
+                                # Accumulate the delta into the string
+                                current_reasoning_summary += event.data.delta
                                 streaming_context = item_id_to_streaming_context[item_id]
+
                                 # Stream the summary delta through the streaming service
                                 await streaming_context.stream_update(
                                     update=StreamTaskMessageDelta(
                                         parent_task_message=streaming_context.task_message,
                                         delta=ReasoningSummaryDelta(
-                                            summary_index=summary_index,
+                                            summary_index=event.data.summary_index,
                                             summary_delta=event.data.delta,
                                             type="reasoning_summary",
                                         ),
@@ -864,15 +872,34 @@ class OpenAIService:
                                 )
 
                             # Reasoning step three: handling summary text done, closing the streaming context
-                            elif isinstance(event.data, ResponseContentPartDoneEvent):
+                            elif isinstance(event.data, ResponseReasoningSummaryPartDoneEvent):
+                                logger.info(f"DEBUG: ResponseReasoningSummaryPartDoneEvent: {event.data}")
                                 # Handle reasoning summary text completion
-                                item_id = event.data.item_id
-                                summary_index = event.data.summary_index
-
                                 streaming_context = item_id_to_streaming_context[item_id]
-                                logger.info(f"Closing streaming context for item_id: {item_id}")
+                                
+                                # Create the complete reasoning content with the accumulated summary
+                                complete_reasoning_content = ReasoningContent(
+                                    author="agent",
+                                    summary=[current_reasoning_summary],
+                                    content=[],
+                                    type="reasoning",
+                                    style="static",
+                                )
+                                
+                                # Send a full message update with the complete reasoning content
+                                await streaming_context.stream_update(
+                                    update=StreamTaskMessageFull(
+                                        parent_task_message=streaming_context.task_message,
+                                        content=complete_reasoning_content,
+                                        type="full",
+                                    ),
+                                )
+
+                                logger.info(f"DEBUG: Sent full message update with complete reasoning content: {complete_reasoning_content}")
+                                
                                 await streaming_context.close()
-                                unclosed_item_ids.remove(item_id)
+                                unclosed_item_ids.discard(item_id)
+                                
 
                             elif isinstance(event.data, ResponseOutputItemDoneEvent):
                                 # Handle item completion
