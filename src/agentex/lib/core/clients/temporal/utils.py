@@ -3,6 +3,7 @@ from typing import Any
 from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
 #     def default(self, o: Any) -> Any:
@@ -74,20 +75,24 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
     if plugins:
         validate_client_plugins(plugins)
 
+    # Check if OpenAI plugin is present - it needs to configure its own data converter
+    has_openai_plugin = any(
+        isinstance(p, OpenAIAgentsPlugin) for p in (plugins or [])
+    )
+
+    # Only set data_converter if OpenAI plugin is not present
+    connect_kwargs = {
+        "target_host": temporal_address,
+        "plugins": plugins,
+    }
+
+    if not has_openai_plugin:
+        connect_kwargs["data_converter"] = pydantic_data_converter
+
     if not metrics_url:
-        client = await Client.connect(
-            target_host=temporal_address,
-            # data_converter=custom_data_converter,
-            data_converter=pydantic_data_converter,
-            plugins=plugins,
-        )
+        client = await Client.connect(**connect_kwargs)
     else:
         runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url)))
-        client = await Client.connect(
-            target_host=temporal_address,
-            # data_converter=custom_data_converter,
-            data_converter=pydantic_data_converter,
-            runtime=runtime,
-            plugins=plugins,
-        )
+        connect_kwargs["runtime"] = runtime
+        client = await Client.connect(**connect_kwargs)
     return client
