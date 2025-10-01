@@ -12,6 +12,7 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 from agentex.types.span import Span
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.environment_variables import EnvironmentVariables
 
 logger = make_logger(__name__)
 
@@ -24,11 +25,18 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             disabled=disabled,
         )
         self._spans: dict[str, SGPSpan] = {}
+        self.env_vars = EnvironmentVariables.refresh()
 
     def _add_source_to_span(self, span: Span) -> None:
         if span.data is None:
             span.data = {}
         span.data["__source__"] = "agentex"
+        if self.env_vars.ACP_TYPE is not None:
+            span.data["__acp_type__"] = self.env_vars.ACP_TYPE
+        if self.env_vars.AGENT_NAME is not None:
+            span.data["__agent_name__"] = self.env_vars.AGENT_NAME
+        if self.env_vars.AGENT_ID is not None:
+            span.data["__agent_id__"] = self.env_vars.AGENT_ID
 
     @override
     def on_span_start(self, span: Span) -> None:
@@ -78,11 +86,18 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             if not self.disabled
             else None
         )
+        self.env_vars = EnvironmentVariables.refresh()
 
     def _add_source_to_span(self, span: Span) -> None:
         if span.data is None:
             span.data = {}
         span.data["__source__"] = "agentex"
+        if self.env_vars.ACP_TYPE is not None:
+            span.data["__acp_type__"] = self.env_vars.ACP_TYPE
+        if self.env_vars.AGENT_NAME is not None:
+            span.data["__agent_name__"] = self.env_vars.AGENT_NAME
+        if self.env_vars.AGENT_ID is not None:
+            span.data["__agent_id__"] = self.env_vars.AGENT_ID
 
     @override
     async def on_span_start(self, span: Span) -> None:
@@ -99,6 +114,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         sgp_span.start_time = span.start_time.isoformat()
 
         if self.disabled:
+            logger.warning("SGP is disabled, skipping span upsert")
             return
         await self.sgp_async_client.spans.upsert_batch(
             items=[sgp_span.to_request_params()]
