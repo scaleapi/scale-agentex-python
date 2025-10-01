@@ -1,19 +1,22 @@
+# ruff: noqa: I001
+# Import order matters - AsyncTracer must come after client import to avoid circular imports
 from datetime import timedelta
 
 from temporalio.common import RetryPolicy
 
+from agentex import AsyncAgentex  # noqa: F401
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.services.adk.tasks import TasksService
+from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
+from agentex.lib.core.temporal.activities.adk.tasks_activities import (
+    DeleteTaskParams,
+    GetTaskParams,
+    TasksActivityName,
+)
+from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task import Task
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import in_temporal_workflow
-from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.lib.core.services.adk.tasks import TasksService
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
-from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
-from agentex.lib.core.temporal.activities.adk.tasks_activities import (
-    GetTaskParams,
-    DeleteTaskParams,
-    TasksActivityName,
-)
 
 logger = make_logger(__name__)
 

@@ -1,15 +1,13 @@
-from typing import Any
-from datetime import timedelta
-from contextlib import asynccontextmanager
+# ruff: noqa: I001
+# Import order matters - AsyncTracer must come after client import to avoid circular imports
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from datetime import timedelta
+from typing import Any
 
 from temporalio.common import RetryPolicy
 
-from agentex.types.span import Span
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
-from agentex.lib.utils.model_utils import BaseModel
-from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex import AsyncAgentex  # noqa: F401
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.services.adk.tracing import TracingService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
@@ -18,6 +16,11 @@ from agentex.lib.core.temporal.activities.adk.tracing_activities import (
     StartSpanParams,
     TracingActivityName,
 )
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.span import Span
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.utils.temporal import in_temporal_workflow
 
 logger = make_logger(__name__)
 
