@@ -5,11 +5,11 @@ This module provides validation functions for agent configurations,
 with clear error messages and best practices enforcement.
 """
 
-from pathlib import Path
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentsConfig, AgentEnvironmentConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig, AgentEnvironmentsConfig
 
 logger = make_logger(__name__)
 

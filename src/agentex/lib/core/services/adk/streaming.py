@@ -2,23 +2,6 @@ import json
 from typing import Literal
 
 from agentex import AsyncAgentex
-from agentex.lib.core.adapters.streams.port import StreamRepository
-from agentex.types.task_message_update import (
-    TaskMessageDelta, 
-    TaskMessageUpdate,
-    StreamTaskMessageStart,
-    StreamTaskMessageDelta,
-    StreamTaskMessageFull,
-    StreamTaskMessageDone,
-)
-from agentex.types.task_message_delta import (
-    TextDelta,
-    DataDelta,
-    ToolRequestDelta,
-    ToolResponseDelta,
-    ReasoningSummaryDelta,
-    ReasoningContentDelta,
-)
 from agentex.lib.utils.logging import make_logger
 from agentex.types.data_content import DataContent
 from agentex.types.task_message import (
@@ -26,9 +9,26 @@ from agentex.types.task_message import (
     TaskMessageContent,
 )
 from agentex.types.text_content import TextContent
+from agentex.types.reasoning_content import ReasoningContent
+from agentex.types.task_message_delta import (
+    DataDelta,
+    TextDelta,
+    ToolRequestDelta,
+    ToolResponseDelta,
+    ReasoningContentDelta,
+    ReasoningSummaryDelta,
+)
+from agentex.types.task_message_update import (
+    TaskMessageDelta,
+    TaskMessageUpdate,
+    StreamTaskMessageDone,
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+    StreamTaskMessageStart,
+)
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
-from agentex.types.reasoning_content import ReasoningContent
+from agentex.lib.core.adapters.streams.port import StreamRepository
 
 logger = make_logger(__name__)
 
@@ -265,7 +265,7 @@ class StreamingTaskMessageContext:
         elif isinstance(update, StreamTaskMessageFull):
             await self._agentex_client.messages.update(
                 task_id=self.task_id,
-                message_id=update.parent_task_message.id,
+                message_id=update.parent_task_message.id,  # type: ignore[union-attr]
                 content=update.content.model_dump(),
                 streaming_status="DONE",
             )
@@ -306,7 +306,7 @@ class StreamingService:
         Returns:
             True if event was streamed successfully, False otherwise
         """
-        stream_topic = _get_stream_topic(update.parent_task_message.task_id)
+        stream_topic = _get_stream_topic(update.parent_task_message.task_id)  # type: ignore[union-attr]
 
         try:
             await self._stream_repository.send_event(

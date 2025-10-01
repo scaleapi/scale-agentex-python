@@ -1,5 +1,5 @@
-from datetime import timedelta
 from typing import Any, TypeVar
+from datetime import timedelta
 
 from pydantic import TypeAdapter
 from temporalio import workflow

@@ -1,10 +1,11 @@
 import asyncio
-from typing import List, Any
+from typing import Any, List
 
 from pydantic import BaseModel
 from temporalio import activity
-from agentex.lib.utils.logging import make_logger
+
 from agentex.lib import adk
+from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 
 logger = make_logger(__name__)

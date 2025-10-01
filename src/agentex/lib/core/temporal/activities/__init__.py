@@ -1,45 +1,45 @@
 import httpx
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from scale_gp import SGPClient, SGPClientError
 
-from agentex import AsyncAgentex
-from agentex.lib.core.adapters.llm.adapter_litellm import LiteLLMGateway
-from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
-from agentex.lib.core.services.adk.acp.acp import ACPService
-from agentex.lib.core.services.adk.agent_task_tracker import AgentTaskTrackerService
-from agentex.lib.core.services.adk.events import EventsService
-from agentex.lib.core.services.adk.messages import MessagesService
-from agentex.lib.core.services.adk.providers.litellm import LiteLLMService
-from agentex.lib.core.services.adk.providers.openai import OpenAIService
-from agentex.lib.core.services.adk.providers.sgp import SGPService
+from agentex import AsyncAgentex  # noqa: F401
+from agentex.lib.core.tracing import AsyncTracer
 from agentex.lib.core.services.adk.state import StateService
-from agentex.lib.core.services.adk.streaming import StreamingService
 from agentex.lib.core.services.adk.tasks import TasksService
+from agentex.lib.core.services.adk.events import EventsService
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.services.adk.acp.acp import ACPService
 from agentex.lib.core.services.adk.tracing import TracingService
+from agentex.lib.core.services.adk.messages import MessagesService
+from agentex.lib.core.services.adk.streaming import StreamingService
+from agentex.lib.core.services.adk.providers.sgp import SGPService
+from agentex.lib.core.adapters.llm.adapter_litellm import LiteLLMGateway
+from agentex.lib.core.services.adk.providers.openai import OpenAIService
 from agentex.lib.core.services.adk.utils.templating import TemplatingService
-from agentex.lib.core.temporal.activities.adk.acp.acp_activities import ACPActivities
-from agentex.lib.core.temporal.activities.adk.agent_task_tracker_activities import (
-    AgentTaskTrackerActivities,
-)
-from agentex.lib.core.temporal.activities.adk.events_activities import EventsActivities
-from agentex.lib.core.temporal.activities.adk.messages_activities import MessagesActivities
-from agentex.lib.core.temporal.activities.adk.providers.litellm_activities import (
-    LiteLLMActivities,
-)
-from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
-    OpenAIActivities,
-)
-from agentex.lib.core.temporal.activities.adk.providers.sgp_activities import SGPActivities
+from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
+from agentex.lib.core.services.adk.providers.litellm import LiteLLMService
+from agentex.lib.core.services.adk.agent_task_tracker import AgentTaskTrackerService
 from agentex.lib.core.temporal.activities.adk.state_activities import StateActivities
+from agentex.lib.core.temporal.activities.adk.tasks_activities import TasksActivities
+from agentex.lib.core.temporal.activities.adk.events_activities import EventsActivities
+from agentex.lib.core.temporal.activities.adk.acp.acp_activities import ACPActivities
+from agentex.lib.core.temporal.activities.adk.tracing_activities import TracingActivities
+from agentex.lib.core.temporal.activities.adk.messages_activities import MessagesActivities
 from agentex.lib.core.temporal.activities.adk.streaming_activities import (
     StreamingActivities,
 )
-from agentex.lib.core.temporal.activities.adk.tasks_activities import TasksActivities
-from agentex.lib.core.temporal.activities.adk.tracing_activities import TracingActivities
+from agentex.lib.core.temporal.activities.adk.providers.sgp_activities import SGPActivities
+from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+    OpenAIActivities,
+)
 from agentex.lib.core.temporal.activities.adk.utils.templating_activities import (
     TemplatingActivities,
 )
-from agentex.lib.core.tracing import AsyncTracer
+from agentex.lib.core.temporal.activities.adk.providers.litellm_activities import (
+    LiteLLMActivities,
+)
+from agentex.lib.core.temporal.activities.adk.agent_task_tracker_activities import (
+    AgentTaskTrackerActivities,
+)
 
 
 def get_all_activities(sgp_client=None):
@@ -204,7 +204,7 @@ def get_all_activities(sgp_client=None):
     # SGP activities
     if sgp_client is not None:
         sgp_all_activities = [
-            sgp_activities.download_file_content,
+            sgp_activities.download_file_content,  # type: ignore[union-attr]
         ]
         activities.extend(sgp_all_activities)
 

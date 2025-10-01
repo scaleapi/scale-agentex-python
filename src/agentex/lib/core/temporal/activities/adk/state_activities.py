@@ -3,10 +3,10 @@ from typing import Any
 
 from temporalio import activity
 
-from agentex.lib.core.services.adk.state import StateService
 from agentex.types.state import State
 from agentex.lib.types.tracing import BaseModelWithTraceParams
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.services.adk.state import StateService
 
 logger = make_logger(__name__)
 

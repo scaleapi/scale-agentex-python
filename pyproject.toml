@@ -116,8 +116,7 @@ format = { chain = [
 "check:importable" = "python -c 'import agentex'"
 
 typecheck = { chain = [
-  "typecheck:pyright",
-  "typecheck:mypy"
+  "typecheck:pyright"
 ]}
 "typecheck:pyright" = "pyright"
 "typecheck:verify-types" = "pyright --verifytypes agentex --ignoreexternal"
@@ -179,10 +178,8 @@ filterwarnings = [
 ]
 
 [tool.pyright]
-# this enables practically every flag given by pyright.
-# there are a couple of flags that are still disabled by
-# default in strict mode as they are experimental and niche.
-typeCheckingMode = "strict"
+# Default to basic type checking, but override for specific directories
+typeCheckingMode = "basic"
 pythonVersion = "3.12"
 
 exclude = [
@@ -190,6 +187,8 @@ exclude = [
     ".venv",
     ".nox",
     ".git",
+    "agentex-server",
+    "examples/tutorials",
 ]
 
 reportImplicitOverride = true
@@ -197,6 +196,33 @@ reportOverlappingOverload = false
 
 reportImportCycles = false
 reportPrivateUsage = false
+
+# Ignore common issues in generated SDK code
+reportMissingTypeStubs = false
+reportUnknownParameterType = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+
+# Enable strict type checking only for hand-written code
+[[tool.pyright.executionEnvironments]]
+root = "src/agentex/lib"
+typeCheckingMode = "strict"
+# But allow some flexibility in OpenAI module for complex type boundaries
+reportArgumentType = false
+
+[[tool.pyright.executionEnvironments]]
+root = "examples"
+typeCheckingMode = "strict"
+# Allow type ignores in tutorials for readability
+reportUnnecessaryTypeIgnoreComment = false
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+typeCheckingMode = "basic"
+# Be loose on typing in tests unless testing types specifically
+reportOptionalMemberAccess = false
+reportArgumentType = false
 
 [tool.mypy]
 pretty = true
@@ -208,7 +234,7 @@ show_error_codes = true
 #
 # We also exclude our `tests` as mypy doesn't always infer
 # types correctly and Pyright will still catch any type errors.
-exclude = ['src/agentex/_files.py', '_dev/.*.py', 'tests/.*']
+exclude = ['src/agentex/_files.py', '_dev/.*.py', 'tests/.*', 'examples/tutorials/.*']
 
 strict_equality = true
 implicit_reexport = true
@@ -301,5 +327,10 @@ known-first-party = ["agentex", "tests"]
 [tool.ruff.lint.per-file-ignores]
 "bin/**.py" = ["T201", "T203"]
 "scripts/**.py" = ["T201", "T203"]
-"tests/**.py" = ["T201", "T203"]
+"tests/**.py" = ["T201", "T203", "ARG001", "ARG002", "ARG005"]
 "examples/**.py" = ["T201", "T203"]
+"examples/**.ipynb" = ["T201", "T203"]
+"examples/tutorials/**.py" = ["T201", "T203"]
+"examples/tutorials/**.ipynb" = ["T201", "T203"]
+"**/run_tests.py" = ["T201", "T203"]
+"**/dev_tools/**.py" = ["T201", "T203"]

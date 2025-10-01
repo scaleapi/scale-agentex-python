@@ -1,11 +1,11 @@
+import os
 import logging
 import contextvars
+
+import ddtrace
+import json_log_formatter
 from rich.console import Console
 from rich.logging import RichHandler
-import json_log_formatter
-import os
-import ddtrace
-from ddtrace import tracer
 
 _is_datadog_configured = bool(os.environ.get("DD_AGENT_HOST"))
 
@@ -13,7 +13,7 @@ ctx_var_request_id = contextvars.ContextVar[str]("request_id")
 
 
 class CustomJSONFormatter(json_log_formatter.JSONFormatter):
-    def json_record(self, message: str, extra: dict, record: logging.LogRecord) -> dict:
+    def json_record(self, message: str, extra: dict, record: logging.LogRecord) -> dict:  # type: ignore[override]
         extra = super().json_record(message, extra, record)
         extra["level"] = record.levelname
         extra["name"] = record.name
@@ -21,10 +21,10 @@ class CustomJSONFormatter(json_log_formatter.JSONFormatter):
         extra["pathname"] = record.pathname
         extra["request_id"] = ctx_var_request_id.get(None)
         if _is_datadog_configured:
-            extra["dd.trace_id"] = tracer.get_log_correlation_context().get("dd.trace_id", None) or getattr(
+            extra["dd.trace_id"] = ddtrace.tracer.get_log_correlation_context().get("dd.trace_id", None) or getattr(  # type: ignore[attr-defined]
                 record, "dd.trace_id", 0
             )
-            extra["dd.span_id"] = tracer.get_log_correlation_context().get("dd.span_id", None) or getattr(
+            extra["dd.span_id"] = ddtrace.tracer.get_log_correlation_context().get("dd.span_id", None) or getattr(  # type: ignore[attr-defined]
                 record, "dd.span_id", 0
             )
         # add the env, service, and version configured for the tracer

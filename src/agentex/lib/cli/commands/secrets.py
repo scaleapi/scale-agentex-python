@@ -1,24 +1,24 @@
 from pathlib import Path
 
-import questionary
 import typer
+import questionary
 from rich import print_json
-from rich.console import Console
 from rich.panel import Panel
+from rich.console import Console
 
-from agentex.lib.cli.handlers.secret_handlers import (
-    delete_secret,
-    get_kubernetes_secrets_by_type,
-    get_secret,
-    sync_secrets,
-)
+from agentex.lib.utils.logging import make_logger
 from agentex.lib.cli.utils.cli_utils import handle_questionary_cancellation
 from agentex.lib.cli.utils.kubectl_utils import (
-    check_and_switch_cluster_context,
     validate_namespace,
+    check_and_switch_cluster_context,
 )
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.handlers.secret_handlers import (
+    get_secret,
+    sync_secrets,
+    delete_secret,
+    get_kubernetes_secrets_by_type,
+)
 
 logger = make_logger(__name__)
 console = Console()

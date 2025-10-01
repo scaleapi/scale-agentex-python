@@ -1,7 +1,7 @@
 import subprocess
 
+from rich.prompt import Prompt, Confirm
 from rich.console import Console
-from rich.prompt import Confirm, Prompt
 
 from agentex.lib.types.credentials import CredentialMapping
 

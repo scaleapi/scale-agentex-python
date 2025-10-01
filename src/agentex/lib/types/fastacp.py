@@ -1,6 +1,7 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, BaseModel, field_validator
+
 from agentex.lib.core.clients.temporal.utils import validate_client_plugins
 
 
@@ -48,11 +49,9 @@ class TemporalACPConfig(AgenticACPConfig):
     """
 
     type: Literal["temporal"] = Field(default="temporal", frozen=True)
-    temporal_address: str = Field(
-        default="temporal-frontend.temporal.svc.cluster.local:7233", frozen=True
-    )
+    temporal_address: str = Field(default="temporal-frontend.temporal.svc.cluster.local:7233", frozen=True)
     plugins: list[Any] = Field(default=[], frozen=True)
-    
+
     @field_validator("plugins")
     @classmethod
     def validate_plugins(cls, v: list[Any]) -> list[Any]:

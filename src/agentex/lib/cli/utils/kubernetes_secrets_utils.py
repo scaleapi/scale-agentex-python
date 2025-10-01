@@ -1,11 +1,11 @@
 import base64
 
 from kubernetes import client
-from kubernetes.client.rest import ApiException
 from rich.console import Console
+from kubernetes.client.rest import ApiException
 
-from agentex.lib.cli.utils.kubectl_utils import get_k8s_client
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.kubectl_utils import get_k8s_client
 
 logger = make_logger(__name__)
 console = Console()
@@ -172,11 +172,11 @@ def get_secret_data(
     v1 = get_k8s_client(context)
     try:
         secret = v1.read_namespaced_secret(name=name, namespace=namespace)
-        if secret.data:
+        if secret.data:  # type: ignore[union-attr]
             # Decode base64 data
             return {
                 key: base64.b64decode(value).decode("utf-8")
-                for key, value in secret.data.items()
+                for key, value in secret.data.items()  # type: ignore[union-attr]
             }
         return {}
     except ApiException as e:

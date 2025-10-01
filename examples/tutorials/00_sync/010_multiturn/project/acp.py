@@ -1,14 +1,14 @@
 import os
-from typing import AsyncGenerator, Union
+from typing import Union, AsyncGenerator
 
 from agentex.lib import adk
-from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.acp import SendMessageParams
-from agentex.lib.types.llm_messages import AssistantMessage, LLMConfig, SystemMessage, UserMessage
-from agentex.types.task_message_update import TaskMessageUpdate
 from agentex.types.task_message import TaskMessageContent
-from agentex.types.task_message_content import TextContent
 from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.types.llm_messages import LLMConfig, UserMessage, SystemMessage, AssistantMessage
+from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.types.task_message_update import TaskMessageUpdate
+from agentex.types.task_message_content import TextContent
 
 # Create an ACP server
 acp = FastACP.create(
@@ -33,11 +33,11 @@ async def handle_message_send(
     # 0. Validate the message.
     #########################################################
 
-    if params.content.type != "text":
-        raise ValueError(f"Expected text message, got {params.content.type}")
+    if not hasattr(params.content, 'type') or params.content.type != "text":
+        raise ValueError(f"Expected text message, got {getattr(params.content, 'type', 'unknown')}")
 
-    if params.content.author != "user":
-        raise ValueError(f"Expected user message, got {params.content.author}")
+    if not hasattr(params.content, 'author') or params.content.author != "user":
+        raise ValueError(f"Expected user message, got {getattr(params.content, 'author', 'unknown')}")
     
     if not os.environ.get("OPENAI_API_KEY"):
         return TextContent(
@@ -74,9 +74,9 @@ async def handle_message_send(
     llm_messages = [
         SystemMessage(content=state.system_prompt),
         *[
-            UserMessage(content=message.content.content) if message.content.author == "user" else AssistantMessage(content=message.content.content)
+            UserMessage(content=getattr(message.content, 'content', '')) if getattr(message.content, 'author', None) == "user" else AssistantMessage(content=getattr(message.content, 'content', ''))
             for message in task_messages
-            if message.content.type == "text"
+            if getattr(message.content, 'type', None) == "text"
         ]
     ]
     
