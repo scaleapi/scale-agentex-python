@@ -97,7 +97,7 @@ async def handle_message_send(
             yield StreamTaskMessageDelta(
                 type="delta",
                 index=message_index,
-                delta=TextDelta(text_delta=chunk.choices[0].delta.content or ""),
+                delta=TextDelta(type="text", text_delta=chunk.choices[0].delta.content or ""),
             )
 
     yield StreamTaskMessageDone(
