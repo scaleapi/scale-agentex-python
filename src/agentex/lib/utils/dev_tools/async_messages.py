@@ -332,7 +332,6 @@ def subscribe_to_async_task_messages(
                             # Deserialize the discriminated union TaskMessageUpdate based on the "type" field
                             message_type = task_message_update_data.get("type", "unknown")
 
-                            
                             # Handle different message types for streaming progress
                             if message_type == "start":
                                 task_message_update = StreamTaskMessageStart.model_validate(task_message_update_data)

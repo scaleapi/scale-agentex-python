@@ -208,8 +208,6 @@ class StreamingTaskMessageContext:
 
         return self
 
-
-
     async def close(self) -> TaskMessage:
         """Close the streaming context."""
         if not self.task_message:

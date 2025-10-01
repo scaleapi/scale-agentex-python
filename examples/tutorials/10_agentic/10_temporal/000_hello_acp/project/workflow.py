@@ -33,7 +33,8 @@ class At000HelloAcpWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-            
+        logger.info(f"Received task message instruction: {params}")
+
         # 2. Echo back the client's message to show it in the UI. This is not done by default so the agent developer has full control over what is shown to the user.
         await adk.messages.create(task_id=params.task.id, content=params.event.content)
 
