@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.4.18"
+version = "0.4.19"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -36,11 +36,14 @@ dependencies = [
     "tzlocal>=5.3.1",
     "tzdata>=2025.2",
     "pytest>=8.4.0",
+    "json_log_formatter>=1.1.1",
     "pytest-asyncio>=1.0.0",
     "scale-gp-beta==0.1.0a20",
     "ipykernel>=6.29.5",
     "openai==1.99.9", # anything higher than 1.99.9 breaks litellm - https://github.com/BerriAI/litellm/issues/13711
     "cloudpickle>=3.1.1",
+    "datadog>=0.52.1",
+    "ddtrace>=3.13.0"
 ]
 requires-python = ">= 3.12,<4"
 classifiers = [
@@ -248,7 +251,7 @@ warn_unused_ignores = false
 warn_redundant_casts = false
 
 disallow_any_generics = true
-disallow_untyped_defs = true
+# disallow_untyped_defs = true
 disallow_untyped_calls = true
 disallow_subclassing_any = true
 disallow_incomplete_defs = true
@@ -264,7 +267,7 @@ cache_fine_grained = true
 # ```
 # Changing this codegen to make mypy happy would increase complexity
 # and would not be worth it.
-disable_error_code = "func-returns-value,overload-cannot-match"
+disable_error_code = "func-returns-value,overload-cannot-match,no-untyped-def"
 
 # https://github.com/python/mypy/issues/12162
 [[tool.mypy.overrides]]

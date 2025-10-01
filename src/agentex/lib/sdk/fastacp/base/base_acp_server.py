@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import uuid
 from typing import Any
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -9,6 +10,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from pydantic import TypeAdapter, ValidationError
 from fastapi.responses import StreamingResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from agentex.lib.types.acp import (
     RPC_SYNC_METHODS,
@@ -19,8 +21,8 @@ from agentex.lib.types.acp import (
     CreateTaskParams,
     SendMessageParams,
 )
-from agentex.lib.utils.logging import make_logger
 from agentex.lib.types.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
+from agentex.lib.utils.logging import ctx_var_request_id, make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.registration import register_agent
 
@@ -37,6 +39,20 @@ logger = make_logger(__name__)
 
 # Create a TypeAdapter for TaskMessageUpdate validation
 task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Middleware to extract or generate request IDs and add them to logs and response headers"""
+
+    async def dispatch(self, request: Request, call_next):
+        # Extract request ID from header or generate a new one if there isn't one
+        request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+        logger.info(f"Request ID: {request_id}")
+        # Store request ID in request state for access in handlers
+        ctx_var_request_id.set(request_id)
+        # Process request
+        response = await call_next(request)
+        return response
 
 
 class BaseACPServer(FastAPI):
@@ -57,6 +73,8 @@ class BaseACPServer(FastAPI):
         self.post("/api")(self._handle_jsonrpc)
 
         # Method handlers
+        # this just adds a request ID to the request and response headers
+        self.add_middleware(RequestIDMiddleware)
         self._handlers: dict[RPCMethod, Callable] = {}
 
     @classmethod

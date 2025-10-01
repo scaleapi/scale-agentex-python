@@ -39,6 +39,7 @@ class EnvVarKeys(str, Enum):
 
 
 class Environment(str, Enum):
+    LOCAL = "local"
     DEV = "development"
     STAGING = "staging"
     PROD = "production"
