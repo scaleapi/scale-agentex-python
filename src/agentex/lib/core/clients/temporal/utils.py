@@ -1,7 +1,8 @@
 from typing import Any
+
 from temporalio.client import Client, Plugin as ClientPlugin
+from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
 #     def default(self, o: Any) -> Any:
@@ -42,10 +43,10 @@ from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
 def validate_client_plugins(plugins: list[Any]) -> None:
     """
     Validate that all items in the plugins list are valid Temporal client plugins.
-    
+
     Args:
         plugins: List of plugins to validate
-        
+
     Raises:
         TypeError: If any plugin is not a valid ClientPlugin instance
     """
@@ -57,26 +58,22 @@ def validate_client_plugins(plugins: list[Any]) -> None:
             )
 
 
-async def get_temporal_client(
-    temporal_address: str, 
-    metrics_url: str = None,
-    plugins: list[Any] = []
-) -> Client:
+async def get_temporal_client(temporal_address: str, metrics_url: str | None = None, plugins: list[Any] = []) -> Client:
     """
     Create a Temporal client with plugin integration.
-    
+
     Args:
         temporal_address: Temporal server address
-        metrics_url: Optional metrics endpoint URL  
+        metrics_url: Optional metrics endpoint URL
         plugins: List of Temporal plugins to include
-        
+
     Returns:
         Configured Temporal client
     """
     # Validate plugins if any are provided
     if plugins:
         validate_client_plugins(plugins)
-        
+
     if not metrics_url:
         client = await Client.connect(
             target_host=temporal_address,

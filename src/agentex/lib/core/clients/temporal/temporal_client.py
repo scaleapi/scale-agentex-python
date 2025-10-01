@@ -1,25 +1,29 @@
-from collections.abc import Callable
-from datetime import timedelta
 from typing import Any
+from datetime import timedelta
+from collections.abc import Callable
 
 from temporalio.client import Client, WorkflowExecutionStatus
-from temporalio.common import RetryPolicy as TemporalRetryPolicy
-from temporalio.common import WorkflowIDReusePolicy
+from temporalio.common import RetryPolicy as TemporalRetryPolicy, WorkflowIDReusePolicy
 from temporalio.service import RPCError, RPCStatusCode
 
-from agentex.lib.core.clients.temporal.types import (
-    DuplicateWorkflowPolicy,
-    RetryPolicy,
-    TaskStatus,
-    WorkflowState,
-)
-from agentex.lib.core.clients.temporal.utils import get_temporal_client
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.core.clients.temporal.types import (
+    TaskStatus,
+    RetryPolicy,
+    WorkflowState,
+    DuplicateWorkflowPolicy,
+)
+from agentex.lib.core.clients.temporal.utils import get_temporal_client
 
 logger = make_logger(__name__)
 
-DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
+DEFAULT_RETRY_POLICY = RetryPolicy(
+    maximum_attempts=1,
+    initial_interval=timedelta(seconds=1),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(minutes=10),
+)
 
 
 TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON = {
@@ -36,8 +40,7 @@ TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON = {
     ),
     WorkflowExecutionStatus.FAILED: WorkflowState(
         status=TaskStatus.FAILED,
-        reason="Task encountered terminal failure. "
-        "Please contact support if retrying does not resolve the issue.",
+        reason="Task encountered terminal failure. Please contact support if retrying does not resolve the issue.",
         is_terminal=True,
     ),
     WorkflowExecutionStatus.RUNNING: WorkflowState(
@@ -72,8 +75,15 @@ DUPLICATE_POLICY_TO_ID_REUSE_POLICY = {
 
 class TemporalClient:
     def __init__(self, temporal_client: Client | None = None, plugins: list[Any] = []):
-        self._client: Client = temporal_client
+        self._client: Client | None = temporal_client
         self._plugins = plugins
+
+    @property
+    def client(self) -> Client:
+        """Get the temporal client, raising an error if not initialized."""
+        if self._client is None:
+            raise RuntimeError("Temporal client not initialized - ensure temporal_address is properly configured")
+        return self._client
 
     @classmethod
     async def create(cls, temporal_address: str, plugins: list[Any] = []):
@@ -89,18 +99,13 @@ class TemporalClient:
         ]:
             _client = None
         else:
-            _client = await get_temporal_client(
-                temporal_address, 
-                plugins=plugins
-            )
+            _client = await get_temporal_client(temporal_address, plugins=plugins)
         return cls(_client, plugins)
 
     async def setup(self, temporal_address: str):
-        self._client = await self._get_temporal_client(
-            temporal_address=temporal_address
-        )
+        self._client = await self._get_temporal_client(temporal_address=temporal_address)
 
-    async def _get_temporal_client(self, temporal_address: str) -> Client:
+    async def _get_temporal_client(self, temporal_address: str) -> Client | None:
         if temporal_address in [
             "false",
             "False",
@@ -113,10 +118,7 @@ class TemporalClient:
         ]:
             return None
         else:
-            return await get_temporal_client(
-                temporal_address, 
-                plugins=self._plugins
-            )
+            return await get_temporal_client(temporal_address, plugins=self._plugins)
 
     async def start_workflow(
         self,
@@ -127,10 +129,8 @@ class TemporalClient:
         execution_timeout: timedelta = timedelta(seconds=86400),
         **kwargs: Any,
     ) -> str:
-        temporal_retry_policy = TemporalRetryPolicy(
-            **retry_policy.model_dump(exclude_unset=True)
-        )
-        workflow_handle = await self._client.start_workflow(
+        temporal_retry_policy = TemporalRetryPolicy(**retry_policy.model_dump(exclude_unset=True))
+        workflow_handle = await self.client.start_workflow(
             *args,
             retry_policy=temporal_retry_policy,
             task_timeout=task_timeout,
@@ -146,8 +146,8 @@ class TemporalClient:
         signal: str | Callable[[dict[str, Any] | list[Any] | str | int | float | bool | BaseModel], Any],
         payload: dict[str, Any] | list[Any] | str | int | float | bool | BaseModel,
     ) -> None:
-        handle = self._client.get_workflow_handle(workflow_id=workflow_id)
-        await handle.signal(signal, payload)
+        handle = self.client.get_workflow_handle(workflow_id=workflow_id)
+        await handle.signal(signal, payload)  # type: ignore[misc]
 
     async def query_workflow(
         self,
@@ -164,12 +164,12 @@ class TemporalClient:
         Returns:
             The result of the query
         """
-        handle = self._client.get_workflow_handle(workflow_id=workflow_id)
+        handle = self.client.get_workflow_handle(workflow_id=workflow_id)
         return await handle.query(query)
 
     async def get_workflow_status(self, workflow_id: str) -> WorkflowState:
         try:
-            handle = self._client.get_workflow_handle(workflow_id=workflow_id)
+            handle = self.client.get_workflow_handle(workflow_id=workflow_id)
             description = await handle.describe()
             return TEMPORAL_STATUS_TO_UPLOAD_STATUS_AND_REASON[description.status]
         except RPCError as e:
@@ -182,7 +182,7 @@ class TemporalClient:
             raise
 
     async def terminate_workflow(self, workflow_id: str) -> None:
-        return await self._client.get_workflow_handle(workflow_id).terminate()
+        return await self.client.get_workflow_handle(workflow_id).terminate()
 
     async def cancel_workflow(self, workflow_id: str) -> None:
-        return await self._client.get_workflow_handle(workflow_id).cancel()
+        return await self.client.get_workflow_handle(workflow_id).cancel()

@@ -4,18 +4,20 @@ Debug process handlers for AgentEx CLI.
 Provides debug-enabled versions of ACP server and temporal worker startup.
 """
 
-import asyncio
 import sys
+import asyncio
+import asyncio.subprocess
+from typing import TYPE_CHECKING, Dict
 from pathlib import Path
-from typing import Dict, TYPE_CHECKING
 
 from rich.console import Console
 
 if TYPE_CHECKING:
-    import asyncio.subprocess
+    pass
+
+from agentex.lib.utils.logging import make_logger
 
 from .debug_config import DebugConfig, resolve_debug_port
-from agentex.lib.utils.logging import make_logger
 
 logger = make_logger(__name__)
 console = Console()

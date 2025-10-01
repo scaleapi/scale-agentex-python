@@ -5,9 +5,9 @@ import os
 from enum import Enum
 from pathlib import Path
 
-from agentex.lib.utils.logging import make_logger
 from dotenv import load_dotenv
 
+from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -39,12 +39,13 @@ class EnvVarKeys(str, Enum):
 
 
 class Environment(str, Enum):
+    LOCAL = "local"
     DEV = "development"
     STAGING = "staging"
     PROD = "production"
 
 
-refreshed_environment_variables: "EnvironmentVariables" | None = None
+refreshed_environment_variables: EnvironmentVariables | None = None
 
 
 class EnvironmentVariables(BaseModel):
@@ -79,13 +80,13 @@ class EnvironmentVariables(BaseModel):
             # Load global .env file first
             global_env_path = PROJECT_ROOT / ".env"
             if global_env_path.exists():
-                print(f"Loading global environment variables FROM: {global_env_path}")
+                logger.debug(f"Loading global environment variables FROM: {global_env_path}")
                 load_dotenv(dotenv_path=global_env_path, override=False)
 
             # Load local project .env.local file (takes precedence)
             local_env_path = Path.cwd().parent / ".env.local"
             if local_env_path.exists():
-                print(f"Loading local environment variables FROM: {local_env_path}")
+                logger.debug(f"Loading local environment variables FROM: {local_env_path}")
                 load_dotenv(dotenv_path=local_env_path, override=True)
 
         # Create kwargs dict with environment variables, using None for missing values

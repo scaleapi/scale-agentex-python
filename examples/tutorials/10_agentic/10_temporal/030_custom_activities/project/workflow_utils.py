@@ -1,17 +1,20 @@
 import asyncio
-from typing import List, Any, Dict
+from typing import Any, Dict, List
+from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from datetime import timedelta
 
 from agentex.lib import adk
+from project.shared_models import StateModel
+from project.custom_activites import (
+    REPORT_PROGRESS_ACTIVITY,
+    PROCESS_BATCH_EVENTS_ACTIVITY,
+    ReportProgressActivityParams,
+    ProcessBatchEventsActivityParams,
+)
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
-
-from project.custom_activites import PROCESS_BATCH_EVENTS_ACTIVITY, ProcessBatchEventsActivityParams, REPORT_PROGRESS_ACTIVITY, ReportProgressActivityParams
-from project.shared_models import StateModel
-
 
 logger = make_logger(__name__)
 
@@ -34,7 +37,7 @@ class BatchProcessingUtils:
                 item = queue.get_nowait()
                 data_to_process.append(item)
                 items_dequeued += 1
-            except:
+            except Exception:
                 # Queue became empty while we were dequeuing
                 break
 

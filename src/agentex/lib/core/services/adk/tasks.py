@@ -1,8 +1,9 @@
 from agentex import AsyncAgentex
-from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task import Task
+from agentex.types.shared import DeleteResponse
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
 
 logger = make_logger(__name__)
 
@@ -48,8 +49,13 @@ class TasksService:
         task_name: str | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
-    ) -> Task:
+    ) -> Task | DeleteResponse:
         trace = self._tracer.trace(trace_id) if self._tracer else None
+        if trace is None:
+            # Handle case without tracing
+            response = await self._agentex_client.tasks.delete(task_id)
+            return Task(**response.model_dump())
+
         async with trace.span(
             parent_id=parent_span_id,
             name="delete_task",

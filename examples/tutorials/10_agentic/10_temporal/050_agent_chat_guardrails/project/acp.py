@@ -1,8 +1,7 @@
 import os
 
-from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.fastacp import TemporalACPConfig
-
+from agentex.lib.sdk.fastacp.fastacp import FastACP
 
 # Create the ACP server
 acp = FastACP.create(

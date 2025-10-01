@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.20 (2025-10-01)
+
+Full Changelog: [v0.4.19...v0.4.20](https://github.com/scaleapi/agentex-python/compare/v0.4.19...v0.4.20)
+
+## 0.4.19 (2025-10-01)
+
+Full Changelog: [v0.4.18...v0.4.19](https://github.com/scaleapi/agentex-python/compare/v0.4.18...v0.4.19)
+
+### Features
+
+* Adds helm config to Agent Environment ([#125](https://github.com/scaleapi/agentex-python/issues/125)) ([e4b39b5](https://github.com/scaleapi/agentex-python/commit/e4b39b5f319452bbc6650a7ef41b3a3179bb3b93))
+
 ## 0.4.18 (2025-09-29)
 
 Full Changelog: [v0.4.17...v0.4.18](https://github.com/scaleapi/agentex-python/compare/v0.4.17...v0.4.18)

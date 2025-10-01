@@ -1,8 +1,8 @@
 from agentex import Agentex, AsyncAgentex
-from agentex.lib.core.tracing.trace import AsyncTrace, Trace
+from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.lib.core.tracing.tracing_processor_manager import (
-    get_async_tracing_processors,
     get_sync_tracing_processors,
+    get_async_tracing_processors,
 )
 
 

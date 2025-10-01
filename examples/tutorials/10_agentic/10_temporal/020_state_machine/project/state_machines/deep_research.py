@@ -1,8 +1,9 @@
 from enum import Enum
 from typing import Dict, List, Optional, override
-from agentex.types.span import Span
+
 from pydantic import BaseModel
 
+from agentex.types.span import Span
 from agentex.lib.sdk.state_machine import StateMachine
 
 

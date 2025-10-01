@@ -30,9 +30,8 @@ if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
         sys.exit(1)
 # === END DEBUG SETUP ===
 
-from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.fastacp import TemporalACPConfig
-
+from agentex.lib.sdk.fastacp.fastacp import FastACP
 
 # Create the ACP server
 acp = FastACP.create(
