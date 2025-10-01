@@ -1,6 +1,6 @@
+import uuid
 import asyncio
 import inspect
-import uuid
 from typing import Any
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -21,8 +21,8 @@ from agentex.lib.types.acp import (
     CreateTaskParams,
     SendMessageParams,
 )
+from agentex.lib.utils.logging import make_logger, ctx_var_request_id
 from agentex.lib.types.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
-from agentex.lib.utils.logging import ctx_var_request_id, make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.registration import register_agent
 
@@ -44,7 +44,7 @@ task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Middleware to extract or generate request IDs and add them to logs and response headers"""
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
         # Extract request ID from header or generate a new one if there isn't one
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
         logger.info(f"Request ID: {request_id}")
