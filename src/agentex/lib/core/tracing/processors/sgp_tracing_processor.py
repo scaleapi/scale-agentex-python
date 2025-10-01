@@ -30,13 +30,14 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
     def _add_source_to_span(self, span: Span) -> None:
         if span.data is None:
             span.data = {}
-        span.data["__source__"] = "agentex"
-        if self.env_vars.ACP_TYPE is not None:
-            span.data["__acp_type__"] = self.env_vars.ACP_TYPE
-        if self.env_vars.AGENT_NAME is not None:
-            span.data["__agent_name__"] = self.env_vars.AGENT_NAME
-        if self.env_vars.AGENT_ID is not None:
-            span.data["__agent_id__"] = self.env_vars.AGENT_ID
+        if isinstance(span.data, dict):
+            span.data["__source__"] = "agentex"
+            if self.env_vars.ACP_TYPE is not None:
+                span.data["__acp_type__"] = self.env_vars.ACP_TYPE
+            if self.env_vars.AGENT_NAME is not None:
+                span.data["__agent_name__"] = self.env_vars.AGENT_NAME
+            if self.env_vars.AGENT_ID is not None:
+                span.data["__agent_id__"] = self.env_vars.AGENT_ID
 
     @override
     def on_span_start(self, span: Span) -> None:
@@ -91,13 +92,14 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
     def _add_source_to_span(self, span: Span) -> None:
         if span.data is None:
             span.data = {}
-        span.data["__source__"] = "agentex"
-        if self.env_vars.ACP_TYPE is not None:
-            span.data["__acp_type__"] = self.env_vars.ACP_TYPE
-        if self.env_vars.AGENT_NAME is not None:
-            span.data["__agent_name__"] = self.env_vars.AGENT_NAME
-        if self.env_vars.AGENT_ID is not None:
-            span.data["__agent_id__"] = self.env_vars.AGENT_ID
+        if isinstance(span.data, dict):
+            span.data["__source__"] = "agentex"
+            if self.env_vars.ACP_TYPE is not None:
+                span.data["__acp_type__"] = self.env_vars.ACP_TYPE
+            if self.env_vars.AGENT_NAME is not None:
+                span.data["__agent_name__"] = self.env_vars.AGENT_NAME
+            if self.env_vars.AGENT_ID is not None:
+                span.data["__agent_id__"] = self.env_vars.AGENT_ID
 
     @override
     async def on_span_start(self, span: Span) -> None:
