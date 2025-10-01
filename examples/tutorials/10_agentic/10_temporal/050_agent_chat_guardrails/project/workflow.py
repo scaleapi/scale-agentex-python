@@ -387,7 +387,6 @@ class At050AgentChatGuardrailsWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        logger.info(f"Received task message instruction: {params}")
 
         if not params.event.content:
             return

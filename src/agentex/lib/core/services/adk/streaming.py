@@ -208,6 +208,35 @@ class StreamingTaskMessageContext:
 
         return self
 
+    # Temp function to just send the full content
+    async def send_full_content(self) -> TaskMessage:
+        """Send the full content message to the repository without updating the task message."""
+        if not self.task_message:
+            raise ValueError("Context not properly initialized - no task message")
+
+        if self._is_closed:
+            return self.task_message  # Already done
+
+        # Update the task message with the final content from accumulated deltas
+        has_deltas = (
+            self._delta_accumulator._accumulated_deltas or 
+            self._delta_accumulator._reasoning_summaries or 
+            self._delta_accumulator._reasoning_contents
+        )
+        if has_deltas:
+            self.task_message.content = self._delta_accumulator.convert_to_content()
+
+        # Send the FULL event with the complete content
+        full_event = StreamTaskMessageFull(
+            parent_task_message=self.task_message,
+            content=self.task_message.content,
+            type="full",
+        )
+        await self._streaming_service.stream_update(full_event)
+
+        return self.task_message
+
+
     async def close(self) -> TaskMessage:
         """Close the streaming context."""
         if not self.task_message:

@@ -9,7 +9,7 @@ description = "An AgentEx agentthat streams multiturn tool-enabled chat with tra
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "agentex-sdk",
+    "agentex-sdk @ file://../../../../../",
     "debugpy>=1.8.15",
     "scale-gp",
 ]
@@ -21,6 +21,9 @@ dev = [
     "isort",
     "flake8",
 ]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["project"]

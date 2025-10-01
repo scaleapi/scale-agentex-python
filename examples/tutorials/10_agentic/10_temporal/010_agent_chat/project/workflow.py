@@ -48,11 +48,11 @@ class StateModel(BaseModel):
     turn_number: int
 
 
-MCP_SERVERS = [
-    StdioServerParameters(
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-sequential-thinking"],
-    ),
+MCP_SERVERS = [ # No longer needed due to reasoning
+    # StdioServerParameters(
+    #     command="npx",
+    #     args=["-y", "@modelcontextprotocol/server-sequential-thinking"],
+    # ),
     StdioServerParameters(
         command="uvx",
         args=["openai-websearch-mcp"],
@@ -163,7 +163,6 @@ class At010AgentChatWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        logger.info(f"Received task message instruction: {params}")
 
         if not params.event.content:
             return
