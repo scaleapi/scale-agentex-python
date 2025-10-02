@@ -131,28 +131,3 @@ the environment.
 
 This repository is setup with some pre-canned prompts for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) as well as [Cursor](https://cursor.com/).
 
-### Cursor
-
-Access to Cursor can be acquired by asking for it in #it-help.  Then just loading this repo in the Cursor IDE should enable the prompts.
-
-### Claude Code
-
-### 1. Install Claude Code
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-### 2. Request a LiteLLM API Key
-Visit the [LiteLLM User Guide](https://scale.atlassian.net/wiki/spaces/EPD/pages/1490354189/LiteLLM+User+Guide#Requesting-LiteLLM-Key-for-Generic-Usage) to request your API key.
-
-### 3. Set Environment Variables
-```bash
-export ANTHROPIC_AUTH_TOKEN=${LITELLM_PROXY_API_KEY}
-export ANTHROPIC_BASE_URL="https://litellm.ml-serving-internal.scale.com"
-```
-
-### 4. Start Claude Code
-```bash
-claude
-```
-This should be run from inside the main repo directory. If you run the command from a terminal inside VSCode, then Claude will use the VSCode editor to show diffs etc. 
