@@ -1,5 +1,4 @@
 # Standard library imports
-import json
 from typing import Any, Literal
 from contextlib import AsyncExitStack, asynccontextmanager
 
@@ -13,14 +12,13 @@ from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTr
 from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseTextDeltaEvent,
-    ResponseFunctionWebSearch,
-    ResponseCodeInterpreterToolCall,
     ResponseFunctionToolCall,
+    ResponseFunctionWebSearch,
     ResponseOutputItemDoneEvent,
-    ResponseTextDeltaEvent,
+    ResponseCodeInterpreterToolCall,
+    ResponseReasoningSummaryPartDoneEvent,
     ResponseReasoningSummaryPartAddedEvent,
     ResponseReasoningSummaryTextDeltaEvent,
-    ResponseReasoningSummaryPartDoneEvent,
 )
 
 # Local imports
@@ -31,7 +29,6 @@ from agentex.lib.utils.temporal import heartbeat_if_in_workflow
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task_message_delta import (
     TextDelta,
-    ReasoningContentDelta,
     ReasoningSummaryDelta,
 )
 from agentex.types.task_message_update import (
