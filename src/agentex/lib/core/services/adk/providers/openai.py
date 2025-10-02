@@ -2,15 +2,18 @@
 import json
 from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, Literal
+from contextlib import AsyncExitStack, asynccontextmanager
 
+from mcp import StdioServerParameters
 from agents import Agent, Runner, RunResult, RunResultStreaming
+from pydantic import BaseModel
+from agents.mcp import MCPServerStdio
 from agents.agent import StopAtTools, ToolsToFinalOutputFunction
 from agents.guardrail import InputGuardrail, OutputGuardrail
 from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
-from agents.mcp import MCPServerStdio
-from mcp import StdioServerParameters
 from openai.types.responses import (
     ResponseCompletedEvent,
+    ResponseTextDeltaEvent,
     ResponseFunctionWebSearch,
     ResponseCodeInterpreterToolCall,
     ResponseFunctionCallArgumentsDeltaEvent,
@@ -23,33 +26,32 @@ from openai.types.responses import (
     ResponseReasoningSummaryPartDoneEvent,
     
 )
-from pydantic import BaseModel
 
 # Local imports
 from agentex import AsyncAgentex
+from agentex.lib.utils import logging
+from agentex.lib.utils.mcp import redact_mcp_server_params
+from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.task_message_delta import (
+    TextDelta,
+    ReasoningContentDelta,
+    ReasoningSummaryDelta,
+)
+from agentex.types.task_message_update import (
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+)
+from agentex.types.task_message_content import (
+    TextContent,
+    ReasoningContent,
+    ToolRequestContent,
+    ToolResponseContent,
+)
 from agentex.lib.core.services.adk.streaming import (
     StreamingService,
     StreamingTaskMessageContext,
 )
-from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
-    StreamTaskMessageFull,
-)
-from agentex.types.task_message_delta import (
-    TextDelta,
-    ReasoningSummaryDelta,
-    ReasoningContentDelta,
-)
-from agentex.types.task_message_content import (
-    ReasoningContent,
-    TextContent,
-    ToolRequestContent,
-    ToolResponseContent,
-)
-from agentex.lib.utils import logging
-from agentex.lib.utils.mcp import redact_mcp_server_params
-from agentex.lib.utils.temporal import heartbeat_if_in_workflow
 
 logger = logging.make_logger(__name__)
 
@@ -145,15 +147,15 @@ class OpenAIService:
             content = tool_output_item["output"]
         else:
             # Attribute access for structured objects
-            call_id = getattr(tool_output_item, "call_id", None)
-            content = getattr(tool_output_item, "output", None)
+            call_id = getattr(tool_output_item, "call_id", "")
+            content = getattr(tool_output_item, "output", "")
 
         # Get the name from the tool call map using generic approach
         tool_call = tool_call_map[call_id]
         if hasattr(tool_call, "name"):
-            tool_name = getattr(tool_call, "name")
+            tool_name = tool_call.name
         elif hasattr(tool_call, "type"):
-            tool_name = getattr(tool_call, "type")
+            tool_name = tool_call.type
         else:
             tool_name = type(tool_call).__name__
 
@@ -180,7 +182,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
     ) -> RunResult:
         """
         Run an agent without streaming or TaskMessage creation.
@@ -212,6 +214,8 @@ class OpenAIService:
         """
         redacted_params = redact_mcp_server_params(mcp_server_params)
 
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
@@ -234,8 +238,11 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                tools = [
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
+                    for tool in tools
+                ] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
 
                 agent_kwargs = {
                     "name": agent_name,
@@ -249,7 +256,10 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
+                        else model_settings
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -307,7 +317,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
     ) -> RunResult:
         """
         Run an agent with automatic TaskMessage creation.
@@ -341,6 +351,8 @@ class OpenAIService:
 
         redacted_params = redact_mcp_server_params(mcp_server_params)
 
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
@@ -364,8 +376,11 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent auto send")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                tools = [
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
+                    for tool in tools
+                ] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -378,7 +393,10 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
+                        else model_settings
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -418,7 +436,7 @@ class OpenAIService:
                     if item.type == "message_output_item":
                         text_content = TextContent(
                             author="agent",
-                            content=item.raw_item.content[0].text,
+                            content=item.raw_item.content[0].text,  # type: ignore[union-attr]
                         )
                         # Create message for the final result using streaming context
                         async with self.streaming_service.streaming_task_message_context(
@@ -508,7 +526,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled but no TaskMessage creation.
@@ -538,6 +556,8 @@ class OpenAIService:
         Returns:
             RunResultStreaming: The result of the agent run with streaming.
         """
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
         redacted_params = redact_mcp_server_params(mcp_server_params)
 
@@ -562,8 +582,11 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent streamed")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                tools = [
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
+                    for tool in tools
+                ] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -576,7 +599,10 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
+                        else model_settings
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:
@@ -634,7 +660,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
@@ -673,6 +699,8 @@ class OpenAIService:
 
         tool_call_map: dict[str, ResponseFunctionToolCall] = {}
 
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
         redacted_params = redact_mcp_server_params(mcp_server_params)
 
@@ -698,8 +726,11 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent streamed auto send")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [tool.to_oai_function_tool() for tool in tools] if tools else []
-                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []
+                tools = [
+                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
+                    for tool in tools
+                ] if tools else []
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
                     "instructions": agent_instructions,
@@ -712,7 +743,10 @@ class OpenAIService:
                     "tool_use_behavior": tool_use_behavior,
                 }
                 if model_settings is not None:
-                    agent_kwargs["model_settings"] = model_settings.to_oai_model_settings()
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
+                        else model_settings
+                    )
                 if input_guardrails is not None:
                     agent_kwargs["input_guardrails"] = input_guardrails
                 if output_guardrails is not None:

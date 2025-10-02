@@ -1,14 +1,13 @@
 import asyncio
-from typing import Any, Coroutine, cast
+from typing import Any, Coroutine
 
 from agentex import AsyncAgentex
-from agentex.lib.core.services.adk.streaming import StreamingService
-from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.types.task_message_update import StreamTaskMessageFull, TaskMessageUpdate
-from agentex.types.task_message import TaskMessage, TaskMessageContent
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
-from agentex.types.task_message_content_param import TaskMessageContentParam
+from agentex.types.task_message import TaskMessage, TaskMessageContent
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
+from agentex.lib.core.services.adk.streaming import StreamingService
 
 logger = make_logger(__name__)
 

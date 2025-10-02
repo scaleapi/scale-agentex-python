@@ -1,10 +1,12 @@
+# ruff: noqa: I001
+# Import order matters - AsyncTracer must come after client import to avoid circular imports
 from datetime import timedelta
 from typing import Any
 
 from pydantic import BaseModel
 from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
+from agentex import AsyncAgentex  # noqa: F401
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.services.adk.state import StateService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers

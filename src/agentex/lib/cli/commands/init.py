@@ -1,12 +1,12 @@
 from enum import Enum
-from pathlib import Path
 from typing import Any, Dict
+from pathlib import Path
 
 import questionary
 from jinja2 import Environment, FileSystemLoader
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.console import Console
 
 from agentex.lib.utils.logging import make_logger
 
@@ -86,7 +86,7 @@ def create_project_structure(
     console.print(f"\n[green]✓[/green] Created project structure at: {project_dir}")
 
 
-def get_project_context(answers: Dict[str, Any], project_path: Path, manifest_root: Path) -> Dict[str, Any]:
+def get_project_context(answers: Dict[str, Any], project_path: Path, manifest_root: Path) -> Dict[str, Any]:  # noqa: ARG001
     """Get the project context from user answers"""
     # Use agent_directory_name as project_name
     project_name = answers["agent_directory_name"].replace("-", "_")

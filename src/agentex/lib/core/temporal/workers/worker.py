@@ -1,28 +1,29 @@
-import dataclasses
-import datetime
 import os
 import uuid
+import datetime
+import dataclasses
+from typing import Any, overload, override
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, overload
 
 from aiohttp import web
 from temporalio.client import Client, Plugin as ClientPlugin
-from temporalio.converter import (
-    AdvancedJSONEncoder,
-    CompositePayloadConverter,
-    DataConverter,
-    DefaultPayloadConverter,
-    JSONPlainPayloadConverter,
-    JSONTypeConverter,
-    _JSONTypeConverterUnhandled,
-)
-from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
 from temporalio.worker import (
     Plugin as WorkerPlugin,
-    UnsandboxedWorkflowRunner,
     Worker,
+    UnsandboxedWorkflowRunner,
 )
+from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
+from temporalio.converter import (
+    DataConverter,
+    JSONTypeConverter,
+    AdvancedJSONEncoder,
+    DefaultPayloadConverter,
+    CompositePayloadConverter,
+    JSONPlainPayloadConverter,
+    _JSONTypeConverterUnhandled,
+)
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.registration import register_agent
@@ -32,6 +33,7 @@ logger = make_logger(__name__)
 
 
 class DateTimeJSONEncoder(AdvancedJSONEncoder):
+    @override
     def default(self, o: Any) -> Any:
         if isinstance(o, datetime.datetime):
             return o.isoformat()
@@ -39,9 +41,8 @@ class DateTimeJSONEncoder(AdvancedJSONEncoder):
 
 
 class DateTimeJSONTypeConverter(JSONTypeConverter):
-    def to_typed_value(
-        self, hint: type, value: Any
-    ) -> Any | None | _JSONTypeConverterUnhandled:
+    @override
+    def to_typed_value(self, hint: type, value: Any) -> Any | None | _JSONTypeConverterUnhandled:
         if hint == datetime.datetime:
             return datetime.datetime.fromisoformat(value)
         return JSONTypeConverter.Unhandled
@@ -66,6 +67,7 @@ custom_data_converter = dataclasses.replace(
     payload_converter_class=DateTimePayloadConverter,
 )
 
+
 def _validate_plugins(plugins: list) -> None:
     """Validate that all items in the plugins list are valid Temporal plugins."""
     for i, plugin in enumerate(plugins):
@@ -76,25 +78,31 @@ def _validate_plugins(plugins: list) -> None:
             )
 
 
-
-async def get_temporal_client(temporal_address: str, metrics_url: str = None, plugins: list = []) -> Client:
-
-    if plugins != []: # We don't need to validate the plugins if they are empty
+async def get_temporal_client(temporal_address: str, metrics_url: str | None = None, plugins: list = []) -> Client:
+    if plugins != []:  # We don't need to validate the plugins if they are empty
         _validate_plugins(plugins)
 
+    # Check if OpenAI plugin is present - it needs to configure its own data converter
+    has_openai_plugin = any(
+        isinstance(p, OpenAIAgentsPlugin) for p in (plugins or [])
+    )
+
+    # Build connection kwargs
+    connect_kwargs = {
+        "target_host": temporal_address,
+        "plugins": plugins,
+    }
+
+    # Only set data_converter if OpenAI plugin is not present
+    if not has_openai_plugin:
+        connect_kwargs["data_converter"] = custom_data_converter
+
     if not metrics_url:
-        client = await Client.connect(
-            target_host=temporal_address, data_converter=custom_data_converter, plugins=plugins
-        )
+        client = await Client.connect(**connect_kwargs)
     else:
-        runtime = Runtime(
-            telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url))
-        )
-        client = await Client.connect(
-            target_host=temporal_address,
-            data_converter=custom_data_converter,
-            runtime=runtime,
-        )
+        runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url)))
+        connect_kwargs["runtime"] = runtime
+        client = await Client.connect(**connect_kwargs)
     return client
 
 
@@ -123,7 +131,7 @@ class AgentexWorker:
         *,
         workflow: type,
     ) -> None: ...
-    
+
     @overload
     async def run(
         self,
@@ -145,15 +153,15 @@ class AgentexWorker:
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
             plugins=self.plugins,
         )
-        
+
         # Enable debug mode if AgentEx debug is enabled (disables deadlock detection)
         debug_enabled = os.environ.get("AGENTEX_DEBUG_ENABLED", "false").lower() == "true"
         if debug_enabled:
             logger.info("🐛 [WORKER] Temporal debug mode enabled - deadlock detection disabled")
-        
+
         if workflow is None and workflows is None:
             raise ValueError("Either workflow or workflows must be provided")
-        
+
         worker = Worker(
             client=temporal_client,
             task_queue=self.task_queue,
@@ -178,7 +186,7 @@ class AgentexWorker:
     async def start_health_check_server(self):
         if not self.health_check_server_running:
             app = web.Application()
-            app.router.add_get("/readyz", lambda request: self._health_check())
+            app.router.add_get("/readyz", lambda request: self._health_check())  # noqa: ARG005
 
             # Disable access logging
             runner = web.AppRunner(app, access_log=None)
@@ -187,27 +195,19 @@ class AgentexWorker:
             try:
                 site = web.TCPSite(runner, "0.0.0.0", self.health_check_port)
                 await site.start()
-                logger.info(
-                    f"Health check server running on http://0.0.0.0:{self.health_check_port}/readyz"
-                )
+                logger.info(f"Health check server running on http://0.0.0.0:{self.health_check_port}/readyz")
                 self.health_check_server_running = True
             except OSError as e:
-                logger.error(
-                    f"Failed to start health check server on port {self.health_check_port}: {e}"
-                )
+                logger.error(f"Failed to start health check server on port {self.health_check_port}: {e}")
                 # Try alternative port if default fails
                 try:
                     alt_port = self.health_check_port + 1
                     site = web.TCPSite(runner, "0.0.0.0", alt_port)
                     await site.start()
-                    logger.info(
-                        f"Health check server running on alternative port http://0.0.0.0:{alt_port}/readyz"
-                    )
+                    logger.info(f"Health check server running on alternative port http://0.0.0.0:{alt_port}/readyz")
                     self.health_check_server_running = True
                 except OSError as e:
-                    logger.error(
-                        f"Failed to start health check server on alternative port {alt_port}: {e}"
-                    )
+                    logger.error(f"Failed to start health check server on alternative port {alt_port}: {e}")
                     raise
 
     """
@@ -217,6 +217,7 @@ class AgentexWorker:
     doing this on the worker side is required to make sure that both share the API key
     which is returned on registration and used to authenticate the worker with the Agentex server.
     """
+
     async def _register_agent(self):
         env_vars = EnvironmentVariables.refresh()
         if env_vars and env_vars.AGENTEX_BASE_URL:

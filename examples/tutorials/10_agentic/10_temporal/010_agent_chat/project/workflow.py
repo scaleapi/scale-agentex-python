@@ -1,25 +1,25 @@
 import os
 import json
-from typing import Dict, List, override, Any
-from dotenv import load_dotenv
+from typing import Any, Dict, List, override
 
-from agentex.lib.utils.model_utils import BaseModel
 from mcp import StdioServerParameters
-from temporalio import workflow
 from agents import ModelSettings, RunContextWrapper
+from dotenv import load_dotenv
+from temporalio import workflow
 from openai.types.shared import Reasoning
 
 from agentex.lib import adk
-from agentex.lib.types.acp import CreateTaskParams, SendEventParams
-from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
-from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.types.acp import SendEventParams, CreateTaskParams
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from agentex.lib.core.tracing.tracing_processor_manager import (
     add_tracing_processor_config,
 )
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
-from agentex.lib.environment_variables import EnvironmentVariables
-from agentex.types.text_content import TextContent
 from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
     FunctionTool,
 )
@@ -61,7 +61,7 @@ MCP_SERVERS = [ # No longer needed due to reasoning
 ]
 
 
-async def calculator(context: RunContextWrapper, args: str) -> str:
+async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG001
     """
     Simple calculator that can perform basic arithmetic operations.
 

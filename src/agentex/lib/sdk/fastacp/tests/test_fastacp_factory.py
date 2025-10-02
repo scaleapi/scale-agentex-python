@@ -3,17 +3,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+from agentex.lib.types.fastacp import (
+    SyncACPConfig,
+    AgenticACPConfig,
+    TemporalACPConfig,
+    AgenticBaseACPConfig,
+)
 from agentex.lib.sdk.fastacp.fastacp import FastACP
-from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
 from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
-from agentex.lib.types.fastacp import (
-    AgenticACPConfig,
-    AgenticBaseACPConfig,
-    SyncACPConfig,
-    TemporalACPConfig,
-)
+from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
 
 
 class TestFastACPInitialization:
@@ -212,7 +212,7 @@ class TestConfigurationValidation:
         with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):
             # This should raise TypeError since config is required parameter
             with pytest.raises(TypeError):
-                FastACP.create_agentic_acp()
+                FastACP.create_agentic_acp()  # type: ignore[call-arg]
 
     def test_invalid_acp_type_string(self):
         """Test that invalid ACP type string raises ValueError"""

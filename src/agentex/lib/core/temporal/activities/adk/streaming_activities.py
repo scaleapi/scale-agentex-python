@@ -2,11 +2,11 @@ from enum import Enum
 
 from temporalio import activity
 
-from agentex.lib.core.services.adk.streaming import StreamingService
-from agentex.types.task_message_update import TaskMessageUpdate
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.types.task_message_update import TaskMessageUpdate
+from agentex.lib.core.services.adk.streaming import StreamingService
 
 logger = make_logger(__name__)
 

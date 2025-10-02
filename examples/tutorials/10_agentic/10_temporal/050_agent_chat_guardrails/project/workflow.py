@@ -1,34 +1,35 @@
+# ruff: noqa: ARG001
 import os
 import json
-from typing import Dict, List, override, Any
+from typing import Any, Dict, List, override
+
+from mcp import StdioServerParameters
 from dotenv import load_dotenv
 
-from agentex.lib.utils.model_utils import BaseModel
-from mcp import StdioServerParameters
+# Simple guardrail output model for this example
+from pydantic import BaseModel
 from temporalio import workflow
-from agentex.lib.adk.models import ModelSettings
-from agentex.lib.core.base.run_context import RunContextWrapper
 from openai.types.shared import Reasoning
 
 from agentex.lib import adk
-from agentex.lib.types.acp import CreateTaskParams, SendEventParams
-from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
-from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.types.acp import SendEventParams, CreateTaskParams
+from agentex.lib.adk.models import ModelSettings
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.core.base.run_context import RunContextWrapper
+from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from agentex.lib.core.tracing.tracing_processor_manager import (
     add_tracing_processor_config,
 )
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
-from agentex.lib.environment_variables import EnvironmentVariables
-from agentex.types.text_content import TextContent
 from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (  # noqa: E501
     FunctionTool,
     TemporalInputGuardrail,
     TemporalOutputGuardrail,
 )
-# Simple guardrail output model for this example
-from pydantic import BaseModel
-from typing import Dict, Any
 
 
 class GuardrailFunctionOutput(BaseModel):
@@ -77,7 +78,7 @@ MCP_SERVERS = [
 ]
 
 
-async def calculator(context: RunContextWrapper, args: str) -> str:
+async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG001
     """
     Simple calculator that can perform basic arithmetic operations.
 

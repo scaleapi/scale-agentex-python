@@ -1,8 +1,10 @@
+from typing import override
+
 import httpx
 
 from agentex import AsyncAgentex
-from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.environment_variables import EnvironmentVariables
 
 logger = make_logger(__name__)
 
@@ -11,6 +13,7 @@ class EnvAuth(httpx.Auth):
     def __init__(self, header_name="x-agent-api-key"):
         self.header_name = header_name
 
+    @override
     def auth_flow(self, request):
         # This gets called for every request
         env_vars = EnvironmentVariables.refresh()

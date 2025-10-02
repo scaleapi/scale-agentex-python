@@ -1,3 +1,6 @@
+# ruff: noqa: I001
+# Import order matters here to avoid circular imports
+# The _modules must be imported before providers/utils
 
 from agentex.lib.adk._modules.acp import ACPModule
 from agentex.lib.adk._modules.agents import AgentsModule

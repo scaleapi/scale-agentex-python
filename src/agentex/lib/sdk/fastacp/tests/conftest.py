@@ -1,28 +1,28 @@
-import asyncio
-import socket
 import time
+import socket
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
-import pytest_asyncio
 import uvicorn
+import pytest_asyncio
 
-from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
-from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
-from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
-from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
+from agentex.types.task import Task
+from agentex.types.agent import Agent
 from agentex.lib.types.acp import (
     CancelTaskParams,
     CreateTaskParams,
     SendMessageParams,
 )
 from agentex.lib.types.json_rpc import JSONRPCRequest
-from agentex.types.agent import Agent
 from agentex.types.task_message import TaskMessageContent
 from agentex.types.task_message_content import TextContent
-from agentex.types.task import Task
+from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
+from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
+from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
 
 # Configure pytest-asyncio
 pytest_plugins = ("pytest_asyncio",)
@@ -47,7 +47,7 @@ def free_port() -> int:
 def sample_task() -> Task:
     """Fixture that provides a sample Task object"""
     return Task(
-        id="test-task-123", agent_id="test-agent-456", status=TaskStatus.RUNNING
+        id="test-task-123", status="RUNNING"
     )
 
 
@@ -72,6 +72,8 @@ def sample_send_message_params(
             name="test-agent",
             description="test-agent",
             acp_type="sync",
+            created_at="2023-01-01T00:00:00Z",
+            updated_at="2023-01-01T00:00:00Z",
         ),
         task=sample_task,
         content=sample_message_content,
@@ -83,8 +85,8 @@ def sample_send_message_params(
 def sample_cancel_task_params() -> CancelTaskParams:
     """Fixture that provides sample CancelTaskParams"""
     return CancelTaskParams(
-        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync"),
-        task=Task(id="test-task-123", agent_id="test-agent-456", status="running"),
+        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync", created_at="2023-01-01T00:00:00Z", updated_at="2023-01-01T00:00:00Z"),
+        task=Task(id="test-task-123", status="RUNNING"),
     )
 
 
@@ -92,7 +94,7 @@ def sample_cancel_task_params() -> CancelTaskParams:
 def sample_create_task_params(sample_task: Task) -> CreateTaskParams:
     """Fixture that provides sample CreateTaskParams"""
     return CreateTaskParams(
-        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync"),
+        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync", created_at="2023-01-01T00:00:00Z", updated_at="2023-01-01T00:00:00Z"),
         task=sample_task,
         params={},
     )
@@ -202,7 +204,7 @@ async def async_sync_acp_server():
     with patch.dict(
         "os.environ", {"AGENTEX_BASE_URL": ""}
     ):  # Disable agent registration
-        server = await SyncACP.create()
+        server = SyncACP.create()
         return server
 
 
@@ -222,7 +224,7 @@ async def async_agentic_base_acp_server():
     with patch.dict(
         "os.environ", {"AGENTEX_BASE_URL": ""}
     ):  # Disable agent registration
-        server = await AgenticBaseACP.create()
+        server = AgenticBaseACP.create()
         return server
 
 
@@ -242,7 +244,7 @@ async def mock_temporal_acp_server():
                 mock_temporal_client.create.return_value = AsyncMock()
                 mock_agentex_client.return_value = AsyncMock()
 
-                server = await TemporalACP.create(temporal_address="localhost:7233")
+                server = TemporalACP.create(temporal_address="localhost:7233")
                 return server
 
 
