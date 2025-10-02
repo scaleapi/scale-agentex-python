@@ -1,6 +1,5 @@
 # Standard library imports
 import json
-from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Any, Literal
 from contextlib import AsyncExitStack, asynccontextmanager
 
@@ -16,15 +15,12 @@ from openai.types.responses import (
     ResponseTextDeltaEvent,
     ResponseFunctionWebSearch,
     ResponseCodeInterpreterToolCall,
-    ResponseFunctionCallArgumentsDeltaEvent,
     ResponseFunctionToolCall,
-    ResponseOutputItemAddedEvent,
     ResponseOutputItemDoneEvent,
     ResponseTextDeltaEvent,
     ResponseReasoningSummaryPartAddedEvent,
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseReasoningSummaryPartDoneEvent,
-    
 )
 
 # Local imports
@@ -768,8 +764,8 @@ class OpenAIService:
                 try:
                     # Process streaming events with TaskMessage creation
                     async for event in result.stream_events():
-                        
                         heartbeat_if_in_workflow("processing stream event with auto send")
+
                         if event.type == "run_item_stream_event":
                             if event.item.type == "tool_call_item":
                                 tool_call_item = event.item.raw_item
@@ -802,13 +798,16 @@ class OpenAIService:
                             elif event.item.type == "tool_call_output_item":
                                 tool_output_item = event.item.raw_item
 
+                                # Extract tool response information using the helper method
+                                call_id, tool_name, content = self._extract_tool_response_info(
+                                    tool_call_map, tool_output_item
+                                )
+
                                 tool_response_content = ToolResponseContent(
                                     author="agent",
-                                    tool_call_id=tool_output_item["call_id"],
-                                    name=tool_call_map[
-                                        tool_output_item["call_id"]
-                                    ].name,
-                                    content=tool_output_item["output"],
+                                    tool_call_id=call_id,
+                                    name=tool_name,
+                                    content=content,
                                 )
 
                                 # Create tool response using streaming context (immediate completion)
@@ -926,33 +925,25 @@ class OpenAIService:
                             elif isinstance(event.data, ResponseOutputItemDoneEvent):
                                 # Handle item completion
                                 item_id = event.data.item.id
+
+                                # Finish the streaming context (sends DONE event and updates message)
                                 if item_id in item_id_to_streaming_context:
-                                    streaming_context = (
-                                        item_id_to_streaming_context[
-                                            item_id
-                                        ]
-                                    )
+                                    streaming_context = item_id_to_streaming_context[item_id]
+                                    await streaming_context.close()
+                                    if item_id in unclosed_item_ids:
+                                        unclosed_item_ids.remove(item_id)
 
                             elif isinstance(event.data, ResponseCompletedEvent):
-                                # All items complete, finish all remaining
-                                # streaming contexts for this session
-                                # Create copy to avoid modifying set in iteration
+                                # All items complete, finish all remaining streaming contexts for this session
+                                # Create a copy to avoid modifying set during iteration
                                 remaining_items = list(unclosed_item_ids)
                                 for item_id in remaining_items:
-                                    if (item_id in unclosed_item_ids and
-                                            item_id in
-                                            item_id_to_streaming_context):
-                                        streaming_context = (
-                                            item_id_to_streaming_context[
-                                                item_id
-                                            ]
-                                        )
-
-                                        # Don't close streaming contexts for text or reasoning
-                                        # They should just end with their last delta
-                                        if not isinstance(streaming_context.task_message.content, (TextContent, ReasoningContent)):
-                                            await streaming_context.close()
-                                            unclosed_item_ids.discard(item_id)
+                                    if (
+                                        item_id in unclosed_item_ids and item_id in item_id_to_streaming_context
+                                    ):  # Check if still unclosed
+                                        streaming_context = item_id_to_streaming_context[item_id]
+                                        await streaming_context.close()
+                                        unclosed_item_ids.discard(item_id)
 
                 except InputGuardrailTripwireTriggered as e:
                     # Handle guardrail trigger by sending a rejection message
@@ -1031,22 +1022,16 @@ class OpenAIService:
                     raise
 
                 finally:
-                    # Cleanup: ensure all streaming contexts for
-                    # this session are properly finished
-                    # Create copy to avoid modifying set in iteration
+                    # Cleanup: ensure all streaming contexts for this session are properly finished
+                    # Create a copy to avoid modifying set during iteration
                     remaining_items = list(unclosed_item_ids)
                     for item_id in remaining_items:
-                        if (item_id in unclosed_item_ids and
-                                item_id in item_id_to_streaming_context):
-                            streaming_context = (
-                                item_id_to_streaming_context[item_id]
-                            )
-
-                            # Don't close streaming contexts for text or reasoning
-                            # They should just end with their last delta
-                            if not isinstance(streaming_context.task_message.content, (TextContent, ReasoningContent)):
-                                await streaming_context.close()
-                                unclosed_item_ids.discard(item_id)
+                        if (
+                            item_id in unclosed_item_ids and item_id in item_id_to_streaming_context
+                        ):  # Check if still unclosed
+                            streaming_context = item_id_to_streaming_context[item_id]
+                            await streaming_context.close()
+                            unclosed_item_ids.discard(item_id)
 
                 if span:
                     span.output = {
