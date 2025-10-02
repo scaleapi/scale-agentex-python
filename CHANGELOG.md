@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.23 (2025-10-02)
+
+Full Changelog: [v0.4.22...v0.4.23](https://github.com/scaleapi/agentex-python/compare/v0.4.22...v0.4.23)
+
+### Features
+
+* Adding Agent info to SGP tracing metadata ([#85](https://github.com/scaleapi/agentex-python/issues/85)) ([900f66b](https://github.com/scaleapi/agentex-python/commit/900f66b60bc61ac515a7e43172d573a31c623fa9))
+
 ## 0.4.22 (2025-10-01)
 
 Full Changelog: [v0.4.21...v0.4.22](https://github.com/scaleapi/agentex-python/compare/v0.4.21...v0.4.22)
