@@ -1,18 +1,18 @@
+from typing import Any, Callable, AsyncGenerator, override
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Callable
 
 from fastapi import FastAPI
 
-from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
-from agentex.lib.core.temporal.services.temporal_task_service import TemporalTaskService
-from agentex.lib.environment_variables import EnvironmentVariables
-from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 from agentex.lib.types.acp import (
+    SendEventParams,
     CancelTaskParams,
     CreateTaskParams,
-    SendEventParams,
 )
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
+from agentex.lib.core.temporal.services.temporal_task_service import TemporalTaskService
 
 logger = make_logger(__name__)
 
@@ -24,23 +24,28 @@ class TemporalACP(BaseACPServer):
     """
 
     def __init__(
-        self, temporal_address: str, temporal_task_service: TemporalTaskService | None = None
+        self,
+        temporal_address: str,
+        temporal_task_service: TemporalTaskService | None = None,
+        plugins: list[Any] | None = None,
     ):
         super().__init__()
         self._temporal_task_service = temporal_task_service
         self._temporal_address = temporal_address
+        self._plugins = plugins or []
 
     @classmethod
-    def create(cls, temporal_address: str) -> "TemporalACP":
+    @override
+    def create(cls, temporal_address: str, plugins: list[Any] | None = None) -> "TemporalACP":
         logger.info("Initializing TemporalACP instance")
 
         # Create instance without temporal client initially
-        temporal_acp = cls(temporal_address=temporal_address)
+        temporal_acp = cls(temporal_address=temporal_address, plugins=plugins)
         temporal_acp._setup_handlers()
         logger.info("TemporalACP instance initialized now")
         return temporal_acp
 
-    # This is to override the lifespan function of the base
+    @override
     def get_lifespan_function(self) -> Callable[[FastAPI], AsyncGenerator[None, None]]:
         @asynccontextmanager
         async def lifespan(app: FastAPI):
@@ -51,7 +56,7 @@ class TemporalACP(BaseACPServer):
             if self._temporal_task_service is None:
                 env_vars = EnvironmentVariables.refresh()
                 temporal_client = await TemporalClient.create(
-                    temporal_address=self._temporal_address
+                    temporal_address=self._temporal_address, plugins=self._plugins
                 )
                 self._temporal_task_service = TemporalTaskService(
                     temporal_client=temporal_client,
@@ -59,11 +64,12 @@ class TemporalACP(BaseACPServer):
                 )
 
             # Call parent lifespan for agent registration
-            async with super().get_lifespan_function()(app):
+            async with super().get_lifespan_function()(app):  # type: ignore[misc]
                 yield
 
-        return lifespan
+        return lifespan  # type: ignore[return-value]
 
+    @override
     def _setup_handlers(self):
         """Set up the handlers for temporal workflow operations"""
 
@@ -71,17 +77,21 @@ class TemporalACP(BaseACPServer):
         async def handle_task_create(params: CreateTaskParams) -> None:
             """Default create task handler - logs the task"""
             logger.info(f"TemporalACP received task create rpc call for task {params.task.id}")
-            await self._temporal_task_service.submit_task(agent=params.agent, task=params.task, params=params.params)
+            if self._temporal_task_service is not None:
+                await self._temporal_task_service.submit_task(
+                    agent=params.agent, task=params.task, params=params.params
+                )
 
         @self.on_task_event_send
         async def handle_event_send(params: SendEventParams) -> None:
             """Forward messages to running workflows via TaskService"""
             try:
-                await self._temporal_task_service.send_event(
-                    agent=params.agent,
-                    task=params.task,
-                    event=params.event,
-                )
+                if self._temporal_task_service is not None:
+                    await self._temporal_task_service.send_event(
+                        agent=params.agent,
+                        task=params.task,
+                        event=params.event,
+                    )
 
             except Exception as e:
                 logger.error(f"Failed to send message: {e}")
@@ -91,7 +101,8 @@ class TemporalACP(BaseACPServer):
         async def handle_cancel(params: CancelTaskParams) -> None:
             """Cancel running workflows via TaskService"""
             try:
-                await self._temporal_task_service.cancel(task_id=params.task.id)
+                if self._temporal_task_service is not None:
+                    await self._temporal_task_service.cancel(task_id=params.task.id)
             except Exception as e:
                 logger.error(f"Failed to cancel task: {e}")
                 raise

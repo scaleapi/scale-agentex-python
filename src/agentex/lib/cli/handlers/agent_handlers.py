@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from python_on_whales import DockerException, docker
 from rich.console import Console
+from python_on_whales import DockerException, docker
 
-from agentex.lib.cli.handlers.run_handlers import RunError
-from agentex.lib.cli.handlers.run_handlers import run_agent as _run_agent
 from agentex.lib.cli.debug import DebugConfig
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.handlers.run_handlers import RunError, run_agent as _run_agent
+from agentex.lib.sdk.config.agent_manifest import AgentManifest
 
 logger = make_logger(__name__)
 console = Console()
@@ -25,9 +24,9 @@ def build_agent(
     repository_name: str | None,
     platforms: list[str],
     push: bool = False,
-    secret: str = None,
-    tag: str = None,
-    build_args: list[str] = None,
+    secret: str | None = None,
+    tag: str | None = None,
+    build_args: list[str] | None = None,
 ) -> str:
     """Build the agent locally and optionally push to registry
 
@@ -66,14 +65,14 @@ def build_agent(
         # Log build context information for debugging
         logger.info(f"Build context path: {build_context.path}")
         logger.info(
-            f"Dockerfile path: {build_context.path / build_context.dockerfile_path}"
+            f"Dockerfile path: {build_context.path / build_context.dockerfile_path}"  # type: ignore[operator]
         )
 
         try:
             # Prepare build arguments
             docker_build_kwargs = {
                 "context_path": str(build_context.path),
-                "file": str(build_context.path / build_context.dockerfile_path),
+                "file": str(build_context.path / build_context.dockerfile_path),  # type: ignore[operator]
                 "tags": [image_name],
                 "platforms": platforms,
             }
@@ -129,23 +128,23 @@ def build_agent(
 
 def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
     """Run an agent locally from the given manifest"""
-    import asyncio
-    import signal
     import sys
+    import signal
+    import asyncio
 
     # Flag to track if we're shutting down
     shutting_down = False
 
-    def signal_handler(signum, frame):
+    def signal_handler(signum, _frame):
         """Handle signals by raising KeyboardInterrupt"""
         nonlocal shutting_down
         if shutting_down:
             # If we're already shutting down and get another signal, force exit
-            print(f"\nForce exit on signal {signum}")
+            logger.info(f"Force exit on signal {signum}")
             sys.exit(1)
-        
+
         shutting_down = True
-        print(f"\nReceived signal {signum}, shutting down...")
+        logger.info(f"Received signal {signum}, shutting down...")
         raise KeyboardInterrupt()
     
     # Set up signal handling for the main thread
@@ -155,7 +154,7 @@ def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
     try:
         asyncio.run(_run_agent(manifest_path, debug_config))
     except KeyboardInterrupt:
-        print("Shutdown completed.")
+        logger.info("Shutdown completed.")
         sys.exit(0)
     except RunError as e:
         raise RuntimeError(str(e)) from e

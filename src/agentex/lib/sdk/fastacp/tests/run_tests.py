@@ -10,9 +10,9 @@ This script provides various options for running the test suite:
 - Run performance tests
 """
 
+import sys
 import argparse
 import subprocess
-import sys
 from pathlib import Path
 
 

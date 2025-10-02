@@ -1,7 +1,7 @@
 from agentex import AsyncAgentex
-from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.event import Event
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.tracing.tracer import AsyncTracer
 
 logger = make_logger(__name__)
 

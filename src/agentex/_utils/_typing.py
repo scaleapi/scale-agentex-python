@@ -53,7 +53,9 @@ def is_typevar(typ: type) -> bool:
 
 _TYPE_ALIAS_TYPES: tuple[type[typing_extensions.TypeAliasType], ...] = (typing_extensions.TypeAliasType,)
 if sys.version_info >= (3, 12):
-    _TYPE_ALIAS_TYPES = (*_TYPE_ALIAS_TYPES, typing.TypeAliasType)
+    # NOTE: This type ignore will be overwritten by Stainless generator.
+    # TODO: Update Stainless config to include this type ignore or move to lib/
+    _TYPE_ALIAS_TYPES = (*_TYPE_ALIAS_TYPES, typing.TypeAliasType)  # type: ignore[assignment]
 
 
 def is_type_alias_type(tp: Any, /) -> TypeIs[typing_extensions.TypeAliasType]:

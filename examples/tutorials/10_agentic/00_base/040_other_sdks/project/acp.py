@@ -1,33 +1,33 @@
 import os
+import json
 from typing import Dict, List, Optional
 from contextlib import AsyncExitStack, asynccontextmanager
-import json 
 
-from agentex.lib import adk
-from agentex.lib.core.services.adk.streaming import StreamingTaskMessageContext
-from agentex.lib.sdk.fastacp.fastacp import FastACP
-from agentex.lib.types.acp import CancelTaskParams, CreateTaskParams, SendEventParams
-from agentex.lib.types.fastacp import AgenticACPConfig
-from agentex.types.task_message_update import (
-    StreamTaskMessageDelta, 
-    StreamTaskMessageFull,
-)
-from agentex.types.task_message_delta import TextDelta
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.model_utils import BaseModel
-from agentex.types.text_content import TextContent
-from agentex.types.task_message_content import ToolRequestContent, ToolResponseContent
-
-from agents import Agent, Runner
-from agents.mcp import MCPServerStdio
 from mcp import StdioServerParameters
+from agents import Agent, Runner
+from pydantic import BaseModel
+from agents.mcp import MCPServerStdio
 from openai.types.responses import (
     ResponseCompletedEvent,
+    ResponseTextDeltaEvent,
     ResponseFunctionToolCall,
     ResponseOutputItemDoneEvent,
-    ResponseTextDeltaEvent,
 )
-from pydantic import BaseModel
+
+from agentex.lib import adk
+from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.lib.types.fastacp import AgenticACPConfig
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.types.task_message_delta import TextDelta
+from agentex.types.task_message_update import (
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+)
+from agentex.types.task_message_content import ToolRequestContent, ToolResponseContent
+from agentex.lib.core.services.adk.streaming import StreamingTaskMessageContext
 
 logger = make_logger(__name__)
 
@@ -86,6 +86,8 @@ async def handle_event_send(params: SendEventParams):
 
     # Retrieve the task state. Each event is handled as a new turn, so we need to get the state for the current turn.
     task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
+    if not task_state:
+        raise ValueError("Task state not found - ensure task was properly initialized")
     state = StateModel.model_validate(task_state.state)
     state.turn_number += 1
 
@@ -149,7 +151,8 @@ async def handle_event_send(params: SendEventParams):
         )
 
         # Set the span output to the state for the next turn
-        span.output = state
+        if span:
+            span.output = state
 
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):

@@ -1,11 +1,12 @@
-import base64
-import json
 import os
-import httpx
+import json
+import base64
 import asyncio
 
-from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
+import httpx
+
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.environment_variables import EnvironmentVariables
 
 logger = make_logger(__name__)
 
@@ -16,6 +17,16 @@ def get_auth_principal(env_vars: EnvironmentVariables):
     try:
         decoded_str = base64.b64decode(env_vars.AUTH_PRINCIPAL_B64).decode('utf-8')
         return json.loads(decoded_str)
+    except Exception:
+        return None
+
+def get_build_info(env_vars: EnvironmentVariables):
+    logger.info(f"Getting build info from {env_vars.BUILD_INFO_PATH}")
+    if not env_vars.BUILD_INFO_PATH:
+        return None
+    try:
+        with open(env_vars.BUILD_INFO_PATH, "r") as f:
+            return json.load(f)
     except Exception:
         return None
 
@@ -38,7 +49,8 @@ async def register_agent(env_vars: EnvironmentVariables):
         "description": description,
         "acp_url": full_acp_url,
         "acp_type": env_vars.ACP_TYPE,
-        "principal_context": get_auth_principal(env_vars)
+        "principal_context": get_auth_principal(env_vars),
+        "registration_metadata": get_build_info(env_vars)
     }
 
     if env_vars.AGENT_ID:

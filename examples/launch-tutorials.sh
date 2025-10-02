@@ -118,9 +118,14 @@ run_tutorial() {
     print_colored $GREEN "🚀 Executing: cd .. && uv run agentex agents run --manifest examples/$manifest_path"
     print_colored $YELLOW "💡 Press Ctrl+C to stop the tutorial"
     echo ""
-    
+
     # Run the tutorial directly (need to go to parent dir where uv project is)
-    (cd .. && uv run agentex agents run --manifest "examples/$manifest_path")
+    # Load .env file if it exists and pass variables to the subshell
+    if [[ -f "../.env" ]]; then
+        (cd .. && set -a && source .env && set +a && uv run agentex agents run --manifest "examples/$manifest_path")
+    else
+        (cd .. && uv run agentex agents run --manifest "examples/$manifest_path")
+    fi
     
     local exit_code=$?
     if [[ $exit_code -eq 0 ]]; then

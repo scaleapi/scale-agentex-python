@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator, validator
+from pydantic import Field, BaseModel, validator, model_validator
 
 
 class TemporalWorkflowConfig(BaseModel):
