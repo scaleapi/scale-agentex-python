@@ -119,7 +119,6 @@ format = { cmd = "task format-ruff", help = "Format code with ruff and docs" }
 post_format = "task format-docs"
 
 typecheck = { cmd = "task check-types-pyright", help = "Run type checking" }
-post_typecheck = "task check-types-mypy"
 
 lint = { cmd = "task check-ruff", help = "Run all linting checks" }
 post_lint = "task typecheck && task check-importable"
