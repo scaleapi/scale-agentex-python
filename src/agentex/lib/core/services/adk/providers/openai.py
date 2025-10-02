@@ -829,7 +829,6 @@ class OpenAIService:
                                 )
                             # Reasoning step one: new summary part added
                             elif isinstance(event.data, ResponseReasoningSummaryPartAddedEvent):
-                                logger.info(f"DEBUG: ResponseReasoningSummaryPartAddedEvent: {event.data}")
                                 # We need to create a new streaming context for this reasoning item
                                 item_id = event.data.item_id
                                 
@@ -873,7 +872,6 @@ class OpenAIService:
 
                             # Reasoning step three: handling summary text done, closing the streaming context
                             elif isinstance(event.data, ResponseReasoningSummaryPartDoneEvent):
-                                logger.info(f"DEBUG: ResponseReasoningSummaryPartDoneEvent: {event.data}")
                                 # Handle reasoning summary text completion
                                 streaming_context = item_id_to_streaming_context[item_id]
                                 
@@ -894,8 +892,6 @@ class OpenAIService:
                                         type="full",
                                     ),
                                 )
-
-                                logger.info(f"DEBUG: Sent full message update with complete reasoning content: {complete_reasoning_content}")
                                 
                                 await streaming_context.close()
                                 unclosed_item_ids.discard(item_id)
