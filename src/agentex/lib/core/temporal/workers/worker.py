@@ -23,6 +23,7 @@ from temporalio.converter import (
     JSONPlainPayloadConverter,
     _JSONTypeConverterUnhandled,
 )
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.registration import register_agent
@@ -81,18 +82,27 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
     if plugins != []:  # We don't need to validate the plugins if they are empty
         _validate_plugins(plugins)
 
+    # Check if OpenAI plugin is present - it needs to configure its own data converter
+    has_openai_plugin = any(
+        isinstance(p, OpenAIAgentsPlugin) for p in (plugins or [])
+    )
+
+    # Build connection kwargs
+    connect_kwargs = {
+        "target_host": temporal_address,
+        "plugins": plugins,
+    }
+
+    # Only set data_converter if OpenAI plugin is not present
+    if not has_openai_plugin:
+        connect_kwargs["data_converter"] = custom_data_converter
+
     if not metrics_url:
-        client = await Client.connect(
-            target_host=temporal_address, data_converter=custom_data_converter, plugins=plugins
-        )
+        client = await Client.connect(**connect_kwargs)
     else:
         runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url)))
-        client = await Client.connect(
-            target_host=temporal_address,
-            data_converter=custom_data_converter,
-            runtime=runtime,
-            plugins=plugins,
-        )
+        connect_kwargs["runtime"] = runtime
+        client = await Client.connect(**connect_kwargs)
     return client
 
 
@@ -102,7 +112,7 @@ class AgentexWorker:
         task_queue,
         max_workers: int = 10,
         max_concurrent_activities: int = 10,
-        health_check_port: int = 80,
+        health_check_port: int = int(os.environ.get("HEALTH_CHECK_PORT")),
         plugins: list = [],
     ):
         self.task_queue = task_queue

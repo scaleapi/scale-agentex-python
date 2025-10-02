@@ -389,6 +389,10 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
             env_vars["WORKFLOW_NAME"] = temporal_config.name
             env_vars["WORKFLOW_TASK_QUEUE"] = temporal_config.queue_name
 
+        # Set health check port from temporal config
+        if manifest.agent.temporal and manifest.agent.temporal.health_check_port is not None:
+            env_vars["HEALTH_CHECK_PORT"] = str(manifest.agent.temporal.health_check_port)
+
     if agent_config.env:
         for key, value in agent_config.env.items():
             env_vars[key] = value
