@@ -49,8 +49,8 @@ def print_task_message(
     
     # Skip empty reasoning messages
     if isinstance(message.content, ReasoningContent):
-        has_summary = message.content.summary and any(s for s in message.content.summary if s)
-        has_content = message.content.content and any(c for c in message.content.content if c)
+        has_summary = bool(message.content.summary) and any(s for s in message.content.summary if s)
+        has_content = bool(message.content.content) and any(c for c in message.content.content if c) if message.content.content is not None else False
         if not has_summary and not has_content:
             return
     
@@ -135,18 +135,19 @@ def print_task_message(
     
     if rich_print and console:
         author_color = "bright_cyan" if message.content.author == "user" else "green"
-        title = f"[bold {author_color}]{message.content.author.upper()}[/bold {author_color}] [{timestamp}]"
         
-        # Use different border styles for tool messages
+        # Use different border styles and colors for different content types
         if content_type == "tool_request":
             border_style = "yellow"
         elif content_type == "tool_response":
             border_style = "bright_green"
         elif content_type == "reasoning":
             border_style = "bright_magenta"
+            author_color = "bright_magenta"  # Also make the author text magenta
         else:
             border_style = author_color
-            
+        
+        title = f"[bold {author_color}]{message.content.author.upper()}[/bold {author_color}] [{timestamp}]"
         panel = Panel(Markdown(content), title=title, border_style=border_style, width=80)
         console.print(panel)
     else:
@@ -329,7 +330,7 @@ def subscribe_to_async_task_messages(
                             
                             # Deserialize the discriminated union TaskMessageUpdate based on the "type" field
                             message_type = task_message_update_data.get("type", "unknown")
-                            
+
                             # Handle different message types for streaming progress
                             if message_type == "start":
                                 task_message_update = StreamTaskMessageStart.model_validate(task_message_update_data)
@@ -359,6 +360,9 @@ def subscribe_to_async_task_messages(
                                 if index in active_spinners:
                                     active_spinners[index].stop()
                                     del active_spinners[index]
+                                    # Ensure clean line after spinner
+                                    if print_messages:
+                                        print()
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
@@ -373,6 +377,9 @@ def subscribe_to_async_task_messages(
                                 if index in active_spinners:
                                     active_spinners[index].stop()
                                     del active_spinners[index]
+                                    # Ensure clean line after spinner
+                                    if print_messages:
+                                        print()
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)

@@ -48,11 +48,11 @@ class StateModel(BaseModel):
     turn_number: int
 
 
-MCP_SERVERS = [
-    StdioServerParameters(
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-sequential-thinking"],
-    ),
+MCP_SERVERS = [ # No longer needed due to reasoning
+    # StdioServerParameters(
+    #     command="npx",
+    #     args=["-y", "@modelcontextprotocol/server-sequential-thinking"],
+    # ),
     StdioServerParameters(
         command="uvx",
         args=["openai-websearch-mcp"],
