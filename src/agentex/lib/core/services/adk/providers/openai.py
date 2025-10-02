@@ -738,10 +738,35 @@ class OpenAIService:
                         
                         heartbeat_if_in_workflow("processing stream event with auto send")
                         if event.type == "run_item_stream_event":
-                            # Tool calls are now handled via raw response events
-                            # for streaming arguments as they come in.
-                            # Here we handle tool outputs after execution
-                            if event.item.type == "tool_call_output_item":
+                            if event.item.type == "tool_call_item":
+                                tool_call_item = event.item.raw_item
+
+                                # Extract tool call information using the helper method
+                                call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
+                                tool_call_map[call_id] = tool_call_item
+
+                                tool_request_content = ToolRequestContent(
+                                    author="agent",
+                                    tool_call_id=call_id,
+                                    name=tool_name,
+                                    arguments=tool_arguments,
+                                )
+
+                                # Create tool request using streaming context (immediate completion)
+                                async with self.streaming_service.streaming_task_message_context(
+                                    task_id=task_id,
+                                    initial_content=tool_request_content,
+                                ) as streaming_context:
+                                    # The message has already been persisted, but we still need to send an upda
+                                    await streaming_context.stream_update(
+                                        update=StreamTaskMessageFull(
+                                            parent_task_message=streaming_context.task_message,
+                                            content=tool_request_content,
+                                            type="full",
+                                        ),
+                                    )
+                                    
+                            elif event.item.type == "tool_call_output_item":
                                 tool_output_item = event.item.raw_item
 
                                 tool_response_content = ToolResponseContent(
@@ -767,39 +792,7 @@ class OpenAIService:
                                     )
 
                         elif event.type == "raw_response_event":
-                            if isinstance(
-                                event.data, ResponseOutputItemAddedEvent
-                            ):
-                            
-                                # Handle new output item being added
-                                if event.data.item.type == "function_call":
-                                    # Tool call is starting - just store mappings
-                                    tool_call = event.data.item
-                                    tool_call_map[tool_call.call_id] = tool_call
-                                    tool_call_item_id_to_call_id[
-                                        tool_call.id
-                                    ] = tool_call.call_id
-                                    
-                            elif isinstance(
-                                event.data, ResponseFunctionCallArgumentsDeltaEvent
-                            ):
-                                # Handle function call arguments delta
-                                # Find the call_id from the item_id
-                                if (
-                                    event.data.item_id
-                                    in tool_call_item_id_to_call_id
-                                ):
-                                    call_id = tool_call_item_id_to_call_id[
-                                        event.data.item_id
-                                    ]
-
-                                    # Just accumulate arguments - don't stream yet
-                                    if call_id in tool_call_map:
-                                        tool_call_map[
-                                            call_id
-                                        ].arguments += event.data.delta
-
-                            elif isinstance(event.data, ResponseTextDeltaEvent):
+                            if isinstance(event.data, ResponseTextDeltaEvent):
                                 # Handle text delta
                                 item_id = event.data.item_id
 
