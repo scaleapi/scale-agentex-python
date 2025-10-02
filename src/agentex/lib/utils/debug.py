@@ -5,7 +5,12 @@ Provides debugging setup functionality that can be used across different compone
 """
 
 import os
+
 import debugpy  # type: ignore
+
+from agentex.lib.utils.logging import make_logger
+
+logger = make_logger(__name__)
 
 
 def setup_debug_if_enabled() -> None:
@@ -33,14 +38,14 @@ def setup_debug_if_enabled() -> None:
         debugpy.configure(subProcess=False)
         debugpy.listen(debug_port)
         
-        print(f"🐛 [{debug_type.upper()}] Debug server listening on port {debug_port}")
-        
+        logger.info(f"🐛 [{debug_type.upper()}] Debug server listening on port {debug_port}")
+
         if wait_for_attach:
-            print(f"⏳ [{debug_type.upper()}] Waiting for debugger to attach...")
+            logger.info(f"⏳ [{debug_type.upper()}] Waiting for debugger to attach...")
             debugpy.wait_for_client()
-            print(f"✅ [{debug_type.upper()}] Debugger attached!")
+            logger.info(f"✅ [{debug_type.upper()}] Debugger attached!")
         else:
-            print(f"📡 [{debug_type.upper()}] Ready for debugger attachment")
+            logger.info(f"📡 [{debug_type.upper()}] Ready for debugger attachment")
 
 
 def is_debug_enabled() -> bool:

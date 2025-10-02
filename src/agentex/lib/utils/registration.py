@@ -1,11 +1,12 @@
-import base64
-import json
 import os
-import httpx
+import json
+import base64
 import asyncio
 
-from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
+import httpx
+
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.environment_variables import EnvironmentVariables
 
 logger = make_logger(__name__)
 

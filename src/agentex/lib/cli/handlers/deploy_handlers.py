@@ -1,22 +1,21 @@
 import os
-import subprocess
 import tempfile
-from pathlib import Path
+import subprocess
 from typing import Any
+from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import Field, BaseModel
 from rich.console import Console
 
-from agentex.lib.cli.utils.exceptions import DeploymentError, HelmError
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
-from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
-from agentex.lib.cli.utils.path_utils import calculate_docker_acp_module, PathResolutionError
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.exceptions import HelmError, DeploymentError
+from agentex.lib.cli.utils.path_utils import PathResolutionError, calculate_docker_acp_module
 from agentex.lib.environment_variables import EnvVarKeys
+from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
-
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
 
 logger = make_logger(__name__)
 console = Console()
@@ -26,43 +25,35 @@ AGENTEX_AGENTS_HELM_CHART_VERSION = "0.1.7-v4-beta"
 
 
 class InputDeployOverrides(BaseModel):
-    repository: str | None = Field(
-        default=None, description="Override the repository for deployment"
-    )
-    image_tag: str | None = Field(
-        default=None, description="Override the image tag for deployment"
-    )
+    repository: str | None = Field(default=None, description="Override the repository for deployment")
+    image_tag: str | None = Field(default=None, description="Override the image tag for deployment")
 
 
 def check_helm_installed() -> bool:
     """Check if helm is installed and available"""
     try:
-        result = subprocess.run(
-            ["helm", "version", "--short"], capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(["helm", "version", "--short"], capture_output=True, text=True, check=True)
         logger.info(f"Helm version: {result.stdout.strip()}")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
 
-def add_helm_repo() -> None:
+def add_helm_repo(helm_repository_name: str, helm_repository_url: str) -> None:
     """Add the agentex helm repository if not already added"""
     try:
         # Check if repo already exists
-        result = subprocess.run(
-            ["helm", "repo", "list"], capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(["helm", "repo", "list"], capture_output=True, text=True, check=True)
 
-        if "scale-egp" not in result.stdout:
+        if helm_repository_name not in result.stdout:
             console.print("Adding agentex helm repository...")
             subprocess.run(
                 [
                     "helm",
                     "repo",
                     "add",
-                    "scale-egp",
-                    "https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts",
+                    helm_repository_name,
+                    helm_repository_url,
                 ],
                 check=True,
             )
@@ -74,7 +65,6 @@ def add_helm_repo() -> None:
 
     except subprocess.CalledProcessError as e:
         raise HelmError(f"Failed to add helm repository: {e}") from e
-
 
 
 def convert_env_vars_dict_to_list(env_vars: dict[str, str]) -> list[dict[str, str]]:
@@ -170,11 +160,11 @@ def merge_deployment_configs(
     # Priority: manifest -> environments.yaml -> secrets (highest)
     all_env_vars: dict[str, str] = {}
     secret_env_vars: list[dict[str, str]] = []
-    
+
     # Start with agent_config env vars from manifest
     if agent_config.env:
         all_env_vars.update(agent_config.env)
-    
+
     # Override with environment config env vars if they exist
     if agent_env_config and agent_env_config.helm_overrides and "env" in agent_env_config.helm_overrides:
         env_overrides = agent_env_config.helm_overrides["env"]
@@ -185,8 +175,6 @@ def merge_deployment_configs(
                 if isinstance(env_var, dict) and "name" in env_var and "value" in env_var:
                     env_override_dict[str(env_var["name"])] = str(env_var["value"])
             all_env_vars.update(env_override_dict)
-
-
 
     # Handle credentials and check for conflicts
     if agent_config.credentials:
@@ -200,7 +188,7 @@ def merge_deployment_configs(
                 env_var_name = credential.env_var_name
                 secret_name = credential.secret_name
                 secret_key = credential.secret_key
-            
+
             # Check if the environment variable name conflicts with existing env vars
             if env_var_name in all_env_vars:
                 logger.warning(
@@ -209,7 +197,7 @@ def merge_deployment_configs(
                 )
                 # Remove from regular env vars since secret takes precedence
                 del all_env_vars[env_var_name]
-            
+
             secret_env_vars.append(
                 {
                     "name": env_var_name,
@@ -223,13 +211,14 @@ def merge_deployment_configs(
         # Add auth principal env var if environment config is set
         if agent_env_config.auth:
             from agentex.lib.cli.utils.auth_utils import _encode_principal_context_from_env_config
+
             encoded_principal = _encode_principal_context_from_env_config(agent_env_config.auth)
             logger.info(f"Encoding auth principal from {agent_env_config.auth}")
             if encoded_principal:
                 all_env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64.value] = encoded_principal
             else:
                 raise DeploymentError(f"Auth principal unable to be encoded for agent_env_config: {agent_env_config}")
-        
+
         logger.info(f"Defined agent helm overrides: {agent_env_config.helm_overrides}")
         logger.info(f"Before-merge helm values: {helm_values}")
         if agent_env_config.helm_overrides:
@@ -240,7 +229,7 @@ def merge_deployment_configs(
     # Environment variable precedence: manifest -> environments.yaml -> secrets (highest)
     if all_env_vars:
         helm_values["env"] = convert_env_vars_dict_to_list(all_env_vars)
-    
+
     if secret_env_vars:
         helm_values["secretEnvVars"] = secret_env_vars
 
@@ -253,30 +242,25 @@ def merge_deployment_configs(
 
     # Handle image pull secrets
     if manifest.deployment and manifest.deployment.imagePullSecrets:
-        pull_secrets = [
-            pull_secret.model_dump()
-            for pull_secret in manifest.deployment.imagePullSecrets
-        ]
+        pull_secrets = [pull_secret.model_dump() for pull_secret in manifest.deployment.imagePullSecrets]
         helm_values["global"]["imagePullSecrets"] = pull_secrets
         helm_values["imagePullSecrets"] = pull_secrets
 
     # Add dynamic ACP command based on manifest configuration if command is not set in helm overrides
-    helm_overrides_command = agent_env_config and agent_env_config.helm_overrides and "command" in agent_env_config.helm_overrides
+    helm_overrides_command = (
+        agent_env_config and agent_env_config.helm_overrides and "command" in agent_env_config.helm_overrides
+    )
     if not helm_overrides_command:
         add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
-    
-    print("Deploying with the following helm values: ", helm_values)
+
+    logger.info("Deploying with the following helm values: %s", helm_values)
     return helm_values
 
 
 def _deep_merge(base_dict: dict[str, Any], override_dict: dict[str, Any]) -> None:
     """Deep merge override_dict into base_dict"""
     for key, value in override_dict.items():
-        if (
-            key in base_dict
-            and isinstance(base_dict[key], dict)
-            and isinstance(value, dict)
-        ):
+        if key in base_dict and isinstance(base_dict[key], dict) and isinstance(value, dict):
             _deep_merge(base_dict[key], value)
         else:
             base_dict[key] = value
@@ -318,8 +302,14 @@ def deploy_agent(
         else:
             console.print(f"[yellow]⚠[/yellow] No environments.yaml found, skipping environment-specific config")
 
+    if agent_env_config:
+        helm_repository_name = agent_env_config.helm_repository_name
+        helm_repository_url = agent_env_config.helm_repository_url
+    else:
+        helm_repository_name = "scale-egp"
+        helm_repository_url = "https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts"
     # Add helm repository/update
-    add_helm_repo()
+    add_helm_repo(helm_repository_name, helm_repository_url)
 
     # Merge configurations
     helm_values = merge_deployment_configs(manifest, agent_env_config, deploy_overrides, manifest_path)
@@ -349,7 +339,7 @@ def deploy_agent(
                 "helm",
                 "upgrade",
                 release_name,
-                "scale-egp/agentex-agent",
+                f"{helm_repository_name}/agentex-agent",
                 "--version",
                 AGENTEX_AGENTS_HELM_CHART_VERSION,
                 "-f",
@@ -371,7 +361,7 @@ def deploy_agent(
                 "helm",
                 "install",
                 release_name,
-                "scale-egp/agentex-agent",
+                f"{helm_repository_name}/agentex-agent",
                 "--version",
                 AGENTEX_AGENTS_HELM_CHART_VERSION,
                 "-f",
@@ -389,12 +379,8 @@ def deploy_agent(
 
         # Show success message with helpful commands
         console.print("\n[green]🎉 Deployment completed successfully![/green]")
-        console.print(
-            f"[blue]Check deployment status:[/blue] helm status {release_name} -n {namespace}"
-        )
-        console.print(
-            f"[blue]View logs:[/blue] kubectl logs -l app.kubernetes.io/name=agentex-agent -n {namespace}"
-        )
+        console.print(f"[blue]Check deployment status:[/blue] helm status {release_name} -n {namespace}")
+        console.print(f"[blue]View logs:[/blue] kubectl logs -l app.kubernetes.io/name=agentex-agent -n {namespace}")
 
     except subprocess.CalledProcessError as e:
         raise HelmError(

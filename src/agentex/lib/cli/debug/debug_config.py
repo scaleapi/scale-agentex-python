@@ -4,7 +4,6 @@ Debug configuration models for AgentEx CLI debugging.
 
 import socket
 from enum import Enum
-from typing import Optional
 
 from agentex.lib.utils.model_utils import BaseModel
 
@@ -62,7 +61,7 @@ class DebugConfig(BaseModel):
     def create_both_debug(
         cls, 
         worker_port: int = 5678,
-        acp_port: int = 5679,
+        _acp_port: int = 5679,
         wait_for_attach: bool = False,
         auto_port: bool = True
     ) -> "DebugConfig":

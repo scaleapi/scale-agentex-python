@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from agentex.lib.types.tracing import TracingProcessorConfig
 from agentex.types.span import Span
+from agentex.lib.types.tracing import TracingProcessorConfig
 
 
 class SyncTracingProcessor(ABC):

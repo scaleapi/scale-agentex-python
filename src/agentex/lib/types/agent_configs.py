@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator, validator
+from pydantic import Field, BaseModel, validator, model_validator
 
 
 class TemporalWorkflowConfig(BaseModel):
@@ -45,6 +45,7 @@ class TemporalConfig(BaseModel):
         enabled: Whether this agent uses Temporal workflows
         workflow: The temporal workflow configuration
         workflows: The list of temporal workflow configurations
+        health_check_port: Port for temporal worker health check endpoint
     """
 
     enabled: bool = Field(
@@ -57,6 +58,10 @@ class TemporalConfig(BaseModel):
     workflows: list[TemporalWorkflowConfig] | None = Field(
         default=None,
         description="List of temporal workflow configurations. Used when enabled=true.",
+    )
+    health_check_port: int | None = Field(
+        default=None,
+        description="Port for temporal worker health check endpoint. Defaults to 80 if not specified.",
     )
 
     @validator("workflows")

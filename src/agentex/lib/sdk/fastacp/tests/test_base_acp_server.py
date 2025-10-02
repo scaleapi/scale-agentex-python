@@ -1,15 +1,16 @@
+# ruff: noqa: ARG001
 import asyncio
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 from agentex.lib.types.acp import (
-    CancelTaskParams,
     RPCMethod,
     SendEventParams,
+    CancelTaskParams,
 )
+from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 
 
 class TestBaseACPServerInitialization:
@@ -21,7 +22,7 @@ class TestBaseACPServerInitialization:
             server = BaseACPServer()
 
             # Check that FastAPI routes are set up
-            routes = [route.path for route in server.routes]
+            routes = [route.path for route in server.routes]  # type: ignore[attr-defined]
             assert "/healthz" in routes
             assert "/api" in routes
 
@@ -141,7 +142,6 @@ class TestJSONRPCEndpointCore:
         data = response.json()
         assert data["jsonrpc"] == "2.0"
         assert data["id"] == "test-1"
-        print("DATA", data)
         # Should return immediate acknowledgment
         assert data["result"]["status"] == "processing"
 
