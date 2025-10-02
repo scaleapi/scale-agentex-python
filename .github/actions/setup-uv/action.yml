@@ -1,0 +1,34 @@
+name: 'Setup UV (Manual)'
+description: 'Manually install UV package manager'
+inputs:
+  uv-version:
+    description: 'UV version to install'
+    required: false
+    default: 'latest'
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.12'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install UV
+      shell: bash
+      run: |
+        if [ "${{ inputs.uv-version }}" = "latest" ]; then
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+        else
+          curl -LsSf https://astral.sh/uv/${{ inputs.uv-version }}/install.sh | sh
+        fi
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Verify UV installation
+      shell: bash
+      run: |
+        uv --version

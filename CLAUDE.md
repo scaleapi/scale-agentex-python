@@ -4,26 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### Package Management in the top level repo
-- Use `rye` for dependency management (preferred)
-- Run `./scripts/bootstrap` to set up the environment
-- Or use `rye sync --all-features` directly
+### Package Management
+- Use `uv` for dependency management
+- Run `uv sync --all-extras --group dev` to set up the environment
+- Run `uv run task setup-pre-commit` to install pre-commit hooks
 
-Special note: the individual tutorials maintain their own tutorial specific virtualenv using `uv`. So when testing/running tutorials, you `uv run` instead of `rye run`.  Everything else is similar.
+Both the main repo and individual tutorials use `uv` for consistency.
 
 #### Testing
-- Run tests: `rye run pytest` or `./scripts/test`
-- Run specific test: `rye run pytest path/to/test_file.py::TestClass::test_method -v`
+- Run tests: `uv run task test` (with mock server) or `uv run pytest` (direct)
+- Run specific test: `uv run pytest path/to/test_file.py::TestClass::test_method -v`
 - Mock server is automatically started for tests, runs on port 4010
 
 #### Linting and Formatting
-- Format code: `rye run format` or `./scripts/format`
-  * The repository is still in flux, so running format might accidentally change files that aren't part of your scope of changes. So always run `run rye format` with additional arguments to constrain the formatting to the files that you are modifying.
-- Lint code: `rye run lint` or `./scripts/lint`
-- Type check: `rye run typecheck` (runs both pyright and mypy)
+- Format code: `uv run task format`
+  * The repository is still in flux, so running format might accidentally change files that aren't part of your scope of changes. So always run `uv run task format` with additional arguments to constrain the formatting to the files that you are modifying.
+- Lint code: `uv run task lint`
+- Type check: `uv run task typecheck` (runs both pyright and mypy)
 
 ### Building and Running
-- Build package: `rye build`
+- Build package: `uv build`
 
 
 
@@ -89,5 +89,5 @@ Most SDK code is auto-generated. Manual changes are preserved in:
 
 ### Environment Requirements
 - Python 3.12+ required
-- Uses Rye for dependency management
+- Uses UV for dependency management
 - Supports both sync and async client patterns

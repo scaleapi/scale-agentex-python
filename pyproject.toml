@@ -33,6 +33,7 @@ dependencies = [
     "mcp[cli]>=1.4.1",
     "scale-gp>=0.1.0a59",
     "openai-agents==0.2.7", # 0.2.3 bug - https://github.com/openai/openai-agents-python/issues/1276
+    "cloudpickle>=3.1.1",
     "tzlocal>=5.3.1",
     "tzdata>=2025.2",
     "pytest>=8.4.0",
@@ -41,7 +42,6 @@ dependencies = [
     "scale-gp-beta==0.1.0a20",
     "ipykernel>=6.29.5",
     "openai==1.99.9", # anything higher than 1.99.9 breaks litellm - https://github.com/BerriAI/litellm/issues/13711
-    "cloudpickle>=3.1.1",
     "datadog>=0.52.1",
     "ddtrace>=3.13.0"
 ]
@@ -74,64 +74,66 @@ dev = [
 [project.scripts]
 agentex = "agentex.lib.cli.commands.main:app"
 
-[tool.rye]
-managed = true
-# version pins are in requirements-dev.lock
-dev-dependencies = [
-    "pyright==1.1.399",
-    "mypy",
-    "respx",
-    "pytest",
-    "pytest-asyncio",
-    "ruff",
-    "time-machine",
-    "nox",
-    "dirty-equals>=0.6.0",
-    "importlib-metadata>=6.7.0",
-    "rich>=13.7.1",
-    "nest_asyncio==1.6.0",
-    "pytest-xdist>=3.6.1",
-    "debugpy>=1.8.15",
-]
-
-[tool.rye.scripts]
-format = { chain = [
-  "format:ruff",
-  "format:docs",
-  "fix:ruff",
-  # run formatting again to fix any inconsistencies when imports are stripped
-  "format:ruff",
-]}
-"format:docs" = "python scripts/utils/ruffen-docs.py README.md api.md"
-"format:ruff" = "ruff format"
-
-"lint" = { chain = [
-  "check:ruff",
-  "typecheck",
-  "check:importable",
-]}
-"check:ruff" = "ruff check ."
-"fix:ruff" = "ruff check --fix ."
-
-"check:importable" = "python -c 'import agentex'"
-
-typecheck = { chain = [
-  "typecheck:pyright"
-]}
-"typecheck:pyright" = "pyright"
-"typecheck:verify-types" = "pyright --verifytypes agentex --ignoreexternal"
-"typecheck:mypy" = "mypy ."
-
 [build-system]
 requires = ["hatchling==1.26.3", "hatch-fancy-pypi-readme"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "dirty-equals>=0.6.0",
+    "debugpy>=1.8.15",
+    "importlib-metadata>=6.7.0",
     "ipywidgets>=8.1.7",
+    "ipykernel>=6.29.5",
+    "mypy",
     "nbstripout>=0.8.1",
+    "nest_asyncio==1.6.0",
+    "nox",
+    "openai==1.99.9", # anything higher than 1.99.9 breaks litellm - https://github.com/BerriAI/litellm/issues/13711
+    "pre-commit>=3.5.0",
+    "pyright==1.1.399",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-xdist>=3.6.1",
+    "respx",
+    "rich>=13.7.1",
+    "ruff",
+    "scale-gp-beta==0.1.0a20",
+    "taskipy>=1.12.0",
+    "time-machine",
     "yaspin>=3.1.0",
 ]
+
+[tool.taskipy.tasks]
+# === ATOMIC TASKS (building blocks) ===
+"format-ruff" = { cmd = "ruff format", help = "Format code with ruff" }
+"format-docs" = { cmd = "python scripts/utils/ruffen-docs.py README.md api.md", help = "Format documentation" }
+"check-ruff" = { cmd = "ruff check .", help = "Check code with ruff" }
+"fix-ruff" = { cmd = "ruff check --fix .", help = "Fix ruff issues automatically" }
+"check-types-pyright" = { cmd = "pyright", help = "Run pyright type checker" }
+"check-types-mypy" = { cmd = "mypy .", help = "Run mypy type checker" }
+"check-importable" = { cmd = "python -c 'import agentex'", help = "Check that agentex can be imported" }
+
+# === COMPOSITE TASKS with hooks ===
+format = { cmd = "task format-ruff", help = "Format code with ruff and docs" }
+post_format = "task format-docs"
+
+typecheck = { cmd = "task check-types-pyright", help = "Run type checking" }
+
+lint = { cmd = "task check-ruff", help = "Run all linting checks" }
+post_lint = "task typecheck && task check-importable"
+
+# === SCRIPT DELEGATION (complex operations) ===
+test = { cmd = "./scripts/test", help = "Run tests with mock server" }
+mock = { cmd = "./scripts/mock", help = "Start mock API server" }
+
+# === DEVELOPMENT SETUP ===
+setup-pre-commit = { cmd = "pre-commit install", help = "Install pre-commit hooks" }
+
+# === CI-SPECIFIC TASKS ===
+ci-lint = { cmd = "task lint", help = "Run linting for CI" }
+ci-test = { cmd = "task test", help = "Run tests for CI" }
+ci-build = { cmd = "uv build", help = "Build package for CI" }
 
 [tool.hatch.build]
 include = [

@@ -1,35 +1,37 @@
 ## Setting up the environment
 
-### With Rye
+We use [UV](https://docs.astral.sh/uv/) for fast, modern Python package management. UV automatically handles Python installation and virtual environment management.
 
-We use [Rye](https://rye.astral.sh/) to manage dependencies because it will automatically provision a Python environment with the expected Python version. To set it up, run:
+### Quick Setup
 
 ```sh
-$ ./scripts/bootstrap
+# Setup environment and dependencies
+$ uv sync --all-extras --group dev
+
+# Install pre-commit hooks
+$ uv run task setup-pre-commit
 ```
 
-Or [install Rye manually](https://rye.astral.sh/guide/installation/) and run:
+### Manual Setup
+
+If you prefer to install UV manually:
 
 ```sh
-$ rye sync --all-features
+# Install UV - https://docs.astral.sh/uv/getting-started/installation/
+$ curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+$ uv sync --all-extras --group dev
 ```
 
-You can then run scripts using `rye run python script.py` or by activating the virtual environment:
+You can then run commands using `uv run` or by activating the virtual environment:
 
 ```sh
-# Activate the virtual environment - https://docs.python.org/3/library/venv.html#how-venvs-work
+# Activate the virtual environment
 $ source .venv/bin/activate
 
-# now you can omit the `rye run` prefix
+# Now you can omit the `uv run` prefix
 $ python script.py
-```
-
-### Without Rye
-
-Alternatively if you don't want to install `Rye`, you can stick with the standard `pip` setup by ensuring you have the Python version specified in `.python-version`, create a virtual environment however you desire and then install dependencies using this command:
-
-```sh
-$ pip install -r requirements-dev.lock
 ```
 
 ## Modifying/Adding code
@@ -45,7 +47,7 @@ All files in the `examples/` directory are not modified by the generator and can
 ```py
 # add an example to examples/<your-example>.py
 
-#!/usr/bin/env -S rye run python
+#!/usr/bin/env -S uv run python
 …
 ```
 
@@ -72,9 +74,9 @@ Building this package will create two files in the `dist/` directory, a `.tar.gz
 To create a distributable version of the library, all you have to do is run this command:
 
 ```sh
-$ rye build
+$ uv build
 # or
-$ python -m build
+$ uv run task ci-build
 ```
 
 Then to install:
@@ -83,35 +85,48 @@ Then to install:
 $ pip install ./path-to-wheel-file.whl
 ```
 
-## Running tests
+## Development Workflow
 
-Most tests require you to [set up a mock server](https://github.com/stoplightio/prism) against the OpenAPI spec to run the tests.
+We use [Taskipy](https://github.com/taskipy/taskipy) to manage development tasks. All commands are defined in `pyproject.toml` and can be run with `uv run task <command>`.
 
-```sh
-# you will need npm installed
-$ npx prism mock path/to/your/openapi.yml
-```
+### Running tests
 
 ```sh
-$ ./scripts/test
+# Run tests with automatic mock server management
+$ uv run task test
+
+# Or run tests directly (no mock server setup)
+$ uv run pytest
 ```
 
-## Linting and formatting
+The test command automatically handles [Prism mock server](https://github.com/stoplightio/prism) setup and teardown using the OpenAPI spec.
 
-This repository uses [ruff](https://github.com/astral-sh/ruff) and
-[black](https://github.com/psf/black) to format the code in the repository.
-
-To lint:
+### Linting and formatting
 
 ```sh
-$ ./scripts/lint
+# Format code and documentation
+$ uv run task format
+
+# Run all linting checks
+$ uv run task lint
+
+# Run type checking only
+$ uv run task typecheck
 ```
 
-To format and fix all ruff issues automatically:
+### Available Tasks
 
 ```sh
-$ ./scripts/format
+# See all available tasks
+$ uv run task --list
 ```
+
+Key tasks:
+- `format` - Format code with Ruff and documentation
+- `lint` - Run all checks (Ruff + type checking + import validation)
+- `test` - Run tests with mock server orchestration
+- `mock` - Start standalone mock API server
+- `setup-pre-commit` - Install pre-commit hooks
 
 ## Publishing and releases
 
@@ -124,8 +139,12 @@ You can release to package managers by using [the `Publish PyPI` GitHub action](
 
 ### Publish manually
 
-If you need to manually release a package, you can run the `bin/publish-pypi` script with a `PYPI_TOKEN` set on
-the environment.
+If you need to manually release a package, you can use UV directly:
+
+```sh
+$ uv build
+$ uv publish --token $PYPI_TOKEN
+```
 
 ## 🤖 **Vibe Coding Setup**
 
