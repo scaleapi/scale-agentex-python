@@ -112,7 +112,7 @@ class AgentexWorker:
         task_queue,
         max_workers: int = 10,
         max_concurrent_activities: int = 10,
-        health_check_port: int = int(os.environ.get("HEALTH_CHECK_PORT")),
+        health_check_port: int | None = None,
         plugins: list = [],
     ):
         self.task_queue = task_queue
@@ -121,7 +121,7 @@ class AgentexWorker:
         self.max_concurrent_activities = max_concurrent_activities
         self.health_check_server_running = False
         self.healthy = False
-        self.health_check_port = health_check_port
+        self.health_check_port = health_check_port if health_check_port is not None else EnvironmentVariables.refresh().HEALTH_CHECK_PORT
         self.plugins = plugins
 
     @overload
