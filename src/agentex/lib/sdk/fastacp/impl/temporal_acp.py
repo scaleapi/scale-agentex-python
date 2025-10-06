@@ -91,6 +91,7 @@ class TemporalACP(BaseACPServer):
                         agent=params.agent,
                         task=params.task,
                         event=params.event,
+                        request=params.request,
                     )
 
             except Exception as e:
