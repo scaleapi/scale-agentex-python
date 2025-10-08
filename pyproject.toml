@@ -5,7 +5,7 @@ description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
 authors = [
-{ name = "Agentex", email = "" },
+{ name = "Agentex", email = "roxanne.farhad@scale.com" },
 ]
 dependencies = [
     "httpx>=0.23.0, <1",
