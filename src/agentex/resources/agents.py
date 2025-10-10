@@ -10,7 +10,7 @@ import httpx
 from pydantic import ValidationError
 
 from ..types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
-from .._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
+from .._types import NOT_GIVEN, Body, Omit, Query, Headers, NotGiven, omit, not_given
 from .._utils import maybe_transform, async_maybe_transform
 from .._compat import cached_property
 from .._resource import SyncAPIResource, AsyncAPIResource
