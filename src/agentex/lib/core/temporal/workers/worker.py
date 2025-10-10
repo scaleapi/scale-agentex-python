@@ -13,6 +13,7 @@ from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.worker import (
     Plugin as WorkerPlugin,
     Worker,
+    Interceptor,
     UnsandboxedWorkflowRunner,
 )
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
@@ -80,6 +81,16 @@ def _validate_plugins(plugins: list) -> None:
             )
 
 
+def _validate_interceptors(interceptors: list) -> None:
+    """Validate that all items in the interceptors list are valid Temporal interceptors."""
+    for i, interceptor in enumerate(interceptors):
+        if not isinstance(interceptor, Interceptor):
+            raise TypeError(
+                f"Interceptor at index {i} must be an instance of temporalio.worker.Interceptor, "
+                f"got {type(interceptor).__name__}"
+            )
+
+
 async def get_temporal_client(temporal_address: str, metrics_url: str | None = None, plugins: list = []) -> Client:
     if plugins != []:  # We don't need to validate the plugins if they are empty
         _validate_plugins(plugins)
@@ -116,6 +127,7 @@ class AgentexWorker:
         max_concurrent_activities: int = 10,
         health_check_port: int | None = None,
         plugins: list = [],
+        interceptors: list = [],
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -125,6 +137,7 @@ class AgentexWorker:
         self.healthy = False
         self.health_check_port = health_check_port if health_check_port is not None else EnvironmentVariables.refresh().HEALTH_CHECK_PORT
         self.plugins = plugins
+        self.interceptors = interceptors
 
     @overload
     async def run(
@@ -151,6 +164,11 @@ class AgentexWorker:
     ):
         await self.start_health_check_server()
         await self._register_agent()
+
+        # Validate interceptors if any are provided
+        if self.interceptors:
+            _validate_interceptors(self.interceptors)
+
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
             plugins=self.plugins,
@@ -174,6 +192,7 @@ class AgentexWorker:
             max_concurrent_activities=self.max_concurrent_activities,
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
+            interceptors=self.interceptors,  # Pass interceptors to Worker
         )
 
         logger.info(f"Starting workers for task queue: {self.task_queue}")
