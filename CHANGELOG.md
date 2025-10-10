@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.24 (2025-10-10)
+
+Full Changelog: [v0.4.23...v0.4.24](https://github.com/scaleapi/agentex-python/compare/v0.4.23...v0.4.24)
+
+### Features
+
+* **api:** manual updates ([09996ea](https://github.com/scaleapi/agentex-python/commit/09996ea688a7225670bdd9d944b64801fac7acce))
+
+
+### Bug Fixes
+
+* health check port handling ([#138](https://github.com/scaleapi/agentex-python/issues/138)) ([fe22301](https://github.com/scaleapi/agentex-python/commit/fe223012db49768f38c4de56b5d5744031b631d1))
+
+
+### Chores
+
+* do not install brew dependencies in ./scripts/bootstrap by default ([2675e14](https://github.com/scaleapi/agentex-python/commit/2675e14bf9f3a0113a849caf2283376c448f9d03))
+* improve example values ([6997fe5](https://github.com/scaleapi/agentex-python/commit/6997fe57910ea54d6d71b25fdea4497925c8ec63))
+* **internal:** detect missing future annotations with ruff ([f1aa71f](https://github.com/scaleapi/agentex-python/commit/f1aa71f89bb0e8369e6d895b5111dc15fd1e2c12))
+* **internal:** update pydantic dependency ([156ea64](https://github.com/scaleapi/agentex-python/commit/156ea64a4fa317d3ab483e7b9b6ba63471b618ef))
+* **internal:** version bump ([8567752](https://github.com/scaleapi/agentex-python/commit/85677527f5c8d393f0eea0a2a629da48fb56f4a9))
+* **internal:** version bump ([45206dd](https://github.com/scaleapi/agentex-python/commit/45206dd28643403800c386b75e1c9a442c8978ae))
+* **internal:** version bump ([98354ba](https://github.com/scaleapi/agentex-python/commit/98354ba2e7630798e25a8e278cba44c1aacc1e08))
+* **internal:** version bump ([aa2a8db](https://github.com/scaleapi/agentex-python/commit/aa2a8db5907f78b4b39849a1900dae27412359bb))
+* **internal:** version bump ([73bba2a](https://github.com/scaleapi/agentex-python/commit/73bba2a59e77fa31caab5b668781b71bc7c5ec2d))
+* **types:** change optional parameter type from NotGiven to Omit ([2117d77](https://github.com/scaleapi/agentex-python/commit/2117d77219da097e784d5d2deab1632a2855dae9))
+
 ## 0.4.23 (2025-10-02)
 
 Full Changelog: [v0.4.22...v0.4.23](https://github.com/scaleapi/agentex-python/compare/v0.4.22...v0.4.23)

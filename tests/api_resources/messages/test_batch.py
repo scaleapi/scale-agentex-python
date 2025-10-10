@@ -26,6 +26,7 @@ class TestBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -40,6 +41,7 @@ class TestBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -58,6 +60,7 @@ class TestBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -79,6 +82,7 @@ class TestBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         )
@@ -93,6 +97,7 @@ class TestBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         )
@@ -111,6 +116,7 @@ class TestBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         ) as response:
@@ -136,6 +142,7 @@ class TestAsyncBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -150,6 +157,7 @@ class TestAsyncBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -168,6 +176,7 @@ class TestAsyncBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -189,6 +198,7 @@ class TestAsyncBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         )
@@ -203,6 +213,7 @@ class TestAsyncBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         )
@@ -221,6 +232,7 @@ class TestAsyncBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         ) as response:
