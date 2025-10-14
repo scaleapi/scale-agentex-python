@@ -193,7 +193,7 @@ class LiteLLMService:
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
-            name="chat_completion_stream",
+            name="chat_completion_stream_auto_send",
             input=llm_config.model_dump(),
         ) as span:
             # Use streaming context manager
