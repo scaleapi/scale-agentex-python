@@ -241,6 +241,7 @@ class LiteLLMService:
                     final_content = TextContent(
                         author="agent",
                         content=complete_message.choices[0].message.content or "",
+                        format="markdown",
                     )
                     await streaming_context.stream_update(
                         update=StreamTaskMessageFull(
