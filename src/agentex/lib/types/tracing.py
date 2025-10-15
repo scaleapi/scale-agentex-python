@@ -26,6 +26,7 @@ class SGPTracingProcessorConfig(BaseModel):
     type: Literal["sgp"] = "sgp"
     sgp_api_key: str
     sgp_account_id: str
+    base_url: str | None = None
 
 
 TracingProcessorConfig = Annotated[

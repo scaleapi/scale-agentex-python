@@ -21,7 +21,11 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
     def __init__(self, config: SGPTracingProcessorConfig):
         disabled = config.sgp_api_key == "" or config.sgp_account_id == ""
         tracing.init(
-            SGPClient(api_key=config.sgp_api_key, account_id=config.sgp_account_id),
+            SGPClient(
+                api_key=config.sgp_api_key, 
+                account_id=config.sgp_account_id,
+                base_url=config.base_url,
+            ),
             disabled=disabled,
         )
         self._spans: dict[str, SGPSpan] = {}
