@@ -24,7 +24,7 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             SGPClient(
                 api_key=config.sgp_api_key, 
                 account_id=config.sgp_account_id,
-                base_url=config.base_url,
+                base_url=config.sgp_base_url,
             ),
             disabled=disabled,
         )
