@@ -1,0 +1,170 @@
+name: Test AgentEx Tutorials
+
+on:
+  workflow_dispatch:
+
+  workflow_call:
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed-tutorials: ${{ steps.check.outputs.changed-tutorials }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Check for changes in tutorials directory
+        id: check
+        run: |
+          # For testing: hardcode 10_agentic/00_base/000_hello_acp tutorial
+          echo "changed-tutorials=[\"10_agentic/00_base/000_hello_acp\"]" >> $GITHUB_OUTPUT
+
+  build-and-push-tutorial-agents:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.changed-tutorials != '[]'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install Rye
+        run: |
+          curl -sSf https://rye.astral.sh/get | bash
+          echo "$HOME/.rye/shims" >> $GITHUB_PATH
+        env:
+          RYE_VERSION: "0.44.0"
+          RYE_INSTALL_OPTION: "--yes"
+
+      - name: Build and install agentex SDK (same as release)
+        run: |
+          rye build --clean
+
+          # Get the wheel filename
+          WHEEL_FILE=$(ls dist/*.whl | head -n 1)
+          echo "Built wheel: $WHEEL_FILE"
+
+          # Install the wheel to make the CLI available
+          pip install "$WHEEL_FILE"
+
+          # Verify CLI is available
+          agentex --version
+
+          # Store wheel path for later use if needed
+          echo "AGENTEX_WHEEL=$WHEEL_FILE" >> $GITHUB_ENV
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build tutorial agent images
+        run: |
+          # Get list of changed tutorials from detect-changes job output
+          CHANGED_TUTORIALS='${{ needs.detect-changes.outputs.changed-tutorials }}'
+          echo "Changed tutorials: $CHANGED_TUTORIALS"
+
+          # Parse the JSON array and build each tutorial
+          echo "$CHANGED_TUTORIALS" | jq -r '.[]' | while read -r tutorial; do
+            echo "🔨 Building tutorial: $tutorial"
+
+            TUTORIAL_PATH="examples/tutorials/$tutorial"
+
+            if [ -f "$TUTORIAL_PATH/manifest.yaml" ]; then
+              echo "📦 Building with agentex CLI..."
+
+              # Extract the last folder name from the tutorial path
+              TAG_NAME=$(basename "$tutorial")
+
+              # Build and push with agentex agents build command
+              agentex agents build \
+                --manifest "$TUTORIAL_PATH/manifest.yaml" \
+                --registry "docker.io" \
+                --repository-name "${{ vars.DOCKERHUB_USERNAME }}/agentex-tutorials" \
+                --tag "${TAG_NAME}-stable-release" \
+                --push
+
+              echo "✅ Successfully built and pushed: ${{ vars.DOCKERHUB_USERNAME }}/agentex-tutorials:${TAG_NAME}-stable-release"
+            else
+              echo "⚠️  No manifest.yaml found in $TUTORIAL_PATH, skipping..."
+            fi
+          done
+
+  run-agentex-tests:
+    runs-on: ubuntu-latest
+    if: needs.detect-changes.outputs.changed-tutorials != "run"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install Rye
+        run: |
+          curl -sSf https://rye.astral.sh/get | bash
+          echo "$HOME/.rye/shims" >> $GITHUB_PATH
+        env:
+          RYE_VERSION: "0.44.0"
+          RYE_INSTALL_OPTION: "--yes"
+
+      - name: Build and install agentex SDK (same as release)
+        run: |
+          rye build --clean
+
+          # Get the wheel filename
+          WHEEL_FILE=$(ls dist/*.whl | head -n 1)
+          echo "Built wheel: $WHEEL_FILE"
+
+          # Install the wheel to make the CLI available
+          pip install "$WHEEL_FILE"
+
+          # Verify CLI is available
+          agentex --version
+
+          # Store wheel path for later use if needed
+          echo "AGENTEX_WHEEL=$WHEEL_FILE" >> $GITHUB_ENV
+
+      # Login to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull AgentEx Server image
+        env:
+          SCALE_PROD_ACCOUNT_ID: "307185671274"
+          AWS_REGION: "us-west-2"
+          AGENTEX_SERVER_IMAGE_NAME: "agentex"
+        run: |
+          # Pull the latest-stable AgentEx server image from ECR
+          SERVER_IMAGE="${{ env.SCALE_PROD_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.AGENTEX_SERVER_IMAGE_NAME }}:latest-stable"
+          echo "📥 Pulling AgentEx server image: $SERVER_IMAGE"
+          docker pull "$SERVER_IMAGE"
+
+          # Tag it for local use
+          docker tag "$SERVER_IMAGE" "agentex-server:test"
+
+          echo "✅ AgentEx server image ready: agentex-server:test"
+
+      - name: Run AgentEx tutorial tests
+        run: |
+          ##  run a script
