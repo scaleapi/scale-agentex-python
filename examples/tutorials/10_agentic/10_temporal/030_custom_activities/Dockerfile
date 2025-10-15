@@ -28,16 +28,17 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the pyproject.toml file to optimize caching
+# Copy pyproject.toml and README.md to install dependencies
 COPY 030_custom_activities/pyproject.toml /app/030_custom_activities/pyproject.toml
+COPY 030_custom_activities/README.md /app/030_custom_activities/README.md
 
 WORKDIR /app/030_custom_activities
 
-# Install the required Python packages using uv
-RUN uv pip install --system .
-
 # Copy the project code
 COPY 030_custom_activities/project /app/030_custom_activities/project
+
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
 
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]

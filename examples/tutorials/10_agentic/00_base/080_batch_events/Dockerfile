@@ -22,17 +22,19 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the requirements file to optimize caching
-COPY 080_batch_events/requirements.txt /app/requirements.txt
+# Copy pyproject.toml and README.md to install dependencies
+COPY 080_batch_events/pyproject.toml /app/080_batch_events/pyproject.toml
+COPY 080_batch_events/README.md /app/080_batch_events/README.md
 
-WORKDIR /app/
-
-# Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+WORKDIR /app/080_batch_events
 
 # Copy the project code
-COPY 080_batch_events/project /app/project
+COPY 080_batch_events/project /app/080_batch_events/project
 
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
+
+WORKDIR /app/080_batch_events
 # Set environment variables
 ENV PYTHONPATH=/app
 

@@ -30,17 +30,21 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the pyproject.toml file to optimize caching
-COPY example_tutorial/pyproject.toml /app/example_tutorial/pyproject.toml
+# Copy pyproject.toml and README.md to install dependencies
+COPY 080_open_ai_agents_sdk_human_in_the_loop/pyproject.toml /app/080_open_ai_agents_sdk_human_in_the_loop/pyproject.toml
+COPY 080_open_ai_agents_sdk_human_in_the_loop/README.md /app/080_open_ai_agents_sdk_human_in_the_loop/README.md
 
-WORKDIR /app/example_tutorial
-
-# Install the required Python packages using uv
-RUN uv pip install --system .
+WORKDIR /app/080_open_ai_agents_sdk_human_in_the_loop
 
 # Copy the project code
-COPY example_tutorial/project /app/example_tutorial/project
+COPY 080_open_ai_agents_sdk_human_in_the_loop/project /app/080_open_ai_agents_sdk_human_in_the_loop/project
 
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
+
+WORKDIR /app/080_open_ai_agents_sdk_human_in_the_loop
+
+ENV PYTHONPATH=/app
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
 

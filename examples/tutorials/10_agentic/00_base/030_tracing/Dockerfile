@@ -22,17 +22,17 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the requirements file to optimize caching
-COPY 030_tracing/requirements.txt /app/requirements.txt
+# Copy pyproject.toml and README.md to install dependencies
+COPY 030_tracing/pyproject.toml /app/030_tracing/pyproject.toml
+COPY 030_tracing/README.md /app/030_tracing/README.md
 
-WORKDIR /app/
-
-# Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+WORKDIR /app/030_tracing
 
 # Copy the project code
-COPY 030_tracing/project /app/project
+COPY 030_tracing/project /app/030_tracing/project
 
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
 
 # Set environment variables
 ENV PYTHONPATH=/app

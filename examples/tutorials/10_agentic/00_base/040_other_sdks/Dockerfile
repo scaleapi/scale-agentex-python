@@ -22,16 +22,17 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the requirements file to optimize caching
-COPY 040_other_sdks/requirements.txt /app/requirements.txt
+# Copy pyproject.toml and README.md to install dependencies
+COPY 040_other_sdks/pyproject.toml /app/040_other_sdks/pyproject.toml
+COPY 040_other_sdks/README.md /app/040_other_sdks/README.md
 
-WORKDIR /app/
-
-# Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+WORKDIR /app/040_other_sdks
 
 # Copy the project code
-COPY 040_other_sdks/project /app/project
+COPY 040_other_sdks/project /app/040_other_sdks/project
+
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
 
 # Set environment variables
 ENV PYTHONPATH=/app

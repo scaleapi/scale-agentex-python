@@ -23,16 +23,17 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the pyproject.toml file to optimize caching
-COPY pyproject.toml /app/pyproject.toml
-WORKDIR /app/
-# Install the required Python packages
-RUN uv pip install --system -e .
+# Copy pyproject.toml and README.md to install dependencies
+COPY 090_multi_agent_non_temporal/pyproject.toml /app/090_multi_agent_non_temporal/pyproject.toml
+COPY 090_multi_agent_non_temporal/README.md /app/090_multi_agent_non_temporal/README.md
+
+WORKDIR /app/090_multi_agent_non_temporal
 
 # Copy the project code
-COPY project /app/project
+COPY 090_multi_agent_non_temporal/project /app/090_multi_agent_non_temporal/project
 
-WORKDIR /app
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
 
 # Set environment variables
 ENV PYTHONPATH=/app
