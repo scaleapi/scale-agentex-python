@@ -6,6 +6,15 @@ This tutorial demonstrates how to implement streaming multiturn tool-enabled cha
 
 This example extends the basic agent chat functionality by adding guardrails that can filter both user inputs and AI outputs. This is useful for content moderation, compliance, or preventing certain topics from being discussed.
 
+## Quick Start
+
+```bash
+cd examples/tutorials/10_agentic/10_temporal/050_agent_chat_guardrails
+uv run agentex agents run --manifest manifest.yaml
+```
+
+**Monitor:** Open Temporal UI at http://localhost:8080 to see guardrail checks as workflow activities.
+
 ## Guardrails
 
 ### Input Guardrails

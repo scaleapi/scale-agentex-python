@@ -1,7 +1,27 @@
 # [Sync] Hello ACP
 
-This is a simple AgentEx agent that just says hello and acknowledges the user's message to show which ACP methods need to be implemented for the sync ACP type.
+## What You'll Learn
 
-## Official Documentation
+The simplest agent type: synchronous request/response pattern with a single `@acp.on_message_send` handler. Best for stateless operations that complete immediately.
 
-[000 Hello ACP](https://dev.agentex.scale.com/docs/tutorials/sync/000_hello_acp)
+**When to use sync:** Quick responses, no long-running operations, no need for task management or durability.
+
+## Quick Start
+
+```bash
+cd examples/tutorials/00_sync/000_hello_acp
+uv run agentex agents run --manifest manifest.yaml
+```
+
+## Key Code
+
+```python
+@acp.on_message_send
+async def handle_message_send(params: SendMessageParams):
+    return TextContent(
+        author="agent",
+        content=f"Echo: {params.content.content}"
+    )
+```
+
+That's it - one handler, immediate response. No task creation, no state management.
