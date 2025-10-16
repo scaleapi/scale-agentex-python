@@ -5,39 +5,294 @@ on:
 
   workflow_call:
 
+permissions:
+  id-token: write # This is needed for OIDC authentication
+  contents: read # This is usually needed for checking out code
+  packages: read # Allow reading packages from the organization                                                          ╎
+
+env:
+  AGENTEX_SERVER_IMAGE_NAME: agentex
+  AGENTEX_AUTH_IMAGE_NAME: agentex-auth
+  SCALE_PROD_ACCOUNT_ID: "307185671274"
+  EGP_PROD_ACCOUNT_ID: "022465994601"
+  AWS_REGION: us-west-2
+
 jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
       changed-tutorials: ${{ steps.check.outputs.changed-tutorials }}
+      all-tutorials: ${{ steps.find-all.outputs.all-tutorials }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 2
+          fetch-depth: 2 # Fetch current commit and parent for comparison
 
       - name: Check for changes in tutorials directory
         id: check
         run: |
+          # Determine the base branch to compare against
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE_REF="${{ github.event.pull_request.base.sha }}"
+          else
+            # For push events or workflow_dispatch, fetch only latest main
+            git fetch --depth=1 origin main:main || true
+            BASE_REF="origin/main"
+          fi
+
+          echo "📊 Comparing current commit with base: $BASE_REF"
+
+          # Get list of changed files in examples/tutorials directory
+          CHANGED_FILES=$(git diff --name-only $BASE_REF HEAD -- examples/tutorials/ || echo "")
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "⚠️  No changes detected in examples/tutorials/"
+            echo "changed-tutorials=[]" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "📝 Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Extract unique tutorial directories that have changes
+          CHANGED_TUTORIALS=$(echo "$CHANGED_FILES" | \
+            grep "^examples/tutorials/" | \
+            sed 's|^examples/tutorials/||' | \
+            awk -F'/' '{print $1"/"$2"/"$3}' | \
+            sort -u | \
+            while read tutorial_dir; do
+              # Check if manifest.yaml exists in this tutorial directory
+              if [ -f "examples/tutorials/$tutorial_dir/manifest.yaml" ]; then
+                echo "$tutorial_dir"
+              fi
+            done | \
+            jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "🎯 Changed tutorials with manifest.yaml: $CHANGED_TUTORIALS"
+          echo "changed-tutorials=$CHANGED_TUTORIALS" >> $GITHUB_OUTPUT
+
+      - name: Find all tutorials
+        id: find-all
+        run: |
           # Find all tutorials with manifest.yaml files
-          TUTORIALS=$(find examples/tutorials -name "manifest.yaml" -type f | \
+          ALL_TUTORIALS=$(find examples/tutorials -name "manifest.yaml" -type f | \
             sed 's|examples/tutorials/||' | \
             sed 's|/manifest.yaml||' | \
             jq -R -s -c 'split("\n") | map(select(length > 0))')
 
-          echo "Found tutorials: $TUTORIALS"
-          echo "changed-tutorials=$TUTORIALS" >> $GITHUB_OUTPUT
+          echo "📚 All tutorials: $ALL_TUTORIALS"
+          echo "all-tutorials=$ALL_TUTORIALS" >> $GITHUB_OUTPUT
 
-  build-tutorial-agent:
+  run-agent-tutorials-test:
+    runs-on: ubuntu-latest
+    steps:
+      # Login to Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create Docker network
+        run: |
+          echo "🌐 Creating Docker network..."
+          docker network create agentex-network
+
+      - name: Start all dependencies
+        run: |
+          echo "🚀 Starting dependencies (Postgres, Redis, Temporal, MongoDB)..."
+
+          # Start main Postgres for AgentEx
+          docker run -d \
+            --name agentex-postgres \
+            --network agentex-network \
+            -p 5432:5432 \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_DB=agentex \
+            --health-cmd "pg_isready -U postgres" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            --health-start-period 5s \
+            postgres:17
+
+          # Start Redis
+          docker run -d \
+            --name agentex-redis \
+            --network agentex-network \
+            -p 6379:6379 \
+            --health-cmd "redis-cli ping" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            --health-start-period 5s \
+            redis:7.4.0-alpine
+
+          # Start MongoDB
+          docker run -d \
+            --name agentex-mongodb \
+            --network agentex-network \
+            -p 27017:27017 \
+            -e MONGO_INITDB_DATABASE=agentex \
+            --health-cmd "mongosh --eval 'db.runCommand(\"ping\").ok' localhost:27017/agentex --quiet" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            --health-start-period 5s \
+            mongo:6.0
+
+          # Start Temporal's PostgreSQL database
+          docker run -d \
+            --name agentex-temporal-postgresql \
+            --network agentex-network \
+            -p 5433:5432 \
+            -e POSTGRES_PASSWORD=temporal \
+            -e POSTGRES_USER=temporal \
+            -e LOG_LEVEL=error \
+            --health-cmd "pg_isready -U temporal" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            --health-start-period 5s \
+            postgres:12
+
+          echo "⏳ Waiting for databases to be healthy..."
+          sleep 10
+
+          # Start Temporal
+          docker run -d \
+            --name agentex-temporal \
+            --network agentex-network \
+            -p 7233:7233 \
+            -e DB=postgres12 \
+            -e DB_PORT=5432 \
+            -e POSTGRES_USER=temporal \
+            -e POSTGRES_PWD=temporal \
+            -e POSTGRES_SEEDS=agentex-temporal-postgresql \
+            -e LOG_LEVEL=error \
+            --health-cmd "nc -z localhost 7233 || exit 0" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            --health-start-period 10s \
+            temporalio/auto-setup:1.25.0
+
+          echo "⏳ Waiting for all dependencies to be healthy..."
+          sleep 15
+
+          # Verify all deps are up
+          docker ps
+
+      - name: Pull and start AgentEx Auth
+        run: |
+          set -e
+
+          # Get the latest tag that doesn't contain "fips"
+          AUTH_REPO="${{ env.SCALE_PROD_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.AGENTEX_AUTH_IMAGE_NAME }}"
+
+          echo "🔍 Finding latest non-FIPS tag for auth image..."
+          LATEST_TAG=$(aws ecr describe-images \
+            --repository-name ${{ env.AGENTEX_AUTH_IMAGE_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[?!contains(@, `fips`)] | [0]' \
+            --output text)
+
+          AUTH_IMAGE="${AUTH_REPO}:${LATEST_TAG}"
+
+          echo "📥 Pulling AgentEx Auth image: $AUTH_IMAGE"
+          docker pull "$AUTH_IMAGE"
+
+          echo "🔐 Starting AgentEx Auth..."
+          docker run -d \
+            --name agentex-auth \
+            --network agentex-network \
+            -p 5000:5000 \
+            -e ENVIRONMENT=development \
+            -e DATABASE_URL=postgresql://postgres:postgres@agentex-postgres:5432/agentex \
+            -e REDIS_URL=redis://agentex-redis:6379 \
+            "$AUTH_IMAGE"
+
+          echo "⏳ Waiting for auth service to be ready..."
+          sleep 5
+
+          # Health check for auth
+          for i in {1..30}; do
+            if curl -f -s http://localhost:5000/healthz > /dev/null 2>&1; then
+              echo "✅ Auth service is healthy!"
+              break
+            fi
+            echo "  Attempt $i/30: Waiting for auth service..."
+            sleep 3
+          done
+
+      - name: Pull and start AgentEx Server
+        run: |
+          set -e
+
+          # Get the latest tag that doesn't contain "fips"
+          SERVER_REPO="${{ env.SCALE_PROD_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.AGENTEX_SERVER_IMAGE_NAME }}"
+
+          echo "🔍 Finding latest non-FIPS tag for server image..."
+          LATEST_TAG=$(aws ecr describe-images \
+            --repository-name ${{ env.AGENTEX_SERVER_IMAGE_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'sort_by(imageDetails,& imagePushedAt)[-1].imageTags[?!contains(@, `fips`)] | [0]' \
+            --output text)
+
+          SERVER_IMAGE="${SERVER_REPO}:${LATEST_TAG}"
+
+          echo "📥 Pulling AgentEx Server image: $SERVER_IMAGE"
+          docker pull "$SERVER_IMAGE"
+
+          echo "🐤 Starting AgentEx server..."
+          docker run -d \
+            --name agentex-server \
+            --network agentex-network \
+            -p 5003:5003 \
+            -e ENVIRONMENT=development \
+            -e UVICORN_PORT=5003 \
+            -e DATABASE_URL=postgresql://postgres:postgres@agentex-postgres:5432/agentex \
+            -e TEMPORAL_ADDRESS=agentex-temporal:7233 \
+            -e REDIS_URL=redis://agentex-redis:6379 \
+            -e MONGODB_URI=mongodb://agentex-mongodb:27017 \
+            -e MONGODB_DATABASE_NAME=agentex \
+            -e AGENTEX_AUTH_URL=http://agentex-auth:5000 \
+            --workdir /app \
+            "$SERVER_IMAGE" \
+            bash -c "
+              echo 'Running database migrations...' &&
+              cd database/migrations &&
+              alembic upgrade head &&
+              cd ../.. &&
+              echo 'Starting API server...' &&
+              uvicorn src.api.app:app --host 0.0.0.0 --port 5003
+            "
+
+          echo "⏳ Waiting for server to be ready..."
+          sleep 10
+
+          # Health check
+          for i in {1..30}; do
+            if curl -f -s http://localhost:5003/healthz > /dev/null 2>&1; then
+              echo "✅ AgentEx server is healthy!"
+              break
+            fi
+            echo "  Attempt $i/30: Waiting for server..."
+            sleep 3
+          done
+
+  build-all-tutorial-agents:
     needs: [detect-changes]
     runs-on: ubuntu-latest
-    if: needs.detect-changes.outputs.changed-tutorials != '[]'
+    # Only run when code is pushed to main (i.e., after PR is merged)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     strategy:
       matrix:
         tutorial: ${{ fromJson(needs.detect-changes.outputs.changed-tutorials) }}
       fail-fast: false
       max-parallel: 10
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -79,11 +334,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
       - name: Build and push tutorial agent
         run: |
           TUTORIAL="${{ matrix.tutorial }}"
@@ -110,67 +360,3 @@ jobs:
             echo "⚠️  No manifest.yaml found in $TUTORIAL_PATH, skipping..."
             exit 1
           fi
-
-  run-agentex-tests:
-    runs-on: ubuntu-latest
-    if: false # Disabled - not running this job for now
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.12"
-
-      - name: Install Rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-        env:
-          RYE_VERSION: "0.44.0"
-          RYE_INSTALL_OPTION: "--yes"
-
-      - name: Build and install agentex SDK (same as release)
-        run: |
-          rye build --clean
-
-          # Get the wheel filename
-          WHEEL_FILE=$(ls dist/*.whl | head -n 1)
-          echo "Built wheel: $WHEEL_FILE"
-
-          # Install the wheel to make the CLI available
-          pip install "$WHEEL_FILE"
-
-          # Verify CLI is available
-          agentex --help | head -n 5
-
-          # Store wheel path for later use if needed
-          echo "AGENTEX_WHEEL=$WHEEL_FILE" >> $GITHUB_ENV
-
-      # Login to Amazon ECR
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Pull AgentEx Server image
-        env:
-          SCALE_PROD_ACCOUNT_ID: "307185671274"
-          AWS_REGION: "us-west-2"
-          AGENTEX_SERVER_IMAGE_NAME: "agentex"
-        run: |
-          # Pull the latest-stable AgentEx server image from ECR
-          SERVER_IMAGE="${{ env.SCALE_PROD_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.AGENTEX_SERVER_IMAGE_NAME }}:latest-stable"
-          echo "📥 Pulling AgentEx server image: $SERVER_IMAGE"
-          docker pull "$SERVER_IMAGE"
-
-          # Tag it for local use
-          docker tag "$SERVER_IMAGE" "agentex-server:test"
-
-          echo "✅ AgentEx server image ready: agentex-server:test"
-
-      - name: Run AgentEx tutorial tests
-        run: |
-          ##  run a script
