@@ -65,9 +65,9 @@ class OpenAIModule:
     async def run_agent(
         self,
         input_list: list[dict[str, Any]],
-        mcp_server_params: list[StdioServerParameters],
         agent_name: str,
         agent_instructions: str,
+        mcp_server_params: list[StdioServerParameters] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=600),
@@ -119,6 +119,10 @@ class OpenAIModule:
         Returns:
             Union[SerializableRunResult, RunResult]: SerializableRunResult when in Temporal, RunResult otherwise.
         """
+        # Default to empty list if not provided
+        if mcp_server_params is None:
+            mcp_server_params = []
+
         if in_temporal_workflow():
             params = RunAgentParams(
                 trace_id=trace_id,
@@ -174,9 +178,9 @@ class OpenAIModule:
         self,
         task_id: str,
         input_list: list[dict[str, Any]],
-        mcp_server_params: list[StdioServerParameters],
         agent_name: str,
         agent_instructions: str,
+        mcp_server_params: list[StdioServerParameters] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=600),
@@ -227,6 +231,10 @@ class OpenAIModule:
         Returns:
             Union[SerializableRunResult, RunResult]: SerializableRunResult when in Temporal, RunResult otherwise.
         """
+        # Default to empty list if not provided
+        if mcp_server_params is None:
+            mcp_server_params = []
+
         if in_temporal_workflow():
             params = RunAgentAutoSendParams(
                 trace_id=trace_id,
@@ -283,9 +291,9 @@ class OpenAIModule:
     async def run_agent_streamed(
         self,
         input_list: list[dict[str, Any]],
-        mcp_server_params: list[StdioServerParameters],
         agent_name: str,
         agent_instructions: str,
+        mcp_server_params: list[StdioServerParameters] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         handoff_description: str | None = None,
@@ -340,6 +348,10 @@ class OpenAIModule:
         Raises:
             ValueError: If called from within a Temporal workflow
         """
+        # Default to empty list if not provided
+        if mcp_server_params is None:
+            mcp_server_params = []
+
         # Temporal workflows should use the auto_send variant
         if in_temporal_workflow():
             raise ValueError(
@@ -373,9 +385,9 @@ class OpenAIModule:
         self,
         task_id: str,
         input_list: list[dict[str, Any]],
-        mcp_server_params: list[StdioServerParameters],
         agent_name: str,
         agent_instructions: str,
+        mcp_server_params: list[StdioServerParameters] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=600),
@@ -426,6 +438,10 @@ class OpenAIModule:
         Returns:
             Union[SerializableRunResultStreaming, RunResultStreaming]: SerializableRunResultStreaming when in Temporal, RunResultStreaming otherwise.
         """
+        # Default to empty list if not provided
+        if mcp_server_params is None:
+            mcp_server_params = []
+
         if in_temporal_workflow():
             params = RunAgentStreamedAutoSendParams(
                 trace_id=trace_id,
