@@ -99,12 +99,12 @@ httpcore==1.0.9
 httpx==0.27.2
     # via agentex-sdk
     # via httpx-aiohttp
+httpx-aiohttp==0.1.9
     # via litellm
     # via mcp
     # via openai
     # via scale-gp
     # via scale-gp-beta
-httpx-aiohttp==0.1.8
     # via agentex-sdk
 httpx-sse==0.4.1
     # via mcp
