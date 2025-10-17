@@ -1,10 +1,52 @@
 # [Temporal] OpenAI Agents SDK - Hello World
 
+**Part of the [OpenAI SDK + Temporal integration series](../README.md)**
+
 ## What You'll Learn
 
 The OpenAI Agents SDK plugin automatically converts LLM calls into durable Temporal activities. When `Runner.run()` executes, the LLM invocation becomes an `invoke_model_activity` visible in Temporal UI with full observability, automatic retries, and durability.
 
 **Key insight:** You don't need to wrap agent calls in activities manually - the plugin handles this automatically, making non-deterministic LLM calls work seamlessly in Temporal workflows.
+
+## Prerequisites
+
+1. Agentex backend running with Temporal (`make dev` in agentex repo)
+2. OpenAI API key configured (see setup below)
+
+## Setup
+
+This tutorial uses the OpenAI Agents SDK plugin, which needs to be added in two places:
+
+### 1. Add Plugin to ACP (`project/acp.py`)
+```python
+from agentex.lib.plugins.openai_agents import OpenAIAgentsPlugin
+
+acp = FastACP.create(
+    config=TemporalACPConfig(
+        plugins=[OpenAIAgentsPlugin()]  # Add this
+    )
+)
+```
+
+### 2. Add Plugin to Worker (`project/run_worker.py`)
+```python
+from agentex.lib.plugins.openai_agents import OpenAIAgentsPlugin
+
+worker = AgentexWorker(
+    task_queue=task_queue_name,
+    plugins=[OpenAIAgentsPlugin()],  # Add this
+)
+```
+
+### 3. Configure OpenAI API Key
+Add to `manifest.yaml`:
+```yaml
+secrets:
+  - name: OPENAI_API_KEY
+    value: "your-openai-api-key-here"
+```
+
+Or set in `.env` file: `OPENAI_API_KEY=your-key-here`
 
 ## Quick Start
 
@@ -18,10 +60,17 @@ uv run agentex agents run --manifest manifest.yaml
 ## Try It
 
 1. Send a message to the agent (it responds in haikus)
-2. Open Temporal UI at http://localhost:8080
-3. Find your workflow execution
-4. Look for the `invoke_model_activity` - this was created automatically
-5. Inspect the activity to see:
+2. Check the agent response:
+
+![Agent Response](../_images/hello_world_response.png)
+
+3. Open Temporal UI at http://localhost:8080
+4. Find your workflow execution
+5. Look for the `invoke_model_activity` - this was created automatically:
+
+![Temporal UI](../_images/hello_world_temporal.png)
+
+6. Inspect the activity to see:
    - Input parameters (your message)
    - Output (agent's haiku response)
    - Execution time
