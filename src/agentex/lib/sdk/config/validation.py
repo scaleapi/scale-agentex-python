@@ -4,6 +4,7 @@ Validation framework for agent configuration files.
 This module provides validation functions for agent configurations,
 with clear error messages and best practices enforcement.
 """
+from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 from pathlib import Path

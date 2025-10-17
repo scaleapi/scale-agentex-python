@@ -1,4 +1,6 @@
 # ruff: noqa: ARG002
+from __future__ import annotations
+
 import json
 import asyncio
 from enum import Enum

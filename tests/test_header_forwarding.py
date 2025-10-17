@@ -1,4 +1,5 @@
 # ruff: noqa: I001
+from __future__ import annotations
 from typing import Any, override
 import sys
 import types
