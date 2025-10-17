@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Callable, AsyncGenerator, override
 from contextlib import asynccontextmanager
 

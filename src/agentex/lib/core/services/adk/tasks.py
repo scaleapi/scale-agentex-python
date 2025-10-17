@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from agentex import AsyncAgentex
 from agentex.types.task import Task
 from agentex.types.shared import DeleteResponse

@@ -1,5 +1,6 @@
 # ruff: noqa: I001
 # Import order matters - AsyncTracer must come after client import to avoid circular imports
+from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import timedelta
