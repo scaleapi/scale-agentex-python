@@ -1,4 +1,6 @@
 # ruff: noqa: ARG001
+from __future__ import annotations
+
 import os
 import json
 from typing import Any, Dict, List, override

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from typing import override
 from collections.abc import Generator, AsyncGenerator

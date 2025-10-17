@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from agentex import Agentex, AsyncAgentex
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.lib.core.tracing.tracing_processor_manager import (
