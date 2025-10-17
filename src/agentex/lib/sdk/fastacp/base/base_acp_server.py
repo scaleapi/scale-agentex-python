@@ -363,8 +363,12 @@ class BaseACPServer(FastAPI):
             else:
                 # The client wants streaming, but the function is not an async generator, so we turn it into one and yield each TaskMessageContent as a StreamTaskMessageFull which will be streamed to the client by the Agentex server.
                 task_message_content_response = await fn(params)
-                if isinstance(task_message_content_response, list):
-                    task_message_content_list = task_message_content_response
+                # Handle None returns gracefully - treat as empty list
+                if task_message_content_response is None:
+                    task_message_content_list = []
+                elif isinstance(task_message_content_response, list):
+                    # Filter out None values from lists
+                    task_message_content_list = [content for content in task_message_content_response if content is not None]
                 else:
                     task_message_content_list = [task_message_content_response]
 
