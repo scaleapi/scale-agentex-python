@@ -1,3 +1,0 @@
-agentex-sdk
-scale-gp
-uvicorn[standard]
