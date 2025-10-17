@@ -51,7 +51,7 @@ class TemporalTaskService:
             workflow_id=task_id,
         )
 
-    async def send_event(self, agent: Agent, task: Task, event: Event) -> None:
+    async def send_event(self, agent: Agent, task: Task, event: Event, request: dict | None = None) -> None:
         return await self._temporal_client.send_signal(
             workflow_id=task.id,
             signal=SignalName.RECEIVE_EVENT.value,
@@ -59,6 +59,7 @@ class TemporalTaskService:
                 agent=agent,
                 task=task,
                 event=event,
+                request=request,
             ).model_dump(),
         )
 

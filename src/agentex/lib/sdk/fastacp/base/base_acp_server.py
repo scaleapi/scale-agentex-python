@@ -154,12 +154,14 @@ class BaseACPServer(FastAPI):
                     ),
                 )
 
-            # Extract application headers, excluding sensitive/transport headers per FASTACP_* rules
+            # Extract application headers using allowlist approach (only x-* headers)
+            # Matches gateway's security filtering rules
             # Forward filtered headers via params.request.headers to agent handlers
             custom_headers = {
                 key: value
                 for key, value in request.headers.items()
-                if key.lower() not in FASTACP_HEADER_SKIP_EXACT
+                if key.lower().startswith("x-")
+                and key.lower() not in FASTACP_HEADER_SKIP_EXACT
                 and not any(key.lower().startswith(p) for p in FASTACP_HEADER_SKIP_PREFIXES)
             }
             
@@ -168,6 +170,7 @@ class BaseACPServer(FastAPI):
             params_data = dict(rpc_request.params) if rpc_request.params else {}
             
             # Add custom headers to the request structure if any headers were provided
+            # Gateway sends filtered headers via HTTP, SDK extracts and populates params.request
             if custom_headers:
                 params_data["request"] = {"headers": custom_headers}
             params = params_model.model_validate(params_data)
