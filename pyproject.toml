@@ -1,11 +1,11 @@
 [project]
 name = "agentex-sdk"
-version = "0.4.23"
+version = "0.4.25"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
 authors = [
-{ name = "Agentex", email = "" },
+{ name = "Agentex", email = "roxanne.farhad@scale.com" },
 ]
 dependencies = [
     "httpx>=0.27.2,<0.28",
@@ -292,6 +292,8 @@ select = [
   "B",
   # remove unused imports
   "F401",
+  # check for missing future annotations
+  "FA102",
   # bare except statements
   "E722",
   # unused arguments
@@ -313,6 +315,8 @@ unfixable = [
   "T201",
   "T203",
 ]
+
+extend-safe-fixes = ["FA102"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "functools.lru_cache".msg = "This function does not retain type information for the wrapped function's arguments; The `lru_cache` function from `_utils` should be used instead"

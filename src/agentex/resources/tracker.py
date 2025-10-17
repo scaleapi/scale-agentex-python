@@ -7,7 +7,7 @@ from typing import Optional
 import httpx
 
 from ..types import tracker_list_params, tracker_update_params
-from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
+from .._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
 from .._utils import maybe_transform, async_maybe_transform
 from .._compat import cached_property
 from .._resource import SyncAPIResource, AsyncAPIResource
@@ -53,7 +53,7 @@ class TrackerResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentTaskTracker:
         """
         Get agent task tracker by tracker ID
@@ -81,15 +81,15 @@ class TrackerResource(SyncAPIResource):
         self,
         tracker_id: str,
         *,
-        last_processed_event_id: Optional[str] | NotGiven = NOT_GIVEN,
-        status: Optional[str] | NotGiven = NOT_GIVEN,
-        status_reason: Optional[str] | NotGiven = NOT_GIVEN,
+        last_processed_event_id: Optional[str] | Omit = omit,
+        status: Optional[str] | Omit = omit,
+        status_reason: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentTaskTracker:
         """
         Update agent task tracker by tracker ID
@@ -130,14 +130,14 @@ class TrackerResource(SyncAPIResource):
     def list(
         self,
         *,
-        agent_id: Optional[str] | NotGiven = NOT_GIVEN,
-        task_id: Optional[str] | NotGiven = NOT_GIVEN,
+        agent_id: Optional[str] | Omit = omit,
+        task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TrackerListResponse:
         """
         List all agent task trackers, optionally filtered by query parameters.
@@ -203,7 +203,7 @@ class AsyncTrackerResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentTaskTracker:
         """
         Get agent task tracker by tracker ID
@@ -231,15 +231,15 @@ class AsyncTrackerResource(AsyncAPIResource):
         self,
         tracker_id: str,
         *,
-        last_processed_event_id: Optional[str] | NotGiven = NOT_GIVEN,
-        status: Optional[str] | NotGiven = NOT_GIVEN,
-        status_reason: Optional[str] | NotGiven = NOT_GIVEN,
+        last_processed_event_id: Optional[str] | Omit = omit,
+        status: Optional[str] | Omit = omit,
+        status_reason: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentTaskTracker:
         """
         Update agent task tracker by tracker ID
@@ -280,14 +280,14 @@ class AsyncTrackerResource(AsyncAPIResource):
     async def list(
         self,
         *,
-        agent_id: Optional[str] | NotGiven = NOT_GIVEN,
-        task_id: Optional[str] | NotGiven = NOT_GIVEN,
+        agent_id: Optional[str] | Omit = omit,
+        task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TrackerListResponse:
         """
         List all agent task trackers, optionally filtered by query parameters.

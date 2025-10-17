@@ -200,6 +200,19 @@ prompt-toolkit==3.0.51
 propcache==0.3.1
     # via aiohttp
     # via yarl
+pydantic==2.11.9
+    # via agentex-sdk
+    # via fastapi
+    # via litellm
+    # via mcp
+    # via openai
+    # via openai-agents
+    # via pydantic-settings
+    # via python-on-whales
+    # via scale-gp
+    # via scale-gp-beta
+pydantic-core==2.33.2
+    # via pydantic
 protobuf==5.29.5
     # via ddtrace
     # via temporalio
@@ -214,19 +227,6 @@ pyasn1==0.6.1
     # via rsa
 pyasn1-modules==0.4.2
     # via google-auth
-pydantic==2.10.3
-    # via agentex-sdk
-    # via fastapi
-    # via litellm
-    # via mcp
-    # via openai
-    # via openai-agents
-    # via pydantic-settings
-    # via python-on-whales
-    # via scale-gp
-    # via scale-gp-beta
-pydantic-core==2.27.1
-    # via pydantic
 pydantic-settings==2.10.1
     # via mcp
 pygments==2.19.2
@@ -351,6 +351,9 @@ typing-extensions==4.12.2
     # via opentelemetry-api
     # via pydantic
     # via pydantic-core
+    # via typing-inspection
+typing-inspection==0.4.1
+    # via pydantic
     # via python-on-whales
     # via referencing
     # via scale-gp
@@ -358,7 +361,6 @@ typing-extensions==4.12.2
     # via temporalio
     # via typer
     # via typing-inspection
-typing-inspection==0.4.1
     # via pydantic-settings
 tzdata==2025.2
     # via agentex-sdk
