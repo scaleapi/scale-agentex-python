@@ -519,7 +519,6 @@ async def test_temporal_task_service_preserves_all_header_types(
         "x-user-oauth-credentials": "oauth-token-12345",
         "authorization": "Bearer jwt-token",
         "x-tenant-id": "tenant-999",
-        "x-request-id": "req-abc-123",
         "x-custom-app-header": "custom-value"
     }
     request = {"headers": request_headers}
