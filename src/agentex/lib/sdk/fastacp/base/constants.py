@@ -23,7 +23,6 @@ BLOCKED_HEADERS: set[str] = {
     "authorization",
     "cookie",
     "x-agent-api-key",
-    "x-request-id",  # Backend generates its own request IDs
 }
 
 # Legacy constants for backward compatibility
