@@ -23,7 +23,7 @@ BLOCKED_HEADERS: set[str] = {
     "authorization",
     "cookie",
     "x-agent-api-key",
-    "x-request-id",
+    # Note: x-request-id is NOT blocked - it's useful for tracing/correlation
 }
 
 # Legacy constants for backward compatibility
