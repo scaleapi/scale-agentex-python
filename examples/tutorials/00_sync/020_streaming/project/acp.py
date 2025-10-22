@@ -29,7 +29,7 @@ class StateModel(BaseModel):
 # Note: The return of this handler is required to be persisted by the Agentex Server
 @acp.on_message_send
 async def handle_message_send(
-    params: SendMessageParams
+    params: SendMessageParams,
 ) -> Union[TaskMessageContent, AsyncGenerator[TaskMessageUpdate, None]]:
     """
     In this tutorial, we'll see how to handle a basic multi-turn conversation without streaming.
@@ -41,12 +41,12 @@ async def handle_message_send(
     if not params.content:
         return
 
-    if not hasattr(params.content, 'type') or params.content.type != "text":
+    if not hasattr(params.content, "type") or params.content.type != "text":
         raise ValueError(f"Expected text message, got {getattr(params.content, 'type', 'unknown')}")
 
-    if not hasattr(params.content, 'author') or params.content.author != "user":
+    if not hasattr(params.content, "author") or params.content.author != "user":
         raise ValueError(f"Expected user message, got {getattr(params.content, 'author', 'unknown')}")
-    
+
     if not os.environ.get("OPENAI_API_KEY"):
         yield StreamTaskMessageFull(
             index=0,
@@ -72,12 +72,14 @@ async def handle_message_send(
     llm_messages = [
         SystemMessage(content=state.system_prompt),
         *[
-            UserMessage(content=getattr(message.content, 'content', '')) if getattr(message.content, 'author', None) == "user" else AssistantMessage(content=getattr(message.content, 'content', ''))
+            UserMessage(content=getattr(message.content, "content", ""))
+            if getattr(message.content, "author", None) == "user"
+            else AssistantMessage(content=getattr(message.content, "content", ""))
             for message in task_messages
-            if message.content and getattr(message.content, 'type', None) == "text"
-        ]
+            if message.content and getattr(message.content, "type", None) == "text"
+        ],
     ]
-    
+
     #########################################################
     # 4. Call an LLM to respond to the user's message and stream the response to the client.
     #########################################################

@@ -31,8 +31,14 @@ WORKDIR /app/080_batch_events
 # Copy the project code
 COPY 080_batch_events/project /app/080_batch_events/project
 
+# Copy test files
+COPY 080_batch_events/test_*.py /app/080_batch_events/
+
 # Install the required Python packages from pyproject.toml
 RUN uv pip install --system .
+
+# Install pytest for running tests
+RUN uv pip install --system pytest pytest-asyncio
 
 WORKDIR /app/080_batch_events
 # Set environment variables
