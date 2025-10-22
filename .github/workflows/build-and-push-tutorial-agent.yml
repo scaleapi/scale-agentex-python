@@ -95,11 +95,10 @@ jobs:
       - name: Build and Push Agent Image
         env:
           REGISTRY: ghcr.io
-          REPOSITORY_PREFIX: agentex-agents
         run: |
           AGENT_NAME="${{ steps.image-name.outputs.agent_name }}"
           VERSION_TAG="${{ inputs.version_tag }}"
-          REPOSITORY_NAME="${REPOSITORY_PREFIX}/${AGENT_NAME}"
+          REPOSITORY_NAME="${{ github.repository }}/tutorial-agents/${AGENT_NAME}"
           FULL_IMAGE="${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"
 
           agentex agents build \
