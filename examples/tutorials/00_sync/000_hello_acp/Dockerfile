@@ -23,7 +23,7 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy just the requirements file to optimize caching
-COPY 000_hello_acp/requirements.txt /app/requirements.txt
+COPY 000_hello_acp/pyproject.toml /app/requirements.txt
 
 WORKDIR /app/
 
