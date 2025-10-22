@@ -1,0 +1,26 @@
+name: Build and Push Tutorial Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent_path:
+        description: "Path to the agent directory (e.g., examples/tutorials/10_agentic/00_base/000_hello_acp)"
+        required: true
+        type: string
+      version_tag:
+        description: "Version tag for the agent build (e.g., v1.0.0, latest)"
+        required: true
+        type: string
+        default: "latest"
+
+  workflow_call:
+    inputs:
+      agent_path:
+        description: "Path to the agent directory"
+        required: true
+        type: string
+      version_tag:
+        description: "Version tag for the agent build"
+        required: true
+        type: string
+        default: "latest"
