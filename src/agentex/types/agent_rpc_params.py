@@ -54,6 +54,12 @@ class ParamsSendMessageRequest(TypedDict, total=False):
     task_id: Optional[str]
     """The ID of the task that the message was sent to"""
 
+    task_name: Optional[str]
+    """The name of the task that the message was sent to"""
+
+    task_params: Optional[Dict[str, object]]
+    """The parameters for the task (only used when creating new tasks)"""
+
 
 class ParamsSendEventRequest(TypedDict, total=False):
     content: Optional[TaskMessageContentParam]

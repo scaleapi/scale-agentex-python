@@ -18,7 +18,7 @@ class Task(BaseModel):
 
     params: Optional[Dict[str, object]] = None
 
-    status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT"]] = None
+    status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]] = None
 
     status_reason: Optional[str] = None
 
