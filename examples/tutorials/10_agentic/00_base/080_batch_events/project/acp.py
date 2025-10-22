@@ -44,7 +44,7 @@ async def process_events_batch(events, task_id: str) -> str:
     
     # Sleep for 2s per event to simulate processing work
     for event in events:
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)
         logger.info(f"  INSIDE PROCESSING LOOP - FINISHED PROCESSING EVENT {event.id}")
     
     # Create message showing what was processed

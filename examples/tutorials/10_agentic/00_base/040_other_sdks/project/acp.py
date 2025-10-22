@@ -92,7 +92,6 @@ async def handle_event_send(params: SendEventParams):
         raise ValueError("Task state not found - ensure task was properly initialized")
     state = StateModel.model_validate(task_state.state)
     state.turn_number += 1
-
     # Add the new user message to the message history
     state.input_list.append({"role": "user", "content": params.event.content.content})
     
@@ -141,7 +140,8 @@ async def handle_event_send(params: SendEventParams):
         )
 
         state.input_list = run_result.to_input_list()
-
+        logger.info(f"state.input_list: {state.input_list}")
+        logger.info(f"state: {state}")
         # Store the messages in the task state for the next turn
         await adk.state.update(
             state_id=task_state.id,
@@ -151,7 +151,7 @@ async def handle_event_send(params: SendEventParams):
             trace_id=params.task.id,
             parent_span_id=span.id if span else None,
         )
-
+        logger.info("successfully updated the state")
         # Set the span output to the state for the next turn
         if span:
             span.output = state
@@ -280,6 +280,7 @@ async def run_openai_agent_with_custom_streaming(
                                         parent_task_message=streaming_context.task_message,
                                         content=tool_request_content,
                                         content_type=tool_request_content.type,
+                                        type="full",
                                     ),
                                 )
 
@@ -305,6 +306,7 @@ async def run_openai_agent_with_custom_streaming(
                                         parent_task_message=streaming_context.task_message,
                                         content=tool_response_content,
                                         content_type=tool_response_content.type,
+                                        type="full",
                                     ),
                                 )
 
@@ -338,7 +340,8 @@ async def run_openai_agent_with_custom_streaming(
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageDelta(
                                     parent_task_message=streaming_context.task_message,
-                                    delta=TextDelta(text_delta=event.data.delta),
+                                    delta=TextDelta(text_delta=event.data.delta, type="text"),
+                                    type="delta",
                                 ),
                             )
 
@@ -364,7 +367,7 @@ async def run_openai_agent_with_custom_streaming(
             finally:
                 # (👋) Close all remaining streaming contexts
                 # This will send a DONE event and update the persisted messages for all remaining streaming contents. Normally this won't be needed, but we do it in case any errors occur.
-                for item_id in unclosed_item_ids:
+                for item_id in list(unclosed_item_ids):
                     streaming_context = item_id_to_streaming_context[item_id]
                     await streaming_context.close()
                     unclosed_item_ids.remove(item_id)

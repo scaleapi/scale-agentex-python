@@ -28,16 +28,17 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the requirements file to optimize caching
-COPY 010_agent_chat/requirements.txt /app/requirements.txt
+# Copy pyproject.toml and README.md to install dependencies
+COPY 050_agent_chat_guardrails/pyproject.toml /app/050_agent_chat_guardrails/pyproject.toml
+COPY 050_agent_chat_guardrails/README.md /app/050_agent_chat_guardrails/README.md
 
-WORKDIR /app/
-
-# Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+WORKDIR /app/050_agent_chat_guardrails
 
 # Copy the project code
-COPY 010_agent_chat/project /app/project
+COPY 050_agent_chat_guardrails/project /app/050_agent_chat_guardrails/project
+
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
 
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]

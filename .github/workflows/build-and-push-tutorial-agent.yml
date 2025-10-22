@@ -81,10 +81,9 @@ jobs:
         run: |
           # Remove examples/tutorials/ prefix and replace / with -
           AGENT_NAME=$(echo "${{ inputs.agent_path }}" | sed 's|^examples/tutorials/||' | sed 's|/|-|g')
-          IMAGE_NAME="${AGENT_NAME}-${{ inputs.version_tag }}"
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
-          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
-          echo "Image name set to $IMAGE_NAME"
+          echo "AGENT_NAME=$AGENT_NAME" >> $GITHUB_ENV
+          echo "agent_name=$AGENT_NAME" >> $GITHUB_OUTPUT
+          echo "Agent name set to $AGENT_NAME"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -96,17 +95,21 @@ jobs:
       - name: Build and Push Agent Image
         env:
           REGISTRY: ghcr.io
-          REPOSITORY: agentex-agents
+          REPOSITORY_PREFIX: agentex-agents
         run: |
-          IMAGE_NAME="${{ steps.image-name.outputs.image_name }}"
+          AGENT_NAME="${{ steps.image-name.outputs.agent_name }}"
+          VERSION_TAG="${{ inputs.version_tag }}"
+          REPOSITORY_NAME="${REPOSITORY_PREFIX}/${AGENT_NAME}"
+          FULL_IMAGE="${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"
 
           agentex agents build \
             --manifest "${{ inputs.agent_path }}/manifest.yaml" \
             --registry "${REGISTRY}" \
-            --tag "${IMAGE_NAME}" \
+            --tag "${VERSION_TAG}" \
             --platforms "linux/amd64" \
-            --repository-name "${REPOSITORY}" \
+            --repository-name "${REPOSITORY_NAME}" \
             --push
 
-          echo "Successfully built and pushed: ${REGISTRY}/${REPOSITORY}:$IMAGE_NAME" 
+          echo "Successfully built and pushed: ${FULL_IMAGE}"
           echo "### Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: \`${FULL_IMAGE}\`" >> $GITHUB_STEP_SUMMARY

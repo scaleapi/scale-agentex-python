@@ -15,3 +15,5 @@ codegen.log
 Brewfile.lock.json
 
 .DS_Store
+
+examples/**/uv.lock

@@ -12,6 +12,7 @@ dependencies = [
     "agentex-sdk",
     "debugpy>=1.8.15",
     "scale-gp",
+    "yaspin>=3.1.0",
 ]
 
 [project.optional-dependencies]
