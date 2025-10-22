@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from agentex import AsyncAgentex
 from agentex.types.event import Event
 from agentex.lib.utils.logging import make_logger

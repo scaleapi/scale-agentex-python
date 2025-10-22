@@ -1,4 +1,6 @@
 # Standard library imports
+from __future__ import annotations
+
 from typing import Any, Literal
 from contextlib import AsyncExitStack, asynccontextmanager
 
