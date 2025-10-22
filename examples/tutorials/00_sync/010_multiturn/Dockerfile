@@ -22,17 +22,19 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the requirements file to optimize caching
-COPY 010_multiturn/requirements.txt /app/requirements.txt
+# Copy pyproject.toml and README.md to install dependencies
+COPY 010_multiturn/pyproject.toml /app/010_multiturn/pyproject.toml
+COPY 010_multiturn/README.md /app/010_multiturn/README.md
 
-WORKDIR /app/
-
-# Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+WORKDIR /app/010_multiturn
 
 # Copy the project code
-COPY 010_multiturn/project /app/project
+COPY 010_multiturn/project /app/010_multiturn/project
 
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
+
+WORKDIR /app/010_multiturn
 # Set environment variables
 ENV PYTHONPATH=/app
 

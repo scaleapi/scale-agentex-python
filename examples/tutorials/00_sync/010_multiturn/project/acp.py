@@ -3,12 +3,12 @@ from typing import Union, AsyncGenerator
 
 from agentex.lib import adk
 from agentex.lib.types.acp import SendMessageParams
-from agentex.types.task_message import TaskMessageContent
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.types.llm_messages import LLMConfig, UserMessage, SystemMessage, AssistantMessage
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.types.task_message_update import TaskMessageUpdate
-from agentex.types.task_message_content import TextContent
+from agentex.types.task_message_content import TaskMessageContent
+from agentex.types import TextContent
 
 # Create an ACP server
 acp = FastACP.create(
@@ -24,7 +24,7 @@ class StateModel(BaseModel):
 # Note: The return of this handler is required to be persisted by the Agentex Server
 @acp.on_message_send
 async def handle_message_send(
-    params: SendMessageParams
+    params: SendMessageParams,
 ) -> Union[TaskMessageContent, AsyncGenerator[TaskMessageUpdate, None]]:
     """
     In this tutorial, we'll see how to handle a basic multi-turn conversation without streaming.
@@ -33,12 +33,12 @@ async def handle_message_send(
     # 0. Validate the message.
     #########################################################
 
-    if not hasattr(params.content, 'type') or params.content.type != "text":
+    if not hasattr(params.content, "type") or params.content.type != "text":
         raise ValueError(f"Expected text message, got {getattr(params.content, 'type', 'unknown')}")
 
-    if not hasattr(params.content, 'author') or params.content.author != "user":
+    if not hasattr(params.content, "author") or params.content.author != "user":
         raise ValueError(f"Expected user message, got {getattr(params.content, 'author', 'unknown')}")
-    
+
     if not os.environ.get("OPENAI_API_KEY"):
         return TextContent(
             author="agent",
@@ -74,12 +74,14 @@ async def handle_message_send(
     llm_messages = [
         SystemMessage(content=state.system_prompt),
         *[
-            UserMessage(content=getattr(message.content, 'content', '')) if getattr(message.content, 'author', None) == "user" else AssistantMessage(content=getattr(message.content, 'content', ''))
+            UserMessage(content=getattr(message.content, "content", ""))
+            if getattr(message.content, "author", None) == "user"
+            else AssistantMessage(content=getattr(message.content, "content", ""))
             for message in task_messages
-            if getattr(message.content, 'type', None) == "text"
-        ]
+            if getattr(message.content, "type", None) == "text"
+        ],
     ]
-    
+
     # TaskMessages are messages that are sent between an Agent and a Client. They are fundamentally decoupled from messages sent to the LLM. This is because you may want to send additional metadata to allow the client to render the message on the UI differently.
 
     # LLMMessages are OpenAI-compatible messages that are sent to the LLM, and are used to track the state of a conversation with a model.
@@ -90,7 +92,7 @@ async def handle_message_send(
     #   - Taking a markdown document output by an LLM, postprocessing it into a JSON object to clearly denote title, content, and footers. This can be sent as a DataContent TaskMessage to the client and converted back to markdown here to send back to the LLM.
     #   - If using multiple LLMs (like in an actor-critic framework), you may want to send DataContent that denotes which LLM generated which part of the output and write conversion logic to split the TaskMessagehistory into multiple LLM conversations.
     #   - If using multiple LLMs, but one LLM's output should not be sent to the user (i.e. a critic model), you can leverage the State as an internal storage mechanism to store the critic model's conversation history. This i s a powerful and flexible way to handle complex scenarios.
-    
+
     #########################################################
     # 4. Call an LLM to respond to the user's message.
     #########################################################
@@ -113,7 +115,4 @@ async def handle_message_send(
     else:
         content_str = ""
 
-    return TextContent(
-        author="agent",
-        content=content_str
-    )
+    return TextContent(author="agent", content=content_str)

@@ -11,6 +11,8 @@ requires-python = ">=3.12"
 dependencies = [
     "agentex-sdk",
     "scale-gp",
+    "pytest",
+    "pytest-xdist"
 ]
 
 [project.optional-dependencies]
@@ -30,4 +32,4 @@ target-version = ['py312']
 
 [tool.isort]
 profile = "black"
-line_length = 88 
+line_length = 88
