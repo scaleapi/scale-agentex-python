@@ -5,7 +5,12 @@ This tutorial demonstrates how to test agentic agents that use event-driven arch
 
 Prerequisites:
     - AgentEx services running (make dev)
-    - An agentic agent running (e.g., tutorial 10_agentic)
+    - An agentic agent running (e.g., tutorial 10_agentic/00_base/000_hello_acp)
+
+Setup:
+    1. List available agents: agentex agents list
+    2. Copy an agent name from the output
+    3. Update AGENT_NAME below
 
 Run:
     pytest test_agentic_agent.py -v
@@ -15,11 +20,14 @@ import pytest
 
 from agentex.lib.testing import assert_valid_agent_response, test_agentic_agent
 
+# TODO: Replace with your actual agent name from 'agentex agents list'
+AGENT_NAME = "ab000-hello-acp"
+
 
 @pytest.mark.asyncio
 async def test_agentic_agent_responds():
     """Test that agentic agent responds to events."""
-    async with test_agentic_agent() as test:
+    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
         # Send event and wait for response
         response = await test.send_event("Hello! How are you?", timeout_seconds=15.0)
 
@@ -31,7 +39,7 @@ async def test_agentic_agent_responds():
 @pytest.mark.asyncio
 async def test_agentic_agent_multi_turn():
     """Test that agentic agent handles multi-turn conversation."""
-    async with test_agentic_agent() as test:
+    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
         # First exchange
         response1 = await test.send_event("Hello!", timeout_seconds=15.0)
         assert_valid_agent_response(response1)
@@ -51,7 +59,7 @@ async def test_agentic_agent_multi_turn():
 @pytest.mark.asyncio
 async def test_agentic_agent_context():
     """Test that agentic agent maintains conversation context."""
-    async with test_agentic_agent() as test:
+    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
         # Establish context
         response1 = await test.send_event("My name is Jordan and I work in finance", timeout_seconds=15.0)
         assert_valid_agent_response(response1)
@@ -66,7 +74,7 @@ async def test_agentic_agent_context():
 @pytest.mark.asyncio
 async def test_agentic_agent_timeout_handling():
     """Test proper timeout configuration for different scenarios."""
-    async with test_agentic_agent() as test:
+    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
         # Quick question - short timeout
         response = await test.send_event("Hi!", timeout_seconds=10.0)
         assert_valid_agent_response(response)
@@ -76,7 +84,7 @@ async def test_agentic_agent_timeout_handling():
 @pytest.mark.asyncio
 async def test_agentic_agent_conversation_flow():
     """Test natural conversation flow with agentic agent."""
-    async with test_agentic_agent() as test:
+    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
         # Simulate a natural conversation
         messages = [
             "I need help with a Python project",
@@ -89,7 +97,7 @@ async def test_agentic_agent_conversation_flow():
             response = await test.send_event(msg, timeout_seconds=20.0)
             assert_valid_agent_response(response)
             responses.append(response)
-            print(f"✓ Exchange {i+1}/3 complete")
+            print(f"✓ Exchange {i + 1}/3 complete")
 
         # All exchanges should succeed
         assert len(responses) == 3

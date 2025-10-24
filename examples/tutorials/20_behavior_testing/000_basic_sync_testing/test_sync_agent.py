@@ -7,6 +7,11 @@ Prerequisites:
     - AgentEx services running (make dev)
     - A sync agent running (e.g., tutorial 00_sync/000_hello_acp)
 
+Setup:
+    1. List available agents: agentex agents list
+    2. Copy a sync agent name from the output
+    3. Update AGENT_NAME below
+
 Run:
     pytest test_sync_agent.py -v
 """
@@ -18,10 +23,13 @@ from agentex.lib.testing import (
     test_sync_agent,
 )
 
+# TODO: Replace with your actual sync agent name from 'agentex agents list'
+AGENT_NAME = "s000-hello-acp"
+
 
 def test_sync_agent_responds():
     """Test that sync agent responds to a simple message."""
-    with test_sync_agent() as test:
+    with test_sync_agent(agent_name=AGENT_NAME) as test:
         # Send a message
         response = test.send_message("Hello! How are you?")
 
@@ -32,7 +40,7 @@ def test_sync_agent_responds():
 
 def test_sync_agent_multi_turn():
     """Test that sync agent handles multi-turn conversation."""
-    with test_sync_agent() as test:
+    with test_sync_agent(agent_name=AGENT_NAME) as test:
         # First exchange
         response1 = test.send_message("Hello!")
         assert_valid_agent_response(response1)
@@ -53,7 +61,7 @@ def test_sync_agent_multi_turn():
 
 def test_sync_agent_context():
     """Test that sync agent maintains conversation context."""
-    with test_sync_agent() as test:
+    with test_sync_agent(agent_name=AGENT_NAME) as test:
         # Establish context
         response1 = test.send_message("My name is Sarah and I'm a teacher")
         assert_valid_agent_response(response1)
@@ -70,7 +78,7 @@ def test_sync_agent_context():
 
 def test_sync_agent_specific_content():
     """Test that agent responds with expected content."""
-    with test_sync_agent() as test:
+    with test_sync_agent(agent_name=AGENT_NAME) as test:
         # Ask a factual question
         response = test.send_message("What is 2 plus 2?")
 
@@ -85,7 +93,7 @@ def test_sync_agent_specific_content():
 
 def test_sync_agent_conversation_length():
     """Test conversation history tracking."""
-    with test_sync_agent() as test:
+    with test_sync_agent(agent_name=AGENT_NAME) as test:
         # Send 3 messages
         test.send_message("First message")
         test.send_message("Second message")

@@ -1,7 +1,7 @@
 """
 AgentEx Testing Framework
 
-Provides testing utilities for AgentEx agents with real infrastructure testing.
+Simplified API for testing agents with real AgentEx infrastructure.
 
 Quick Start:
     ```python
@@ -9,71 +9,58 @@ Quick Start:
     from agentex.lib.testing import test_sync_agent, test_agentic_agent
 
 
-    # Sync agents - immediate response
-    def test_sync_simple():
-        with test_sync_agent() as test:
+    # Sync agents - MUST specify which agent
+    def test_my_sync_agent():
+        with test_sync_agent(agent_name="my-agent") as test:
             response = test.send_message("Hello!")
             assert response is not None
 
 
-    # Agentic agents - async event-driven
+    # Agentic agents
     @pytest.mark.asyncio
-    async def test_agentic_simple():
-        async with test_agentic_agent() as test:
+    async def test_my_agentic_agent():
+        async with test_agentic_agent(agent_name="my-agent") as test:
             response = await test.send_event("Hello!", timeout_seconds=15.0)
             assert response is not None
     ```
 
-Key Principle: Different agent types use appropriate client methods.
-- Sync agents: Use send_message() for immediate responses
-- Agentic/Temporal agents: Use send_event() with polling for async responses
+Core Principles:
+- **Explicit agent selection required** (no auto-selection)
+- Use send_message() for sync agents (immediate response)
+- Use send_event() for agentic agents (async polling)
 
-Components exported:
-- test_sync_agent(), test_agentic_agent() - Simple context managers
-- Fixtures: real_agentex_client, real_agentex_async_client, sync_agent, agentic_agent
-- Assertions: assert_agent_response_contains(), assert_conversation_maintains_context()
+To discover agent names:
+    Run: agentex agents list
+
+Documentation:
+    See USAGE.md in this directory for complete guide with examples
 """
 
-from agentex.lib.testing.fixtures import (
-    sync_agent,
-    agentic_agent,
-    real_agentex_client,
-    real_agentex_async_client,
-)
 from agentex.lib.testing.sessions import (
-    SyncAgentTest,
-    AgenticAgentTest,
     test_sync_agent,
     test_agentic_agent,
-    sync_agent_test_session,
-    agentic_agent_test_session,
 )
 from agentex.lib.testing.assertions import (
-    extract_response_text,
     assert_valid_agent_response,
     assert_agent_response_contains,
     assert_conversation_maintains_context,
 )
+from agentex.lib.testing.exceptions import (
+    AgentNotFoundError,
+    AgentSelectionError,
+    AgentTimeoutError,
+)
 
 __all__ = [
-    # Simple testing functions (recommended)
+    # Core testing API
     "test_sync_agent",
     "test_agentic_agent",
-    # Client fixtures
-    "real_agentex_client",
-    "real_agentex_async_client",
-    # Agent fixtures
-    "sync_agent",
-    "agentic_agent",
-    # Test session classes
-    "SyncAgentTest",
-    "AgenticAgentTest",
-    # Session managers
-    "sync_agent_test_session",
-    "agentic_agent_test_session",
     # Assertions
-    "assert_agent_response_contains",
     "assert_valid_agent_response",
+    "assert_agent_response_contains",
     "assert_conversation_maintains_context",
-    "extract_response_text",
+    # Common exceptions users might catch
+    "AgentNotFoundError",
+    "AgentSelectionError",
+    "AgentTimeoutError",
 ]
