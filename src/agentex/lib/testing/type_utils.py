@@ -10,11 +10,11 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agentex.types import SendMessageResponse, SendEventResponse
+    from agentex.types import SendEventResponse, SendMessageResponse
     from agentex.types.text_content import TextContent
 
-from agentex.types.text_content_param import TextContentParam
 from agentex.lib.testing.exceptions import AgentResponseError
+from agentex.types.text_content_param import TextContentParam
 
 logger = logging.getLogger(__name__)
 

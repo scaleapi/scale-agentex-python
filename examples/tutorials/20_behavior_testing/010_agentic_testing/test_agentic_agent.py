@@ -18,7 +18,7 @@ Run:
 
 import pytest
 
-from agentex.lib.testing import assert_valid_agent_response, test_agentic_agent
+from agentex.lib.testing import test_agentic_agent, assert_valid_agent_response
 
 # TODO: Replace with your actual agent name from 'agentex agents list'
 AGENT_NAME = "ab000-hello-acp"

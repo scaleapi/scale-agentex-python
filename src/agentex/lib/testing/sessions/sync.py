@@ -12,14 +12,13 @@ from collections.abc import Generator
 
 from agentex import Agentex
 from agentex.types import Agent
-from agentex.types.text_content import TextContent
-from agentex.types.agent_rpc_params import ParamsSendMessageRequest
-
-from agentex.lib.testing.config import config
-from agentex.lib.testing.agent_selector import AgentSelector
 from agentex.lib.testing.retry import with_retry
+from agentex.lib.testing.config import config
+from agentex.types.text_content import TextContent
 from agentex.lib.testing.exceptions import AgentResponseError
 from agentex.lib.testing.type_utils import create_user_message, extract_agent_response
+from agentex.types.agent_rpc_params import ParamsSendMessageRequest
+from agentex.lib.testing.agent_selector import AgentSelector
 
 logger = logging.getLogger(__name__)
 

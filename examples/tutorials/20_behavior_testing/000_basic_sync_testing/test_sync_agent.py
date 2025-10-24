@@ -17,10 +17,10 @@ Run:
 """
 
 from agentex.lib.testing import (
+    test_sync_agent,
+    assert_valid_agent_response,
     assert_agent_response_contains,
     assert_conversation_maintains_context,
-    assert_valid_agent_response,
-    test_sync_agent,
 )
 
 # TODO: Replace with your actual sync agent name from 'agentex agents list'

@@ -46,9 +46,9 @@ from agentex.lib.testing.assertions import (
     assert_conversation_maintains_context,
 )
 from agentex.lib.testing.exceptions import (
+    AgentTimeoutError,
     AgentNotFoundError,
     AgentSelectionError,
-    AgentTimeoutError,
 )
 
 __all__ = [

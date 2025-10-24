@@ -3,6 +3,7 @@ Custom exceptions for AgentEx Testing Framework.
 
 Provides specific error types for better error handling and debugging.
 """
+from __future__ import annotations
 
 
 class AgentexTestingError(Exception):

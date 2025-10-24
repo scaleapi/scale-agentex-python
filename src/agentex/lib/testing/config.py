@@ -4,8 +4,8 @@ Configuration for AgentEx Testing Framework.
 Centralized configuration management with environment variable support.
 """
 
-import logging
 import os
+import logging
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

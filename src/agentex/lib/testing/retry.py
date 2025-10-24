@@ -9,8 +9,8 @@ from __future__ import annotations
 import time
 import asyncio
 import logging
+from typing import TypeVar, Callable, ParamSpec
 from functools import wraps
-from typing import Callable, TypeVar, ParamSpec
 
 from agentex.lib.testing.config import config
 
