@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.26 (2025-10-21)
+
+Full Changelog: [v0.4.25...v0.4.26](https://github.com/scaleapi/agentex-python/compare/v0.4.25...v0.4.26)
+
+### Features
+
+* **api:** api update ([0c1dedd](https://github.com/scaleapi/agentex-python/commit/0c1dedd0fecb05e3684f110cc589f2abe55acb97))
+* **api:** api update ([719dc74](https://github.com/scaleapi/agentex-python/commit/719dc74f7844e2a3c14e46996e353d9c632b8e0a))
+
+
+### Chores
+
+* bump `httpx-aiohttp` version to 0.1.9 ([21c7921](https://github.com/scaleapi/agentex-python/commit/21c79210a0d65944fec5010fcc581a2d85fb94ab))
+
+## 0.4.25 (2025-10-10)
+
+Full Changelog: [v0.4.24...v0.4.25](https://github.com/scaleapi/agentex-python/compare/v0.4.24...v0.4.25)
+
 ## 0.4.24 (2025-10-10)
 
 Full Changelog: [v0.4.23...v0.4.24](https://github.com/scaleapi/agentex-python/compare/v0.4.23...v0.4.24)

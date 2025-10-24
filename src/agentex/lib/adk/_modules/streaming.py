@@ -1,5 +1,6 @@
 # ruff: noqa: I001
 # Import order matters - AsyncTracer must come after client import to avoid circular imports
+from __future__ import annotations
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex  # noqa: F401

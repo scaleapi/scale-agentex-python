@@ -20,12 +20,13 @@ def get_auth_principal(env_vars: EnvironmentVariables):
     except Exception:
         return None
 
-def get_build_info(env_vars: EnvironmentVariables):
-    logger.info(f"Getting build info from {env_vars.BUILD_INFO_PATH}")
-    if not env_vars.BUILD_INFO_PATH:
+def get_build_info():
+    build_info_path = os.environ.get("BUILD_INFO_PATH")
+    logger.info(f"Getting build info from {build_info_path}")
+    if not build_info_path:
         return None
     try:
-        with open(env_vars.BUILD_INFO_PATH, "r") as f:
+        with open(build_info_path, "r") as f:
             return json.load(f)
     except Exception:
         return None
@@ -50,7 +51,7 @@ async def register_agent(env_vars: EnvironmentVariables):
         "acp_url": full_acp_url,
         "acp_type": env_vars.ACP_TYPE,
         "principal_context": get_auth_principal(env_vars),
-        "registration_metadata": get_build_info(env_vars)
+        "registration_metadata": get_build_info()
     }
 
     if env_vars.AGENT_ID:

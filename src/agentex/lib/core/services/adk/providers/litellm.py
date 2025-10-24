@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import AsyncGenerator
 
 from agentex import AsyncAgentex
@@ -193,7 +195,7 @@ class LiteLLMService:
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
-            name="chat_completion_stream",
+            name="chat_completion_stream_auto_send",
             input=llm_config.model_dump(),
         ) as span:
             # Use streaming context manager
@@ -241,6 +243,7 @@ class LiteLLMService:
                     final_content = TextContent(
                         author="agent",
                         content=complete_message.choices[0].message.content or "",
+                        format="markdown",
                     )
                     await streaming_context.stream_update(
                         update=StreamTaskMessageFull(

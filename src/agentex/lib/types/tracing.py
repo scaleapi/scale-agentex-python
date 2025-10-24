@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Literal, Annotated
 
 from pydantic import Field
@@ -26,6 +28,7 @@ class SGPTracingProcessorConfig(BaseModel):
     type: Literal["sgp"] = "sgp"
     sgp_api_key: str
     sgp_account_id: str
+    sgp_base_url: str | None = None
 
 
 TracingProcessorConfig = Annotated[

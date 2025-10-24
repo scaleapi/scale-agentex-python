@@ -22,17 +22,17 @@ build:
     # - Your agent's directory (your custom agent code)
     # These paths are collected and sent to the Docker daemon for building
     include_paths:
-      - example_tutorial
+      - 060_open_ai_agents_sdk_hello_world
 
     # Path to your agent's Dockerfile
     # This defines how your agent's image is built from the context
     # Relative to the root directory
-    dockerfile: example_tutorial/Dockerfile
+    dockerfile: 060_open_ai_agents_sdk_hello_world/Dockerfile
 
     # Path to your agent's .dockerignore
     # Filters unnecessary files from the build context
     # Helps keep build context small and builds fast
-    dockerignore: example_tutorial/.dockerignore
+    dockerignore: 060_open_ai_agents_sdk_hello_world/.dockerignore
 
 
 # Local Development Configuration

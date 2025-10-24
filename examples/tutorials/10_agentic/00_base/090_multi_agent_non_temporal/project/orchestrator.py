@@ -1,4 +1,5 @@
 # Orchestrator Agent - Coordinates the multi-agent content creation workflow
+from __future__ import annotations
 
 import sys
 import json

@@ -23,10 +23,11 @@ from agentex.lib.core.tracing.tracing_processor_manager import (
 logger = make_logger(__name__)
 
 # Add a tracing processor
-add_tracing_processor_config(SGPTracingProcessorConfig(
-    sgp_api_key=os.environ.get("SCALE_GP_API_KEY", ""),
-    sgp_account_id=os.environ.get("SCALE_GP_ACCOUNT_ID", "")
-))
+add_tracing_processor_config(
+    SGPTracingProcessorConfig(
+        sgp_api_key=os.environ.get("SCALE_GP_API_KEY", ""), sgp_account_id=os.environ.get("SCALE_GP_ACCOUNT_ID", "")
+    )
+)
 
 # Create an ACP server
 
@@ -35,6 +36,7 @@ acp = FastACP.create(
     acp_type="agentic",
     config=AgenticACPConfig(type="base"),
 )
+
 
 class StateModel(BaseModel):
     messages: List[Message]
@@ -51,6 +53,7 @@ async def handle_task_create(params: CreateTaskParams):
 
     state = StateModel(messages=[SystemMessage(content="You are a helpful assistant that can answer questions.")])
     await adk.state.create(task_id=params.task.id, agent_id=params.agent.id, state=state)
+
 
 @acp.on_task_event_send
 async def handle_event_send(params: SendEventParams):
@@ -107,8 +110,8 @@ async def handle_event_send(params: SendEventParams):
 
     # Safely extract content from the event
     content_text = ""
-    if hasattr(params.event.content, 'content'):
-        content_val = getattr(params.event.content, 'content', '')
+    if hasattr(params.event.content, "content"):
+        content_val = getattr(params.event.content, "content", "")
         if isinstance(content_val, str):
             content_text = content_val
     state.messages.append(UserMessage(content=content_text))
@@ -128,7 +131,7 @@ async def handle_event_send(params: SendEventParams):
     state.messages.append(AssistantMessage(content=response_content))
 
     #########################################################
-    # 8. (👋) Send agent response to client 
+    # 8. (👋) Send agent response to client
     #########################################################
 
     if chat_completion.choices[0].message:
@@ -157,8 +160,8 @@ async def handle_event_send(params: SendEventParams):
         trace_id=params.task.id,
     )
 
+
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):
     """Default task cancel handler"""
     logger.info(f"Task canceled: {params.task}")
-

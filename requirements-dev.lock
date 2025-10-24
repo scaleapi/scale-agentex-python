@@ -113,9 +113,9 @@ httpx==0.27.2
     # via mcp
     # via openai
     # via respx
+httpx-aiohttp==0.1.9
     # via scale-gp
     # via scale-gp-beta
-httpx-aiohttp==0.1.8
     # via agentex-sdk
 httpx-sse==0.4.1
     # via mcp

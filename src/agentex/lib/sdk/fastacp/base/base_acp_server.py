@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 import asyncio
 import inspect
@@ -152,12 +154,14 @@ class BaseACPServer(FastAPI):
                     ),
                 )
 
-            # Extract application headers, excluding sensitive/transport headers per FASTACP_* rules
+            # Extract application headers using allowlist approach (only x-* headers)
+            # Matches gateway's security filtering rules
             # Forward filtered headers via params.request.headers to agent handlers
             custom_headers = {
                 key: value
                 for key, value in request.headers.items()
-                if key.lower() not in FASTACP_HEADER_SKIP_EXACT
+                if key.lower().startswith("x-")
+                and key.lower() not in FASTACP_HEADER_SKIP_EXACT
                 and not any(key.lower().startswith(p) for p in FASTACP_HEADER_SKIP_PREFIXES)
             }
             
@@ -166,6 +170,7 @@ class BaseACPServer(FastAPI):
             params_data = dict(rpc_request.params) if rpc_request.params else {}
             
             # Add custom headers to the request structure if any headers were provided
+            # Gateway sends filtered headers via HTTP, SDK extracts and populates params.request
             if custom_headers:
                 params_data["request"] = {"headers": custom_headers}
             params = params_model.model_validate(params_data)
@@ -363,8 +368,12 @@ class BaseACPServer(FastAPI):
             else:
                 # The client wants streaming, but the function is not an async generator, so we turn it into one and yield each TaskMessageContent as a StreamTaskMessageFull which will be streamed to the client by the Agentex server.
                 task_message_content_response = await fn(params)
-                if isinstance(task_message_content_response, list):
-                    task_message_content_list = task_message_content_response
+                # Handle None returns gracefully - treat as empty list
+                if task_message_content_response is None:
+                    task_message_content_list = []
+                elif isinstance(task_message_content_response, list):
+                    # Filter out None values from lists
+                    task_message_content_list = [content for content in task_message_content_response if content is not None]
                 else:
                     task_message_content_list = [task_message_content_response]
 

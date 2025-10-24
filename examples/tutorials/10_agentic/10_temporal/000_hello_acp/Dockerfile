@@ -28,16 +28,17 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
-# Copy just the requirements file to optimize caching
-COPY 000_hello_acp/requirements.txt /app/requirements.txt
+# Copy pyproject.toml and README.md to install dependencies
+COPY 000_hello_acp/pyproject.toml /app/000_hello_acp/pyproject.toml
+COPY 000_hello_acp/README.md /app/000_hello_acp/README.md
 
-WORKDIR /app/
-
-# Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+WORKDIR /app/000_hello_acp
 
 # Copy the project code
-COPY 000_hello_acp/project /app/project
+COPY 000_hello_acp/project /app/000_hello_acp/project
+
+# Install the required Python packages from pyproject.toml
+RUN uv pip install --system .
 
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
