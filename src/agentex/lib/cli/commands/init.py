@@ -9,6 +9,9 @@ from jinja2 import Environment, FileSystemLoader
 from rich.panel import Panel
 from rich.table import Table
 from rich.console import Console
+from rich.syntax import Syntax
+from rich.text import Text
+from rich.rule import Rule
 
 from agentex.lib.utils.logging import make_logger
 
@@ -178,7 +181,7 @@ def init():
         return
 
     description = questionary.text(
-        "Provide a brief description of your agent:", default="An AgentEx agent"
+        "Provide a brief description of your agent:", default="An Agentex agent"
     ).ask()
     if not description:
         return
@@ -214,21 +217,155 @@ def init():
         project_path, context, answers["template_type"], answers["use_uv"]
     )
 
-    # Show next steps
-    console.print("\n[bold green]✨ Project created successfully![/bold green]")
-    console.print("\n[bold]Next steps:[/bold]")
-    console.print(f"1. cd {project_path}/{context['project_name']}")
-    console.print("2. Review and customize the generated files")
-    console.print("3. Update the container registry in manifest.yaml")
-
-    if answers["template_type"] == TemplateType.TEMPORAL:
-        console.print("4. Run locally:")
-        console.print("   agentex agents run --manifest manifest.yaml")
-    else:
-        console.print("4. Run locally:")
-        console.print("   agentex agents run --manifest manifest.yaml")
-
-    console.print("5. Deploy your agent:")
-    console.print(
-        "   agentex agents deploy --cluster your-cluster --namespace your-namespace"
+    # Show success message
+    console.print()
+    success_text = Text("✅ Project created successfully!", style="bold green")
+    success_panel = Panel(
+        success_text,
+        border_style="green",
+        padding=(0, 2),
+        title="[bold white]Status[/bold white]",
+        title_align="left"
     )
+    console.print(success_panel)
+    
+    # Main header
+    console.print()
+    console.print(Rule("[bold blue]Next Steps[/bold blue]", style="blue"))
+    console.print()
+
+    # Local Development Section
+    local_steps = Text()
+    local_steps.append("1. ", style="bold white")
+    local_steps.append("Navigate to your project directory:\n", style="white")
+    local_steps.append(f"   cd {project_path}/{context['project_name']}\n\n", style="dim cyan")
+    
+    local_steps.append("2. ", style="bold white")
+    local_steps.append("Review the generated files. ", style="white")
+    local_steps.append("project/acp.py", style="yellow")
+    local_steps.append(" is your agent's entrypoint.\n", style="white")
+    local_steps.append("   See ", style="dim white")
+    local_steps.append("https://agentex.sgp.scale.com/docs", style="blue underline")
+    local_steps.append(" for how to customize different agent types", style="dim white")
+    local_steps.append("\n\n", style="white")
+    
+    local_steps.append("3. ", style="bold white")
+    local_steps.append("Set up your environment and test locally ", style="white")
+    local_steps.append("(no deployment needed)", style="dim white")
+    local_steps.append(":\n", style="white")
+    local_steps.append("   uv venv && uv sync && source .venv/bin/activate", style="dim cyan")
+    local_steps.append("\n   agentex agents run --manifest manifest.yaml", style="dim cyan")
+    
+    local_panel = Panel(
+        local_steps,
+        title="[bold blue]Development Setup[/bold blue]",
+        title_align="left",
+        border_style="blue",
+        padding=(1, 2)
+    )
+    console.print(local_panel)
+    console.print()
+
+    # Prerequisites Note
+    prereq_text = Text()
+    prereq_text.append("The above is all you need for local development. Once you're ready for production, read this box and below.\n\n", style="white")
+    
+    prereq_text.append("• ", style="bold white")
+    prereq_text.append("Prerequisites for Production: ", style="bold yellow")
+    prereq_text.append("You need Agentex hosted on a Kubernetes cluster.\n", style="white")
+    prereq_text.append("  See ", style="dim white")
+    prereq_text.append("https://agentex.sgp.scale.com/docs", style="blue underline")
+    prereq_text.append(" for setup instructions. ", style="dim white")
+    prereq_text.append("Scale GenAI Platform (SGP) customers", style="dim cyan")
+    prereq_text.append(" already have this setup as part of their enterprise license.\n\n", style="dim white")
+    
+    prereq_text.append("• ", style="bold white")
+    prereq_text.append("Best Practice: ", style="bold blue")
+    prereq_text.append("Use CI/CD pipelines for production deployments, not manual commands.\n", style="white")
+    prereq_text.append("  Commands below demonstrate Agentex's quick deployment capabilities.", style="dim white")
+    
+    prereq_panel = Panel(
+        prereq_text,
+        border_style="yellow",
+        padding=(1, 2)
+    )
+    console.print(prereq_panel)
+    console.print()
+
+    # Production Setup Section (includes deployment)
+    prod_steps = Text()
+    prod_steps.append("4. ", style="bold white")
+    prod_steps.append("Configure where to push your container image", style="white")
+    prod_steps.append(":\n", style="white")
+    prod_steps.append("   Edit ", style="dim white")
+    prod_steps.append("manifest.yaml", style="dim yellow")
+    prod_steps.append(" → ", style="dim white")
+    prod_steps.append("deployment.image.repository", style="dim yellow")
+    prod_steps.append(" → replace ", style="dim white")
+    prod_steps.append('""', style="dim red")
+    prod_steps.append(" with your registry", style="dim white")
+    prod_steps.append("\n   Examples: ", style="dim white")
+    prod_steps.append("123456789012.dkr.ecr.us-west-2.amazonaws.com/my-agent", style="dim blue")
+    prod_steps.append(", ", style="dim white")
+    prod_steps.append("gcr.io/my-project", style="dim blue")
+    prod_steps.append(", ", style="dim white")
+    prod_steps.append("myregistry.azurecr.io", style="dim blue")
+    prod_steps.append("\n\n", style="white")
+    
+    prod_steps.append("5. ", style="bold white")
+    prod_steps.append("Build your agent as a container and push to registry", style="white")
+    prod_steps.append(":\n", style="white")
+    prod_steps.append("   agentex agents build --manifest manifest.yaml --registry <your-registry> --push", style="dim cyan")
+    prod_steps.append("\n\n", style="white")
+    
+    prod_steps.append("6. ", style="bold white")
+    prod_steps.append("Upload secrets to cluster ", style="white")
+    prod_steps.append("(API keys, credentials your agent needs)", style="dim white")
+    prod_steps.append(":\n", style="white")
+    prod_steps.append("   agentex secrets sync --manifest manifest.yaml --cluster your-cluster", style="dim cyan")
+    prod_steps.append("\n   ", style="white")
+    prod_steps.append("Note: ", style="dim yellow")
+    prod_steps.append("Secrets are ", style="dim white")
+    prod_steps.append("never stored in manifest.yaml", style="dim red")
+    prod_steps.append(". You provide them via ", style="dim white")
+    prod_steps.append("--values file", style="dim blue")
+    prod_steps.append(" or interactive prompts", style="dim white")
+    prod_steps.append("\n\n", style="white")
+    
+    prod_steps.append("7. ", style="bold white")
+    prod_steps.append("Deploy your agent to run on the cluster", style="white")
+    prod_steps.append(":\n", style="white")
+    prod_steps.append("   agentex agents deploy --cluster your-cluster --namespace your-namespace", style="dim cyan")
+    prod_steps.append("\n\n", style="white")
+    prod_steps.append("Note: These commands use Helm charts hosted by Scale to deploy agents.", style="dim italic")
+    
+    prod_panel = Panel(
+        prod_steps,
+        title="[bold magenta]Production Setup & Deployment[/bold magenta]",
+        title_align="left",
+        border_style="magenta",
+        padding=(1, 2)
+    )
+    console.print(prod_panel)
+    
+    # Professional footer with helpful context
+    console.print()
+    console.print(Rule(style="dim white"))
+    
+    # Add helpful context about the workflow
+    help_text = Text()
+    help_text.append("ℹ️  ", style="blue")
+    help_text.append("Quick Start: ", style="bold white")
+    help_text.append("Steps 1-3 for local development. Steps 4-7 require Agentex cluster for production.", style="dim white")
+    console.print("   ", help_text)
+    
+    tip_text = Text()
+    tip_text.append("💡 ", style="yellow")
+    tip_text.append("Need help? ", style="bold white")
+    tip_text.append("Use ", style="dim white")
+    tip_text.append("agentex --help", style="cyan")
+    tip_text.append(" or ", style="dim white")
+    tip_text.append("agentex [command] --help", style="cyan")
+    tip_text.append(" for detailed options", style="dim white")
+    console.print("   ", tip_text)
+    console.print()
