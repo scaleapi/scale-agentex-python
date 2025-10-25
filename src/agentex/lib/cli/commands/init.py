@@ -6,12 +6,11 @@ from pathlib import Path
 
 import questionary
 from jinja2 import Environment, FileSystemLoader
+from rich.rule import Rule
+from rich.text import Text
 from rich.panel import Panel
 from rich.table import Table
 from rich.console import Console
-from rich.syntax import Syntax
-from rich.text import Text
-from rich.rule import Rule
 
 from agentex.lib.utils.logging import make_logger
 

@@ -2,13 +2,13 @@ import os
 from typing import Union, AsyncGenerator
 
 from agentex.lib import adk
+from agentex.types import TextContent
 from agentex.lib.types.acp import SendMessageParams
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.types.llm_messages import LLMConfig, UserMessage, SystemMessage, AssistantMessage
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.types.task_message_update import TaskMessageUpdate
 from agentex.types.task_message_content import TaskMessageContent
-from agentex.types import TextContent
 
 # Create an ACP server
 acp = FastACP.create(
