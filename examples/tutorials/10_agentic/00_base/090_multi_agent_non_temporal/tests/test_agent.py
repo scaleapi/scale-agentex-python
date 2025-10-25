@@ -17,16 +17,17 @@ Configuration:
 
 import os
 import uuid
+
 import pytest
 import pytest_asyncio
+from test_utils.agentic import (
+    stream_agent_response,
+    send_event_and_poll_yielding,
+)
+
 from agentex import AsyncAgentex
 from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
-from test_utils.agentic import (
-    send_event_and_poll_yielding,
-    stream_agent_response,
-)
 from agentex.types.text_content_param import TextContentParam
-
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -61,7 +62,7 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling."""
 
     @pytest.mark.asyncio
-    async def test_multi_agent_workflow_complete(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_multi_agent_workflow_complete(self, client: AsyncAgentex, _agent_name: str, agent_id: str):
         """Test the complete multi-agent workflow with all agents using polling that yields messages."""
         # Create a task for the orchestrator
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
@@ -145,7 +146,7 @@ class TestStreamingEvents:
     """Test streaming event sending."""
 
     @pytest.mark.asyncio
-    async def test_multi_agent_workflow_streaming(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_multi_agent_workflow_streaming(self, client: AsyncAgentex, _agent_name: str, agent_id: str):
         """Test the multi-agent workflow with streaming responses and early exit."""
         # Create a task for the orchestrator
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))

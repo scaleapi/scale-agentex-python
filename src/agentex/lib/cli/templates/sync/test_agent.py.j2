@@ -51,7 +51,7 @@ def agent_id(client, agent_name):
 class TestNonStreamingMessages:
     """Test non-streaming message sending."""
 
-    def test_send_message(self, client: Agentex, agent_name: str):
+    def test_send_message(self, client: Agentex, _agent_name: str):
         """Test sending a message and receiving a response."""
         # TODO: Fill in the test based on what data your agent is expected to handle
         ...
@@ -60,7 +60,7 @@ class TestNonStreamingMessages:
 class TestStreamingMessages:
     """Test streaming message sending."""
 
-    def test_send_stream_message(self, client: Agentex, agent_name: str):
+    def test_send_stream_message(self, client: Agentex, _agent_name: str):
         """Test streaming a message and aggregating deltas."""
         # TODO: Fill in the test based on what data your agent is expected to handle
         ...
