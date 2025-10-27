@@ -12,3 +12,7 @@ class TaskListParams(TypedDict, total=False):
     agent_id: Optional[str]
 
     agent_name: Optional[str]
+
+    limit: int
+
+    page_number: int

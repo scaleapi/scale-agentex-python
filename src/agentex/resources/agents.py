@@ -83,6 +83,8 @@ class AgentsResource(SyncAPIResource):
     def list(
         self,
         *,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -95,6 +97,10 @@ class AgentsResource(SyncAPIResource):
         List all registered agents, optionally filtered by query parameters.
 
         Args:
+          limit: Limit
+
+          page_number: Page number
+
           task_id: Task ID
 
           extra_headers: Send extra headers
@@ -112,7 +118,14 @@ class AgentsResource(SyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=maybe_transform({"task_id": task_id}, agent_list_params.AgentListParams),
+                query=maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "task_id": task_id,
+                    },
+                    agent_list_params.AgentListParams,
+                ),
             ),
             cast_to=AgentListResponse,
         )
@@ -369,6 +382,8 @@ class AsyncAgentsResource(AsyncAPIResource):
     async def list(
         self,
         *,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -381,6 +396,10 @@ class AsyncAgentsResource(AsyncAPIResource):
         List all registered agents, optionally filtered by query parameters.
 
         Args:
+          limit: Limit
+
+          page_number: Page number
+
           task_id: Task ID
 
           extra_headers: Send extra headers
@@ -398,7 +417,14 @@ class AsyncAgentsResource(AsyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=await async_maybe_transform({"task_id": task_id}, agent_list_params.AgentListParams),
+                query=await async_maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "task_id": task_id,
+                    },
+                    agent_list_params.AgentListParams,
+                ),
             ),
             cast_to=AgentListResponse,
         )
