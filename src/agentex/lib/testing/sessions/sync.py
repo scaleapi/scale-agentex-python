@@ -94,6 +94,44 @@ class SyncAgentTest:
 
         return agent_response
 
+    def send_message_streaming(self, content: str):
+        """
+        Send message to sync agent and get streaming response.
+
+        Args:
+            content: Message text to send
+
+        Yields:
+            SendMessageResponse chunks as they arrive
+
+        Example:
+            from agentex.lib.testing.streaming import collect_streaming_deltas
+
+            response_gen = test.send_message_streaming("Hello")
+            content, chunks = collect_streaming_deltas(response_gen)
+            assert len(content) > 0
+        """
+
+        self._conversation_history.append(content)
+
+        logger.debug(f"Sending streaming message to sync agent {self.agent.id}: {content[:50]}...")
+
+        # Create user message parameter
+        user_message_param = create_user_message(content)
+
+        # Build params with streaming enabled
+        if self.task_id:
+            params = ParamsSendMessageRequest(task_id=self.task_id, content=user_message_param, stream=True)
+        else:
+            self._task_name_counter += 1
+            params = ParamsSendMessageRequest(task_id=None, content=user_message_param, stream=True)
+
+        # Get streaming response
+        response_generator = self.client.agents.send_message(agent_id=self.agent.id, params=params)
+
+        # Return the generator for caller to collect
+        return response_generator
+
     def get_conversation_history(self) -> list[str]:
         """
         Get the full conversation history.

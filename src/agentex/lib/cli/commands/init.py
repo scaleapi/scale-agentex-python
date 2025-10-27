@@ -45,6 +45,13 @@ def create_project_structure(path: Path, context: Dict[str, Any], template_type:
     # Create __init__.py
     (code_dir / "__init__.py").touch()
 
+    # Create tests directory
+    tests_dir: Path = project_dir / "tests"
+    tests_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create tests/__init__.py
+    (tests_dir / "__init__.py").touch()
+
     # Define project files based on template type
     project_files = {
         TemplateType.TEMPORAL: ["acp.py", "workflow.py", "run_worker.py"],
@@ -77,12 +84,14 @@ def create_project_structure(path: Path, context: Dict[str, Any], template_type:
     # Add development notebook for agents
     root_templates["dev.ipynb.j2"] = "dev.ipynb"
 
-    # Add test file
-    root_templates["test_agent.py.j2"] = "test_agent.py"
-
     for template, output in root_templates.items():
         output_path = project_dir / output
         output_path.write_text(render_template(template, context, template_type))
+
+    # Create test file in tests/ directory
+    test_template_path = "test_agent.py.j2"
+    test_output_path = tests_dir / "test_agent.py"
+    test_output_path.write_text(render_template(test_template_path, context, template_type))
 
     console.print(f"\n[green]✓[/green] Created project structure at: {project_dir}")
 
@@ -219,7 +228,7 @@ def init():
         console.print("   agentex agents run --manifest manifest.yaml")
 
     console.print("5. Test your agent:")
-    console.print("   pytest test_agent.py -v")
+    console.print("   pytest tests/test_agent.py -v")
 
     console.print("6. Deploy your agent:")
     console.print("   agentex agents deploy --cluster your-cluster --namespace your-namespace")

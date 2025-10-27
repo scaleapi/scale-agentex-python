@@ -40,6 +40,11 @@ from agentex.lib.testing.sessions import (
     test_sync_agent,
     test_agentic_agent,
 )
+from agentex.lib.testing.streaming import (
+    stream_task_messages,
+    stream_agent_response,
+    collect_streaming_deltas,
+)
 from agentex.lib.testing.assertions import (
     assert_valid_agent_response,
     assert_agent_response_contains,
@@ -59,6 +64,10 @@ __all__ = [
     "assert_valid_agent_response",
     "assert_agent_response_contains",
     "assert_conversation_maintains_context",
+    # Streaming utilities
+    "stream_agent_response",
+    "stream_task_messages",
+    "collect_streaming_deltas",
     # Common exceptions users might catch
     "AgentNotFoundError",
     "AgentSelectionError",

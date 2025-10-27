@@ -81,6 +81,45 @@ class AgenticAgentTest:
 
         return agent_response
 
+    async def send_event_and_stream(
+        self,
+        content: str,
+        timeout_seconds: float = 30.0,
+    ):
+        """
+        Send event and stream the SSE response events.
+
+        Args:
+            content: Message text to send
+            timeout_seconds: Maximum time to wait for stream
+
+        Yields:
+            Parsed SSE event dictionaries
+
+        Example:
+            async for event in test.send_event_and_stream("Task"):
+                if event.get('type') == 'delta':
+                    print(event.get('delta'))
+        """
+        from agentex.lib.testing.streaming import stream_agent_response
+
+        self._conversation_history.append(content)
+
+        logger.debug(f"Sending event with streaming: {content[:50]}...")
+
+        # Create user message parameter
+        user_message_param = create_user_message(content)
+
+        # Build params
+        params = ParamsSendEventRequest(task_id=self.task_id, content=user_message_param)
+
+        # Send event
+        await self.client.agents.send_event(agent_id=self.agent.id, params=params)
+
+        # Stream the response
+        async for event in stream_agent_response(self.client, self.task_id, timeout_seconds):
+            yield event
+
     async def get_conversation_history(self) -> list[str]:
         """
         Get full conversation history.
