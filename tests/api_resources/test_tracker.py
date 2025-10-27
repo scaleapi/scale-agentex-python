@@ -124,6 +124,8 @@ class TestTracker:
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         tracker = client.tracker.list(
             agent_id="agent_id",
+            limit=1,
+            page_number=1,
             task_id="task_id",
         )
         assert_matches_type(TrackerListResponse, tracker, path=["response"])
@@ -262,6 +264,8 @@ class TestAsyncTracker:
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         tracker = await async_client.tracker.list(
             agent_id="agent_id",
+            limit=1,
+            page_number=1,
             task_id="task_id",
         )
         assert_matches_type(TrackerListResponse, tracker, path=["response"])

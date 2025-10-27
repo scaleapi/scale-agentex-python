@@ -9,4 +9,8 @@ __all__ = ["SpanListParams"]
 
 
 class SpanListParams(TypedDict, total=False):
+    limit: int
+
+    page_number: int
+
     trace_id: Optional[str]
