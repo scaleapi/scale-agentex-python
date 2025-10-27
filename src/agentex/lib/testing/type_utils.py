@@ -10,8 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agentex.types import SendEventResponse, SendMessageResponse
-    from agentex.types.text_content import TextContent
+    pass
 
 from agentex.lib.testing.exceptions import AgentResponseError
 from agentex.types.text_content_param import TextContentParam
@@ -32,7 +31,7 @@ def create_user_message(content: str) -> TextContentParam:
     return TextContentParam(type="text", author="user", content=content)
 
 
-def extract_agent_response(response: SendMessageResponse | SendEventResponse, agent_id: str) -> TextContent:
+def extract_agent_response(response, agent_id: str):  # type: ignore[no-untyped-def]
     """
     Extract agent response from RPC response.
 
@@ -80,7 +79,7 @@ def extract_agent_response(response: SendMessageResponse | SendEventResponse, ag
     raise AgentResponseError(agent_id, f"Could not extract TextContent from response type: {type(response).__name__}")
 
 
-def extract_task_id_from_response(response: SendEventResponse) -> str | None:
+def extract_task_id_from_response(response) -> str | None:  # type: ignore[no-untyped-def]
     """
     Extract task ID from send_event response.
 

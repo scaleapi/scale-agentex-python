@@ -59,12 +59,14 @@ def with_retry(func: Callable[P, T]) -> Callable[P, T]:
 
         # All retries exhausted
         logger.error(f"API call failed after {config.api_retry_attempts} attempts: {last_exception}")
-        raise last_exception
+        if last_exception:
+            raise last_exception
+        raise RuntimeError("All retries exhausted without exception")
 
     return wrapper
 
 
-def with_async_retry(func: Callable[P, T]) -> Callable[P, T]:
+def with_async_retry(func):  # type: ignore[no-untyped-def]
     """
     Decorator to retry async functions on transient failures.
 
@@ -103,6 +105,8 @@ def with_async_retry(func: Callable[P, T]) -> Callable[P, T]:
 
         # All retries exhausted
         logger.error(f"API call failed after {config.api_retry_attempts} attempts: {last_exception}")
-        raise last_exception
+        if last_exception:
+            raise last_exception
+        raise RuntimeError("All retries exhausted without exception")
 
-    return wrapper
+    return wrapper  # type: ignore[return-value]

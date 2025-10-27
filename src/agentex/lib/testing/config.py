@@ -80,7 +80,7 @@ def is_agentex_available() -> bool:
         True if AgentEx is healthy, False otherwise
     """
     try:
-        import httpx
+        import httpx  # type: ignore[import-not-found]
 
         response = httpx.get(f"{config.base_url}/healthz", timeout=config.health_check_timeout)
         is_healthy = response.status_code == 200
