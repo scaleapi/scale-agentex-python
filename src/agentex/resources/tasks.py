@@ -84,6 +84,8 @@ class TasksResource(SyncAPIResource):
         *,
         agent_id: Optional[str] | Omit = omit,
         agent_name: Optional[str] | Omit = omit,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -114,6 +116,8 @@ class TasksResource(SyncAPIResource):
                     {
                         "agent_id": agent_id,
                         "agent_name": agent_name,
+                        "limit": limit,
+                        "page_number": page_number,
                     },
                     task_list_params.TaskListParams,
                 ),
@@ -349,6 +353,8 @@ class AsyncTasksResource(AsyncAPIResource):
         *,
         agent_id: Optional[str] | Omit = omit,
         agent_name: Optional[str] | Omit = omit,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -379,6 +385,8 @@ class AsyncTasksResource(AsyncAPIResource):
                     {
                         "agent_id": agent_id,
                         "agent_name": agent_name,
+                        "limit": limit,
+                        "page_number": page_number,
                     },
                     task_list_params.TaskListParams,
                 ),

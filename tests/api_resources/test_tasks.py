@@ -73,6 +73,8 @@ class TestTasks:
         task = client.tasks.list(
             agent_id="agent_id",
             agent_name="agent_name",
+            limit=0,
+            page_number=0,
         )
         assert_matches_type(TaskListResponse, task, path=["response"])
 
@@ -366,6 +368,8 @@ class TestAsyncTasks:
         task = await async_client.tasks.list(
             agent_id="agent_id",
             agent_name="agent_name",
+            limit=0,
+            page_number=0,
         )
         assert_matches_type(TaskListResponse, task, path=["response"])
 

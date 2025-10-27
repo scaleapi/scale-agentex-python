@@ -165,6 +165,8 @@ class TestStates:
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         state = client.states.list(
             agent_id="agent_id",
+            limit=1,
+            page_number=1,
             task_id="task_id",
         )
         assert_matches_type(StateListResponse, state, path=["response"])
@@ -386,6 +388,8 @@ class TestAsyncStates:
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         state = await async_client.states.list(
             agent_id="agent_id",
+            limit=1,
+            page_number=1,
             task_id="task_id",
         )
         assert_matches_type(StateListResponse, state, path=["response"])

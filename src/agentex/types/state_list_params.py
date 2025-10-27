@@ -12,5 +12,11 @@ class StateListParams(TypedDict, total=False):
     agent_id: Optional[str]
     """Agent ID"""
 
+    limit: int
+    """Limit"""
+
+    page_number: int
+    """Page number"""
+
     task_id: Optional[str]
     """Task ID"""
