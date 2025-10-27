@@ -24,23 +24,21 @@ Configuration:
 - AGENT_NAME: Name of the agent to test (default: at010-agent-chat)
 """
 
-from agentex.lib.utils.dev_tools.async_messages import subscribe_to_async_task_messages
-from agentex.types.agent_rpc_result import StreamTaskMessageDone
-from agentex.types.agent_rpc_result import StreamTaskMessageFull
-from typing import List
 import os
 import uuid
-from agentex.types import TaskMessage, TextContent
-from agentex.types.task import Task
+import asyncio
+
 import pytest
 import pytest_asyncio
-from agentex import AsyncAgentex
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from test_utils.agentic import (
-    send_event_and_poll_yielding,
     stream_agent_response,
+    send_event_and_poll_yielding,
 )
-import asyncio
+
+from agentex import AsyncAgentex
+from agentex.types import TaskMessage, TextContent
+from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
+from agentex.types.agent_rpc_result import StreamTaskMessageDone, StreamTaskMessageFull
 from agentex.types.text_content_param import TextContentParam
 
 # Configuration from environment variables
@@ -76,7 +74,7 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling with OpenAI Agents SDK."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, _agent_name: str, agent_id: str):
         """Test sending a simple event and polling for the response (no tool use)."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))

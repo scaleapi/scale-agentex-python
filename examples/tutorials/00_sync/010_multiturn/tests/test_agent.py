@@ -16,19 +16,15 @@ Configuration:
 - AGENT_NAME: Name of the agent to test (default: s010-multiturn)
 """
 
-import enum
 import os
 
-from agentex.lib.sdk.fastacp.base.base_acp_server import uuid
-from agentex.lib.types.acp import SendMessageParams
-
-from test_utils.sync import collect_streaming_response, validate_text_in_string
-
-from agentex.types import TaskMessageContentParam, TextContent, TextContentParam, task_list_params
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest, ParamsSendMessageRequest
 import pytest
-from agentex import Agentex
+from test_utils.sync import validate_text_in_string, collect_streaming_response
 
+from agentex import Agentex
+from agentex.types import TextContent, TextContentParam
+from agentex.types.agent_rpc_params import ParamsCreateTaskRequest, ParamsSendMessageRequest
+from agentex.lib.sdk.fastacp.base.base_acp_server import uuid
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
