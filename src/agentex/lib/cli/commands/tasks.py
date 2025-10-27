@@ -25,7 +25,7 @@ def get(
     client = Agentex()
     task = client.tasks.retrieve(task_id=task_id)
     logger.info(f"Full Task {task_id}:")
-    print_json(data=task.to_dict())
+    print_json(data=task.to_dict(), default=str)
 
 
 @tasks.command()
@@ -35,7 +35,7 @@ def list():
     """
     client = Agentex()
     tasks = client.tasks.list()
-    print_json(data=[task.to_dict() for task in tasks])
+    print_json(data=[task.to_dict() for task in tasks], default=str)
 
 
 @tasks.command()
@@ -46,7 +46,10 @@ def list_running(
     List all currently running tasks for a specific agent.
     """
     client = Agentex()
-    all_tasks = client.tasks.list()
+    if agent_name:
+        all_tasks = client.tasks.list(agent_name=agent_name)
+    else:
+        all_tasks = client.tasks.list()
     running_tasks = [task for task in all_tasks if hasattr(task, "status") and task.status == "RUNNING"]
 
     if not running_tasks:
@@ -74,7 +77,7 @@ def list_running(
                 {"id": getattr(task, "id", "unknown"), "status": getattr(task, "status", "unknown")}
             )
 
-    print_json(data=serializable_tasks)
+    print_json(data=serializable_tasks, default=str)
 
 
 @tasks.command()
