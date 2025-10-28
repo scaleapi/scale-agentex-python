@@ -56,10 +56,15 @@ class TaskManager:
         logger.debug(f"Creating task: {task_name} for agent {agent_id}")
 
         params = ParamsCreateTaskRequest(name=task_name, params={})
-        task = client.agents.create_task(agent_id=agent_id, params=params)
+        response = client.agents.create_task(agent_id=agent_id, params=params)
 
-        logger.debug(f"Task created successfully: {task.id}")
-        return task
+        # Extract task from response.result
+        if hasattr(response, 'result') and response.result:
+            task = response.result
+            logger.debug(f"Task created successfully: {task.id}")
+            return task
+        else:
+            raise Exception(f"Failed to create task: {response}")
 
     @staticmethod
     async def create_task_async(client: AsyncAgentex, agent: Agent, task_type: str) -> Task:
