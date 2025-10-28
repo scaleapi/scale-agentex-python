@@ -92,6 +92,7 @@ dev-dependencies = [
     "nest_asyncio==1.6.0",
     "pytest-xdist>=3.6.1",
     "debugpy>=1.8.15",
+    "pre-commit>=4.0.0",
 ]
 
 [tool.rye.scripts]

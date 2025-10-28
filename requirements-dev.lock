@@ -49,6 +49,8 @@ certifi==2023.7.22
     # via httpx
     # via kubernetes
     # via requests
+cfgv==3.4.0
+    # via pre-commit
 charset-normalizer==3.4.3
     # via requests
 click==8.2.1
@@ -113,14 +115,16 @@ httpx==0.27.2
     # via mcp
     # via openai
     # via respx
-httpx-aiohttp==0.1.9
     # via scale-gp
     # via scale-gp-beta
+httpx-aiohttp==0.1.9
     # via agentex-sdk
 httpx-sse==0.4.1
     # via mcp
 huggingface-hub==0.34.4
     # via tokenizers
+identify==2.6.15
+    # via pre-commit
 idna==3.4
     # via anyio
     # via httpx
@@ -186,6 +190,7 @@ nest-asyncio==1.6.0
 nexus-rpc==1.1.0
     # via temporalio
 nodeenv==1.8.0
+    # via pre-commit
     # via pyright
 nox==2023.4.22
 oauthlib==3.3.1
@@ -213,26 +218,13 @@ platformdirs==3.11.0
     # via virtualenv
 pluggy==1.5.0
     # via pytest
+pre-commit==4.3.0
 prompt-toolkit==3.0.51
     # via ipython
     # via questionary
 propcache==0.3.1
     # via aiohttp
     # via yarl
-pydantic==2.11.9
-    # via agentex-sdk
-    # via agentex-sdk
-    # via fastapi
-    # via litellm
-    # via mcp
-    # via openai
-    # via openai-agents
-    # via pydantic-settings
-    # via python-on-whales
-    # via scale-gp
-    # via scale-gp-beta
-pydantic-core==2.33.2
-    # via pydantic
 protobuf==5.29.5
     # via ddtrace
     # via temporalio
@@ -247,6 +239,19 @@ pyasn1==0.6.1
     # via rsa
 pyasn1-modules==0.4.2
     # via google-auth
+pydantic==2.11.9
+    # via agentex-sdk
+    # via fastapi
+    # via litellm
+    # via mcp
+    # via openai
+    # via openai-agents
+    # via pydantic-settings
+    # via python-on-whales
+    # via scale-gp
+    # via scale-gp-beta
+pydantic-core==2.33.2
+    # via pydantic
 pydantic-settings==2.10.1
     # via mcp
 pygments==2.18.0
@@ -282,6 +287,7 @@ pyyaml==6.0.2
     # via agentex-sdk
     # via huggingface-hub
     # via kubernetes
+    # via pre-commit
 pyzmq==27.0.1
     # via ipykernel
     # via jupyter-client
@@ -383,9 +389,6 @@ typing-extensions==4.12.2
     # via pydantic
     # via pydantic-core
     # via pyright
-    # via typing-inspection
-typing-inspection==0.4.1
-    # via pydantic
     # via python-on-whales
     # via referencing
     # via scale-gp
@@ -393,6 +396,8 @@ typing-inspection==0.4.1
     # via temporalio
     # via typer
     # via typing-inspection
+typing-inspection==0.4.1
+    # via pydantic
     # via pydantic-settings
 tzdata==2025.2
     # via agentex-sdk
@@ -406,6 +411,7 @@ uvicorn==0.35.0
     # via mcp
 virtualenv==20.24.5
     # via nox
+    # via pre-commit
 watchfiles==0.24.0
     # via agentex-sdk
 wcwidth==0.2.13
