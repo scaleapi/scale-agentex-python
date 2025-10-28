@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
+from typing_extensions import Literal
 
 import httpx
 
-from ..types import task_list_params
+from ..types import task_list_params, task_retrieve_params, task_retrieve_by_name_params
 from .._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
 from .._utils import maybe_transform, async_maybe_transform
 from .._compat import cached_property
@@ -18,10 +19,11 @@ from .._response import (
     async_to_streamed_response_wrapper,
 )
 from .._streaming import Stream, AsyncStream
-from ..types.task import Task
 from .._base_client import make_request_options
 from ..types.task_list_response import TaskListResponse
 from ..types.shared.delete_response import DeleteResponse
+from ..types.task_retrieve_response import TaskRetrieveResponse
+from ..types.task_retrieve_by_name_response import TaskRetrieveByNameResponse
 
 __all__ = ["TasksResource", "AsyncTasksResource"]
 
@@ -50,13 +52,14 @@ class TasksResource(SyncAPIResource):
         self,
         task_id: str,
         *,
+        relationships: List[Literal["agents"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> Task:
+    ) -> TaskRetrieveResponse:
         """
         Get a task by its unique ID.
 
@@ -74,9 +77,13 @@ class TasksResource(SyncAPIResource):
         return self._get(
             f"/tasks/{task_id}",
             options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout,
+                query=maybe_transform({"relationships": relationships}, task_retrieve_params.TaskRetrieveParams),
             ),
-            cast_to=Task,
+            cast_to=TaskRetrieveResponse,
         )
 
     def list(
@@ -86,6 +93,7 @@ class TasksResource(SyncAPIResource):
         agent_name: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
         page_number: int | Omit = omit,
+        relationships: List[Literal["agents"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -118,6 +126,7 @@ class TasksResource(SyncAPIResource):
                         "agent_name": agent_name,
                         "limit": limit,
                         "page_number": page_number,
+                        "relationships": relationships,
                     },
                     task_list_params.TaskListParams,
                 ),
@@ -195,13 +204,14 @@ class TasksResource(SyncAPIResource):
         self,
         task_name: str,
         *,
+        relationships: List[Literal["agents"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> Task:
+    ) -> TaskRetrieveByNameResponse:
         """
         Get a task by its unique name.
 
@@ -219,9 +229,15 @@ class TasksResource(SyncAPIResource):
         return self._get(
             f"/tasks/name/{task_name}",
             options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout,
+                query=maybe_transform(
+                    {"relationships": relationships}, task_retrieve_by_name_params.TaskRetrieveByNameParams
+                ),
             ),
-            cast_to=Task,
+            cast_to=TaskRetrieveByNameResponse,
         )
 
     def stream_events(
@@ -319,13 +335,14 @@ class AsyncTasksResource(AsyncAPIResource):
         self,
         task_id: str,
         *,
+        relationships: List[Literal["agents"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> Task:
+    ) -> TaskRetrieveResponse:
         """
         Get a task by its unique ID.
 
@@ -343,9 +360,15 @@ class AsyncTasksResource(AsyncAPIResource):
         return await self._get(
             f"/tasks/{task_id}",
             options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout,
+                query=await async_maybe_transform(
+                    {"relationships": relationships}, task_retrieve_params.TaskRetrieveParams
+                ),
             ),
-            cast_to=Task,
+            cast_to=TaskRetrieveResponse,
         )
 
     async def list(
@@ -355,6 +378,7 @@ class AsyncTasksResource(AsyncAPIResource):
         agent_name: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
         page_number: int | Omit = omit,
+        relationships: List[Literal["agents"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -387,6 +411,7 @@ class AsyncTasksResource(AsyncAPIResource):
                         "agent_name": agent_name,
                         "limit": limit,
                         "page_number": page_number,
+                        "relationships": relationships,
                     },
                     task_list_params.TaskListParams,
                 ),
@@ -464,13 +489,14 @@ class AsyncTasksResource(AsyncAPIResource):
         self,
         task_name: str,
         *,
+        relationships: List[Literal["agents"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> Task:
+    ) -> TaskRetrieveByNameResponse:
         """
         Get a task by its unique name.
 
@@ -488,9 +514,15 @@ class AsyncTasksResource(AsyncAPIResource):
         return await self._get(
             f"/tasks/name/{task_name}",
             options=make_request_options(
-                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+                extra_headers=extra_headers,
+                extra_query=extra_query,
+                extra_body=extra_body,
+                timeout=timeout,
+                query=await async_maybe_transform(
+                    {"relationships": relationships}, task_retrieve_by_name_params.TaskRetrieveByNameParams
+                ),
             ),
-            cast_to=Task,
+            cast_to=TaskRetrieveByNameResponse,
         )
 
     async def stream_events(
