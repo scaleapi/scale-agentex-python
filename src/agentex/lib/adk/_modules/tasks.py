@@ -16,6 +16,8 @@ from agentex.lib.core.temporal.activities.adk.tasks_activities import (
 )
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task import Task
+from agentex.types.task_retrieve_response import TaskRetrieveResponse
+from agentex.types.task_retrieve_by_name_response import TaskRetrieveByNameResponse
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import in_temporal_workflow
 
@@ -53,7 +55,7 @@ class TasksModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
-    ) -> Task:
+    ) -> TaskRetrieveResponse | TaskRetrieveByNameResponse:
         """
         Get a task by ID or name.
         Args:
