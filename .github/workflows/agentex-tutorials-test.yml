@@ -27,7 +27,7 @@ jobs:
           echo "🚀 Starting dependencies (Postgres, Redis, Temporal, MongoDB)..."
 
           # Start all services except the agentex service
-          docker compose up
+          docker compose up -d
 
           echo "⏳ Waiting for dependencies to be healthy..."
 
