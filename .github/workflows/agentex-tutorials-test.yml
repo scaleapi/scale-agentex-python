@@ -5,25 +5,41 @@ on:
 
 jobs:
   test-tutorials:
-    timeout-minutes: 10
-    name: test-tutorials
+    timeout-minutes: 15
+    name: test-tutorial-${{ matrix.tutorial }}
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rye
+      - name: Install UV
         run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-        env:
-          RYE_VERSION: "0.44.0"
-          RYE_INSTALL_OPTION: "--yes"
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Bootstrap
-        run: ./scripts/bootstrap
+      - name: Checkout scale-agentex repo
+        uses: actions/checkout@v4
+        with:
+          repository: scaleapi/scale-agentex
+          path: scale-agentex
 
-      - name: Simple validation test
+      - name: Navigate to scale-agentex repo
         run: |
-          echo "✅ Tutorial test workflow is working!"
-          echo "Rye version: $(rye --version)"
-          echo "Python version: $(python --version)"
+          cd scale-agentex/agentex
+          echo "🚀 Starting dependencies (Postgres, Redis, Temporal, MongoDB)..."
+
+          # Start all services except the agentex service
+          docker compose up
+
+          echo "⏳ Waiting for dependencies to be healthy..."
+
+          # Wait for services to be healthy
+          for i in {1..30}; do
+            if docker compose ps | grep -q "healthy"; then
+              echo "✅ Dependencies are healthy"
+              break
+            fi
+            echo "  Attempt $i/30: Waiting for services..."
+            sleep 5
+          done
+
+          # Verify all deps are up
+          docker compose ps

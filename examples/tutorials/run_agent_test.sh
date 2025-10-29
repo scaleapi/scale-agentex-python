@@ -1,16 +1,14 @@
 #!/bin/bash
 #
-# Run all agentic tutorial tests
+# Run a single agent tutorial test
 #
-# This script runs the test runner for all agentic tutorials in sequence.
-# It stops at the first failure unless --continue-on-error is specified.
+# This script runs the test for a single agent tutorial.
+# It starts the agent, runs tests against it, then stops the agent.
 #
 # Usage:
-#   ./run_all_agentic_tests.sh                              # Run all tutorials
-#   ./run_all_agentic_tests.sh --continue-on-error          # Run all, continue on error
-#   ./run_all_agentic_tests.sh <tutorial_path>              # Run single tutorial
-#   ./run_all_agentic_tests.sh --view-logs                  # View most recent agent logs
-#   ./run_all_agentic_tests.sh --view-logs <tutorial_path>  # View logs for specific tutorial
+#   ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test
+#   ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial
+#   ./run_agent_test.sh --view-logs                         # View most recent agent logs
 #
 
 set -e  # Exit on error
@@ -28,43 +26,16 @@ AGENT_PORT=8000
 AGENTEX_SERVER_PORT=5003
 
 # Parse arguments
-CONTINUE_ON_ERROR=false
-SINGLE_TUTORIAL=""
+TUTORIAL_PATH=""
 VIEW_LOGS=false
 
 for arg in "$@"; do
-    if [[ "$arg" == "--continue-on-error" ]]; then
-        CONTINUE_ON_ERROR=true
-    elif [[ "$arg" == "--view-logs" ]]; then
+    if [[ "$arg" == "--view-logs" ]]; then
         VIEW_LOGS=true
     else
-        SINGLE_TUTORIAL="$arg"
+        TUTORIAL_PATH="$arg"
     fi
 done
-
-# Find all agentic tutorial directories
-ALL_TUTORIALS=(
-    # sync tutorials
-    "00_sync/000_hello_acp"
-    "00_sync/010_multiturn"
-    "00_sync/020_streaming"
-    # base tutorials
-    "10_agentic/00_base/000_hello_acp"
-    "10_agentic/00_base/010_multiturn"
-    "10_agentic/00_base/020_streaming"
-    "10_agentic/00_base/030_tracing"
-    "10_agentic/00_base/040_other_sdks"
-    "10_agentic/00_base/080_batch_events"
-#    "10_agentic/00_base/090_multi_agent_non_temporal" This will require its own version of this
-    # temporal tutorials
-    "10_agentic/10_temporal/000_hello_acp"
-    "10_agentic/10_temporal/010_agent_chat"
-    "10_agentic/10_temporal/020_state_machine"
-)
-
-PASSED=0
-FAILED=0
-FAILED_TESTS=()
 
 # Function to check prerequisites for running this test suite
 check_prerequisites() {
@@ -280,8 +251,6 @@ execute_tutorial_test() {
     # Start the agent
     if ! start_agent "$tutorial"; then
         echo -e "${RED}❌ FAILED to start agent: $tutorial${NC}"
-        ((FAILED++))
-        FAILED_TESTS+=("$tutorial")
         return 1
     fi
 
@@ -289,12 +258,9 @@ execute_tutorial_test() {
     local test_passed=false
     if run_test "$tutorial"; then
         echo -e "${GREEN}✅ PASSED: $tutorial${NC}"
-        ((PASSED++))
         test_passed=true
     else
         echo -e "${RED}❌ FAILED: $tutorial${NC}"
-        ((FAILED++))
-        FAILED_TESTS+=("$tutorial")
     fi
 
     # Stop the agent
@@ -313,23 +279,30 @@ execute_tutorial_test() {
 main() {
     # Handle --view-logs flag
     if [ "$VIEW_LOGS" = true ]; then
-        if [[ -n "$SINGLE_TUTORIAL" ]]; then
-            view_agent_logs "$SINGLE_TUTORIAL"
+        if [[ -n "$TUTORIAL_PATH" ]]; then
+            view_agent_logs "$TUTORIAL_PATH"
         else
             view_agent_logs
         fi
         exit 0
     fi
 
-    echo "================================================================================"
-    if [[ -n "$SINGLE_TUTORIAL" ]]; then
-        echo "Running Single Tutorial Test: $SINGLE_TUTORIAL"
-    else
-        echo "Running All Agentic Tutorial Tests"
-        if [ "$CONTINUE_ON_ERROR" = true ]; then
-            echo -e "${YELLOW}⚠️  Running in continue-on-error mode${NC}"
-        fi
+    # Require tutorial path
+    if [[ -z "$TUTORIAL_PATH" ]]; then
+        echo -e "${RED}❌ Error: Tutorial path is required${NC}"
+        echo ""
+        echo "Usage:"
+        echo "  ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test"
+        echo "  ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial"
+        echo "  ./run_agent_test.sh --view-logs                         # View most recent agent logs"
+        echo ""
+        echo "Example:"
+        echo "  ./run_agent_test.sh 00_sync/000_hello_acp"
+        exit 1
     fi
+
+    echo "================================================================================"
+    echo "Running Tutorial Test: $TUTORIAL_PATH"
     echo "================================================================================"
     echo ""
 
@@ -338,46 +311,19 @@ main() {
 
     echo ""
 
-    # Determine which tutorials to run
-    if [[ -n "$SINGLE_TUTORIAL" ]]; then
-        TUTORIALS=("$SINGLE_TUTORIAL")
-    else
-        TUTORIALS=("${ALL_TUTORIALS[@]}")
-    fi
-
-    # Iterate over tutorials
-    for tutorial in "${TUTORIALS[@]}"; do
-        execute_tutorial_test "$tutorial"
-
-        # Exit early if in fail-fast mode
-        if [ "$CONTINUE_ON_ERROR" = false ] && [ $FAILED -gt 0 ]; then
-            echo ""
-            echo -e "${RED}Stopping due to test failure. Use --continue-on-error to continue.${NC}"
-            exit 1
-        fi
-    done
-
-    # Print summary
-    echo ""
-    echo "================================================================================"
-    echo "Test Summary"
-    echo "================================================================================"
-    echo -e "Total:  $((PASSED + FAILED))"
-    echo -e "${GREEN}Passed: $PASSED${NC}"
-    echo -e "${RED}Failed: $FAILED${NC}"
-    echo ""
-
-    if [ $FAILED -gt 0 ]; then
-        echo "Failed tests:"
-        for test in "${FAILED_TESTS[@]}"; do
-            echo -e "  ${RED}✗${NC} $test"
-        done
+    # Execute the single tutorial test
+    if execute_tutorial_test "$TUTORIAL_PATH"; then
         echo ""
-        exit 1
-    else
-        echo -e "${GREEN}🎉 All tests passed!${NC}"
-        echo ""
+        echo "================================================================================"
+        echo -e "${GREEN}🎉 Test passed for: $TUTORIAL_PATH${NC}"
+        echo "================================================================================"
         exit 0
+    else
+        echo ""
+        echo "================================================================================"
+        echo -e "${RED}❌ Test failed for: $TUTORIAL_PATH${NC}"
+        echo "================================================================================"
+        exit 1
     fi
 }
 
