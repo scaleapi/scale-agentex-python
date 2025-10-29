@@ -1,0 +1,29 @@
+name: Test Tutorial Agents
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-tutorials:
+    timeout-minutes: 10
+    name: test-tutorials
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rye
+        run: |
+          curl -sSf https://rye.astral.sh/get | bash
+          echo "$HOME/.rye/shims" >> $GITHUB_PATH
+        env:
+          RYE_VERSION: "0.44.0"
+          RYE_INSTALL_OPTION: "--yes"
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: Simple validation test
+        run: |
+          echo "✅ Tutorial test workflow is working!"
+          echo "Rye version: $(rye --version)"
+          echo "Python version: $(python --version)"
