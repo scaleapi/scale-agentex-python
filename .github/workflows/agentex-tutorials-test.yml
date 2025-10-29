@@ -10,10 +10,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout agentex-python repo
+        uses: actions/checkout@v4
+
       - name: Install UV
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install Rye
+        run: |
+          curl -sSf https://rye.astral.sh/get | bash
+          echo "$HOME/.rye/shims" >> $GITHUB_PATH
+        env:
+          RYE_VERSION: "0.44.0"
+          RYE_INSTALL_OPTION: "--yes"
 
       - name: Checkout scale-agentex repo
         uses: actions/checkout@v4
@@ -43,3 +54,106 @@ jobs:
 
           # Verify all deps are up
           docker compose ps
+
+      - name: Run Parallel Tutorial Tests
+        working-directory: ./examples/tutorials
+        run: |
+
+          # Find all tutorial directories
+          tutorial_paths=()
+          for dir in $(find . -name "manifest.yaml" -exec dirname {} \; | sort); do
+            tutorial_paths+=("${dir#./}")  # Remove leading ./
+          done
+
+          echo "Found ${#tutorial_paths[@]} tutorials:"
+          printf '  %s\n' "${tutorial_paths[@]}"
+
+          # Run tests in parallel with unique ports
+          pids=()
+          failed_tests=()
+          passed_tests=()
+
+          for i in "${!tutorial_paths[@]}"; do
+            tutorial="${tutorial_paths[$i]}"
+            port=$((8000 + i))
+
+            echo ""
+            echo "========================================="
+            echo "Starting test $((i+1))/${#tutorial_paths[@]}: $tutorial (port $port)"
+            echo "========================================="
+
+            # Modify manifest.yaml to use unique port
+            manifest_path="$tutorial/manifest.yaml"
+            if [ -f "$manifest_path" ]; then
+              # Backup original manifest
+              cp "$manifest_path" "$manifest_path.backup"
+
+              # Update port in manifest (modify the line containing 'port: 8000' or 'port: XXXX')
+              sed -i "s/port: [0-9]*/port: $port/" "$manifest_path"
+
+              echo "Updated $manifest_path to use port $port"
+            fi
+
+            # Run test in background with unique port
+            (
+              AGENTEX_API_BASE_URL="http://localhost:5003" \
+                ./run_agent_test.sh --build-cli "$tutorial"
+
+              if [ $? -eq 0 ]; then
+                echo "✅ PASSED: $tutorial (port $port)"
+                echo "$tutorial" > "/tmp/passed_$i.txt"
+              else
+                echo "❌ FAILED: $tutorial (port $port)"
+                echo "$tutorial" > "/tmp/failed_$i.txt"
+              fi
+            ) &
+
+            pids+=($!)
+          done
+
+          # Wait for all tests to complete
+          echo ""
+          echo "Waiting for all tests to complete..."
+          for pid in "${pids[@]}"; do
+            wait "$pid"
+          done
+
+          # Restore all original manifests
+          echo ""
+          echo "Restoring original manifest files..."
+          for tutorial in "${tutorial_paths[@]}"; do
+            if [ -f "$tutorial/manifest.yaml.backup" ]; then
+              mv "$tutorial/manifest.yaml.backup" "$tutorial/manifest.yaml"
+              echo "Restored $tutorial/manifest.yaml"
+            fi
+          done
+
+          # Collect results
+          for i in "${!tutorial_paths[@]}"; do
+            if [ -f "/tmp/passed_$i.txt" ]; then
+              passed_tests+=($(cat "/tmp/passed_$i.txt"))
+            elif [ -f "/tmp/failed_$i.txt" ]; then
+              failed_tests+=($(cat "/tmp/failed_$i.txt"))
+            fi
+          done
+
+          # Print summary
+          echo ""
+          echo "========================================="
+          echo "TEST SUMMARY"
+          echo "========================================="
+          echo "Total: ${#tutorial_paths[@]}"
+          echo "Passed: ${#passed_tests[@]}"
+          echo "Failed: ${#failed_tests[@]}"
+
+          if [ ${#failed_tests[@]} -gt 0 ]; then
+            echo ""
+            echo "Failed tests:"
+            for test in "${failed_tests[@]}"; do
+              echo "  ❌ $test"
+            done
+            exit 1
+          else
+            echo ""
+            echo "🎉 All tests passed!"
+          fi

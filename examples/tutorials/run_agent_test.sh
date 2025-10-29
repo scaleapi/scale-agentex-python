@@ -7,6 +7,7 @@
 #
 # Usage:
 #   ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test
+#   ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test
 #   ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial
 #   ./run_agent_test.sh --view-logs                         # View most recent agent logs
 #
@@ -28,10 +29,13 @@ AGENTEX_SERVER_PORT=5003
 # Parse arguments
 TUTORIAL_PATH=""
 VIEW_LOGS=false
+BUILD_CLI=false
 
 for arg in "$@"; do
     if [[ "$arg" == "--view-logs" ]]; then
         VIEW_LOGS=true
+    elif [[ "$arg" == "--build-cli" ]]; then
+        BUILD_CLI=true
     else
         TUTORIAL_PATH="$arg"
     fi
@@ -105,7 +109,8 @@ start_agent() {
     cd "$tutorial_path" || return 1
 
     # Start the agent in background and capture PID
-    uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
+    local agentex_cmd=$(get_agentex_command)
+    $agentex_cmd agents run --manifest manifest.yaml > "$logfile" 2>&1 &
     local pid=$!
 
     # Return to original directory
@@ -275,6 +280,58 @@ execute_tutorial_test() {
     fi
 }
 
+# Function to build CLI from source
+build_cli() {
+    echo -e "${YELLOW}🔨 Building CLI from source...${NC}"
+
+    # Navigate to the repo root (two levels up from examples/tutorials)
+    local repo_root="../../"
+    local original_dir="$PWD"
+
+    cd "$repo_root" || {
+        echo -e "${RED}❌ Failed to navigate to repo root${NC}"
+        return 1
+    }
+
+    # Check if rye is available
+    if ! command -v rye &> /dev/null; then
+        echo -e "${RED}❌ rye is required to build the CLI${NC}"
+        echo "Please install rye: curl -sSf https://rye.astral.sh/get | bash"
+        cd "$original_dir"
+        return 1
+    fi
+
+    # Build the CLI
+    echo -e "${YELLOW}Running rye sync --all-features...${NC}"
+    if ! rye sync --all-features; then
+        echo -e "${RED}❌ Failed to sync dependencies${NC}"
+        cd "$original_dir"
+        return 1
+    fi
+
+    echo -e "${YELLOW}Running rye build...${NC}"
+    if ! rye build; then
+        echo -e "${RED}❌ Failed to build package${NC}"
+        cd "$original_dir"
+        return 1
+    fi
+
+    echo -e "${GREEN}✅ CLI built successfully${NC}"
+    cd "$original_dir"
+    return 0
+}
+
+# Function to get the appropriate agentex command
+get_agentex_command() {
+    if [ "$BUILD_CLI" = true ]; then
+        # Use the local build via rye run from repo root
+        echo "../../rye run agentex"
+    else
+        # Use the system-installed version
+        echo "uv run agentex"
+    fi
+}
+
 # Main execution function
 main() {
     # Handle --view-logs flag
@@ -293,11 +350,13 @@ main() {
         echo ""
         echo "Usage:"
         echo "  ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test"
+        echo "  ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test"
         echo "  ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial"
         echo "  ./run_agent_test.sh --view-logs                         # View most recent agent logs"
         echo ""
-        echo "Example:"
+        echo "Examples:"
         echo "  ./run_agent_test.sh 00_sync/000_hello_acp"
+        echo "  ./run_agent_test.sh --build-cli 00_sync/000_hello_acp"
         exit 1
     fi
 
@@ -310,6 +369,15 @@ main() {
     check_prerequisites
 
     echo ""
+
+    # Build CLI if requested
+    if [ "$BUILD_CLI" = true ]; then
+        if ! build_cli; then
+            echo -e "${RED}❌ Failed to build CLI from source${NC}"
+            exit 1
+        fi
+        echo ""
+    fi
 
     # Execute the single tutorial test
     if execute_tutorial_test "$TUTORIAL_PATH"; then
