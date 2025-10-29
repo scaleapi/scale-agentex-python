@@ -22,6 +22,7 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
 
+
 # Copy pyproject.toml and README.md to install dependencies
 COPY 000_hello_acp/pyproject.toml /app/000_hello_acp/pyproject.toml
 COPY 000_hello_acp/README.md /app/000_hello_acp/README.md
