@@ -1,16 +1,15 @@
 #!/bin/bash
 #
-# Run all agentic tutorial tests
+# Run a single agent tutorial test
 #
-# This script runs the test runner for all agentic tutorials in sequence.
-# It stops at the first failure unless --continue-on-error is specified.
+# This script runs the test for a single agent tutorial.
+# It starts the agent, runs tests against it, then stops the agent.
 #
 # Usage:
-#   ./run_all_agentic_tests.sh                              # Run all tutorials
-#   ./run_all_agentic_tests.sh --continue-on-error          # Run all, continue on error
-#   ./run_all_agentic_tests.sh <tutorial_path>              # Run single tutorial
-#   ./run_all_agentic_tests.sh --view-logs                  # View most recent agent logs
-#   ./run_all_agentic_tests.sh --view-logs <tutorial_path>  # View logs for specific tutorial
+#   ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test
+#   ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test
+#   ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial
+#   ./run_agent_test.sh --view-logs                         # View most recent agent logs
 #
 
 set -e  # Exit on error
@@ -28,43 +27,19 @@ AGENT_PORT=8000
 AGENTEX_SERVER_PORT=5003
 
 # Parse arguments
-CONTINUE_ON_ERROR=false
-SINGLE_TUTORIAL=""
+TUTORIAL_PATH=""
 VIEW_LOGS=false
+BUILD_CLI=false
 
 for arg in "$@"; do
-    if [[ "$arg" == "--continue-on-error" ]]; then
-        CONTINUE_ON_ERROR=true
-    elif [[ "$arg" == "--view-logs" ]]; then
+    if [[ "$arg" == "--view-logs" ]]; then
         VIEW_LOGS=true
+    elif [[ "$arg" == "--build-cli" ]]; then
+        BUILD_CLI=true
     else
-        SINGLE_TUTORIAL="$arg"
+        TUTORIAL_PATH="$arg"
     fi
 done
-
-# Find all agentic tutorial directories
-ALL_TUTORIALS=(
-    # sync tutorials
-    "00_sync/000_hello_acp"
-    "00_sync/010_multiturn"
-    "00_sync/020_streaming"
-    # base tutorials
-    "10_agentic/00_base/000_hello_acp"
-    "10_agentic/00_base/010_multiturn"
-    "10_agentic/00_base/020_streaming"
-    "10_agentic/00_base/030_tracing"
-    "10_agentic/00_base/040_other_sdks"
-    "10_agentic/00_base/080_batch_events"
-#    "10_agentic/00_base/090_multi_agent_non_temporal" This will require its own version of this
-    # temporal tutorials
-    "10_agentic/10_temporal/000_hello_acp"
-    "10_agentic/10_temporal/010_agent_chat"
-    "10_agentic/10_temporal/020_state_machine"
-)
-
-PASSED=0
-FAILED=0
-FAILED_TESTS=()
 
 # Function to check prerequisites for running this test suite
 check_prerequisites() {
@@ -103,7 +78,14 @@ wait_for_agent_ready() {
     done
 
     echo -e "${RED}❌ Timeout waiting for ${name} agent to be ready${NC}"
-    echo "Check logs: tail -f $logfile"
+    echo -e "${YELLOW}📋 Agent logs:${NC}"
+    if [[ -f "$logfile" ]]; then
+        echo "----------------------------------------"
+        tail -50 "$logfile"
+        echo "----------------------------------------"
+    else
+        echo "❌ Log file not found: $logfile"
+    fi
     return 1
 }
 
@@ -134,7 +116,8 @@ start_agent() {
     cd "$tutorial_path" || return 1
 
     # Start the agent in background and capture PID
-    uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
+    local agentex_cmd=$(get_agentex_command)
+    $agentex_cmd agents run --manifest manifest.yaml > "$logfile" 2>&1 &
     local pid=$!
 
     # Return to original directory
@@ -280,8 +263,6 @@ execute_tutorial_test() {
     # Start the agent
     if ! start_agent "$tutorial"; then
         echo -e "${RED}❌ FAILED to start agent: $tutorial${NC}"
-        ((FAILED++))
-        FAILED_TESTS+=("$tutorial")
         return 1
     fi
 
@@ -289,12 +270,9 @@ execute_tutorial_test() {
     local test_passed=false
     if run_test "$tutorial"; then
         echo -e "${GREEN}✅ PASSED: $tutorial${NC}"
-        ((PASSED++))
         test_passed=true
     else
         echo -e "${RED}❌ FAILED: $tutorial${NC}"
-        ((FAILED++))
-        FAILED_TESTS+=("$tutorial")
     fi
 
     # Stop the agent
@@ -309,27 +287,88 @@ execute_tutorial_test() {
     fi
 }
 
+# Function to build CLI from source
+build_cli() {
+    echo -e "${YELLOW}🔨 Building CLI from source...${NC}"
+
+    # Navigate to the repo root (two levels up from examples/tutorials)
+    local repo_root="../../"
+    local original_dir="$PWD"
+
+    cd "$repo_root" || {
+        echo -e "${RED}❌ Failed to navigate to repo root${NC}"
+        return 1
+    }
+
+    # Check if rye is available
+    if ! command -v rye &> /dev/null; then
+        echo -e "${RED}❌ rye is required to build the CLI${NC}"
+        echo "Please install rye: curl -sSf https://rye.astral.sh/get | bash"
+        cd "$original_dir"
+        return 1
+    fi
+
+    # Build the CLI
+    echo -e "${YELLOW}Running rye sync --all-features...${NC}"
+    if ! rye sync --all-features; then
+        echo -e "${RED}❌ Failed to sync dependencies${NC}"
+        cd "$original_dir"
+        return 1
+    fi
+
+    echo -e "${YELLOW}Running rye build...${NC}"
+    if ! rye build; then
+        echo -e "${RED}❌ Failed to build package${NC}"
+        cd "$original_dir"
+        return 1
+    fi
+
+    echo -e "${GREEN}✅ CLI built successfully${NC}"
+    cd "$original_dir"
+    return 0
+}
+
+# Function to get the appropriate agentex command
+get_agentex_command() {
+    if [ "$BUILD_CLI" = true ]; then
+        # Use the local build via rye run from repo root
+        echo "../../rye run agentex"
+    else
+        # Use the system-installed version
+        echo "uv run agentex"
+    fi
+}
+
 # Main execution function
 main() {
     # Handle --view-logs flag
     if [ "$VIEW_LOGS" = true ]; then
-        if [[ -n "$SINGLE_TUTORIAL" ]]; then
-            view_agent_logs "$SINGLE_TUTORIAL"
+        if [[ -n "$TUTORIAL_PATH" ]]; then
+            view_agent_logs "$TUTORIAL_PATH"
         else
             view_agent_logs
         fi
         exit 0
     fi
 
-    echo "================================================================================"
-    if [[ -n "$SINGLE_TUTORIAL" ]]; then
-        echo "Running Single Tutorial Test: $SINGLE_TUTORIAL"
-    else
-        echo "Running All Agentic Tutorial Tests"
-        if [ "$CONTINUE_ON_ERROR" = true ]; then
-            echo -e "${YELLOW}⚠️  Running in continue-on-error mode${NC}"
-        fi
+    # Require tutorial path
+    if [[ -z "$TUTORIAL_PATH" ]]; then
+        echo -e "${RED}❌ Error: Tutorial path is required${NC}"
+        echo ""
+        echo "Usage:"
+        echo "  ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test"
+        echo "  ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test"
+        echo "  ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial"
+        echo "  ./run_agent_test.sh --view-logs                         # View most recent agent logs"
+        echo ""
+        echo "Examples:"
+        echo "  ./run_agent_test.sh 00_sync/000_hello_acp"
+        echo "  ./run_agent_test.sh --build-cli 00_sync/000_hello_acp"
+        exit 1
     fi
+
+    echo "================================================================================"
+    echo "Running Tutorial Test: $TUTORIAL_PATH"
     echo "================================================================================"
     echo ""
 
@@ -338,46 +377,28 @@ main() {
 
     echo ""
 
-    # Determine which tutorials to run
-    if [[ -n "$SINGLE_TUTORIAL" ]]; then
-        TUTORIALS=("$SINGLE_TUTORIAL")
-    else
-        TUTORIALS=("${ALL_TUTORIALS[@]}")
-    fi
-
-    # Iterate over tutorials
-    for tutorial in "${TUTORIALS[@]}"; do
-        execute_tutorial_test "$tutorial"
-
-        # Exit early if in fail-fast mode
-        if [ "$CONTINUE_ON_ERROR" = false ] && [ $FAILED -gt 0 ]; then
-            echo ""
-            echo -e "${RED}Stopping due to test failure. Use --continue-on-error to continue.${NC}"
+    # Build CLI if requested
+    if [ "$BUILD_CLI" = true ]; then
+        if ! build_cli; then
+            echo -e "${RED}❌ Failed to build CLI from source${NC}"
             exit 1
         fi
-    done
-
-    # Print summary
-    echo ""
-    echo "================================================================================"
-    echo "Test Summary"
-    echo "================================================================================"
-    echo -e "Total:  $((PASSED + FAILED))"
-    echo -e "${GREEN}Passed: $PASSED${NC}"
-    echo -e "${RED}Failed: $FAILED${NC}"
-    echo ""
-
-    if [ $FAILED -gt 0 ]; then
-        echo "Failed tests:"
-        for test in "${FAILED_TESTS[@]}"; do
-            echo -e "  ${RED}✗${NC} $test"
-        done
         echo ""
-        exit 1
-    else
-        echo -e "${GREEN}🎉 All tests passed!${NC}"
+    fi
+
+    # Execute the single tutorial test
+    if execute_tutorial_test "$TUTORIAL_PATH"; then
         echo ""
+        echo "================================================================================"
+        echo -e "${GREEN}🎉 Test passed for: $TUTORIAL_PATH${NC}"
+        echo "================================================================================"
         exit 0
+    else
+        echo ""
+        echo "================================================================================"
+        echo -e "${RED}❌ Test failed for: $TUTORIAL_PATH${NC}"
+        echo "================================================================================"
+        exit 1
     fi
 }
 

@@ -42,6 +42,7 @@ acp = FastACP.create(
     config=AgenticACPConfig(type="base"),
 )
 
+
 class StateModel(BaseModel):
     input_list: List[dict]
     turn_number: int
@@ -53,11 +54,7 @@ MCP_SERVERS = [
         args=["-y", "@modelcontextprotocol/server-sequential-thinking"],
     ),
     StdioServerParameters(
-        command="uvx",
-        args=["openai-websearch-mcp"],
-        env={
-            "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")
-        }
+        command="uvx", args=["openai-websearch-mcp"], env={"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")}
     ),
 ]
 
@@ -72,6 +69,7 @@ async def handle_task_create(params: CreateTaskParams):
     )
     await adk.state.create(task_id=params.task.id, agent_id=params.agent.id, state=state)
 
+
 @acp.on_task_event_send
 async def handle_event_send(params: SendEventParams):
     # !!! Warning: Because "Agentic" ACPs are designed to be fully asynchronous, race conditions can occur if parallel events are sent. It is highly recommended to use the "temporal" type in the AgenticACPConfig instead to handle complex use cases. The "base" ACP is only designed to be used for simple use cases and for learning purposes.
@@ -85,7 +83,6 @@ async def handle_event_send(params: SendEventParams):
     if params.event.content.author != "user":
         raise ValueError(f"Expected user message, got {params.event.content.author}")
 
-
     # Retrieve the task state. Each event is handled as a new turn, so we need to get the state for the current turn.
     task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
     if not task_state:
@@ -94,12 +91,8 @@ async def handle_event_send(params: SendEventParams):
     state.turn_number += 1
     # Add the new user message to the message history
     state.input_list.append({"role": "user", "content": params.event.content.content})
-    
-    async with adk.tracing.span(
-        trace_id=params.task.id,
-        name=f"Turn {state.turn_number}",
-        input=state
-    ) as span:
+
+    async with adk.tracing.span(trace_id=params.task.id, name=f"Turn {state.turn_number}", input=state) as span:
         # Echo back the user's message so it shows up in the UI. This is not done by default so the agent developer has full control over what is shown to the user.
         await adk.messages.create(
             task_id=params.task.id,
@@ -156,6 +149,7 @@ async def handle_event_send(params: SendEventParams):
         if span:
             span.output = state
 
+
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):
     """Default task cancel handler"""
@@ -173,8 +167,8 @@ async def mcp_server_context(mcp_server_params: list[StdioServerParameters]):
     servers = []
     for params in mcp_server_params:
         server = MCPServerStdio(
-            name=f"Server: {params.command}", 
-            params=params.model_dump(), 
+            name=f"Server: {params.command}",
+            params=params.model_dump(),
             cache_tools_list=True,
             client_session_timeout_seconds=60,
         )
@@ -253,7 +247,6 @@ async def run_openai_agent_with_custom_streaming(
             try:
                 # Process streaming events with TaskMessage creation
                 async for event in result.stream_events():
-
                     if event.type == "run_item_stream_event":
                         if event.item.type == "tool_call_item":
                             tool_call_item = event.item.raw_item
@@ -374,9 +367,7 @@ async def run_openai_agent_with_custom_streaming(
         if span:
             span.output = {
                 "new_items": [
-                    item.raw_item.model_dump()
-                    if isinstance(item.raw_item, BaseModel)
-                    else item.raw_item
+                    item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
                     for item in result.new_items
                 ],
                 "final_output": result.final_output,
