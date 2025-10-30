@@ -8,6 +8,8 @@ from agentex.types.task import Task
 from agentex.lib.types.tracing import BaseModelWithTraceParams
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.services.adk.tasks import TasksService
+from agentex.types.task_retrieve_response import TaskRetrieveResponse
+from agentex.types.task_retrieve_by_name_response import TaskRetrieveByNameResponse
 
 logger = make_logger(__name__)
 
@@ -32,7 +34,7 @@ class TasksActivities:
         self._tasks_service = tasks_service
 
     @activity.defn(name=TasksActivityName.GET_TASK)
-    async def get_task(self, params: GetTaskParams) -> Task | None:
+    async def get_task(self, params: GetTaskParams) -> TaskRetrieveResponse | TaskRetrieveByNameResponse:
         return await self._tasks_service.get_task(
             task_id=params.task_id,
             task_name=params.task_name,

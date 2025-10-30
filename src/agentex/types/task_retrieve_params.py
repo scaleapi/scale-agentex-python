@@ -2,19 +2,11 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 from typing_extensions import Literal, TypedDict
 
-__all__ = ["TaskListParams"]
+__all__ = ["TaskRetrieveParams"]
 
 
-class TaskListParams(TypedDict, total=False):
-    agent_id: Optional[str]
-
-    agent_name: Optional[str]
-
-    limit: int
-
-    page_number: int
-
+class TaskRetrieveParams(TypedDict, total=False):
     relationships: List[Literal["agents"]]

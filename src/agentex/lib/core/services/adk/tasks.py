@@ -6,6 +6,8 @@ from agentex.types.shared import DeleteResponse
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
 from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.task_retrieve_response import TaskRetrieveResponse
+from agentex.types.task_retrieve_by_name_response import TaskRetrieveByNameResponse
 
 logger = make_logger(__name__)
 
@@ -25,7 +27,7 @@ class TasksService:
         task_name: str | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
-    ) -> Task:
+    ) -> TaskRetrieveResponse | TaskRetrieveByNameResponse:
         trace = self._tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
