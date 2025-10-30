@@ -78,7 +78,14 @@ wait_for_agent_ready() {
     done
 
     echo -e "${RED}❌ Timeout waiting for ${name} agent to be ready${NC}"
-    echo "Check logs: tail -f $logfile"
+    echo -e "${YELLOW}📋 Agent logs:${NC}"
+    if [[ -f "$logfile" ]]; then
+        echo "----------------------------------------"
+        tail -50 "$logfile"
+        echo "----------------------------------------"
+    else
+        echo "❌ Log file not found: $logfile"
+    fi
     return 1
 }
 
