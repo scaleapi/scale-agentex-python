@@ -65,7 +65,7 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll(self, client: AsyncAgentex, _agent_name: str, agent_id: str):
+    async def test_send_event_and_poll(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and polling for the response."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
