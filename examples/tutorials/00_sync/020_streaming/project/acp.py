@@ -1,19 +1,19 @@
 import os
 from typing import Union, AsyncGenerator
 
+from agents import Agent, Runner, RunConfig
+
 from agentex.lib import adk
 from agentex.lib.types.acp import SendMessageParams
+from agentex.lib.types.converters import convert_task_messages_to_oai_agents_inputs
 from agentex.lib.utils.model_utils import BaseModel
-from agentex.lib.types.llm_messages import LLMConfig, UserMessage, SystemMessage, AssistantMessage
 from agentex.lib.sdk.fastacp.fastacp import FastACP
-from agentex.types.task_message_delta import TextDelta
-from agentex.types.task_message_update import (
-    TaskMessageUpdate,
-    StreamTaskMessageDone,
-    StreamTaskMessageFull,
-    StreamTaskMessageDelta,
-)
+from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
 from agentex.types.task_message_content import TextContent, TaskMessageContent
+from agentex.lib.adk.providers._modules.sync_provider import (
+    SyncStreamingProvider,
+    convert_openai_to_agentex_events,
+)
 
 # Create an ACP server
 acp = FastACP.create(
@@ -69,40 +69,35 @@ async def handle_message_send(
 
     task_messages = await adk.messages.list(task_id=params.task.id)
 
-    llm_messages = [
-        SystemMessage(content=state.system_prompt),
-        *[
-            UserMessage(content=getattr(message.content, "content", ""))
-            if getattr(message.content, "author", None) == "user"
-            else AssistantMessage(content=getattr(message.content, "content", ""))
-            for message in task_messages
-            if message.content and getattr(message.content, "type", None) == "text"
-        ],
-    ]
 
-    #########################################################
-    # 4. Call an LLM to respond to the user's message and stream the response to the client.
-    #########################################################
-
-    # Call an LLM to respond to the user's message
-
-    print(f"Calling LLM with model {state.model} and messages {llm_messages}")
-
-    # The Agentex server automatically commits input and output messages to the database so you don't need to do this yourself, simply process the input content and return the output content.
-
-    message_index = 0
-    async for chunk in adk.providers.litellm.chat_completion_stream(
-        llm_config=LLMConfig(model=state.model, messages=llm_messages, stream=True),
+    # Initialize the provider and run config to allow for tracing
+    provider = SyncStreamingProvider(
         trace_id=params.task.id,
-    ):
-        if chunk and chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-            yield StreamTaskMessageDelta(
-                type="delta",
-                index=message_index,
-                delta=TextDelta(type="text", text_delta=chunk.choices[0].delta.content or ""),
-            )
-
-    yield StreamTaskMessageDone(
-        type="done",
-        index=message_index,
     )
+
+    # Initialize the run config to allow for tracing and streaming
+    run_config = RunConfig(
+        model_provider=provider,
+    )
+
+
+    test_agent = Agent(name="assistant", instructions=state.system_prompt, model=state.model)
+
+    # Convert task messages to OpenAI Agents SDK format
+    input_list = convert_task_messages_to_oai_agents_inputs(task_messages)
+
+    # Run the agent and stream the events
+    result = Runner.run_streamed(test_agent, input_list, run_config=run_config)
+
+
+    #########################################################
+    # 4. Stream the events to the client.
+    #########################################################
+    # Convert the OpenAI events to Agentex events
+    # This is done by converting the OpenAI events to Agentex events and yielding them to the client
+    stream = result.stream_events()
+
+    # Yield the Agentex events to the client
+    async for agentex_event in convert_openai_to_agentex_events(stream):
+        yield agentex_event
+
