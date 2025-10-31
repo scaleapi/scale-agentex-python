@@ -6,7 +6,6 @@ Prevents pytest from trying to collect our testing framework helper functions
 """
 
 
-
 def pytest_configure(config):  # noqa: ARG001
     """
     Configure pytest to not collect our framework functions.

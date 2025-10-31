@@ -78,6 +78,13 @@ class SyncAgentTest:
         # Sync agents use send_message for immediate responses
         response = self.client.agents.send_message(agent_id=self.agent.id, params=params)
 
+        # Extract task_id if we didn't have one (API auto-creates task)
+        if not self.task_id and hasattr(response, 'result') and isinstance(response.result, list):
+            # Get task_id from first message
+            if len(response.result) > 0 and hasattr(response.result[0], 'task_id'):
+                self.task_id = response.result[0].task_id
+                logger.debug(f"Task auto-created: {self.task_id}")
+
         # Extract response using type_utils
         agent_response = extract_agent_response(response, self.agent.id)
 
@@ -127,7 +134,32 @@ class SyncAgentTest:
             params = ParamsSendMessageRequest(task_id=None, content=user_message_param)
 
         # Get streaming response using send_message_stream
-        response_generator = self.client.agents.send_message_stream(agent_id=self.agent.id, params=params)
+        # Use agent.name if available (preferred by SDK), fallback to agent.id
+        agent_identifier = self.agent.name if hasattr(self.agent, 'name') and self.agent.name else None
+        if agent_identifier:
+            response_generator = self.client.agents.send_message_stream(agent_name=agent_identifier, params=params)
+        else:
+            response_generator = self.client.agents.send_message_stream(agent_id=self.agent.id, params=params)
+
+        # Extract task_id from first chunk if we don't have one
+        if not self.task_id:
+            # We need to peek at first chunk to get task_id
+            first_chunk = next(response_generator, None)
+            if first_chunk and hasattr(first_chunk, 'result'):
+                result = first_chunk.result
+                if hasattr(result, 'task_id') and result.task_id:
+                    self.task_id = result.task_id
+                    logger.debug(f"Task auto-created from stream: {self.task_id}")
+                # Check if result has parent_task_message with task_id
+                elif hasattr(result, 'parent_task_message') and result.parent_task_message:
+                    if hasattr(result.parent_task_message, 'task_id'):
+                        self.task_id = result.parent_task_message.task_id
+                        logger.debug(f"Task auto-created from stream: {self.task_id}")
+
+            # Re-yield first chunk and then rest of generator
+            if first_chunk:
+                from itertools import chain
+                return chain([first_chunk], response_generator)
 
         # Return the generator for caller to collect
         return response_generator
