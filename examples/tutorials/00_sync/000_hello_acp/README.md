@@ -1,6 +1,7 @@
 # [Sync] Hello ACP
 
 This is a simple AgentEx agent that just says hello and acknowledges the user's message to show which ACP methods need to be implemented for the sync ACP type.
+It is a SYNC agent.
 
 ## Official Documentation
 
