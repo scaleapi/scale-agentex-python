@@ -10,8 +10,8 @@ acp = FastACP.create(
         # When deployed to the cluster, the Temporal address will automatically be set to the cluster address
         # For local development, we set the address manually to talk to the local Temporal service set up via docker compose
         type="temporal",
-        temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233")
-    )
+        temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233"),
+    ),
 )
 
 
@@ -27,4 +27,4 @@ acp = FastACP.create(
 
 # @acp.on_task_cancel
 # This does not need to be handled by your workflow.
-# It is automatically handled by the temporal client which cancels the workflow directly 
+# It is automatically handled by the temporal client which cancels the workflow directly

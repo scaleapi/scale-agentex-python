@@ -41,21 +41,23 @@ if environment_variables.AGENT_NAME is None:
 
 logger = make_logger(__name__)
 
+
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
 class ExampleTutorialWorkflow(BaseWorkflow):
     """
     Hello World Temporal Workflow with OpenAI Agents SDK Integration
-    
+
     This workflow demonstrates the basic pattern for integrating OpenAI Agents SDK
     with Temporal workflows. It shows how agent conversations become durable and
     observable through Temporal's workflow engine.
-    
+
     KEY FEATURES:
     - Durable agent conversations that survive process restarts
     - Automatic activity creation for LLM calls (visible in Temporal UI)
     - Long-running workflows that can handle multiple user interactions
     - Full observability and monitoring through Temporal dashboard
     """
+
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
@@ -64,21 +66,21 @@ class ExampleTutorialWorkflow(BaseWorkflow):
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """
         Handle incoming user messages and respond using OpenAI Agents SDK
-        
+
         This signal handler demonstrates the basic integration pattern:
         1. Receive user message through Temporal signal
         2. Echo message back to UI for visibility
         3. Create and run OpenAI agent (automatically becomes a Temporal activity)
         4. Return agent's response to user
-        
+
         TEMPORAL INTEGRATION MAGIC:
-        - When Runner.run() executes, it automatically creates a "invoke_model_activity" 
+        - When Runner.run() executes, it automatically creates a "invoke_model_activity"
         - This activity is visible in Temporal UI with full observability
         - If the LLM call fails, Temporal automatically retries it
         - The entire conversation is durable and survives process restarts
         """
         logger.info(f"Received task message instruction: {params}")
-            
+
         # ============================================================================
         # STEP 1: Echo User Message
         # ============================================================================
@@ -91,15 +93,14 @@ class ExampleTutorialWorkflow(BaseWorkflow):
         # ============================================================================
         # Create a simple agent using OpenAI Agents SDK. This agent will respond in haikus
         # to demonstrate the basic functionality. No tools needed for this hello world example.
-        # 
+        #
         # IMPORTANT: The OpenAI Agents SDK plugin (configured in acp.py and run_worker.py)
         # automatically converts agent interactions into Temporal activities for durability.
-        
-        
+
         agent = Agent(
             name="Haiku Assistant",
             instructions="You are a friendly assistant who always responds in the form of a haiku. "
-                        "Each response should be exactly 3 lines following the 5-7-5 syllable pattern.",
+            "Each response should be exactly 3 lines following the 5-7-5 syllable pattern.",
         )
 
         # ============================================================================
@@ -111,19 +112,19 @@ class ExampleTutorialWorkflow(BaseWorkflow):
         # 3. You'll see "invoke_model_activity" appear in the Temporal UI
         # 4. If the LLM call fails, Temporal retries it automatically
         # 5. The conversation state is preserved even if the worker restarts
-        
+
         # IMPORTANT NOTE ABOUT AGENT RUN CALLS:
         # =====================================
         # Notice that we don't need to wrap the Runner.run() call in an activity!
-        # This might feel weird for anyone who has used Temporal before, as typically 
+        # This might feel weird for anyone who has used Temporal before, as typically
         # non-deterministic operations like LLM calls would need to be wrapped in activities.
-        # However, the OpenAI Agents SDK plugin is handling all of this automatically 
+        # However, the OpenAI Agents SDK plugin is handling all of this automatically
         # behind the scenes.
         #
         # Another benefit of this approach is that we don't have to serialize the arguments,
-        # which would typically be the case with Temporal activities - the plugin handles 
+        # which would typically be the case with Temporal activities - the plugin handles
         # all of this for us, making the developer experience much smoother.
-        
+
         # Pass the text content directly to Runner.run (it accepts strings)
         result = await Runner.run(agent, params.event.content.content)
 
@@ -159,18 +160,18 @@ class ExampleTutorialWorkflow(BaseWorkflow):
     async def on_task_create(self, params: CreateTaskParams) -> str:
         """
         Temporal Workflow Entry Point - Long-Running Agent Conversation
-        
+
         This method runs when the workflow starts and keeps the agent conversation alive.
         It demonstrates Temporal's ability to run workflows for extended periods (minutes,
         hours, days, or even years) while maintaining full durability.
-        
+
         TEMPORAL WORKFLOW LIFECYCLE:
         1. Workflow starts when a task is created
         2. Sends initial acknowledgment message to user
         3. Waits indefinitely for user messages (handled by on_task_event_send signal)
         4. Each user message triggers the signal handler which runs the OpenAI agent
         5. Workflow continues running until explicitly completed or canceled
-        
+
         DURABILITY BENEFITS:
         - Workflow survives worker restarts, deployments, infrastructure failures
         - All agent conversation history is preserved in Temporal's event store
@@ -189,10 +190,10 @@ class ExampleTutorialWorkflow(BaseWorkflow):
             content=TextContent(
                 author="agent",
                 content=f"🌸 Hello! I'm your Haiku Assistant, powered by OpenAI Agents SDK + Temporal! 🌸\n\n"
-                       f"I'll respond to all your messages in beautiful haiku form. "
-                       f"This conversation is now durable - even if I restart, our chat continues!\n\n"
-                       f"Task created with params:\n{json.dumps(params.params, indent=2)}\n\n"
-                       f"Send me a message and I'll respond with a haiku! 🎋",
+                f"I'll respond to all your messages in beautiful haiku form. "
+                f"This conversation is now durable - even if I restart, our chat continues!\n\n"
+                f"Task created with params:\n{json.dumps(params.params, indent=2)}\n\n"
+                f"Send me a message and I'll respond with a haiku! 🎋",
             ),
         )
 
@@ -218,7 +219,7 @@ class ExampleTutorialWorkflow(BaseWorkflow):
     async def complete_task_signal(self) -> None:
         """
         Signal to gracefully complete the agent conversation workflow
-        
+
         This signal can be sent to end the workflow cleanly. In a real application,
         you might trigger this when a user ends the conversation or after a period
         of inactivity.

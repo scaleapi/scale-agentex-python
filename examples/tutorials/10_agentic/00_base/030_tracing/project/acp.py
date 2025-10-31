@@ -21,6 +21,7 @@ acp = FastACP.create(
     config=AgenticACPConfig(type="base"),
 )
 
+
 class StateModel(BaseModel):
     messages: List[Message]
     turn_number: int
@@ -40,6 +41,7 @@ async def handle_task_create(params: CreateTaskParams):
         turn_number=0,
     )
     await adk.state.create(task_id=params.task.id, agent_id=params.agent.id, state=state)
+
 
 @acp.on_task_event_send
 async def handle_event_send(params: SendEventParams):
@@ -70,8 +72,8 @@ async def handle_event_send(params: SendEventParams):
     # Add the new user message to the message history
     # Safely extract content from the event
     content_text = ""
-    if hasattr(params.event.content, 'content'):
-        content_val = getattr(params.event.content, 'content', '')
+    if hasattr(params.event.content, "content"):
+        content_val = getattr(params.event.content, "content", "")
         if isinstance(content_val, str):
             content_text = content_val
     state.messages.append(UserMessage(content=content_text))
@@ -84,12 +86,7 @@ async def handle_event_send(params: SendEventParams):
     # If you want to create a hierarchical trace, you can do so by creating spans in your business logic and passing the span id to the ADK methods. Traces will be grouped under parent spans for better readability.
     # If you're not trying to create a hierarchical trace, but just trying to create a custom span to trace something, you can use this too to create a custom span that is associate with your trace by trace ID.
 
-    async with adk.tracing.span(
-        trace_id=params.task.id,
-        name=f"Turn {state.turn_number}",
-        input=state
-    ) as span:
-        
+    async with adk.tracing.span(trace_id=params.task.id, name=f"Turn {state.turn_number}", input=state) as span:
         #########################################################
         # 5. Echo back the user's message so it shows up in the UI.
         #########################################################
@@ -105,7 +102,7 @@ async def handle_event_send(params: SendEventParams):
         #########################################################
         # 6. If the OpenAI API key is not set, send a message to the user to let them know.
         #########################################################
-        
+
         # (👋) Notice that we pass the parent_span_id to the ADK methods to create a hierarchical trace.
         if not os.environ.get("OPENAI_API_KEY"):
             await adk.messages.create(
@@ -129,15 +126,15 @@ async def handle_event_send(params: SendEventParams):
             trace_id=params.task.id,
             parent_span_id=span.id if span else None,
         )
-        
+
         # Safely extract content from the task message
         response_text = ""
-        if task_message.content and hasattr(task_message.content, 'content'):  # type: ignore[union-attr]
-            content_val = getattr(task_message.content, 'content', '')  # type: ignore[union-attr]
+        if task_message.content and hasattr(task_message.content, "content"):  # type: ignore[union-attr]
+            content_val = getattr(task_message.content, "content", "")  # type: ignore[union-attr]
             if isinstance(content_val, str):
                 response_text = content_val
         state.messages.append(AssistantMessage(content=response_text))
-        
+
         #########################################################
         # 8. Store the messages in the task state for the next turn
         #########################################################
@@ -160,6 +157,7 @@ async def handle_event_send(params: SendEventParams):
         # In this case, the state is comprehensive and expressive, so we just store the change in state that occured.
         if span:
             span.output = state  # type: ignore[misc]
+
 
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):

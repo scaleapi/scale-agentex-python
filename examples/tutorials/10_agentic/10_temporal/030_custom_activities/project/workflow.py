@@ -41,7 +41,7 @@ MAX_QUEUE_DEPTH = 50
 class At030CustomActivitiesWorkflow(BaseWorkflow):
     """
     Simple tutorial workflow demonstrating custom activities with concurrent processing.
-    
+
     Key Learning Points:
     1. Queue incoming events using Temporal signals
     2. Process events in batches when enough arrive
@@ -49,6 +49,7 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
     4. Execute custom activities from within workflows
     5. Handle workflow completion cleanly
     """
+
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._incoming_queue: asyncio.Queue[Any] = asyncio.Queue()
@@ -56,13 +57,12 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
         self._batch_size = BATCH_SIZE
         self._state: StateModel
 
-
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
         if params.event.content is None:
             return
-        
+
         if params.event.content.type == "text":
             if self._incoming_queue.qsize() >= MAX_QUEUE_DEPTH:
                 logger.warning(f"Queue is at max depth of {MAX_QUEUE_DEPTH}. Dropping event.")
@@ -79,23 +79,22 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
             except Exception as e:
                 logger.error(f"Error parsing received data: {e}. Dropping event.")
                 return
-            
+
             if received_data.clear_queue:
                 await BatchProcessingUtils.handle_queue_clear(self._incoming_queue, params.task.id)
-            
+
             if received_data.cancel_running_tasks:
                 await BatchProcessingUtils.handle_task_cancellation(self._processing_tasks, params.task.id)
             else:
                 logger.info(f"Received IncomingEventData: {received_data} with no known action.")
         else:
             logger.info(f"Received event: {params.event.content} with no action.")
-        
 
     @workflow.run
     @override
     async def on_task_create(self, params: CreateTaskParams) -> None:
         logger.info(f"Received task create params: {params}")
-        
+
         self._state = StateModel()
         await adk.messages.create(
             task_id=params.task.id,
@@ -110,13 +109,14 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
         # Simple event processing loop with progress tracking
         while True:
             # Check for completed tasks and update progress
-            self._processing_tasks = await BatchProcessingUtils.update_progress(self._processing_tasks, self._state, params.task.id)
-            
+            self._processing_tasks = await BatchProcessingUtils.update_progress(
+                self._processing_tasks, self._state, params.task.id
+            )
+
             # Wait for enough events to form a batch, or timeout
             try:
                 await workflow.wait_condition(
-                    lambda: self._incoming_queue.qsize() >= self._batch_size, 
-                    timeout=WAIT_TIMEOUT
+                    lambda: self._incoming_queue.qsize() >= self._batch_size, timeout=WAIT_TIMEOUT
                 )
             except asyncio.TimeoutError:
                 logger.info(f"⏰ Timeout after {WAIT_TIMEOUT} seconds - ending workflow")
@@ -125,8 +125,8 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
             # We have enough events - start processing them as a batch
             data_to_process: List[Any] = []
             await BatchProcessingUtils.dequeue_pending_data(self._incoming_queue, data_to_process, self._batch_size)
-            
-            if data_to_process:                
+
+            if data_to_process:
                 await adk.messages.create(
                     task_id=params.task.id,
                     content=TextContent(
@@ -134,28 +134,32 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
                         content=f"📦 Starting batch #{batch_number} with {len(data_to_process)} events using asyncio.create_task()",
                     ),
                 )
-                
+
                 # Create concurrent task for this batch - this is the key learning point!
                 task = asyncio.create_task(
                     BatchProcessingUtils.process_batch_concurrent(
-                        events=data_to_process,
-                        batch_number=batch_number,
-                        task_id=params.task.id
+                        events=data_to_process, batch_number=batch_number, task_id=params.task.id
                     )
                 )
                 batch_number += 1
                 self._processing_tasks.append(task)
-                
-                logger.info(f"📝 Tutorial Note: Created asyncio.create_task() for batch #{batch_number} to run asynchronously")
-                
+
+                logger.info(
+                    f"📝 Tutorial Note: Created asyncio.create_task() for batch #{batch_number} to run asynchronously"
+                )
+
                 # Check progress again immediately to show real-time updates
-                self._processing_tasks = await BatchProcessingUtils.update_progress(self._processing_tasks, self._state, params.task.id)
-        
+                self._processing_tasks = await BatchProcessingUtils.update_progress(
+                    self._processing_tasks, self._state, params.task.id
+                )
+
         # Process any remaining events that didn't form a complete batch
         if self._incoming_queue.qsize() > 0:
             data_to_process: List[Any] = []
-            await BatchProcessingUtils.dequeue_pending_data(self._incoming_queue, data_to_process, self._incoming_queue.qsize())
-            
+            await BatchProcessingUtils.dequeue_pending_data(
+                self._incoming_queue, data_to_process, self._incoming_queue.qsize()
+            )
+
             await adk.messages.create(
                 task_id=params.task.id,
                 content=TextContent(
@@ -163,13 +167,11 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
                     content=f"🔄 Processing final {len(data_to_process)} events that didn't form a complete batch.",
                 ),
             )
-            
+
             # Now, add another batch to process the remaining events
             task = asyncio.create_task(
                 BatchProcessingUtils.process_batch_concurrent(
-                    events=data_to_process,
-                    batch_number=batch_number,
-                    task_id=params.task.id
+                    events=data_to_process, batch_number=batch_number, task_id=params.task.id
                 )
             )
             self._processing_tasks.append(task)
@@ -183,15 +185,15 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
                 num_batches_processed=self._state.num_batches_processed,
                 num_batches_failed=self._state.num_batches_failed,
                 num_batches_running=0,
-                task_id=params.task.id
+                task_id=params.task.id,
             ),
             start_to_close_timeout=timedelta(minutes=1),
-            retry_policy=RetryPolicy(maximum_attempts=3)
+            retry_policy=RetryPolicy(maximum_attempts=3),
         )
 
         final_summary = (
             f"✅ Workflow Complete! Final Summary:\n"
-            f"• Batches completed successfully: {self._state.num_batches_processed} ✅\n" 
+            f"• Batches completed successfully: {self._state.num_batches_processed} ✅\n"
             f"• Batches failed: {self._state.num_batches_failed} ❌\n"
             f"• Total events processed: {self._state.total_events_processed}\n"
             f"• Events dropped (queue full): {self._state.total_events_dropped}\n"
@@ -199,18 +201,12 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
         )
         await adk.messages.create(
             task_id=params.task.id,
-            content=TextContent(
-                author="agent",
-                content=final_summary
-            ),
+            content=TextContent(author="agent", content=final_summary),
         )
 
         await workflow.execute_activity(
             COMPLETE_WORKFLOW_ACTIVITY,
-            CompleteWorkflowActivityParams(
-                task_id=params.task.id
-            ),
+            CompleteWorkflowActivityParams(task_id=params.task.id),
             start_to_close_timeout=timedelta(minutes=1),
-            retry_policy=RetryPolicy(maximum_attempts=3)            
-        )        
-
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )

@@ -9,6 +9,7 @@ from agentex.lib.sdk.state_machine import StateMachine
 
 class DeepResearchState(str, Enum):
     """States for the deep research workflow."""
+
     CLARIFYING_USER_QUERY = "clarifying_user_query"
     PERFORMING_DEEP_RESEARCH = "performing_deep_research"
     WAITING_FOR_USER_INPUT = "waiting_for_user_input"
@@ -18,10 +19,11 @@ class DeepResearchState(str, Enum):
 
 class DeepResearchData(BaseModel):
     """Data model for the deep research state machine - everything is one continuous research report."""
+
     task_id: Optional[str] = None
     current_span: Optional[Span] = None
     current_turn: int = 1
-    
+
     # Research report data
     user_query: str = ""
     follow_up_questions: List[str] = []
@@ -34,7 +36,7 @@ class DeepResearchData(BaseModel):
 
 class DeepResearchStateMachine(StateMachine[DeepResearchData]):
     """State machine for the deep research workflow."""
-    
+
     @override
     async def terminal_condition(self) -> bool:
         """Check if the state machine has reached a terminal state."""
