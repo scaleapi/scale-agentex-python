@@ -1,317 +1,199 @@
-# example-tutorial - AgentEx Temporal Agent Template
+# [Temporal] OpenAI Agents SDK - Human in the Loop
 
-This is a starter template for building asynchronous agents with the AgentEx framework and Temporal. It provides a basic implementation of the Agent 2 Client Protocol (ACP) with Temporal workflow support to help you get started quickly.
+**Part of the [OpenAI SDK + Temporal integration series](../README.md)** → Previous: [070 Tools](../070_open_ai_agents_sdk_tools/)
 
 ## What You'll Learn
 
-- **Tasks**: A task is a grouping mechanism for related messages. Think of it as a conversation thread or a session.
-- **Messages**: Messages are communication objects within a task. They can contain text, data, or instructions.
-- **ACP Events**: The agent responds to four main events:
-  - `task_received`: When a new task is created
-  - `task_message_received`: When a message is sent within a task
-  - `task_approved`: When a task is approved
-  - `task_canceled`: When a task is canceled
-- **Temporal Workflows**: Long-running processes that can handle complex state management and async operations
+How to pause agent execution and wait indefinitely for human approval using Temporal's child workflows and signals. The agent can wait for hours, days, or weeks for human input without consuming resources - and if the system crashes, it resumes exactly where it left off.
 
-## Running the Agent
+**Pattern:**
+1. Agent calls `wait_for_confirmation` tool
+2. Tool spawns a child workflow that waits for a signal
+3. Human approves/rejects via Temporal CLI or web UI
+4. Child workflow completes, agent continues with the response
 
-1. Run the agent locally:
-```bash
-agentex agents run --manifest manifest.yaml
-```
+## New Temporal Concepts
 
-The agent will start on port 8000 and print messages whenever it receives any of the ACP events.
+### Signals
+Signals are a way for external systems to interact with running workflows. Think of them as secure, durable messages sent to your workflow from the outside world.
 
-## What's Inside
+**Use cases:**
+- User approving/rejecting an action in a web app
+- Payment confirmation triggering shipping
+- Live data feeds (stock prices) triggering trades
+- Webhooks from external services updating workflow state
 
-This template:
-- Sets up a basic ACP server with Temporal integration
-- Handles each of the required ACP events
-- Provides a foundation for building complex async agents
-- Includes Temporal workflow and activity definitions
+**How it works:** Define a function in your workflow class with the `@workflow.signal` decorator. External systems can then send signals using:
+- Temporal SDK (by workflow ID)
+- Another Temporal workflow
+- Temporal CLI
+- Temporal Web UI
 
-## Next Steps
+[Learn more about signals](https://docs.temporal.io/develop/python/message-passing#send-signal-from-client)
 
-For more advanced agent development, check out the AgentEx tutorials:
+### Child Workflows
+Child workflows are like spawning a new workflow from within your current workflow. Similar to calling a function in traditional programming, but the child workflow:
+- Runs independently with its own execution history
+- Inherits all Temporal durability guarantees
+- Can be monitored separately in Temporal UI
+- Continues running even if the parent has issues
 
-- **Tutorials 00-08**: Learn about building synchronous agents with ACP
-- **Tutorials 09-10**: Learn how to use Temporal to power asynchronous agents
-  - Tutorial 09: Basic Temporal workflow setup
-  - Tutorial 10: Advanced Temporal patterns and best practices
+**Why use child workflows for human-in-the-loop?**
+- The parent workflow can continue processing while waiting
+- The child workflow can wait indefinitely for human input
+- Full isolation between waiting logic and main agent logic
+- Clean separation of concerns
 
-These tutorials will help you understand:
-- How to handle long-running tasks
-- Implementing state machines
-- Managing complex workflows
-- Best practices for async agent development
+[Learn more about child workflows](https://docs.temporal.io/develop/python/child-workflows)
 
-## The Manifest File
+## Prerequisites
+- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
+- Backend services running: `make dev` from repository root
+- Temporal UI available at http://localhost:8233
+- OpenAI Agents SDK plugin configured (see [060_hello_world](../060_open_ai_agents_sdk_hello_world/))
+- Understanding of tools (see [070_tools](../070_open_ai_agents_sdk_tools/))
 
-The `manifest.yaml` file is your agent's configuration file. It defines:
-- How your agent should be built and packaged
-- What files are included in your agent's Docker image
-- Your agent's name and description
-- Local development settings (like the port your agent runs on)
-- Temporal worker configuration
-
-This file is essential for both local development and deployment of your agent.
-
-## Project Structure
-
-```
-example_tutorial/
-├── project/                  # Your agent's code
-│   ├── __init__.py
-│   ├── acp.py               # ACP server and event handlers
-│   ├── workflow.py          # Temporal workflow definitions
-│   ├── activities.py        # Temporal activity definitions
-│   └── run_worker.py        # Temporal worker setup
-├── Dockerfile               # Container definition
-├── manifest.yaml            # Deployment config
-├── dev.ipynb                # Development notebook for testing
-
-└── pyproject.toml          # Dependencies (uv)
-
-```
-
-## Development
-
-### 1. Customize Event Handlers
-- Modify the handlers in `acp.py` to implement your agent's logic
-- Add your own tools and capabilities
-- Implement custom state management
-
-### 2. Test Your Agent with the Development Notebook
-Use the included `dev.ipynb` Jupyter notebook to test your agent interactively:
+## Quick Start
 
 ```bash
-# Start Jupyter notebook (make sure you have jupyter installed)
-jupyter notebook dev.ipynb
-
-# Or use VS Code to open the notebook directly
-code dev.ipynb
-```
-
-The notebook includes:
-- **Setup**: Connect to your local AgentEx backend
-- **Task creation**: Create a new task for the conversation
-- **Event sending**: Send events to the agent and get responses
-- **Async message subscription**: Subscribe to server-side events to receive agent responses
-- **Rich message display**: Beautiful formatting with timestamps and author information
-
-The notebook automatically uses your agent name (`example-tutorial`) and demonstrates the agentic ACP workflow: create task → send event → subscribe to responses.
-
-### 3. Develop Temporal Workflows
-- Edit `workflow.py` to define your agent's async workflow logic
-- Modify `activities.py` to add custom activities
-- Use `run_worker.py` to configure the Temporal worker
-
-### 4. Manage Dependencies
-
-
-You chose **uv** for package management. Here's how to work with dependencies:
-
-```bash
-# Add new dependencies
-agentex uv add requests openai anthropic
-
-# Add Temporal-specific dependencies (already included)
-agentex uv add temporalio
-
-# Install/sync dependencies
-agentex uv sync
-
-# Run commands with uv
+cd examples/tutorials/10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop
 uv run agentex agents run --manifest manifest.yaml
 ```
 
-**Benefits of uv:**
-- Faster dependency resolution and installation
-- Better dependency isolation
-- Modern Python packaging standards
+**Monitor:** Open Temporal UI at http://localhost:8233 to see child workflows and signals.
 
+## Try It
 
+1. Ask the agent to do something that requires approval (e.g., "Order 100 widgets")
+2. The agent will call `wait_for_confirmation` and pause
+3. Open Temporal UI (localhost:8233)
+4. Find the parent workflow - you'll see it's waiting on the child workflow:
 
-### 5. Configure Credentials
-- Add any required credentials to your manifest.yaml
-- For local development, create a `.env` file in the project directory
-- Use `load_dotenv()` only in development mode:
+![Parent Workflow Waiting](../_images/human_in_the_loop_workflow.png)
 
+5. Find the child workflow - it's waiting for a signal:
+
+![Child Workflow Waiting](../_images/human_in_the_loop_child_workflow.png)
+
+6. Send approval signal via CLI:
+
+```bash
+temporal workflow signal \
+  --workflow-id="<child-workflow-id>" \
+  --name="fulfill_order_signal" \
+  --input=true
+```
+
+7. Watch both workflows complete - the agent resumes and finishes the action
+
+## Key Code
+
+### The Tool: Spawning a Child Workflow
 ```python
-import os
-from dotenv import load_dotenv
+from agents import function_tool
+from temporalio import workflow
+from project.child_workflow import ChildWorkflow
+from temporalio.workflow import ParentClosePolicy
 
-if os.environ.get("ENVIRONMENT") == "development":
-    load_dotenv()
+@function_tool
+async def wait_for_confirmation(confirmation: bool) -> str:
+    """Wait for human confirmation before proceeding"""
+
+    # Spawn a child workflow that will wait for a signal
+    result = await workflow.execute_child_workflow(
+        ChildWorkflow.on_task_create,
+        environment_variables.WORKFLOW_NAME + "_child",
+        id="child-workflow-id",
+        parent_close_policy=ParentClosePolicy.TERMINATE,
+    )
+
+    return result
 ```
 
-## Local Development
-
-### 1. Start the Agentex Backend
-```bash
-# Navigate to the backend directory
-cd agentex
-
-# Start all services using Docker Compose
-make dev
-
-# Optional: In a separate terminal, use lazydocker for a better UI (everything should say "healthy")
-lzd
-```
-
-### 2. Setup Your Agent's requirements/pyproject.toml
-```bash
-agentex uv sync [--group editable-apy]
-source .venv/bin/activate
-
-# OR
-conda create -n example_tutorial python=3.12
-conda activate example_tutorial
-pip install -r requirements.txt
-```
-### 3. Run Your Agent
-```bash
-# From this directory
-export ENVIRONMENT=development && [uv run] agentex agents run --manifest manifest.yaml
-```
-4. **Interact with your agent**
-
-Option 0: CLI (deprecated - to be replaced once a new CLI is implemented - please use the web UI for now!)
-```bash
-# Submit a task via CLI
-agentex tasks submit --agent example-tutorial --task "Your task here"
-```
-
-Option 1: Web UI
-```bash
-# Start the local web interface
-cd agentex-web
-make dev
-
-# Then open http://localhost:3000 in your browser to chat with your agent
-```
-
-## Development Tips
-
-### Environment Variables
-- Set environment variables in project/.env for any required credentials
-- Or configure them in the manifest.yaml under the `env` section
-- The `.env` file is automatically loaded in development mode
-
-### Local Testing
-- Use `export ENVIRONMENT=development` before running your agent
-- This enables local service discovery and debugging features
-- Your agent will automatically connect to locally running services
-
-### Temporal-Specific Tips
-- Monitor workflows in the Temporal Web UI at http://localhost:8080
-- Use the Temporal CLI for advanced workflow management
-- Check workflow logs for debugging async operations
-
-### Debugging
-- Check agent logs in the terminal where you ran the agent
-- Use the web UI to inspect task history and responses
-- Monitor backend services with `lzd` (LazyDocker)
-- Use Temporal Web UI for workflow debugging
-
-### To build the agent Docker image locally (normally not necessary):
-
-1. Build the agent image:
-```bash
-agentex agents build --manifest manifest.yaml
-```
-
-## Advanced Features
-
-### Temporal Workflows
-Extend your agent with sophisticated async workflows:
-
+### The Child Workflow: Waiting for Signals
 ```python
-# In project/workflow.py
-@workflow.defn
-class MyWorkflow(BaseWorkflow):
-    async def complex_operation(self):
-        # Multi-step async operations
-        # Error handling and retries
-        # State management
-        pass
+import asyncio
+from temporalio import workflow
+
+@workflow.defn(name=environment_variables.WORKFLOW_NAME + "_child")
+class ChildWorkflow():
+    def __init__(self):
+        # Queue to hold signals
+        self._pending_confirmation: asyncio.Queue[bool] = asyncio.Queue()
+
+    @workflow.run
+    async def on_task_create(self, name: str) -> str:
+        logger.info(f"Child workflow started: {name}")
+
+        # Wait indefinitely until we receive a signal
+        await workflow.wait_condition(
+            lambda: not self._pending_confirmation.empty()
+        )
+
+        # Signal received - complete the workflow
+        return "Task completed"
+
+    @workflow.signal
+    async def fulfill_order_signal(self, success: bool) -> None:
+        """External systems call this to approve/reject"""
+        if success:
+            await self._pending_confirmation.put(True)
 ```
 
-### Custom Activities
-Add custom activities for external operations. **Important**: Always specify appropriate timeouts (recommended: 10 minutes):
-
+### Using the Tool in Your Agent
 ```python
-# In project/activities.py
-from datetime import timedelta
-from temporalio import activity
-from temporalio.common import RetryPolicy
-
-@activity.defn(name="call_external_api")
-async def call_external_api(data):
-    # HTTP requests, database operations, etc.
-    pass
-
-# In your workflow, call it with a timeout:
-result = await workflow.execute_activity(
-    "call_external_api",
-    data,
-    start_to_close_timeout=timedelta(minutes=10),  # Recommended: 10 minute timeout
-    heartbeat_timeout=timedelta(minutes=1),         # Optional: heartbeat monitoring
-    retry_policy=RetryPolicy(maximum_attempts=3)    # Optional: retry policy
+confirm_order_agent = Agent(
+    name="Confirm Order",
+    instructions="When user asks to confirm an order, use wait_for_confirmation tool.",
+    tools=[wait_for_confirmation]
 )
 
-# Don't forget to register your custom activities in run_worker.py:
-# all_activities = get_all_activities() + [your_custom_activity_function]
+result = await Runner.run(confirm_order_agent, params.event.content.content)
 ```
 
-### Integration with External Services
+## How It Works
 
-```bash
-# Add service clients
-agentex uv add httpx requests-oauthlib
+1. **Agent calls tool**: The LLM decides to call `wait_for_confirmation`
+2. **Child workflow spawned**: A new workflow is created with its own ID
+3. **Child waits**: Uses `workflow.wait_condition()` to block until signal arrives
+4. **Parent waits**: Parent workflow is blocked waiting for child to complete
+5. **Signal sent**: External system (CLI, web app, API) sends signal with workflow ID
+6. **Signal received**: Child workflow's `fulfill_order_signal()` method is called
+7. **Queue updated**: Signal handler adds item to queue
+8. **Wait condition satisfied**: `wait_condition()` unblocks
+9. **Child completes**: Returns result to parent
+10. **Parent resumes**: Agent continues with the response
 
-# Add AI/ML libraries
-agentex uv add openai anthropic transformers
+**Critical insight:** At any point, if the system crashes:
+- Both workflows are durable and will resume
+- No context is lost
+- The moment the signal arrives, execution continues
 
-# Add database clients
-agentex uv add asyncpg redis
-```
+## Why This Matters
 
+**Without Temporal:** If your system crashes while waiting for human approval, you lose all context about what was being approved. The user has to start over.
 
-## Troubleshooting
+**With Temporal:**
+- The workflow waits durably (hours, days, weeks)
+- If the system crashes and restarts, context is preserved
+- The moment a human sends approval, workflow resumes exactly where it left off
+- Full audit trail of who approved what and when
 
-### Common Issues
+**Production use cases:**
+- **Financial transactions**: Agent initiates transfer, human approves
+- **Legal document processing**: AI extracts data, lawyer reviews
+- **Multi-step purchasing**: Agent negotiates, manager approves
+- **Compliance workflows**: System flags issue, human decides action
+- **High-stakes decisions**: Any operation requiring human judgment
 
-1. **Agent not appearing in web UI**
-   - Check if agent is running on port 8000
-   - Verify `ENVIRONMENT=development` is set
-   - Check agent logs for errors
+This pattern transforms agents from fully automated systems into **collaborative AI assistants** that know when to ask for help.
 
-2. **Temporal workflow issues**
-   - Check Temporal Web UI at http://localhost:8080
-   - Verify Temporal server is running in backend services
-   - Check workflow logs for specific errors
+## When to Use
+- Financial transactions requiring approval
+- High-stakes decisions needing human judgment
+- Compliance workflows with mandatory review steps
+- Legal or contractual operations
+- Any operation where errors have serious consequences
+- Workflows where AI assists but humans decide
 
-3. **Dependency issues**
-
-   - Run `agentex uv sync` to ensure all dependencies are installed
-   - Verify temporalio is properly installed
-
-
-4. **Port conflicts**
-   - Check if another service is using port 8000
-   - Use `lsof -i :8000` to find conflicting processes
-
-### Temporal-Specific Troubleshooting
-
-1. **Workflow not starting**
-   - Check if Temporal server is running (`docker ps`)
-   - Verify task queue configuration in `run_worker.py`
-   - Check workflow registration in the worker
-
-2. **Activity failures**
-   - Check activity logs in the console
-   - Verify activity registration
-   - Check for timeout issues
-
-Happy building with Temporal! 🚀⚡
+**Congratulations!** You've completed all AgentEx tutorials. You now know how to build production-ready agents from simple sync patterns to complex durable workflows with human oversight.
