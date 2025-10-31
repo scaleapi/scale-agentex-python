@@ -45,11 +45,9 @@ The system uses a shared build configuration with type-safe interfaces:
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
-- Backend services running: `make dev` from repository root
-- Python 3.12+ and uv package manager
+- Python 3.12+
+- uv package manager
 - OpenAI API key (set `OPENAI_API_KEY` or create `.env` file)
-- Understanding of agentic patterns (see previous tutorials)
 
 ### Running the System
 
@@ -197,14 +195,3 @@ This tutorial demonstrates:
 - **AgentEx CLI usage** for development and deployment
 - **Inter-agent communication patterns** with proper error handling
 - **Scalable agent architecture** with clear separation of concerns
-
-## When to Use
-- Complex workflows requiring multiple specialized agents
-- Content pipelines with review/approval steps
-- Systems where each stage needs different capabilities
-- When you want agent separation without Temporal (though Temporal is recommended for production)
-
-## Why This Matters
-This shows how far you can go with non-Temporal multi-agent systems. However, note the limitations: manual state management, potential race conditions, and no built-in durability. For production multi-agent systems, consider Temporal ([../10_temporal/](../../10_temporal/)) which provides workflow orchestration, durability, and state management out of the box.
-
-**Next:** Ready for production workflows? → [../../10_temporal/000_hello_acp](../../10_temporal/000_hello_acp/)

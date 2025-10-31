@@ -1,12 +1,18 @@
 # Changelog
 
-## 0.5.1 (2025-10-29)
+## 0.5.2 (2025-10-31)
 
-Full Changelog: [v0.5.0...v0.5.1](https://github.com/scaleapi/agentex-python/compare/v0.5.0...v0.5.1)
+Full Changelog: [v0.5.0...v0.5.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.0...v0.5.2)
 
-### Bug Fixes
+### Features
 
-* **client:** close streams without requiring full consumption ([f56acae](https://github.com/scaleapi/agentex-python/commit/f56acae74ee83a116e735ca7bf68f2096aafaf6e))
+* **api:** manual updates ([dc66b57](https://github.com/scaleapi/scale-agentex-python/commit/dc66b57618525669b3aa15676343ef542675a5f9))
+* bump the helm chart version ([1ffafb0](https://github.com/scaleapi/scale-agentex-python/commit/1ffafb0406138d6abd84254fa394b88c4a28ce70))
+
+
+### Chores
+
+* sync repo ([0e05416](https://github.com/scaleapi/scale-agentex-python/commit/0e05416219ca93ae347e6175804bc0f2259a6b44))
 
 ## 0.5.0 (2025-10-28)
 
