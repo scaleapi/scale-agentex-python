@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.0 (2025-10-28)
+
+Full Changelog: [v0.4.28...v0.5.0](https://github.com/scaleapi/agentex-python/compare/v0.4.28...v0.5.0)
+
+### Features
+
+* **api:** api update ([129fae6](https://github.com/scaleapi/agentex-python/commit/129fae69844e655b5dd02b6f67c44d15f5dbfa93))
+
+## 0.4.28 (2025-10-28)
+
+Full Changelog: [v0.4.27...v0.4.28](https://github.com/scaleapi/agentex-python/compare/v0.4.27...v0.4.28)
+
+## 0.4.27 (2025-10-27)
+
+Full Changelog: [v0.4.26...v0.4.27](https://github.com/scaleapi/agentex-python/compare/v0.4.26...v0.4.27)
+
+### Features
+
+* **api:** api update ([f5e4fd2](https://github.com/scaleapi/agentex-python/commit/f5e4fd2f2fbb2c7e67e51795fba1f0b2e13048de))
+
 ## 0.4.26 (2025-10-21)
 
 Full Changelog: [v0.4.25...v0.4.26](https://github.com/scaleapi/agentex-python/compare/v0.4.25...v0.4.26)

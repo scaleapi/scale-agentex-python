@@ -2,15 +2,15 @@
 
 from typing import Dict, List, Optional
 from datetime import datetime
-from typing_extensions import Literal, TypeAlias
+from typing_extensions import Literal
 
 from .agent import Agent
 from .._models import BaseModel
 
-__all__ = ["TaskListResponse", "TaskListResponseItem"]
+__all__ = ["TaskRetrieveResponse"]
 
 
-class TaskListResponseItem(BaseModel):
+class TaskRetrieveResponse(BaseModel):
     id: str
 
     agents: Optional[List[Agent]] = None
@@ -28,6 +28,3 @@ class TaskListResponseItem(BaseModel):
     task_metadata: Optional[Dict[str, object]] = None
 
     updated_at: Optional[datetime] = None
-
-
-TaskListResponse: TypeAlias = List[TaskListResponseItem]

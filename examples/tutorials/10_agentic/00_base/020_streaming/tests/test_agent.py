@@ -15,22 +15,22 @@ Configuration:
 - AGENT_NAME: Name of the agent to test (default: ab020-streaming)
 """
 
-from typing import List
 import os
 import uuid
-from agentex.types import TaskMessage, TextContent
-from agentex.types.task import Task
+import asyncio
+from typing import List
+
 import pytest
 import pytest_asyncio
-from agentex import AsyncAgentex
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from test_utils.agentic import (
-    send_event_and_poll_yielding,
     stream_agent_response,
+    send_event_and_poll_yielding,
 )
-import asyncio
-from agentex.types.text_content_param import TextContentParam
 
+from agentex import AsyncAgentex
+from agentex.types import TaskMessage, TextContent
+from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
+from agentex.types.text_content_param import TextContentParam
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -65,7 +65,7 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_send_event_and_poll(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and polling for the response."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))

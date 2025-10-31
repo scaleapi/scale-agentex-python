@@ -24,24 +24,21 @@ Configuration:
 - AGENT_NAME: Name of the agent to test (default: at020-state-machine)
 """
 
-from agentex.types.tool_request_content import ToolRequestContent
-from pure_eval.core import is_expression_interesting
 import os
 import uuid
 import asyncio
+
 import pytest
 import pytest_asyncio
-from agentex import AsyncAgentex
-from agentex.types import TaskMessage, TextContent
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
-from agentex.types.text_content_param import TextContentParam
 from test_utils.agentic import (
-    send_event_and_poll_yielding,
-    stream_agent_response,
-    poll_messages,
     stream_task_messages,
+    send_event_and_poll_yielding,
 )
 
+from agentex import AsyncAgentex
+from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
+from agentex.types.text_content_param import TextContentParam
+from agentex.types.tool_request_content import ToolRequestContent
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -75,7 +72,7 @@ async def agent_id(client, agent_name):
 class TestNonStreamingEvents:
     """Test non-streaming event sending and polling with state machine workflow."""
     @pytest.mark.asyncio
-    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, agent_id: str):
         """Test sending a simple event and polling for the response (no tool use)."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
@@ -130,7 +127,7 @@ class TestNonStreamingEvents:
 class TestStreamingEvents:
     """Test streaming event sending with state machine workflow."""
     @pytest.mark.asyncio
-    async def test_send_event_and_stream(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_send_event_and_stream(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and streaming the response."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))

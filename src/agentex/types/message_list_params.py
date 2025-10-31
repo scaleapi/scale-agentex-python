@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
 from typing_extensions import Required, TypedDict
 
 __all__ = ["MessageListParams"]
@@ -12,4 +11,6 @@ class MessageListParams(TypedDict, total=False):
     task_id: Required[str]
     """The task ID"""
 
-    limit: Optional[int]
+    limit: int
+
+    page_number: int

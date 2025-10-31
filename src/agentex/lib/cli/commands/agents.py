@@ -52,7 +52,7 @@ def get(
     client = Agentex()
     agent = client.agents.retrieve(agent_id=agent_id)
     logger.info(f"Agent retrieved: {agent}")
-    print_json(data=agent.to_dict())
+    print_json(data=agent.to_dict(), default=str)
 
 
 @agents.command()
@@ -64,7 +64,7 @@ def list():
     client = Agentex()
     agents = client.agents.list()
     logger.info(f"Agents retrieved: {agents}")
-    print_json(data=[agent.to_dict() for agent in agents])
+    print_json(data=[agent.to_dict() for agent in agents], default=str)
 
 
 @agents.command()

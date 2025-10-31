@@ -17,12 +17,13 @@ Configuration:
 """
 
 import os
-from agentex.types import TextContentParam, TextDelta, TextContent
-from agentex.types.agent_rpc_params import ParamsSendMessageRequest
-from agentex.types.task_message_update import StreamTaskMessageDelta, StreamTaskMessageFull
-import pytest
-from agentex import Agentex
 
+import pytest
+
+from agentex import Agentex
+from agentex.types import TextDelta, TextContent, TextContentParam
+from agentex.types.agent_rpc_params import ParamsSendMessageRequest
+from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")

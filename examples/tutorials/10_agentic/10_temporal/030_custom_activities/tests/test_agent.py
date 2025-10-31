@@ -16,22 +16,11 @@ Configuration:
 """
 
 import os
-import uuid
-import asyncio
+
 import pytest
 import pytest_asyncio
-from agentex import AsyncAgentex
-from agentex.types import TaskMessage
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
-from agentex.types.text_content_param import TextContentParam
-from test_utils.agentic import (
-    poll_for_agent_response,
-    send_event_and_poll_yielding,
-    stream_agent_response,
-    validate_text_in_response,
-    poll_messages,
-)
 
+from agentex import AsyncAgentex
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -66,7 +55,7 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_send_event_and_poll(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and polling for the response."""
         # TODO: Create a task for this conversation
         # task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
@@ -108,7 +97,7 @@ class TestStreamingEvents:
     """Test streaming event sending."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_stream(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_send_event_and_stream(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and streaming the response."""
         # TODO: Create a task for this conversation
         # task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))

@@ -15,21 +15,21 @@ Configuration:
 - AGENT_NAME: Name of the agent to test (default: ab010-multiturn)
 """
 
-from typing import List
 import os
 import uuid
-from agentex._utils import is_iterable
-from agentex.types import TaskMessage, TextContent
-from agentex.types.task import Task
+import asyncio
+from typing import List
+
 import pytest
 import pytest_asyncio
-from agentex import AsyncAgentex
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from test_utils.agentic import (
-    send_event_and_poll_yielding,
     stream_agent_response,
+    send_event_and_poll_yielding,
 )
-import asyncio
+
+from agentex import AsyncAgentex
+from agentex.types import TextContent
+from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from agentex.types.text_content_param import TextContentParam
 
 # Configuration from environment variables
@@ -65,7 +65,7 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_send_event_and_poll(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and polling for the response."""
         # TODO: Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
