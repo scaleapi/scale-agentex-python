@@ -119,15 +119,15 @@ class SyncAgentTest:
         # Create user message parameter
         user_message_param = create_user_message(content)
 
-        # Build params with streaming enabled
+        # Build params for streaming (don't set stream=True, use send_message_stream instead)
         if self.task_id:
-            params = ParamsSendMessageRequest(task_id=self.task_id, content=user_message_param, stream=True)
+            params = ParamsSendMessageRequest(task_id=self.task_id, content=user_message_param)
         else:
             self._task_name_counter += 1
-            params = ParamsSendMessageRequest(task_id=None, content=user_message_param, stream=True)
+            params = ParamsSendMessageRequest(task_id=None, content=user_message_param)
 
-        # Get streaming response
-        response_generator = self.client.agents.send_message(agent_id=self.agent.id, params=params)
+        # Get streaming response using send_message_stream
+        response_generator = self.client.agents.send_message_stream(agent_id=self.agent.id, params=params)
 
         # Return the generator for caller to collect
         return response_generator
@@ -184,6 +184,7 @@ def sync_agent_test_session(
     yield SyncAgentTest(agentex_client, agent, task_id)
 
 
+@contextmanager
 def test_sync_agent(
     *, agent_name: str | None = None, agent_id: str | None = None
 ) -> Generator[SyncAgentTest, None, None]:

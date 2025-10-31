@@ -59,7 +59,7 @@ class TaskManager:
         response = client.agents.create_task(agent_id=agent_id, params=params)
 
         # Extract task from response.result
-        if hasattr(response, 'result') and response.result:
+        if hasattr(response, "result") and response.result:
             task = response.result
             logger.debug(f"Task created successfully: {task.id}")
             return task

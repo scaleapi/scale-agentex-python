@@ -53,6 +53,15 @@ def extract_agent_response(response, agent_id: str):  # type: ignore[no-untyped-
     if hasattr(response, "result") and response.result is not None:
         result = response.result
 
+        # SendMessageResponse: result is a list of TaskMessages
+        if isinstance(result, list) and len(result) > 0:
+            # Get the last message (most recent agent response)
+            last_message = result[-1]
+            if hasattr(last_message, "content"):
+                content = last_message.content
+                if isinstance(content, TextContent):
+                    return content
+
         # SendMessageResponse: result.content
         if hasattr(result, "content"):
             content = result.content
