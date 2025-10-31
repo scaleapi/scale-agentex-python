@@ -1,13 +1,5 @@
 # Changelog
 
-## 0.5.1 (2025-10-29)
-
-Full Changelog: [v0.5.0...v0.5.1](https://github.com/scaleapi/agentex-python/compare/v0.5.0...v0.5.1)
-
-### Bug Fixes
-
-* **client:** close streams without requiring full consumption ([f56acae](https://github.com/scaleapi/agentex-python/commit/f56acae74ee83a116e735ca7bf68f2096aafaf6e))
-
 ## 0.5.0 (2025-10-28)
 
 Full Changelog: [v0.4.28...v0.5.0](https://github.com/scaleapi/agentex-python/compare/v0.4.28...v0.5.0)
