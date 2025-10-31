@@ -17,8 +17,8 @@ Run: pytest tests/test_agent.py -v
 from agentex import Agentex
 from agentex.lib.testing import (
     test_sync_agent,
-    assert_valid_agent_response,
     collect_streaming_deltas,
+    assert_valid_agent_response,
 )
 
 AGENT_NAME = "s020-streaming"
