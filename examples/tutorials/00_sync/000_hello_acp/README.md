@@ -1,5 +1,6 @@
 # [Sync] Hello ACP
 
+This is a simple AgentEx agent that just says hello and acknowledges the user's message to show which ACP methods need to be implemented for the sync ACP type.
 The simplest agent type: synchronous request/response pattern with a single `@acp.on_message_send` handler. Best for stateless operations that complete immediately.
 
 ## What You'll Learn
@@ -9,7 +10,7 @@ The simplest agent type: synchronous request/response pattern with a single `@ac
 
 ## Prerequisites
 - Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
-- Backend services running: `make dev` from repository root
+- Backend services running: `make dev` from repository (agentex) root
 
 ## Quick Start
 
