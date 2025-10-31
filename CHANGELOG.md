@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.3 (2025-10-31)
+
+Full Changelog: [v0.5.2...v0.5.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.2...v0.5.3)
+
+### Chores
+
+* re apply example updates ([043973b](https://github.com/scaleapi/scale-agentex-python/commit/043973bec649ab2304eff7a313938e1e3e5377e5))
+
 ## 0.5.2 (2025-10-31)
 
 Full Changelog: [v0.5.0...v0.5.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.0...v0.5.2)
