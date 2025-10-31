@@ -49,7 +49,7 @@ class CriticState(BaseModel):
 async def handle_task_create(params: CreateTaskParams):
     """Initialize the critic agent state."""
     logger.info(f"Critic task created: {params.task.id}")
-    
+
     # Initialize state with system message
     system_message = SystemMessage(
         content="""You are a professional content critic and quality assurance specialist. Your job is to review content against specific rules and provide constructive feedback.
@@ -68,15 +68,15 @@ When reviewing content:
 
 Return ONLY a JSON object in the specified format. Do not include any other text or explanations."""
     )
-    
+
     state = CriticState(messages=[system_message])
     await adk.state.create(task_id=params.task.id, agent_id=params.agent.id, state=state)
-    
+
     await adk.messages.create(
         task_id=params.task.id,
         content=TextContent(
             author="agent",
-            content="🔍 **Critic Agent** - Content Quality Assurance\n\nI specialize in reviewing content against specific rules and providing constructive feedback.\n\nSend me a JSON request with:\n```json\n{\n  \"draft\": \"Content to review\",\n  \"rules\": [\"Rule 1\", \"Rule 2\", \"Rule 3\"]\n}\n```\n\nI'll respond with feedback JSON:\n```json\n{\n  \"feedback\": [\"issue1\", \"issue2\"] // or [] if approved\n}\n```\n\nReady to ensure quality! 🎯",
+            content='🔍 **Critic Agent** - Content Quality Assurance\n\nI specialize in reviewing content against specific rules and providing constructive feedback.\n\nSend me a JSON request with:\n```json\n{\n  "draft": "Content to review",\n  "rules": ["Rule 1", "Rule 2", "Rule 3"]\n}\n```\n\nI\'ll respond with feedback JSON:\n```json\n{\n  "feedback": ["issue1", "issue2"] // or [] if approved\n}\n```\n\nReady to ensure quality! 🎯',
         ),
     )
 
@@ -84,10 +84,10 @@ Return ONLY a JSON object in the specified format. Do not include any other text
 @acp.on_task_event_send
 async def handle_event_send(params: SendEventParams):
     """Handle content review requests."""
-    
+
     if not params.event.content:
         return
-        
+
     if params.event.content.type != "text":
         await adk.messages.create(
             task_id=params.task.id,
@@ -97,11 +97,11 @@ async def handle_event_send(params: SendEventParams):
             ),
         )
         return
-    
+
     # Echo back the message (if from user)
     if params.event.content.author == "user":
         await adk.messages.create(task_id=params.task.id, content=params.event.content)
-    
+
     # Check if OpenAI API key is available
     if not os.environ.get("OPENAI_API_KEY"):
         await adk.messages.create(
@@ -112,9 +112,9 @@ async def handle_event_send(params: SendEventParams):
             ),
         )
         return
-    
+
     content = params.event.content.content
-    
+
     try:
         # Parse the JSON request
         try:
@@ -128,7 +128,7 @@ async def handle_event_send(params: SendEventParams):
                 ),
             )
             return
-        
+
         # Validate required fields
         if "draft" not in request_data or "rules" not in request_data:
             await adk.messages.create(
@@ -139,7 +139,7 @@ async def handle_event_send(params: SendEventParams):
                 ),
             )
             return
-        
+
         # Parse and validate request using Pydantic
         try:
             critic_request = CriticRequest.model_validate(request_data)
@@ -152,11 +152,11 @@ async def handle_event_send(params: SendEventParams):
                 ),
             )
             return
-        
+
         draft = critic_request.draft
         rules = critic_request.rules
         orchestrator_task_id = critic_request.orchestrator_task_id
-        
+
         if not isinstance(rules, list):
             await adk.messages.create(
                 task_id=params.task.id,
@@ -166,18 +166,20 @@ async def handle_event_send(params: SendEventParams):
                 ),
             )
             return
-        
+
         # Get current state
         task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
         state = CriticState.model_validate(task_state.state)
-        
+
         # Add this review to history
-        state.review_history.append({
-            "draft": draft,
-            "rules": rules,
-            "timestamp": "now"  # In real implementation, use proper timestamp
-        })
-        
+        state.review_history.append(
+            {
+                "draft": draft,
+                "rules": rules,
+                "timestamp": "now",  # In real implementation, use proper timestamp
+            }
+        )
+
         # Send status update
         await adk.messages.create(
             task_id=params.task.id,
@@ -186,10 +188,10 @@ async def handle_event_send(params: SendEventParams):
                 content=f"🔍 **Reviewing Content** (Review #{len(state.review_history)})\n\nChecking content against {len(rules)} rules...",
             ),
         )
-        
+
         # Create review prompt
-        rules_text = "\n".join([f"{i+1}. {rule}" for i, rule in enumerate(rules)])
-        
+        rules_text = "\n".join([f"{i + 1}. {rule}" for i, rule in enumerate(rules)])
+
         user_message_content = f"""Please review the following content against the specified rules and provide feedback:
 
 CONTENT TO REVIEW:
@@ -211,16 +213,16 @@ You MUST respond with a JSON object in this exact format:
 }}
 
 Do not include any other text or explanations outside the JSON response."""
-        
+
         # Add user message to conversation
         state.messages.append(UserMessage(content=user_message_content))
-        
+
         # Generate review using LLM
         chat_completion = await adk.providers.litellm.chat_completion(
             llm_config=LLMConfig(model="gpt-4o-mini", messages=state.messages),
             trace_id=params.task.id,
         )
-        
+
         if not chat_completion.choices or not chat_completion.choices[0].message:
             await adk.messages.create(
                 task_id=params.task.id,
@@ -230,12 +232,12 @@ Do not include any other text or explanations outside the JSON response."""
                 ),
             )
             return
-        
+
         review_response = chat_completion.choices[0].message.content or ""
-        
+
         # Add assistant response to conversation
         state.messages.append(AssistantMessage(content=review_response))
-        
+
         # Parse the review response
         try:
             review_data = json.loads(review_response.strip())
@@ -243,15 +245,17 @@ Do not include any other text or explanations outside the JSON response."""
         except json.JSONDecodeError:
             # Fallback if LLM doesn't return valid JSON
             feedback = ["Unable to parse review response"]
-        
+
         # Create result message
         if feedback:
-            result_message = f"❌ **Content Needs Revision**\n\nIssues found:\n" + "\n".join([f"• {item}" for item in feedback])
+            result_message = f"❌ **Content Needs Revision**\n\nIssues found:\n" + "\n".join(
+                [f"• {item}" for item in feedback]
+            )
             approval_status = "needs_revision"
         else:
             result_message = "✅ **Content Approved**\n\nAll rules have been met!"
             approval_status = "approved"
-        
+
         # Send the review result back to this task
         await adk.messages.create(
             task_id=params.task.id,
@@ -260,30 +264,25 @@ Do not include any other text or explanations outside the JSON response."""
                 content=result_message,
             ),
         )
-        
+
         # Also send the result back to the orchestrator agent if this request came from another agent
         if params.event.content.author == "agent" and orchestrator_task_id:
             try:
                 # Send result back to orchestrator using Pydantic model
                 result_data = CriticResponse(
-                    feedback=feedback,
-                    approval_status=approval_status,
-                    task_id=params.task.id
+                    feedback=feedback, approval_status=approval_status, task_id=params.task.id
                 ).model_dump()
-                
+
                 await adk.acp.send_event(
                     agent_name="ab090-orchestrator-agent",
                     task_id=orchestrator_task_id,  # Use the orchestrator's original task ID
-                    content=TextContent(
-                        author="agent",
-                        content=json.dumps(result_data)
-                    )
+                    content=TextContent(author="agent", content=json.dumps(result_data)),
                 )
                 logger.info(f"Sent review result back to orchestrator for task {orchestrator_task_id}")
-                
+
             except Exception as e:
                 logger.error(f"Failed to send result to orchestrator: {e}")
-        
+
         # Update state
         await adk.state.update(
             state_id=task_state.id,
@@ -292,9 +291,9 @@ Do not include any other text or explanations outside the JSON response."""
             state=state,
             trace_id=params.task.id,
         )
-        
+
         logger.info(f"Completed review for task {params.task.id}: {len(feedback)} issues found")
-        
+
     except Exception as e:
         logger.error(f"Error in content review: {e}")
         await adk.messages.create(

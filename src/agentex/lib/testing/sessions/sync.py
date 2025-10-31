@@ -1,0 +1,248 @@
+"""
+Sync Agent Testing
+
+Provides testing utilities for sync agents that respond immediately via send_message().
+"""
+
+from __future__ import annotations
+
+import logging
+from contextlib import contextmanager
+from collections.abc import Generator
+
+from agentex import Agentex
+from agentex.types import Agent
+from agentex.lib.testing.retry import with_retry
+from agentex.lib.testing.config import config
+from agentex.types.text_content import TextContent
+from agentex.lib.testing.exceptions import AgentResponseError
+from agentex.lib.testing.type_utils import create_user_message, extract_agent_response
+from agentex.types.agent_rpc_params import ParamsSendMessageRequest
+from agentex.lib.testing.agent_selector import AgentSelector
+
+logger = logging.getLogger(__name__)
+
+
+class SyncAgentTest:
+    """
+    Test helper for sync agents that respond immediately.
+
+    Sync agents use send_message() and should respond synchronously
+    without requiring polling or task management.
+    """
+
+    def __init__(self, client: Agentex, agent: Agent, task_id: str | None = None):
+        self.client = client
+        self.agent = agent
+        self.task_id = task_id  # Optional task ID
+        self._conversation_history: list[str] = []  # Store as strings
+        self._task_name_counter = 0
+
+    @with_retry
+    def send_message(self, content: str) -> TextContent:
+        """
+        Send message to sync agent and get immediate response.
+
+        Args:
+            content: Message text to send
+
+        Returns:
+            Agent's response as TextContent
+
+        Raises:
+            AgentResponseError: If agent response is invalid
+            Exception: Network or API errors (after retries)
+
+        Note:
+            Sync agents respond immediately. No async/await needed.
+            Tasks are auto-created per conversation if not provided.
+        """
+        self._conversation_history.append(content)
+
+        logger.debug(f"Sending message to sync agent {self.agent.id}: {content[:50]}...")
+
+        # Create user message parameter
+        user_message_param = create_user_message(content)
+
+        # Build params - use task_id if we have one, otherwise auto-create
+        if self.task_id:
+            params = ParamsSendMessageRequest(task_id=self.task_id, content=user_message_param, stream=False)
+        else:
+            # Auto-create task with unique name
+            self._task_name_counter += 1
+            task_name = f"{config.task_name_prefix}-{self.agent.id[:8]}-{self._task_name_counter}"
+            # Note: send_message might not support task_name auto-creation
+            # We'll use task_id=None and let the API handle it
+            params = ParamsSendMessageRequest(task_id=None, content=user_message_param, stream=False)
+
+        # Sync agents use send_message for immediate responses
+        response = self.client.agents.send_message(agent_id=self.agent.id, params=params)
+
+        # Extract task_id if we didn't have one (API auto-creates task)
+        if not self.task_id and hasattr(response, 'result') and isinstance(response.result, list):
+            # Get task_id from first message
+            if len(response.result) > 0 and hasattr(response.result[0], 'task_id'):
+                self.task_id = response.result[0].task_id
+                logger.debug(f"Task auto-created: {self.task_id}")
+
+        # Extract response using type_utils
+        agent_response = extract_agent_response(response, self.agent.id)
+
+        # Validate it's from agent
+        if agent_response.author != "agent":
+            raise AgentResponseError(
+                self.agent.id,
+                f"Expected author 'agent', got '{agent_response.author}'",
+            )
+
+        self._conversation_history.append(agent_response.content)
+
+        logger.debug(f"Received response from agent: {agent_response.content[:50]}...")
+
+        return agent_response
+
+    def send_message_streaming(self, content: str):
+        """
+        Send message to sync agent and get streaming response.
+
+        Args:
+            content: Message text to send
+
+        Yields:
+            SendMessageResponse chunks as they arrive
+
+        Example:
+            from agentex.lib.testing.streaming import collect_streaming_deltas
+
+            response_gen = test.send_message_streaming("Hello")
+            content, chunks = collect_streaming_deltas(response_gen)
+            assert len(content) > 0
+        """
+
+        self._conversation_history.append(content)
+
+        logger.debug(f"Sending streaming message to sync agent {self.agent.id}: {content[:50]}...")
+
+        # Create user message parameter
+        user_message_param = create_user_message(content)
+
+        # Build params for streaming (don't set stream=True, use send_message_stream instead)
+        if self.task_id:
+            params = ParamsSendMessageRequest(task_id=self.task_id, content=user_message_param)
+        else:
+            self._task_name_counter += 1
+            params = ParamsSendMessageRequest(task_id=None, content=user_message_param)
+
+        # Get streaming response using send_message_stream
+        # Use agent.name if available (preferred by SDK), fallback to agent.id
+        agent_identifier = self.agent.name if hasattr(self.agent, 'name') and self.agent.name else None
+        if agent_identifier:
+            response_generator = self.client.agents.send_message_stream(agent_name=agent_identifier, params=params)
+        else:
+            response_generator = self.client.agents.send_message_stream(agent_id=self.agent.id, params=params)
+
+        # Extract task_id from first chunk if we don't have one
+        if not self.task_id:
+            # We need to peek at first chunk to get task_id
+            first_chunk = next(response_generator, None)
+            if first_chunk and hasattr(first_chunk, 'result'):
+                result = first_chunk.result
+                if hasattr(result, 'task_id') and result.task_id:
+                    self.task_id = result.task_id
+                    logger.debug(f"Task auto-created from stream: {self.task_id}")
+                # Check if result has parent_task_message with task_id
+                elif hasattr(result, 'parent_task_message') and result.parent_task_message:
+                    if hasattr(result.parent_task_message, 'task_id'):
+                        self.task_id = result.parent_task_message.task_id
+                        logger.debug(f"Task auto-created from stream: {self.task_id}")
+
+            # Re-yield first chunk and then rest of generator
+            if first_chunk:
+                from itertools import chain
+                return chain([first_chunk], response_generator)
+
+        # Return the generator for caller to collect
+        return response_generator
+
+    def get_conversation_history(self) -> list[str]:
+        """
+        Get the full conversation history.
+
+        Returns:
+            List of message contents (strings) in chronological order
+        """
+        return self._conversation_history.copy()
+
+
+@contextmanager
+def sync_agent_test_session(
+    agentex_client: Agentex,
+    agent_name: str | None = None,
+    agent_id: str | None = None,
+    task_id: str | None = None,
+) -> Generator[SyncAgentTest, None, None]:
+    """
+    Context manager for sync agent testing.
+
+    Args:
+        agentex_client: Agentex client instance
+        agent_name: Agent name to test (required if agent_id not provided)
+        agent_id: Agent ID to test (required if agent_name not provided)
+        task_id: Optional task ID to use (if None, tasks auto-created)
+
+    Yields:
+        SyncAgentTest instance for testing
+
+    Raises:
+        AgentNotFoundError: No matching sync agents found
+        AgentSelectionError: Multiple agents match, need to specify
+
+    Usage:
+        with sync_agent_test_session(client, agent_name="my-agent") as test:
+            response = test.send_message("Hello!")
+            assert response is not None
+    """
+    # Get all agents
+    agents = agentex_client.agents.list()
+    if not agents:
+        from agentex.lib.testing.exceptions import AgentNotFoundError
+
+        raise AgentNotFoundError("sync")
+
+    # Select sync agent
+    agent = AgentSelector.select_sync_agent(agents, agent_name, agent_id)
+
+    # No task management needed - sync agents can auto-create or use provided task_id
+    yield SyncAgentTest(agentex_client, agent, task_id)
+
+
+@contextmanager
+def test_sync_agent(
+    *, agent_name: str | None = None, agent_id: str | None = None
+) -> Generator[SyncAgentTest, None, None]:
+    """
+    Simple sync agent testing without managing client.
+
+    **Agent selection is required** - you must specify either agent_name or agent_id.
+
+    Args:
+        agent_name: Agent name to test (required if agent_id not provided)
+        agent_id: Agent ID to test (required if agent_name not provided)
+
+    Yields:
+        SyncAgentTest instance for testing
+
+    Raises:
+        AgentSelectionError: Agent selection required or ambiguous
+        AgentNotFoundError: No matching agent found
+
+    Usage:
+        with test_sync_agent(agent_name="my-agent") as test:
+            response = test.send_message("Hello!")
+
+    To discover agent names:
+        Run: agentex agents list
+    """
+    client = Agentex(api_key="test", base_url=config.base_url)
+    with sync_agent_test_session(client, agent_name, agent_id) as session:
+        yield session

@@ -5,7 +5,7 @@ This tutorial demonstrates two key patterns for integrating OpenAI Agents SDK wi
 
 PATTERN 1: Simple External Tools as Activities (activity_as_tool)
 - Convert individual Temporal activities directly into agent tools
-- 1:1 mapping between tool calls and activities  
+- 1:1 mapping between tool calls and activities
 - Best for: single non-deterministic operations (API calls, DB queries)
 - Example: get_weather activity → weather tool
 
@@ -19,30 +19,30 @@ Both patterns provide durability, automatic retries, and full observability thro
 
 WHY THIS APPROACH IS GAME-CHANGING:
 ===================================
-There's a crucial meta-point that should be coming through here: **why is this different?** 
-This approach is truly transactional because of how the `await` works in Temporal workflows. 
-Consider a "move money" example - if the operation fails between the withdraw and deposit, 
-Temporal will resume exactly where it left off - the agent gets real-world flexibility even 
+There's a crucial meta-point that should be coming through here: **why is this different?**
+This approach is truly transactional because of how the `await` works in Temporal workflows.
+Consider a "move money" example - if the operation fails between the withdraw and deposit,
+Temporal will resume exactly where it left off - the agent gets real-world flexibility even
 if systems die.
 
-**Why even use Temporal? Why are we adding complexity?** The gain is enormous when you 
+**Why even use Temporal? Why are we adding complexity?** The gain is enormous when you
 consider what happens without it:
 
-In a traditional approach without Temporal, if you withdraw money but then the system crashes 
-before depositing, you're stuck in a broken state. The money has been withdrawn, but never 
-deposited. In a banking scenario, you can't just "withdraw again" - the money is already gone 
+In a traditional approach without Temporal, if you withdraw money but then the system crashes
+before depositing, you're stuck in a broken state. The money has been withdrawn, but never
+deposited. In a banking scenario, you can't just "withdraw again" - the money is already gone
 from the source account, and your agent has no way to recover or know what state it was in.
 
-This is why you can't build very complicated agents without this confidence in transactional 
+This is why you can't build very complicated agents without this confidence in transactional
 behavior. Temporal gives us:
 
 - **Guaranteed execution**: If the workflow starts, it will complete, even through failures
 - **Exact resumption**: Pick up exactly where we left off, not start over
-- **Transactional integrity**: Either both operations complete, or the workflow can be designed 
+- **Transactional integrity**: Either both operations complete, or the workflow can be designed
   to handle partial completion
 - **Production reliability**: Build agents that can handle real-world complexity and failures
 
-Without this foundation, agents remain fragile toys. With Temporal, they become production-ready 
+Without this foundation, agents remain fragile toys. With Temporal, they become production-ready
 systems that can handle the complexities of the real world.
 """
 
@@ -72,11 +72,13 @@ if environment_variables.AGENT_NAME is None:
 
 logger = make_logger(__name__)
 
+
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
 class ExampleTutorialWorkflow(BaseWorkflow):
     """
     Minimal async workflow template for AgentEx Temporal agents.
     """
+
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
@@ -85,35 +87,35 @@ class ExampleTutorialWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
         logger.info(f"Received task message instruction: {params}")
-            
-        # Echo back the client's message to show it in the UI. This is not done by default 
+
+        # Echo back the client's message to show it in the UI. This is not done by default
         # so the agent developer has full control over what is shown to the user.
         await adk.messages.create(task_id=params.task.id, content=params.event.content)
 
         # ============================================================================
         # OpenAI Agents SDK + Temporal Integration: Two Patterns for Tool Creation
         # ============================================================================
-        
+
         # #### When to Use Activities for Tools
         #
         # You'll want to use the activity pattern for tools in the following scenarios:
         #
-        # - **API calls within the tool**: Whenever your tool makes an API call (external 
-        #   service, database, etc.), you must wrap it as an activity since these are 
+        # - **API calls within the tool**: Whenever your tool makes an API call (external
+        #   service, database, etc.), you must wrap it as an activity since these are
         #   non-deterministic operations that could fail or return different results
-        # - **Idempotent single operations**: When the tool performs an already idempotent 
-        #   single call that you want to ensure gets executed reliably with Temporal's retry 
+        # - **Idempotent single operations**: When the tool performs an already idempotent
+        #   single call that you want to ensure gets executed reliably with Temporal's retry
         #   guarantees
         #
-        # Let's start with the case where it is non-deterministic. If this is the case, we 
-        # want this tool to be an activity to guarantee that it will be executed. The way to 
-        # do this is to add some syntax to make the tool call an activity. Let's create a tool 
-        # that gives us the weather and create a weather agent. For this example, we will just 
-        # return a hard-coded string but we can easily imagine this being an API call to a 
-        # weather service which would make it non-deterministic. First we will create a new 
-        # file called `activities.py`. Here we will create a function to get the weather and 
+        # Let's start with the case where it is non-deterministic. If this is the case, we
+        # want this tool to be an activity to guarantee that it will be executed. The way to
+        # do this is to add some syntax to make the tool call an activity. Let's create a tool
+        # that gives us the weather and create a weather agent. For this example, we will just
+        # return a hard-coded string but we can easily imagine this being an API call to a
+        # weather service which would make it non-deterministic. First we will create a new
+        # file called `activities.py`. Here we will create a function to get the weather and
         # simply add an activity annotation on top.
-        
+
         # There are TWO key patterns for integrating tools with the OpenAI Agents SDK in Temporal:
         #
         # PATTERN 1: Simple External Tools as Activities
@@ -147,7 +149,7 @@ class ExampleTutorialWorkflow(BaseWorkflow):
                 # The get_weather activity will be executed with durability guarantees
                 activity_as_tool(
                     get_weather,  # This is defined in activities.py as @activity.defn
-                    start_to_close_timeout=timedelta(seconds=10)
+                    start_to_close_timeout=timedelta(seconds=10),
                 ),
             ],
         )
@@ -156,7 +158,7 @@ class ExampleTutorialWorkflow(BaseWorkflow):
         result = await Runner.run(weather_agent, params.event.content.content)
 
         # ============================================================================
-        # PATTERN 2: Multiple Activities Within Tools  
+        # PATTERN 2: Multiple Activities Within Tools
         # ============================================================================
         # Use this pattern when:
         # - You need multiple sequential non-deterministic operations within one tool
@@ -171,7 +173,7 @@ class ExampleTutorialWorkflow(BaseWorkflow):
         #
         # BENEFITS:
         # - Guaranteed execution order (withdraw THEN deposit)
-        # - Each step is durable and retryable individually  
+        # - Each step is durable and retryable individually
         # - Atomic operations from the agent's perspective
         # - Better than having LLM make multiple separate tool calls
 
@@ -186,7 +188,7 @@ class ExampleTutorialWorkflow(BaseWorkflow):
         #         move_money,
         #     ],
         # )
-        
+
         # # Run the agent - when it calls move_money tool, it will create TWO activities:
         # # 1. withdraw_money activity
         # # 2. deposit_money activity (only after withdraw succeeds)
@@ -195,17 +197,17 @@ class ExampleTutorialWorkflow(BaseWorkflow):
         # ============================================================================
         # PATTERN COMPARISON SUMMARY:
         # ============================================================================
-        # 
+        #
         # Pattern 1 (activity_as_tool):        | Pattern 2 (function_tool with activities):
         # - Single activity per tool call      | - Multiple activities per tool call
-        # - 1:1 tool to activity mapping       | - 1:many tool to activity mapping  
+        # - 1:1 tool to activity mapping       | - 1:many tool to activity mapping
         # - Simple non-deterministic ops       | - Complex multi-step operations
         # - Let LLM sequence multiple tools     | - Code controls activity sequencing
         # - Example: get_weather, db_lookup    | - Example: money_transfer, multi_step_workflow
         #
         # BOTH patterns provide:
         # - Automatic retries and failure recovery
-        # - Full observability in Temporal UI  
+        # - Full observability in Temporal UI
         # - Durable execution guarantees
         # - Seamless integration with OpenAI Agents SDK
         # ============================================================================
@@ -234,7 +236,7 @@ class ExampleTutorialWorkflow(BaseWorkflow):
 
         await workflow.wait_condition(
             lambda: self._complete_task,
-            timeout=None, # Set a timeout if you want to prevent the task from running indefinitely. Generally this is not needed. Temporal can run hundreds of millions of workflows in parallel and more. Only do this if you have a specific reason to do so.
+            timeout=None,  # Set a timeout if you want to prevent the task from running indefinitely. Generally this is not needed. Temporal can run hundreds of millions of workflows in parallel and more. Only do this if you have a specific reason to do so.
         )
         return "Task completed"
 
