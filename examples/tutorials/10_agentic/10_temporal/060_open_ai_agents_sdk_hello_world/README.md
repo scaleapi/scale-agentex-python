@@ -9,9 +9,11 @@ The OpenAI Agents SDK plugin automatically converts LLM calls into durable Tempo
 **Key insight:** You don't need to wrap agent calls in activities manually - the plugin handles this automatically, making non-deterministic LLM calls work seamlessly in Temporal workflows.
 
 ## Prerequisites
-
-1. Agentex backend running with Temporal (`make dev` in agentex repo)
-2. OpenAI API key configured (see setup below)
+- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
+- Backend services running: `make dev` from repository root (includes Temporal)
+- Temporal UI available at http://localhost:8233
+- OpenAI API key configured (see setup below)
+- Understanding of Temporal workflows (see [000_hello_acp](../000_hello_acp/))
 
 ## Setup
 
@@ -55,7 +57,7 @@ cd examples/tutorials/10_agentic/10_temporal/060_open_ai_agents_sdk_hello_world
 uv run agentex agents run --manifest manifest.yaml
 ```
 
-**Monitor:** Open Temporal UI at http://localhost:8080 to see automatic activity creation.
+**Monitor:** Open Temporal UI at http://localhost:8233 to see automatic activity creation.
 
 ## Try It
 
@@ -64,7 +66,7 @@ uv run agentex agents run --manifest manifest.yaml
 
 ![Agent Response](../_images/hello_world_response.png)
 
-3. Open Temporal UI at http://localhost:8080
+3. Open Temporal UI at http://localhost:8233
 4. Find your workflow execution
 5. Look for the `invoke_model_activity` - this was created automatically:
 
@@ -93,3 +95,11 @@ The magic happens behind the scenes - no manual activity wrapping needed. The co
 **Observability:** Every LLM call is tracked as an activity with full execution history.
 
 **Reliability:** Failed LLM calls are automatically retried with exponential backoff.
+
+## When to Use
+- Building agents with OpenAI's SDK
+- Need durability for LLM calls
+- Want automatic activity creation without manual wrapping
+- Leveraging OpenAI's agent patterns with Temporal's durability
+
+**Next:** [070_open_ai_agents_sdk_tools](../070_open_ai_agents_sdk_tools/) - Add durable tools to your agents

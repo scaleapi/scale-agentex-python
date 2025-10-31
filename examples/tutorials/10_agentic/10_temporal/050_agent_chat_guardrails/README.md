@@ -1,10 +1,18 @@
-# [Agentic] Agent Chat with Guardrails
+# [Temporal] Agent Chat with Guardrails
 
 This tutorial demonstrates how to implement streaming multiturn tool-enabled chat with input and output guardrails using Temporal workflows in AgentEx agents.
 
-## Overview
+## What You'll Learn
+- Adding safety guardrails to conversational agents
+- Input validation and output filtering
+- Implementing content moderation with Temporal
+- When to block vs warn vs allow content
 
-This example extends the basic agent chat functionality by adding guardrails that can filter both user inputs and AI outputs. This is useful for content moderation, compliance, or preventing certain topics from being discussed.
+## Prerequisites
+- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
+- Backend services running: `make dev` from repository root
+- Temporal UI available at http://localhost:8233
+- Understanding of agent chat patterns (see [010_agent_chat](../010_agent_chat/))
 
 ## Quick Start
 
@@ -13,7 +21,7 @@ cd examples/tutorials/10_agentic/10_temporal/050_agent_chat_guardrails
 uv run agentex agents run --manifest manifest.yaml
 ```
 
-**Monitor:** Open Temporal UI at http://localhost:8080 to see guardrail checks as workflow activities.
+**Monitor:** Open Temporal UI at http://localhost:8233 to see guardrail checks as workflow activities.
 
 ## Guardrails
 
@@ -49,3 +57,14 @@ The guardrails are implemented as functions that:
   - `rejection_message`: Custom message shown when content is blocked
 
 See `workflow.py` for the complete implementation.
+
+## When to Use
+- Content moderation and safety requirements
+- Compliance with regulatory restrictions
+- Brand safety and reputation protection
+- Preventing agents from discussing sensitive topics
+
+## Why This Matters
+Production agents need safety rails. This pattern shows how to implement content filtering without sacrificing the benefits of Temporal workflows. Guardrail checks become durable activities, visible in Temporal UI for audit and debugging.
+
+**Next:** [060_open_ai_agents_sdk_hello_world](../060_open_ai_agents_sdk_hello_world/) - Integrate OpenAI Agents SDK with Temporal

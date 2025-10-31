@@ -47,8 +47,11 @@ Child workflows are like spawning a new workflow from within your current workfl
 [Learn more about child workflows](https://docs.temporal.io/develop/python/child-workflows)
 
 ## Prerequisites
-
-See [Hello World tutorial](../060_open_ai_agents_sdk_hello_world/) for basic setup of the OpenAI Agents SDK plugin.
+- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
+- Backend services running: `make dev` from repository root
+- Temporal UI available at http://localhost:8233
+- OpenAI Agents SDK plugin configured (see [060_hello_world](../060_open_ai_agents_sdk_hello_world/))
+- Understanding of tools (see [070_tools](../070_open_ai_agents_sdk_tools/))
 
 ## Quick Start
 
@@ -57,13 +60,13 @@ cd examples/tutorials/10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the
 uv run agentex agents run --manifest manifest.yaml
 ```
 
-**Monitor:** Open Temporal UI at http://localhost:8080 to see child workflows and signals.
+**Monitor:** Open Temporal UI at http://localhost:8233 to see child workflows and signals.
 
 ## Try It
 
 1. Ask the agent to do something that requires approval (e.g., "Order 100 widgets")
 2. The agent will call `wait_for_confirmation` and pause
-3. Open Temporal UI (localhost:8080)
+3. Open Temporal UI (localhost:8233)
 4. Find the parent workflow - you'll see it's waiting on the child workflow:
 
 ![Parent Workflow Waiting](../_images/human_in_the_loop_workflow.png)
@@ -184,3 +187,13 @@ result = await Runner.run(confirm_order_agent, params.event.content.content)
 - **High-stakes decisions**: Any operation requiring human judgment
 
 This pattern transforms agents from fully automated systems into **collaborative AI assistants** that know when to ask for help.
+
+## When to Use
+- Financial transactions requiring approval
+- High-stakes decisions needing human judgment
+- Compliance workflows with mandatory review steps
+- Legal or contractual operations
+- Any operation where errors have serious consequences
+- Workflows where AI assists but humans decide
+
+**Congratulations!** You've completed all AgentEx tutorials. You now know how to build production-ready agents from simple sync patterns to complex durable workflows with human oversight.

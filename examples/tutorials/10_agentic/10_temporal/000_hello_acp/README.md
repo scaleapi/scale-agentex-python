@@ -1,12 +1,18 @@
 # [Temporal] Hello ACP
 
-## What You'll Learn
-
 Temporal workflows make agents durable - they survive restarts and can run indefinitely without consuming resources while idle. Instead of handlers, you define a workflow class with `@workflow.run` and `@workflow.signal` methods.
 
-**When to use Temporal:** Production agents that need guaranteed execution, long-running tasks (hours/days/weeks), or operations that must survive system failures.
+## What You'll Learn
+- Building durable agents with Temporal workflows
+- The workflow and signal pattern
+- How workflows survive failures and resume automatically
+- When to use Temporal vs base agentic agents
 
-**Coming from base agentic?** See tutorial `080_batch_events` to understand when you need Temporal.
+## Prerequisites
+- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
+- Backend services running: `make dev` from repository root (includes Temporal)
+- Temporal UI available at http://localhost:8233
+- Understanding of base agentic agents (see [../../00_base/080_batch_events](../../00_base/080_batch_events/) to understand why Temporal)
 
 ## Quick Start
 
@@ -15,7 +21,7 @@ cd examples/tutorials/10_agentic/10_temporal/000_hello_acp
 uv run agentex agents run --manifest manifest.yaml
 ```
 
-**Monitor:** Check Temporal UI at http://localhost:8080 to see your durable workflow running.
+**Monitor:** Check Temporal UI at http://localhost:8233 to see your durable workflow running.
 
 ## Key Pattern
 
@@ -32,10 +38,18 @@ class MyWorkflow(BaseWorkflow):
         # Handle events as signals to the workflow
 ```
 
-## Why This Matters
+## When to Use
+- Production agents that need guaranteed execution
+- Long-running tasks (hours, days, weeks, or longer)
+- Operations that must survive system failures
+- Agents with concurrent event handling requirements
+- When you need durability and observability
 
+## Why This Matters
 **Without Temporal:** If your worker crashes, the agent loses all state and has to start over.
 
 **With Temporal:** The workflow resumes exactly where it left off. If it crashes mid-conversation, Temporal brings it back up with full context intact. Can run for years if needed, only consuming resources when actively processing.
 
 This is the foundation for production-ready agents that handle real-world reliability requirements.
+
+**Next:** [010_agent_chat](../010_agent_chat/) - Build a complete conversational agent with tools

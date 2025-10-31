@@ -18,8 +18,10 @@ Two patterns for making agent tools durable with Temporal:
 - Ensures atomic operations (withdraw always happens before deposit)
 
 ## Prerequisites
-
-See [Hello World tutorial](../060_open_ai_agents_sdk_hello_world/) for basic setup of the OpenAI Agents SDK plugin.
+- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
+- Backend services running: `make dev` from repository root
+- Temporal UI available at http://localhost:8233
+- OpenAI Agents SDK plugin configured (see [060_hello_world](../060_open_ai_agents_sdk_hello_world/))
 
 ## Quick Start
 
@@ -28,7 +30,7 @@ cd examples/tutorials/10_agentic/10_temporal/070_open_ai_agents_sdk_tools
 uv run agentex agents run --manifest manifest.yaml
 ```
 
-**Monitor:** Open Temporal UI at http://localhost:8080 to see tool calls as activities.
+**Monitor:** Open Temporal UI at http://localhost:8233 to see tool calls as activities.
 
 ## Try It
 
@@ -40,7 +42,7 @@ Ask "What's the weather in San Francisco?"
 
 ![Weather Response](../_images/weather_response.png)
 
-2. Open Temporal UI (localhost:8080)
+2. Open Temporal UI (localhost:8233)
 3. See a single `get_weather` activity created:
 
 ![Weather Activity](../_images/weather_activity_tool.png)
@@ -160,3 +162,19 @@ This makes agents production-ready for:
 - Order fulfillment workflows
 - Multi-step API integrations
 - Any operation where partial completion is dangerous
+
+## When to Use
+
+**Pattern 1 (activity_as_tool):**
+- Single API calls
+- Database queries
+- External service integrations
+- Operations that are naturally atomic
+
+**Pattern 2 (Multi-activity tools):**
+- Financial transactions requiring sequencing
+- Multi-step operations with dependencies
+- Operations where order matters critically
+- Workflows needing guaranteed atomicity
+
+**Next:** [080_open_ai_agents_sdk_human_in_the_loop](../080_open_ai_agents_sdk_human_in_the_loop/) - Add human approval workflows

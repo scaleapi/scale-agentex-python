@@ -1,10 +1,16 @@
 # [Sync] Multiturn
 
+Handle multi-turn conversations in synchronous agents by manually maintaining conversation history and context between messages.
+
 ## What You'll Learn
+- How to handle conversation history in sync agents
+- Building context from previous messages
+- The limitations of stateless multiturn patterns
 
-Handle multi-turn conversations in synchronous agents by maintaining conversation history and context between messages.
-
-**Use case:** Chatbots that need to reference previous messages within the same session.
+## Prerequisites
+- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
+- Backend services running: `make dev` from repository root
+- Understanding of basic sync agents (see [000_hello_acp](../000_hello_acp/))
 
 ## Quick Start
 
@@ -36,3 +42,13 @@ async def handle_message_send(params: SendMessageParams):
 ```
 
 The handler accepts history, builds context, and returns responses that reference previous exchanges.
+
+## When to Use
+- Simple chatbots that need conversation memory
+- When client can maintain and send conversation history
+- Quick prototypes before building full agentic agents
+
+## Why This Matters
+While sync agents can handle conversations, you're responsible for managing state on the client side. This becomes complex quickly. For production conversational agents, consider agentic agents ([10_agentic/00_base/010_multiturn](../../10_agentic/00_base/010_multiturn/)) where the platform manages state automatically.
+
+**Next:** [020_streaming](../020_streaming/) - Stream responses in real-time
