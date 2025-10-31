@@ -331,8 +331,8 @@ build_cli() {
 # Function to get the appropriate agentex command
 get_agentex_command() {
     if [ "$BUILD_CLI" = true ]; then
-        # Use the local build via rye run from repo root
-        echo "../../rye run agentex"
+        # Use the local build via rye run (rye is in PATH)
+        echo "rye run agentex"
     else
         # Use the system-installed version
         echo "uv run agentex"
