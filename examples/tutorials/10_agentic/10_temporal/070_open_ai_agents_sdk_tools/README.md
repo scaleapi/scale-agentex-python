@@ -1,317 +1,180 @@
-# example-tutorial - AgentEx Temporal Agent Template
+# [Temporal] OpenAI Agents SDK - Tools
 
-This is a starter template for building asynchronous agents with the AgentEx framework and Temporal. It provides a basic implementation of the Agent 2 Client Protocol (ACP) with Temporal workflow support to help you get started quickly.
+**Part of the [OpenAI SDK + Temporal integration series](../README.md)** → Previous: [060 Hello World](../060_open_ai_agents_sdk_hello_world/)
 
 ## What You'll Learn
 
-- **Tasks**: A task is a grouping mechanism for related messages. Think of it as a conversation thread or a session.
-- **Messages**: Messages are communication objects within a task. They can contain text, data, or instructions.
-- **ACP Events**: The agent responds to four main events:
-  - `task_received`: When a new task is created
-  - `task_message_received`: When a message is sent within a task
-  - `task_approved`: When a task is approved
-  - `task_canceled`: When a task is canceled
-- **Temporal Workflows**: Long-running processes that can handle complex state management and async operations
+Two patterns for making agent tools durable with Temporal:
 
-## Running the Agent
+**Pattern 1: `activity_as_tool()`** - Single activity per tool call
+- Use for: Single API calls, DB queries, external operations
+- Example: `get_weather` tool → creates one `get_weather` activity
+- 1:1 mapping between tool calls and activities
 
-1. Run the agent locally:
-```bash
-agentex agents run --manifest manifest.yaml
-```
+**Pattern 2: Function tools with multiple activities** - Multiple activities per tool call
+- Use for: Multi-step operations needing guaranteed sequencing
+- Example: `move_money` tool → creates `withdraw_money` activity THEN `deposit_money` activity
+- 1:many mapping - your code controls execution order, not the LLM
+- Ensures atomic operations (withdraw always happens before deposit)
 
-The agent will start on port 8000 and print messages whenever it receives any of the ACP events.
+## Prerequisites
+- Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
+- Backend services running: `make dev` from repository root
+- Temporal UI available at http://localhost:8233
+- OpenAI Agents SDK plugin configured (see [060_hello_world](../060_open_ai_agents_sdk_hello_world/))
 
-## What's Inside
-
-This template:
-- Sets up a basic ACP server with Temporal integration
-- Handles each of the required ACP events
-- Provides a foundation for building complex async agents
-- Includes Temporal workflow and activity definitions
-
-## Next Steps
-
-For more advanced agent development, check out the AgentEx tutorials:
-
-- **Tutorials 00-08**: Learn about building synchronous agents with ACP
-- **Tutorials 09-10**: Learn how to use Temporal to power asynchronous agents
-  - Tutorial 09: Basic Temporal workflow setup
-  - Tutorial 10: Advanced Temporal patterns and best practices
-
-These tutorials will help you understand:
-- How to handle long-running tasks
-- Implementing state machines
-- Managing complex workflows
-- Best practices for async agent development
-
-## The Manifest File
-
-The `manifest.yaml` file is your agent's configuration file. It defines:
-- How your agent should be built and packaged
-- What files are included in your agent's Docker image
-- Your agent's name and description
-- Local development settings (like the port your agent runs on)
-- Temporal worker configuration
-
-This file is essential for both local development and deployment of your agent.
-
-## Project Structure
-
-```
-example_tutorial/
-├── project/                  # Your agent's code
-│   ├── __init__.py
-│   ├── acp.py               # ACP server and event handlers
-│   ├── workflow.py          # Temporal workflow definitions
-│   ├── activities.py        # Temporal activity definitions
-│   └── run_worker.py        # Temporal worker setup
-├── Dockerfile               # Container definition
-├── manifest.yaml            # Deployment config
-├── dev.ipynb                # Development notebook for testing
-
-└── pyproject.toml          # Dependencies (uv)
-
-```
-
-## Development
-
-### 1. Customize Event Handlers
-- Modify the handlers in `acp.py` to implement your agent's logic
-- Add your own tools and capabilities
-- Implement custom state management
-
-### 2. Test Your Agent with the Development Notebook
-Use the included `dev.ipynb` Jupyter notebook to test your agent interactively:
+## Quick Start
 
 ```bash
-# Start Jupyter notebook (make sure you have jupyter installed)
-jupyter notebook dev.ipynb
-
-# Or use VS Code to open the notebook directly
-code dev.ipynb
-```
-
-The notebook includes:
-- **Setup**: Connect to your local AgentEx backend
-- **Task creation**: Create a new task for the conversation
-- **Event sending**: Send events to the agent and get responses
-- **Async message subscription**: Subscribe to server-side events to receive agent responses
-- **Rich message display**: Beautiful formatting with timestamps and author information
-
-The notebook automatically uses your agent name (`example-tutorial`) and demonstrates the agentic ACP workflow: create task → send event → subscribe to responses.
-
-### 3. Develop Temporal Workflows
-- Edit `workflow.py` to define your agent's async workflow logic
-- Modify `activities.py` to add custom activities
-- Use `run_worker.py` to configure the Temporal worker
-
-### 4. Manage Dependencies
-
-
-You chose **uv** for package management. Here's how to work with dependencies:
-
-```bash
-# Add new dependencies
-agentex uv add requests openai anthropic
-
-# Add Temporal-specific dependencies (already included)
-agentex uv add temporalio
-
-# Install/sync dependencies
-agentex uv sync
-
-# Run commands with uv
+cd examples/tutorials/10_agentic/10_temporal/070_open_ai_agents_sdk_tools
 uv run agentex agents run --manifest manifest.yaml
 ```
 
-**Benefits of uv:**
-- Faster dependency resolution and installation
-- Better dependency isolation
-- Modern Python packaging standards
+**Monitor:** Open Temporal UI at http://localhost:8233 to see tool calls as activities.
 
+## Try It
 
+### Pattern 1: Single Activity Tool
 
-### 5. Configure Credentials
-- Add any required credentials to your manifest.yaml
-- For local development, create a `.env` file in the project directory
-- Use `load_dotenv()` only in development mode:
+Ask "What's the weather in San Francisco?"
 
+1. Check the agent response:
+
+![Weather Response](../_images/weather_response.png)
+
+2. Open Temporal UI (localhost:8233)
+3. See a single `get_weather` activity created:
+
+![Weather Activity](../_images/weather_activity_tool.png)
+
+The activity shows the external call with retry capability. Each step (model invocation → tool call → model invocation) is durable.
+
+### Pattern 2: Multi-Activity Tool (Optional)
+
+To try the advanced banking example, uncomment the `move_money` sections in the code, then ask to move money.
+
+1. Check the agent response:
+
+![Money Transfer Response](../_images/move_money_response.png)
+
+2. Open Temporal UI and see TWO sequential activities:
+
+![Money Transfer Workflow](../_images/move_money_temporal.png)
+
+- First: `withdraw_money` activity executes
+- Then: `deposit_money` activity executes
+- Each activity shows its parameters and execution time
+
+**Critical insight:** If the system crashes after withdraw but before deposit, Temporal resumes exactly where it left off. The deposit will still happen - guaranteed transactional integrity.
+
+## Key Code
+
+### Pattern 1: Single Activity Tool
 ```python
-import os
-from dotenv import load_dotenv
+# Define the activity
+@activity.defn
+async def get_weather(city: str) -> str:
+    """Get the weather for a given city"""
+    # This could be an API call - Temporal handles retries
+    return f"The weather in {city} is sunny"
 
-if os.environ.get("ENVIRONMENT") == "development":
-    load_dotenv()
-```
-
-## Local Development
-
-### 1. Start the Agentex Backend
-```bash
-# Navigate to the backend directory
-cd agentex
-
-# Start all services using Docker Compose
-make dev
-
-# Optional: In a separate terminal, use lazydocker for a better UI (everything should say "healthy")
-lzd
-```
-
-### 2. Setup Your Agent's requirements/pyproject.toml
-```bash
-agentex uv sync [--group editable-apy]
-source .venv/bin/activate
-
-# OR
-conda create -n example_tutorial python=3.12
-conda activate example_tutorial
-pip install -r requirements.txt
-```
-### 3. Run Your Agent
-```bash
-# From this directory
-export ENVIRONMENT=development && [uv run] agentex agents run --manifest manifest.yaml
-```
-4. **Interact with your agent**
-
-Option 0: CLI (deprecated - to be replaced once a new CLI is implemented - please use the web UI for now!)
-```bash
-# Submit a task via CLI
-agentex tasks submit --agent example-tutorial --task "Your task here"
-```
-
-Option 1: Web UI
-```bash
-# Start the local web interface
-cd agentex-web
-make dev
-
-# Then open http://localhost:3000 in your browser to chat with your agent
-```
-
-## Development Tips
-
-### Environment Variables
-- Set environment variables in project/.env for any required credentials
-- Or configure them in the manifest.yaml under the `env` section
-- The `.env` file is automatically loaded in development mode
-
-### Local Testing
-- Use `export ENVIRONMENT=development` before running your agent
-- This enables local service discovery and debugging features
-- Your agent will automatically connect to locally running services
-
-### Temporal-Specific Tips
-- Monitor workflows in the Temporal Web UI at http://localhost:8080
-- Use the Temporal CLI for advanced workflow management
-- Check workflow logs for debugging async operations
-
-### Debugging
-- Check agent logs in the terminal where you ran the agent
-- Use the web UI to inspect task history and responses
-- Monitor backend services with `lzd` (LazyDocker)
-- Use Temporal Web UI for workflow debugging
-
-### To build the agent Docker image locally (normally not necessary):
-
-1. Build the agent image:
-```bash
-agentex agents build --manifest manifest.yaml
-```
-
-## Advanced Features
-
-### Temporal Workflows
-Extend your agent with sophisticated async workflows:
-
-```python
-# In project/workflow.py
-@workflow.defn
-class MyWorkflow(BaseWorkflow):
-    async def complex_operation(self):
-        # Multi-step async operations
-        # Error handling and retries
-        # State management
-        pass
-```
-
-### Custom Activities
-Add custom activities for external operations. **Important**: Always specify appropriate timeouts (recommended: 10 minutes):
-
-```python
-# In project/activities.py
-from datetime import timedelta
-from temporalio import activity
-from temporalio.common import RetryPolicy
-
-@activity.defn(name="call_external_api")
-async def call_external_api(data):
-    # HTTP requests, database operations, etc.
-    pass
-
-# In your workflow, call it with a timeout:
-result = await workflow.execute_activity(
-    "call_external_api",
-    data,
-    start_to_close_timeout=timedelta(minutes=10),  # Recommended: 10 minute timeout
-    heartbeat_timeout=timedelta(minutes=1),         # Optional: heartbeat monitoring
-    retry_policy=RetryPolicy(maximum_attempts=3)    # Optional: retry policy
+# Use activity_as_tool to convert it
+weather_agent = Agent(
+    name="Weather Assistant",
+    instructions="Use the get_weather tool to answer weather questions.",
+    tools=[
+        activity_as_tool(get_weather, start_to_close_timeout=timedelta(seconds=10))
+    ]
 )
-
-# Don't forget to register your custom activities in run_worker.py:
-# all_activities = get_all_activities() + [your_custom_activity_function]
 ```
 
-### Integration with External Services
+### Pattern 2: Multi-Activity Tool
+```python
+# Define individual activities
+@activity.defn
+async def withdraw_money(from_account: str, amount: float) -> str:
+    # Simulate API call
+    await asyncio.sleep(5)
+    return f"Withdrew ${amount} from {from_account}"
 
-```bash
-# Add service clients
-agentex uv add httpx requests-oauthlib
+@activity.defn
+async def deposit_money(to_account: str, amount: float) -> str:
+    # Simulate API call
+    await asyncio.sleep(10)
+    return f"Deposited ${amount} into {to_account}"
 
-# Add AI/ML libraries
-agentex uv add openai anthropic transformers
+# Create a function tool that orchestrates both activities
+@function_tool
+async def move_money(from_account: str, to_account: str, amount: float) -> str:
+    """Move money from one account to another"""
 
-# Add database clients
-agentex uv add asyncpg redis
+    # Step 1: Withdraw (becomes an activity)
+    await workflow.start_activity(
+        "withdraw_money",
+        args=[from_account, amount],
+        start_to_close_timeout=timedelta(days=1)
+    )
+
+    # Step 2: Deposit (becomes an activity)
+    await workflow.start_activity(
+        "deposit_money",
+        args=[to_account, amount],
+        start_to_close_timeout=timedelta(days=1)
+    )
+
+    return "Money transferred successfully"
+
+# Use the tool in your agent
+money_agent = Agent(
+    name="Money Mover",
+    instructions="Use move_money to transfer funds between accounts.",
+    tools=[move_money]
+)
 ```
 
+## When to Use Each Pattern
 
-## Troubleshooting
+### Use Pattern 1 when:
+- Tool performs a single external operation (API call, DB query)
+- Operation is already idempotent
+- No sequencing guarantees needed
 
-### Common Issues
+### Use Pattern 2 when:
+- Tool requires multiple sequential operations
+- Order must be guaranteed (withdraw THEN deposit)
+- Operations need to be atomic from the agent's perspective
+- You want transactional integrity across steps
 
-1. **Agent not appearing in web UI**
-   - Check if agent is running on port 8000
-   - Verify `ENVIRONMENT=development` is set
-   - Check agent logs for errors
+## Why This Matters
 
-2. **Temporal workflow issues**
-   - Check Temporal Web UI at http://localhost:8080
-   - Verify Temporal server is running in backend services
-   - Check workflow logs for specific errors
+**Without Temporal:** If you withdraw money but crash before depositing, you're stuck in a broken state. The money is gone from the source account with no way to recover.
 
-3. **Dependency issues**
+**With Temporal (Pattern 2):**
+- Guaranteed execution with exact resumption after failures
+- If the system crashes after withdraw, Temporal resumes and completes deposit
+- Each step is tracked and retried independently
+- Full observability of the entire operation
 
-   - Run `agentex uv sync` to ensure all dependencies are installed
-   - Verify temporalio is properly installed
+**Key insight:** Pattern 2 moves sequencing control from the LLM (which might call tools in wrong order) to your deterministic code (which guarantees correct order). The LLM still decides *when* to call the tool, but your code controls *how* the operations execute.
 
+This makes agents production-ready for:
+- Financial transactions
+- Order fulfillment workflows
+- Multi-step API integrations
+- Any operation where partial completion is dangerous
 
-4. **Port conflicts**
-   - Check if another service is using port 8000
-   - Use `lsof -i :8000` to find conflicting processes
+## When to Use
 
-### Temporal-Specific Troubleshooting
+**Pattern 1 (activity_as_tool):**
+- Single API calls
+- Database queries
+- External service integrations
+- Operations that are naturally atomic
 
-1. **Workflow not starting**
-   - Check if Temporal server is running (`docker ps`)
-   - Verify task queue configuration in `run_worker.py`
-   - Check workflow registration in the worker
+**Pattern 2 (Multi-activity tools):**
+- Financial transactions requiring sequencing
+- Multi-step operations with dependencies
+- Operations where order matters critically
+- Workflows needing guaranteed atomicity
 
-2. **Activity failures**
-   - Check activity logs in the console
-   - Verify activity registration
-   - Check for timeout issues
-
-Happy building with Temporal! 🚀⚡
+**Next:** [080_open_ai_agents_sdk_human_in_the_loop](../080_open_ai_agents_sdk_human_in_the_loop/) - Add human approval workflows
