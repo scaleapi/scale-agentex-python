@@ -87,7 +87,11 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         self.disabled = config.sgp_api_key == "" or config.sgp_account_id == ""
         self._spans: dict[str, SGPSpan] = {}
         self.sgp_async_client = (
-            AsyncSGPClient(api_key=config.sgp_api_key, account_id=config.sgp_account_id)
+            AsyncSGPClient(
+                api_key=config.sgp_api_key, 
+                account_id=config.sgp_account_id,
+                base_url=config.sgp_base_url,
+            )
             if not self.disabled
             else None
         )
