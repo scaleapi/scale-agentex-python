@@ -31,7 +31,7 @@ class TrackerResource(SyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return TrackerResourceWithRawResponse(self)
 
@@ -40,7 +40,7 @@ class TrackerResource(SyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return TrackerResourceWithStreamingResponse(self)
 
@@ -189,7 +189,7 @@ class AsyncTrackerResource(AsyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AsyncTrackerResourceWithRawResponse(self)
 
@@ -198,7 +198,7 @@ class AsyncTrackerResource(AsyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AsyncTrackerResourceWithStreamingResponse(self)
 
