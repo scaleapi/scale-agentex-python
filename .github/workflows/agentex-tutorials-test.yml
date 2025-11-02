@@ -18,20 +18,6 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install Rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          # Source the rye environment as recommended by the installer
-          source "$HOME/.rye/env"
-          # Add to PATH for subsequent steps
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-          # Verify installation
-          which rye
-          rye --version
-        env:
-          RYE_VERSION: "0.44.0"
-          RYE_INSTALL_OPTION: "--yes"
-
       - name: Checkout scale-agentex repo
         uses: actions/checkout@v4
         with:
@@ -61,15 +47,19 @@ jobs:
           # Verify all deps are up
           docker compose ps
 
+      - name: Build AgentEx SDK
+        run: |
+          echo "🔨 Building AgentEx SDK wheel..."
+          uv build
+          echo "✅ SDK built successfully"
+          ls -la dist/
+
       - name: Run Parallel Tutorial Tests
         working-directory: ./examples/tutorials
         run: |
-          # Ensure rye is available (source the environment from previous step)
-          source "$HOME/.rye/env"
-
-          # Verify rye is working
-          echo "Rye version: $(rye --version)"
-          echo "Rye path: $(which rye)"
+          # Verify uv is working
+          echo "UV version: $(uv --version)"
+          echo "UV path: $(which uv)"
 
           # Find all tutorial directories
           tutorial_paths=()

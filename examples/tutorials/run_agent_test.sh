@@ -115,33 +115,33 @@ start_agent() {
     # Change to tutorial directory
     cd "$tutorial_path" || return 1
 
-    # Debug current directory and virtualenv status
-    echo -e "${YELLOW}DEBUG: Current directory: $PWD${NC}"
-    echo -e "${YELLOW}DEBUG: Tutorial path: $tutorial_path${NC}"
-
-    # Check if .venv exists
-    echo -e "${YELLOW}DEBUG: Tutorial .venv contents:${NC}"
-    if [ -d ".venv" ]; then
-        ls -la .venv/ || echo "Cannot list .venv contents"
-    else
-        echo "No .venv directory found"
-    fi
-
-    # Check what packages are available in rye context
-    echo -e "${YELLOW}DEBUG: Available packages in tutorial rye context:${NC}"
-    rye run pip list 2>/dev/null || echo "Cannot list packages"
-
-    # Specifically check for agentex-sdk
-    echo -e "${YELLOW}DEBUG: Checking for agentex-sdk:${NC}"
-    rye run pip show agentex-sdk 2>/dev/null || echo "agentex-sdk not found in virtualenv"
-
-    # Show rye project status
-    echo -e "${YELLOW}DEBUG: Rye show output:${NC}"
-    rye show 2>/dev/null || echo "No rye project detected"
-
     # Start the agent in background and capture PID
-    local agentex_cmd=$(get_agentex_command)
-    $agentex_cmd agents run --manifest manifest.yaml > "$logfile" 2>&1 &
+    local manifest_path="$PWD/manifest.yaml"  # Always use full path
+
+    echo -e "${YELLOW}DEBUG: Manifest path: $manifest_path${NC}"
+    echo -e "${YELLOW}DEBUG: Log file: $logfile${NC}"
+
+    if [ "$BUILD_CLI" = true ]; then
+        echo -e "${YELLOW}DEBUG: Using locally built wheel${NC}"
+
+        # From tutorial subdirectory, we need to go up 4 levels to reach repo root
+        # tutorials/00_sync/000_hello_acp -> tutorials -> examples -> agentex-python
+        local wheel_file=$(ls ../../../../dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+        if [[ -z "$wheel_file" ]]; then
+            echo -e "${RED}❌ No built wheel found in ../../../../dist/agentex_sdk-*.whl${NC}"
+            echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"
+            echo -e "${YELLOW}💡 From the repo root directory: /Users/roxanne.farhad/Desktop/scale/agentex-python${NC}"
+            cd "$original_dir"
+            return 1
+        fi
+
+        echo -e "${YELLOW}DEBUG: Using wheel: $wheel_file${NC}"
+        # Use the built wheel
+        uv run --with "$wheel_file" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
+    else
+        echo -e "${YELLOW}DEBUG: Using system CLI${NC}"
+        uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
+    fi
     local pid=$!
 
     # Return to original directory
@@ -311,9 +311,9 @@ execute_tutorial_test() {
     fi
 }
 
-# Function to build CLI from source
-build_cli() {
-    echo -e "${YELLOW}🔨 Building CLI from source...${NC}"
+# Function to check if built wheel is available
+check_built_wheel() {
+    echo -e "${YELLOW}🔍 Checking for locally built wheel...${NC}"
 
     # Navigate to the repo root (two levels up from examples/tutorials)
     local repo_root="../../"
@@ -324,44 +324,31 @@ build_cli() {
         return 1
     }
 
-    # Check if rye is available
-    if ! command -v rye &> /dev/null; then
-        echo -e "${RED}❌ rye is required to build the CLI${NC}"
-        echo "Please install rye: curl -sSf https://rye.astral.sh/get | bash"
+    # Check if wheel exists
+    local wheel_file=$(ls dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+    if [[ -z "$wheel_file" ]]; then
+        echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"
+        echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"
+        echo -e "${YELLOW}💡 From the repo root directory: $(pwd)${NC}"
         cd "$original_dir"
         return 1
     fi
 
-    # Build the CLI
-    echo -e "${YELLOW}Running rye sync --all-features...${NC}"
-    if ! rye sync --all-features; then
-        echo -e "${RED}❌ Failed to sync dependencies${NC}"
+    echo -e "${GREEN}✅ Found built wheel: $wheel_file${NC}"
+
+    # Test the wheel by running agentex --help
+    echo -e "${YELLOW}Verifying built wheel...${NC}"
+    if ! uv run --with "$wheel_file" agentex --help >/dev/null 2>&1; then
+        echo -e "${RED}❌ Failed to run agentex with built wheel${NC}"
         cd "$original_dir"
         return 1
     fi
 
-    echo -e "${YELLOW}Running rye build...${NC}"
-    if ! rye build; then
-        echo -e "${RED}❌ Failed to build package${NC}"
-        cd "$original_dir"
-        return 1
-    fi
-
-    echo -e "${GREEN}✅ CLI built successfully${NC}"
+    echo -e "${GREEN}✅ Built wheel verified successfully${NC}"
     cd "$original_dir"
     return 0
 }
 
-# Function to get the appropriate agentex command
-get_agentex_command() {
-    if [ "$BUILD_CLI" = true ]; then
-        # Use the local build via rye run (rye is in PATH)
-        echo "rye run agentex"
-    else
-        # Use the system-installed version
-        echo "uv run agentex"
-    fi
-}
 
 # Main execution function
 main() {
@@ -401,10 +388,10 @@ main() {
 
     echo ""
 
-    # Build CLI if requested
+    # Check built wheel if requested
     if [ "$BUILD_CLI" = true ]; then
-        if ! build_cli; then
-            echo -e "${RED}❌ Failed to build CLI from source${NC}"
+        if ! check_built_wheel; then
+            echo -e "${RED}❌ Failed to find or verify built wheel${NC}"
             exit 1
         fi
         echo ""
