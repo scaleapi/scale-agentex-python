@@ -260,6 +260,52 @@ run_test() {
     # Change to tutorial directory
     cd "$tutorial_path" || return 1
 
+    # Debug connectivity inside uv environment
+    echo -e "${YELLOW}🔍 Testing connectivity inside uv environment...${NC}"
+    uv run python -c "
+import os
+print(f'AGENTEX_API_BASE_URL: {os.environ.get(\"AGENTEX_API_BASE_URL\", \"NOT SET\")}')
+try:
+    import httpx
+    response = httpx.get('http://localhost:5003/agents', timeout=10)
+    print(f'✅ HTTP request successful: {response.status_code}')
+    print(f'Response: {response.text}')
+except Exception as e:
+    print(f'❌ HTTP request failed: {e}')
+
+print('\\n🔍 Testing AgentEx SDK send_message...')
+try:
+    from agentex import Agentex
+    from agentex.types.agent_rpc_params import ParamsSendMessageRequest
+    from agentex.types import TextContentParam
+
+    client = Agentex(base_url='http://localhost:5003')
+    print(f'✅ AgentEx client created successfully')
+
+    # Make the same request as the failing test
+    response = client.agents.send_message(
+        agent_name='s000-hello-acp',
+        params=ParamsSendMessageRequest(
+            content=TextContentParam(
+                author='user',
+                content='Hello, Agent! How are you?',
+                type='text',
+            )
+        ),
+    )
+    print(f'✅ SDK send_message successful')
+    print(f'Response result: {response.result}')
+    if response.result:
+        print(f'Result length: {len(response.result)}')
+        if len(response.result) > 0:
+            print(f'First message content: {response.result[0].content}')
+
+except Exception as e:
+    print(f'❌ AgentEx SDK send_message failed: {e}')
+    import traceback
+    traceback.print_exc()
+"
+
     # Run the tests
     uv run pytest tests/test_agent.py -v -s
     local exit_code=$?

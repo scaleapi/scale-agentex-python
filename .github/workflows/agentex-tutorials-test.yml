@@ -29,7 +29,7 @@ jobs:
           cd scale-agentex/agentex
           echo "🚀 Starting dependencies (Postgres, Redis, Temporal, MongoDB)..."
 
-          # Start all services except the agentex service
+          # Start all services
           docker compose up -d
 
           echo "⏳ Waiting for dependencies to be healthy..."
@@ -44,8 +44,26 @@ jobs:
             sleep 5
           done
 
-          # Verify all deps are up
+          # Wait specifically for AgentEx server to be ready
+          echo "⏳ Waiting for AgentEx server to be ready..."
+          for i in {1..30}; do
+            if curl -s --max-time 5 http://localhost:5003/health >/dev/null 2>&1; then
+              echo "✅ AgentEx server is ready"
+              break
+            fi
+            echo "  Attempt $i/30: Waiting for AgentEx server..."
+            sleep 5
+          done
+
+          # Debug port mappings
+          echo "🔍 Docker port mappings:"
           docker compose ps
+          echo ""
+          echo "🔍 Docker port details:"
+          docker compose ps --format "table {{.Name}}\t{{.Image}}\t{{.Ports}}"
+          echo ""
+          echo "🔍 Testing AgentEx server accessibility:"
+          curl -v --max-time 10 http://localhost:5003/health 2>&1 || echo "❌ AgentEx not accessible on localhost:5003"
 
       - name: Build AgentEx SDK
         run: |
@@ -124,9 +142,13 @@ jobs:
               echo "Updated $manifest_path to use port $port"
             fi
 
+            # Debug connectivity before running test
+            echo "🔍 Pre-test connectivity check:"
+            curl -v --max-time 5 http://localhost:5003/agents 2>&1 || echo "❌ /agents endpoint not accessible"
+
             # Run test in background with unique port
             (
-              AGENTEX_API_BASE_URL="http://host.docker.internal:5003" \
+              AGENTEX_API_BASE_URL="http://localhost:5003" \
                 ./run_agent_test.sh --build-cli "$tutorial"
 
               if [ $? -eq 0 ]; then
