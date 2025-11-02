@@ -61,6 +61,33 @@ jobs:
           echo "UV version: $(uv --version)"
           echo "UV path: $(which uv)"
 
+          # Start background job to continuously poll AgentEx container logs
+          echo "🔍 Starting AgentEx container log polling in background..."
+          (
+            echo "Log polling started at $(date)"
+
+            # Function to get container logs
+            get_logs() {
+              echo "=== AgentEx Container Logs $(date) ==="
+              docker logs agentex --tail=20 2>/dev/null || {
+                echo "⚠️ Failed to get logs from 'agentex' container"
+                echo "Available containers:"
+                docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+              }
+              echo "=== End Logs ==="
+              echo ""
+            }
+
+            # Poll logs every 2 seconds (very frequent for debugging)
+            while true; do
+              get_logs
+              sleep 2
+            done
+          ) &
+
+          LOG_POLLER_PID=$!
+          echo "📋 Log poller started with PID: $LOG_POLLER_PID"
+
           # Find all tutorial directories
           tutorial_paths=()
           for dir in $(find . -name "manifest.yaml" -exec dirname {} \; | sort); do
@@ -99,7 +126,7 @@ jobs:
 
             # Run test in background with unique port
             (
-              AGENTEX_API_BASE_URL="http://localhost:5003" \
+              AGENTEX_API_BASE_URL="http://host.docker.internal:5003" \
                 ./run_agent_test.sh --build-cli "$tutorial"
 
               if [ $? -eq 0 ]; then
@@ -121,6 +148,32 @@ jobs:
             wait "$pid"
           done
 
+          # Always show AgentEx server container logs immediately after tests complete
+          echo ""
+          echo "========================================="
+          echo "AGENTEX SERVER CONTAINER LOGS"
+          echo "========================================="
+
+          # Show AgentEx server container logs
+          echo "📋 AgentEx server container logs:"
+          echo "----------------------------------------"
+
+          echo "Available containers:"
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+
+          echo ""
+          echo "AgentEx container logs (last 100 lines):"
+          docker logs agentex --tail=100 2>/dev/null || {
+            echo "❌ Failed to get logs from 'agentex' container"
+            echo "Available containers:"
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+          }
+          echo "----------------------------------------"
+
+          # Stop the log poller
+          echo "🛑 Stopping log poller (PID: $LOG_POLLER_PID)"
+          kill $LOG_POLLER_PID 2>/dev/null || echo "Log poller already stopped"
+
           # Restore all original manifests
           echo ""
           echo "Restoring original manifest files..."
@@ -140,6 +193,7 @@ jobs:
             fi
           done
 
+
           # Print summary
           echo ""
           echo "========================================="
@@ -155,6 +209,33 @@ jobs:
             for test in "${failed_tests[@]}"; do
               echo "  ❌ $test"
             done
+
+            echo ""
+            echo "========================================="
+            echo "TUTORIAL AGENT LOGS FOR FAILED TESTS"
+            echo "========================================="
+
+            # Show logs for failed tests
+            for test in "${failed_tests[@]}"; do
+              test_name=$(basename "$test")
+              logfile="/tmp/agentex-${test_name}.log"
+
+              echo ""
+              echo "📋 Tutorial agent logs for $test ($logfile):"
+              echo "----------------------------------------"
+
+              if [ -f "$logfile" ]; then
+                echo "Last 100 lines of tutorial agent logs:"
+                tail -100 "$logfile"
+              else
+                echo "⚠️  No log file found at: $logfile"
+                echo "Available log files:"
+                ls -la /tmp/agentex-*.log 2>/dev/null || echo "  (none)"
+              fi
+
+              echo "----------------------------------------"
+            done
+
             exit 1
           else
             echo ""
