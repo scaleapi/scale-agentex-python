@@ -2,17 +2,16 @@ import asyncio
 
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
-from project.workflow import {{ workflow_class }}
+from project.workflow import ExampleTutorialWorkflow
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.activities import get_all_activities
 from agentex.lib.core.temporal.workers.worker import AgentexWorker
-from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import ContextInterceptor
 from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model import (
     TemporalStreamingModelProvider,
 )
-from agentex.lib.core.temporal.plugins.openai_agents.hooks.activities import stream_lifecycle_content
+from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import ContextInterceptor
 
 environment_variables = EnvironmentVariables.refresh()
 
@@ -22,14 +21,13 @@ logger = make_logger(__name__)
 async def main():
     # Setup debug mode if enabled
     setup_debug_if_enabled()
-
+    
     task_queue_name = environment_variables.WORKFLOW_TASK_QUEUE
     if task_queue_name is None:
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")
-
+    
     # Add activities to the worker
-    # stream_lifecycle_content is required for hooks to work (creates tool_request/tool_response messages)
-    all_activities = get_all_activities() + [stream_lifecycle_content]  # add your own activities here
+    all_activities = get_all_activities() + []  # add your own activities here
 
     # ============================================================================
     # STREAMING SETUP: Interceptor + Model Provider
@@ -59,12 +57,12 @@ async def main():
     worker = AgentexWorker(
         task_queue=task_queue_name,
         plugins=[OpenAIAgentsPlugin(model_provider=temporal_streaming_model_provider)],
-        interceptors=[context_interceptor],
+        interceptors=[context_interceptor]
     )
 
     await worker.run(
         activities=all_activities,
-        workflow={{ workflow_class }},
+        workflow=ExampleTutorialWorkflow,
     )
 
 if __name__ == "__main__":

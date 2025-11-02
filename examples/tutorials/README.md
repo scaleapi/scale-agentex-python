@@ -37,23 +37,15 @@ graph TD
     M -->|Yes| N[10_temporal/<br/>000_hello_acp]
     M -->|No| O[00_base/090_multi_agent]
 
-    N --> P[10_temporal/010_agent_chat]
-    P --> Q[10_temporal/020_state_machine]
-    Q --> R[10_temporal/030_custom_activities]
-    R --> S[10_temporal/050_guardrails]
-
-    S --> T{Using<br/>OpenAI SDK?}
-    T -->|Yes| U[10_temporal/060_openai_hello]
-    U --> V[10_temporal/070_openai_tools]
-    V --> W[10_temporal/080_openai_hitl]
-    T -->|No| X[🎉 Production Ready!]
-    W --> X
+    N --> P[10_temporal/<br/>010_openai_hello]
+    P --> Q[10_temporal/<br/>020_openai_tools]
+    Q --> R[10_temporal/<br/>030_openai_hitl]
+    R --> S[🎉 Production Ready!]
 
     style A fill:#e1f5e1
-    style X fill:#fff3cd
+    style S fill:#fff3cd
     style E fill:#e3f2fd
     style M fill:#e3f2fd
-    style T fill:#e3f2fd
 ```
 
 ## Tutorial Structure
@@ -89,19 +81,15 @@ Task-based architecture without workflow orchestration. Adds task management on 
 #### 10_temporal/ - Production Workflows
 Durable, fault-tolerant agents with Temporal workflow orchestration.
 
-**Core Patterns:**
+**Tutorials:**
 - **[000_hello_acp](10_agentic/10_temporal/000_hello_acp/)** - Temporal basics
-- **[010_agent_chat](10_agentic/10_temporal/010_agent_chat/)** - Stateful conversations
-- **[020_state_machine](10_agentic/10_temporal/020_state_machine/)** - Structured state management
-- **[030_custom_activities](10_agentic/10_temporal/030_custom_activities/)** - Custom Temporal activities
-- **[050_agent_chat_guardrails](10_agentic/10_temporal/050_agent_chat_guardrails/)** - Safety & validation
-
-**OpenAI Agents SDK Series:**
-- **[060_openai_hello_world](10_agentic/10_temporal/060_open_ai_agents_sdk_hello_world/)** - Plugin-based agents
-- **[070_openai_tools](10_agentic/10_temporal/070_open_ai_agents_sdk_tools/)** - Tool integration patterns
-- **[080_openai_hitl](10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/)** - Human oversight workflows
+- **[010_openai_hello_world](10_agentic/10_temporal/010_open_ai_agents_sdk_hello_world/)** - OpenAI Agents SDK integration
+- **[020_openai_tools](10_agentic/10_temporal/020_open_ai_agents_sdk_tools/)** - Durable tool patterns
+- **[030_openai_hitl](10_agentic/10_temporal/030_open_ai_agents_sdk_human_in_the_loop/)** - Human-in-the-loop workflows
 
 **When to use:** Production systems requiring durability, fault tolerance, long-running workflows, or complex state management
+
+**Note:** Older tutorials using the `run_agent_streamed_auto_send` pattern have been archived to `10_temporal/_archived/`. See the [archive README](10_agentic/10_temporal/_archived/README.md) for migration guidance.
 
 ---
 

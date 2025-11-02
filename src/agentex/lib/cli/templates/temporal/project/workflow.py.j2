@@ -28,21 +28,47 @@ class {{ workflow_class }}(BaseWorkflow):
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
+        self._task_id = None
+        self._trace_id = None
+        self._parent_span_id = None
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
         logger.info(f"Received task message instruction: {params}")
-            
-        # 2. Echo back the client's message to show it in the UI. This is not done by default so the agent developer has full control over what is shown to the user.
+
+        # Echo back the client's message to show it in the UI. This is not done by default
+        # so the agent developer has full control over what is shown to the user.
         await adk.messages.create(task_id=params.task.id, content=params.event.content)
 
-        # 3. Send a simple response message.
-        # In future tutorials, this is where we'll add more sophisticated response logic.
+        # ============================================================================
+        # NEXT STEPS: Using OpenAI Agents SDK with Temporal
+        # ============================================================================
+        # This project is configured with the OpenAI Agents SDK integration including:
+        # - TemporalStreamingModelProvider for real-time token streaming
+        # - ContextInterceptor for threading task_id through activities
+        # - TemporalStreamingHooks (via stream_lifecycle_content activity)
+        #
+        # To use the OpenAI Agents SDK in your workflow:
+        # 1. Add: from agents import Agent, Runner
+        # 2. Add: from agentex.lib.core.temporal.plugins.openai_agents.hooks.hooks import TemporalStreamingHooks
+        # 3. Initialize streaming context variables:
+        #    self._task_id = params.task.id
+        #    self._trace_id = params.task.id
+        #    self._parent_span_id = params.task.id
+        # 4. Create hooks: hooks = TemporalStreamingHooks(task_id=params.task.id)
+        # 5. Create your agent and run: result = await Runner.run(agent, input, hooks=hooks)
+        #
+        # For complete examples with tools, see:
+        # https://github.com/scaleapi/agentex-python/tree/main/examples/tutorials/10_agentic/10_temporal/070_open_ai_agents_sdk_tools
+        # ============================================================================
+
+        # Send a simple response message.
+        # Replace this with your OpenAI Agents SDK logic following the pattern above.
         await adk.messages.create(
             task_id=params.task.id,
             content=TextContent(
                 author="agent",
-                content=f"Hello! I've received your message. I can't respond right now, but in future tutorials we'll see how you can get me to intelligently respond to your message.",
+                content=f"Hello! I've received your message. See the comments above for how to integrate the OpenAI Agents SDK.",
             ),
         )
 

@@ -25,6 +25,7 @@ async def send_event_and_poll_yielding(
     user_message: str,
     timeout: int = 30,
     sleep_interval: float = 1.0,
+    yield_updates: bool = False,
 ) -> AsyncGenerator[TaskMessage, None]:
     """
     Send an event to an agent and poll for responses, yielding messages as they arrive.
@@ -38,6 +39,7 @@ async def send_event_and_poll_yielding(
         user_message: The message content to send
         timeout: Maximum seconds to wait for a response (default: 30)
         sleep_interval: Seconds to sleep between polls (default: 1.0)
+        yield_updates: If True, yield messages again when their content changes (for streaming)
 
     Yields:
         TaskMessage objects as they are discovered during polling
@@ -60,6 +62,7 @@ async def send_event_and_poll_yielding(
         timeout=timeout,
         sleep_interval=sleep_interval,
         messages_created_after=messages_created_after,
+        yield_updates=yield_updates,
     ):
         yield message
 
@@ -70,9 +73,27 @@ async def poll_messages(
     timeout: int = 30,
     sleep_interval: float = 1.0,
     messages_created_after: Optional[float] = None,
+    yield_updates: bool = False,
 ) -> AsyncGenerator[TaskMessage, None]:
+    """
+    Poll for messages continuously until timeout.
+
+    Args:
+        client: AgentEx client instance
+        task_id: The task ID to poll messages for
+        timeout: Maximum seconds to poll (default: 30)
+        sleep_interval: Seconds to sleep between polls (default: 1.0)
+        messages_created_after: Optional timestamp to filter messages (Unix timestamp)
+        yield_updates: If True, yield messages again when their content changes (for streaming)
+                      If False, only yield each message ID once (default: False)
+
+    Yields:
+        TaskMessage objects as they are discovered or updated
+    """
     # Keep track of messages we've already yielded
     seen_message_ids = set()
+    # Track message content hashes to detect updates (for streaming)
+    message_content_hashes = {}
     start_time = datetime.now()
 
     # Poll continuously until timeout
@@ -81,10 +102,6 @@ async def poll_messages(
         # print("DEBGUG: Messages found: ", messages)
         new_messages_found = 0
         for message in messages:
-            # Skip if we've already yielded this message
-            if message.id in seen_message_ids:
-                continue
-
             # Check if message passes timestamp filter
             if messages_created_after and message.created_at:
                 # If message.created_at is timezone-naive, assume it's UTC
@@ -95,14 +112,27 @@ async def poll_messages(
                 if msg_timestamp < messages_created_after:
                     continue
 
-            # Yield new messages that pass the filter
-            seen_message_ids.add(message.id)
-            new_messages_found += 1
+            # Check if this is a new message or an update to existing message
+            is_new_message = message.id not in seen_message_ids
 
-            # This yield should transfer control back to the caller
-            yield message
+            if yield_updates:
+                # For streaming: track content changes
+                content_str = message.content.content if message.content and hasattr(message.content, 'content') else ""
+                content_hash = hash(content_str + str(message.streaming_status))
+                is_updated = message.id in message_content_hashes and message_content_hashes[message.id] != content_hash
 
-            # If we see this print, it means the caller consumed the message and we resumed
+                if is_new_message or is_updated:
+                    message_content_hashes[message.id] = content_hash
+                    seen_message_ids.add(message.id)
+                    new_messages_found += 1
+                    yield message
+            else:
+                # Original behavior: only yield each message ID once
+                if is_new_message:
+                    seen_message_ids.add(message.id)
+                    new_messages_found += 1
+                    yield message
+
         # Sleep before next poll
         await asyncio.sleep(sleep_interval)
 
@@ -208,6 +238,66 @@ async def stream_task_messages(
         if task_message:
             yield task_message
 
+
+
+async def send_event_and_poll_with_streaming(
+    client: AsyncAgentex,
+    agent_id: str,
+    task_id: str,
+    user_message: str,
+    timeout: int = 30,
+    sleep_interval: float = 1.0,
+    streaming_wait_time: float = 5.0,
+) -> TaskMessage:
+    """
+    Send an event to a temporal agent and poll for the complete response.
+
+    This function is specifically designed for temporal agents that use streaming.
+    It handles the case where streaming updates the same message ID with chunks,
+    so it captures the initial message and re-fetches it after waiting for streaming to complete.
+
+    Args:
+        client: AgentEx client instance
+        agent_id: The agent ID
+        task_id: The task ID
+        user_message: The message content to send
+        timeout: Maximum seconds to wait for initial response (default: 30)
+        sleep_interval: Seconds to sleep between polls (default: 1.0)
+        streaming_wait_time: Seconds to wait for streaming to complete before re-fetching (default: 5.0)
+
+    Returns:
+        The final complete TaskMessage with streamed content
+
+    Raises:
+        AssertionError: If no agent message is received
+    """
+    # Send the event and poll for the initial message
+    agent_message = None
+
+    async for message in send_event_and_poll_yielding(
+        client=client,
+        agent_id=agent_id,
+        task_id=task_id,
+        user_message=user_message,
+        timeout=timeout,
+        sleep_interval=sleep_interval,
+    ):
+        if message.content and message.content.type == "text" and message.content.author == "agent":
+            agent_message = message
+            break
+
+    if agent_message is None:
+        raise AssertionError("No agent message received")
+
+    # If the message is still in progress, wait and re-fetch
+    # Otherwise, we can use it directly since streaming already completed
+    if agent_message.streaming_status == "IN_PROGRESS":
+        await asyncio.sleep(streaming_wait_time)
+        final_message = await client.messages.retrieve(agent_message.id)
+        return final_message
+    else:
+        # Already complete
+        return agent_message
 
 
 def validate_text_in_response(expected_text: str, message: TaskMessage) -> bool:

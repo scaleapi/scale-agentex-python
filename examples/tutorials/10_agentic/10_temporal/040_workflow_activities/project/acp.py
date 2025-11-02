@@ -7,9 +7,6 @@ from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
     try:
         import debugpy
-        from agentex.lib.utils.logging import make_logger
-
-        logger = make_logger(__name__)
         debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "5679"))
         debug_type = os.getenv("AGENTEX_DEBUG_TYPE", "acp")
         wait_for_attach = os.getenv("AGENTEX_DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true"
@@ -18,14 +15,14 @@ if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
         debugpy.configure(subProcess=False)
         debugpy.listen(debug_port)
 
-        logger.info(f"🐛 [{debug_type.upper()}] Debug server listening on port {debug_port}")
+        print(f"🐛 [{debug_type.upper()}] Debug server listening on port {debug_port}")
 
         if wait_for_attach:
-            logger.info(f"⏳ [{debug_type.upper()}] Waiting for debugger to attach...")
+            print(f"⏳ [{debug_type.upper()}] Waiting for debugger to attach...")
             debugpy.wait_for_client()
-            logger.info(f"✅ [{debug_type.upper()}] Debugger attached!")
+            print(f"✅ [{debug_type.upper()}] Debugger attached!")
         else:
-            logger.info(f"📡 [{debug_type.upper()}] Ready for debugger attachment")
+            print(f"📡 [{debug_type.upper()}] Ready for debugger attachment")
 
     except ImportError:
         print("❌ debugpy not available. Install with: pip install debugpy")
@@ -45,31 +42,13 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 context_interceptor = ContextInterceptor()
 temporal_streaming_model_provider = TemporalStreamingModelProvider()
 
-# Create the ACP server
+# Create the ACP server with OpenAI Agents SDK plugin
 acp = FastACP.create(
     acp_type="agentic",
     config=TemporalACPConfig(
-        # When deployed to the cluster, the Temporal address will automatically be set to the cluster address
-        # For local development, we set the address manually to talk to the local Temporal service set up via docker compose
-        # We are also adding the Open AI Agents SDK plugin to the ACP.
         type="temporal",
         temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233"),
         plugins=[OpenAIAgentsPlugin(model_provider=temporal_streaming_model_provider)],
         interceptors=[context_interceptor]
     )
 )
-
-
-# Notice that we don't need to register any handlers when we use type="temporal"
-# If you look at the code in agentex.sdk.fastacp.impl.temporal_acp
-# You can see that these handlers are automatically registered when the ACP is created
-
-# @acp.on_task_create
-# This will be handled by the method in your workflow that is decorated with @workflow.run
-
-# @acp.on_task_event_send
-# This will be handled by the method in your workflow that is decorated with @workflow.signal(name=SignalName.RECEIVE_MESSAGE)
-
-# @acp.on_task_cancel
-# This does not need to be handled by your workflow.
-# It is automatically handled by the temporal client which cancels the workflow directly 

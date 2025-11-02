@@ -128,6 +128,7 @@ class AgentexWorker:
         health_check_port: int | None = None,
         plugins: list = [],
         interceptors: list = [],
+        mcp_server_providers: list = [],
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -138,6 +139,7 @@ class AgentexWorker:
         self.health_check_port = health_check_port if health_check_port is not None else EnvironmentVariables.refresh().HEALTH_CHECK_PORT
         self.plugins = plugins
         self.interceptors = interceptors
+        self.mcp_server_providers = mcp_server_providers
 
     @overload
     async def run(
@@ -169,9 +171,57 @@ class AgentexWorker:
         if self.interceptors:
             _validate_interceptors(self.interceptors)
 
+        # Prepare plugins list - handle OpenAI Agents plugin and MCP servers
+        plugins = []
+
+        # Find existing OpenAI Agents plugin if any
+        openai_plugin = None
+        for p in self.plugins:
+            if isinstance(p, OpenAIAgentsPlugin):
+                openai_plugin = p
+            else:
+                plugins.append(p)
+
+        if self.mcp_server_providers:
+            # If there's an existing OpenAI plugin, we need to recreate it with MCP servers
+            if openai_plugin:
+                # Recreate the plugin with MCP servers added
+                import dataclasses
+
+                # Get existing config from the plugin
+                plugin_dict = {}
+                if hasattr(openai_plugin, '_model_params'):
+                    plugin_dict['model_params'] = openai_plugin._model_params
+                if hasattr(openai_plugin, '_model_provider'):
+                    plugin_dict['model_provider'] = openai_plugin._model_provider
+
+                # Add MCP servers
+                plugin_dict['mcp_server_providers'] = self.mcp_server_providers
+
+                plugins.append(OpenAIAgentsPlugin(**plugin_dict))
+                logger.info(f"Added {len(self.mcp_server_providers)} MCP server providers to existing OpenAI Agents plugin")
+            else:
+                # No existing plugin, create one with MCP servers
+                from datetime import timedelta
+                from temporalio.contrib.openai_agents import ModelActivityParameters
+
+                plugins.append(
+                    OpenAIAgentsPlugin(
+                        model_params=ModelActivityParameters(
+                            start_to_close_timeout=timedelta(seconds=180)
+                        ),
+                        mcp_server_providers=self.mcp_server_providers,
+                    )
+                )
+                logger.info(f"Created OpenAI Agents plugin with {len(self.mcp_server_providers)} MCP server providers")
+        else:
+            # No MCP servers, just add back the OpenAI plugin if it exists
+            if openai_plugin:
+                plugins.append(openai_plugin)
+
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
-            plugins=self.plugins,
+            plugins=plugins,
         )
 
         # Enable debug mode if AgentEx debug is enabled (disables deadlock detection)

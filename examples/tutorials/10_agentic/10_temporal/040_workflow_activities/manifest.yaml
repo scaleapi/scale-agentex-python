@@ -1,0 +1,62 @@
+# Workflow Activities Tutorial Manifest
+# Tutorial demonstrating activities for workflow orchestration alongside OpenAI Agents SDK
+
+build:
+  context:
+    root: ../
+    include_paths:
+      - 040_workflow_activities
+    dockerfile: 040_workflow_activities/Dockerfile
+    dockerignore: 040_workflow_activities/.dockerignore
+
+local_development:
+  agent:
+    port: 8000
+    host_address: host.docker.internal
+
+  paths:
+    acp: project/acp.py
+    worker: project/run_worker.py
+
+agent:
+  acp_type: agentic
+  name: workflow-activities-tutorial
+  description: Tutorial showing workflow-level activities for orchestration alongside OpenAI Agents SDK
+
+  temporal:
+    enabled: true
+    workflows:
+      - name: workflow-activities-tutorial
+        queue_name: workflow_activities_tutorial_queue
+
+  credentials:
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+
+  env:
+    OPENAI_API_KEY: ""
+    OPENAI_ORG_ID: ""
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+
+  imagePullSecrets:
+    - name: my-registry-secret
+
+  global:
+    agent:
+      name: "workflow-activities-tutorial"
+      description: "Tutorial: Workflow-level activities for orchestration"
+
+    replicaCount: 1
+
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

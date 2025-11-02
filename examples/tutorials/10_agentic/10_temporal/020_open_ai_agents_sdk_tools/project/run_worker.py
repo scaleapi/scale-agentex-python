@@ -2,17 +2,18 @@ import asyncio
 
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
-from project.workflow import {{ workflow_class }}
+from project.workflow import ExampleTutorialWorkflow
+from project.activities import get_weather, deposit_money, withdraw_money
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.activities import get_all_activities
 from agentex.lib.core.temporal.workers.worker import AgentexWorker
-from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import ContextInterceptor
+from agentex.lib.core.temporal.plugins.openai_agents.hooks.activities import stream_lifecycle_content
 from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model import (
     TemporalStreamingModelProvider,
 )
-from agentex.lib.core.temporal.plugins.openai_agents.hooks.activities import stream_lifecycle_content
+from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import ContextInterceptor
 
 environment_variables = EnvironmentVariables.refresh()
 
@@ -28,8 +29,7 @@ async def main():
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")
 
     # Add activities to the worker
-    # stream_lifecycle_content is required for hooks to work (creates tool_request/tool_response messages)
-    all_activities = get_all_activities() + [stream_lifecycle_content]  # add your own activities here
+    all_activities = get_all_activities() + [withdraw_money, deposit_money, get_weather, stream_lifecycle_content]  # add your own activities here
 
     # ============================================================================
     # STREAMING SETUP: Interceptor + Model Provider
@@ -64,7 +64,7 @@ async def main():
 
     await worker.run(
         activities=all_activities,
-        workflow={{ workflow_class }},
+        workflow=ExampleTutorialWorkflow,
     )
 
 if __name__ == "__main__":

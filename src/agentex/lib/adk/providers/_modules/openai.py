@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import Any, Literal
 from datetime import timedelta
 
@@ -11,6 +12,12 @@ from agents.guardrail import InputGuardrail, OutputGuardrail
 from temporalio.common import RetryPolicy
 from agents.agent_output import AgentOutputSchemaBase
 from agents.model_settings import ModelSettings
+
+# Use warnings.deprecated in Python 3.13+, typing_extensions.deprecated for older versions
+if sys.version_info >= (3, 13):
+    from warnings import deprecated
+else:
+    from typing_extensions import deprecated
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import in_temporal_workflow
@@ -383,6 +390,10 @@ class OpenAIModule:
             previous_response_id=previous_response_id,
         )
 
+    @deprecated(
+        "Use the OpenAI Agents SDK integration with Temporal instead. "
+        "See examples in tutorials/10_agentic/10_temporal/ for migration guidance."
+    )
     async def run_agent_streamed_auto_send(
         self,
         task_id: str,
@@ -412,6 +423,10 @@ class OpenAIModule:
     ) -> SerializableRunResultStreaming | RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
+
+        .. deprecated::
+            Use the OpenAI Agents SDK integration with Temporal instead.
+            See examples in tutorials/10_agentic/10_temporal/ for migration guidance.
 
         Args:
             task_id: The ID of the task to run the agent for.
