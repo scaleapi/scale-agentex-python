@@ -115,6 +115,30 @@ start_agent() {
     # Change to tutorial directory
     cd "$tutorial_path" || return 1
 
+    # Debug current directory and virtualenv status
+    echo -e "${YELLOW}DEBUG: Current directory: $PWD${NC}"
+    echo -e "${YELLOW}DEBUG: Tutorial path: $tutorial_path${NC}"
+
+    # Check if .venv exists
+    echo -e "${YELLOW}DEBUG: Tutorial .venv contents:${NC}"
+    if [ -d ".venv" ]; then
+        ls -la .venv/ || echo "Cannot list .venv contents"
+    else
+        echo "No .venv directory found"
+    fi
+
+    # Check what packages are available in rye context
+    echo -e "${YELLOW}DEBUG: Available packages in tutorial rye context:${NC}"
+    rye run pip list 2>/dev/null || echo "Cannot list packages"
+
+    # Specifically check for agentex-sdk
+    echo -e "${YELLOW}DEBUG: Checking for agentex-sdk:${NC}"
+    rye run pip show agentex-sdk 2>/dev/null || echo "agentex-sdk not found in virtualenv"
+
+    # Show rye project status
+    echo -e "${YELLOW}DEBUG: Rye show output:${NC}"
+    rye show 2>/dev/null || echo "No rye project detected"
+
     # Start the agent in background and capture PID
     local agentex_cmd=$(get_agentex_command)
     $agentex_cmd agents run --manifest manifest.yaml > "$logfile" 2>&1 &
