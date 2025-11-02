@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from temporalio.client import Client, Plugin as ClientPlugin
+from temporalio.worker import Interceptor
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
@@ -58,6 +59,24 @@ def validate_client_plugins(plugins: list[Any]) -> None:
             raise TypeError(
                 f"Plugin at index {i} must be an instance of temporalio.client.Plugin, "
                 f"got {type(plugin).__name__}. Note: WorkerPlugin is not valid for workflow clients."
+            )
+
+
+def validate_worker_interceptors(interceptors: list[Any]) -> None:
+    """
+    Validate that all items in the interceptors list are valid Temporal worker interceptors.
+
+    Args:
+        interceptors: List of interceptors to validate
+
+    Raises:
+        TypeError: If any interceptor is not a valid Interceptor instance
+    """
+    for i, interceptor in enumerate(interceptors):
+        if not isinstance(interceptor, Interceptor):
+            raise TypeError(
+                f"Interceptor at index {i} must be an instance of temporalio.worker.Interceptor, "
+                f"got {type(interceptor).__name__}"
             )
 
 
