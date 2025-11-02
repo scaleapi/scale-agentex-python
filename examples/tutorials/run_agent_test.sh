@@ -272,6 +272,19 @@ run_test() {
         return 0
     else
         echo -e "${RED}❌ Tests failed for ${name}${NC}"
+
+        # Print agent logs to help with debugging
+        local logfile="/tmp/agentex-${name}.log"
+        if [[ -f "$logfile" ]]; then
+            echo ""
+            echo -e "${YELLOW}📋 Agent logs for debugging:${NC}"
+            echo "----------------------------------------"
+            tail -50 "$logfile"
+            echo "----------------------------------------"
+        else
+            echo -e "${YELLOW}⚠️  No agent log file found at: $logfile${NC}"
+        fi
+
         return 1
     fi
 }
