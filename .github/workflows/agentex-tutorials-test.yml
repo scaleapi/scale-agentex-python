@@ -4,10 +4,31 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-tutorials:
-    timeout-minutes: 15
-    name: test-tutorials
+  find-tutorials:
     runs-on: ubuntu-latest
+    outputs:
+      tutorials: ${{ steps.get-tutorials.outputs.tutorials }}
+    steps:
+      - name: Checkout agentex-python repo
+        uses: actions/checkout@v4
+
+      - name: Find all tutorials
+        id: get-tutorials
+        run: |
+          cd examples/tutorials
+          tutorials=$(find . -name "manifest.yaml" -exec dirname {} \; | sort | sed 's|^\./||' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "tutorials=$tutorials" >> $GITHUB_OUTPUT
+          echo "Found tutorials: $tutorials"
+
+  test-tutorial:
+    needs: find-tutorials
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        tutorial: ${{ fromJson(needs.find-tutorials.outputs.tutorials) }}
+      fail-fast: false
+    name: test-${{ matrix.tutorial }}
 
     steps:
       - name: Checkout agentex-python repo
@@ -34,15 +55,14 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
 
           # Add extra_hosts to agentex service to make host.docker.internal work
-          # This allows the AgentEx container to reach the GitHub runner host
           yq eval '.services.agentex.extra_hosts = ["host.docker.internal:host-gateway"]' -i docker-compose.yml
 
           echo "✅ Added extra_hosts configuration to agentex service"
 
-      - name: Navigate to scale-agentex repo
+      - name: Start AgentEx Server
         run: |
           cd scale-agentex/agentex
-          echo "🚀 Starting dependencies (Postgres, Redis, Temporal, MongoDB)..."
+          echo "🚀 Starting AgentEx server and dependencies..."
 
           # Start all services
           docker compose up -d
@@ -77,316 +97,11 @@ jobs:
           echo "✅ SDK built successfully"
           ls -la dist/
 
-      - name: Run Parallel Tutorial Tests
+      - name: Test Tutorial
         working-directory: ./examples/tutorials
         env:
           OPENAI_API_KEY: ${{ secrets.TUTORIAL_OPENAI_API_KEY }}
         run: |
-          # Verify uv is working
-          echo "UV version: $(uv --version)"
-          echo "UV path: $(which uv)"
-
-          # Start background job to poll AgentEx container logs and write to file
-          (
-            echo "AgentEx container log polling started at $(date)" > /tmp/agentex_container_logs.txt
-
-            # Function to get container logs
-            get_logs() {
-              echo "=== AgentEx Container Logs $(date) ===" >> /tmp/agentex_container_logs.txt
-              docker logs agentex --tail=20 2>/dev/null >> /tmp/agentex_container_logs.txt || {
-                echo "⚠️ Failed to get logs from 'agentex' container" >> /tmp/agentex_container_logs.txt
-                echo "Available containers:" >> /tmp/agentex_container_logs.txt
-                docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" >> /tmp/agentex_container_logs.txt
-              } 2>/dev/null
-              echo "=== End Logs ===" >> /tmp/agentex_container_logs.txt
-              echo "" >> /tmp/agentex_container_logs.txt
-            }
-
-            # Poll logs every 10 seconds during test execution
-            while true; do
-              get_logs
-              sleep 10
-            done
-          ) &
-
-          LOG_POLLER_PID=$!
-          echo "📋 AgentEx log polling started in background (PID: $LOG_POLLER_PID)"
-
-
-          # Find all tutorial directories
-          tutorial_paths=()
-          for dir in $(find . -name "manifest.yaml" -exec dirname {} \; | sort); do
-            tutorial_paths+=("${dir#./}")  # Remove leading ./
-          done
-
-          echo "Found ${#tutorial_paths[@]} tutorials:"
-          printf '  %s\n' "${tutorial_paths[@]}"
-
-          # Run tests in parallel with unique ports
-          pids=()
-          failed_tests=()
-          passed_tests=()
-
-          # Run all tutorial tests
-          for i in "${!tutorial_paths[@]}"; do
-            tutorial="${tutorial_paths[$i]}"
-            port=$((8000 + i))
-
-            echo ""
-            echo "========================================="
-            echo "Starting test $((i+1))/${#tutorial_paths[@]}: $tutorial (port $port)"
-            echo "========================================="
-
-            # Modify manifest.yaml to use unique port
-            manifest_path="$tutorial/manifest.yaml"
-            if [ -f "$manifest_path" ]; then
-              # Backup original manifest
-              cp "$manifest_path" "$manifest_path.backup"
-
-              # Update port in manifest (modify the line containing 'port: 8000' or 'port: XXXX')
-              sed -i "s/port: [0-9]*/port: $port/" "$manifest_path"
-
-              # Keep host_address as host.docker.internal for CI (allows Docker container to reach GitHub runner host)
-              # Note: The AgentEx server runs in Docker and needs host.docker.internal to reach the tutorial agent on the host
-            fi
-
-
-            # Run test in background with unique port and show pytest output in real-time
-            (
-              test_output_file="/tmp/test_output_$i.log"
-              echo "Running test: $tutorial" | tee "$test_output_file"
-              echo "Port: $port" | tee -a "$test_output_file"
-              echo "========================================" | tee -a "$test_output_file"
-
-              # Use stdbuf to ensure unbuffered output for real-time visibility
-              AGENTEX_API_BASE_URL="http://localhost:5003" \
-                stdbuf -oL -eL ./run_agent_test.sh --build-cli --quiet "$tutorial" 2>&1 | tee -a "$test_output_file"
-
-              exit_code=${PIPESTATUS[0]}
-              if [ $exit_code -eq 0 ]; then
-                echo "✅ PASSED: $tutorial (port $port)"
-                echo "$tutorial" > "/tmp/passed_$i.txt"
-                echo "$test_output_file" > "/tmp/passed_output_$i.txt"
-              else
-                echo "❌ FAILED: $tutorial (port $port)"
-                echo "$tutorial" > "/tmp/failed_$i.txt"
-                echo "$test_output_file" > "/tmp/failed_output_$i.txt"
-              fi
-              exit $exit_code
-            ) &
-
-            pids+=($!)
-          done
-
-          # Wait for all tests to complete
-          echo ""
-          echo "Waiting for all tests to complete..."
-          for pid in "${pids[@]}"; do
-            wait "$pid"
-          done
-
-          # Restore all original manifests
-          echo ""
-          echo "Restoring original manifest files..."
-          for tutorial in "${tutorial_paths[@]}"; do
-            if [ -f "$tutorial/manifest.yaml.backup" ]; then
-              mv "$tutorial/manifest.yaml.backup" "$tutorial/manifest.yaml"
-              echo "Restored $tutorial/manifest.yaml"
-            fi
-          done
-
-          # Collect results
-          for i in "${!tutorial_paths[@]}"; do
-            if [ -f "/tmp/passed_$i.txt" ]; then
-              passed_tests+=($(cat "/tmp/passed_$i.txt"))
-            elif [ -f "/tmp/failed_$i.txt" ]; then
-              failed_tests+=($(cat "/tmp/failed_$i.txt"))
-            fi
-          done
-
-
-          # Stop the background log poller
-          echo "🛑 Stopping AgentEx log poller (PID: $LOG_POLLER_PID)"
-          kill $LOG_POLLER_PID 2>/dev/null || echo "Log poller already stopped"
-
-          # Print summary
-          echo ""
-          echo "========================================="
-          echo "TEST SUMMARY"
-          echo "========================================="
-          echo "Total: ${#tutorial_paths[@]}"
-          echo "Passed: ${#passed_tests[@]}"
-          echo "Failed: ${#failed_tests[@]}"
-
-          if [ ${#failed_tests[@]} -gt 0 ]; then
-            echo ""
-            echo "Failed tests:"
-            for test in "${failed_tests[@]}"; do
-              echo "  ❌ $test"
-            done
-          else
-            echo ""
-            echo "🎉 All tests passed!"
-          fi
-
-          # Show comprehensive pytest summary
-          echo ""
-          echo "========================================="
-          echo "PYTEST RESULTS SUMMARY"
-          echo "========================================="
-
-          # Collect all pytest results
-          total_passed_tests=0
-          total_failed_tests=0
-          total_pytest_tests=0
-
-          echo ""
-          echo "📊 PYTEST EXECUTION SUMMARY:"
-          echo "----------------------------------------"
-
-          for i in "${!tutorial_paths[@]}"; do
-            tutorial="${tutorial_paths[$i]}"
-            output_file="/tmp/test_output_$i.log"
-
-            if [ -f "$output_file" ]; then
-              # Extract pytest summary from each test
-              if grep -q "PYTEST OUTPUT" "$output_file"; then
-                pytest_section=$(sed -n '/========== PYTEST OUTPUT ==========/,/========== END PYTEST OUTPUT ==========/p' "$output_file")
-
-                # Count individual test results in this tutorial
-                test_passed=$(echo "$pytest_section" | grep -c "PASSED" || echo "0")
-                test_failed=$(echo "$pytest_section" | grep -c "FAILED" || echo "0")
-                test_errors=$(echo "$pytest_section" | grep -c "ERROR" || echo "0")
-
-                if [ "$test_passed" -gt 0 ] || [ "$test_failed" -gt 0 ] || [ "$test_errors" -gt 0 ]; then
-                  tutorial_total=$((test_passed + test_failed + test_errors))
-                  total_pytest_tests=$((total_pytest_tests + tutorial_total))
-                  total_passed_tests=$((total_passed_tests + test_passed))
-                  total_failed_tests=$((total_failed_tests + test_failed + test_errors))
-
-                  if [ "$test_failed" -gt 0 ] || [ "$test_errors" -gt 0 ]; then
-                    echo "❌ $tutorial: $tutorial_total tests ($test_passed passed, $test_failed failed, $test_errors errors)"
-                  else
-                    echo "✅ $tutorial: $tutorial_total tests ($test_passed passed)"
-                  fi
-                else
-                  echo "⚠️  $tutorial: No pytest results found"
-                fi
-              else
-                echo "⚠️  $tutorial: No pytest output detected"
-              fi
-            else
-              echo "⚠️  $tutorial: No output file found"
-            fi
-          done
-
-          echo "----------------------------------------"
-          echo "🏁 OVERALL PYTEST SUMMARY:"
-          echo "   Total pytest tests run: $total_pytest_tests"
-          echo "   Total pytest tests passed: $total_passed_tests"
-          echo "   Total pytest tests failed: $total_failed_tests"
-          echo ""
-
-          # Show detailed results for failed tests only
-          if [ ${#failed_tests[@]} -gt 0 ]; then
-            echo "❌ DETAILED FAILURE ANALYSIS:"
-            echo "----------------------------------------"
-            for i in "${!tutorial_paths[@]}"; do
-              if [ -f "/tmp/failed_$i.txt" ]; then
-                test_name=$(cat "/tmp/failed_$i.txt")
-                output_file=$(cat "/tmp/failed_output_$i.txt")
-                echo ""
-                echo "📋 FAILED: $test_name"
-                echo "----------------------------------------"
-                if [ -f "$output_file" ]; then
-                  # Show just the pytest failure details
-                  if grep -q "PYTEST OUTPUT" "$output_file"; then
-                    echo "Pytest failure details:"
-                    sed -n '/========== PYTEST OUTPUT ==========/,/========== END PYTEST OUTPUT ==========/p' "$output_file"
-                  else
-                    echo "No pytest output found. Showing last 40 lines:"
-                    tail -40 "$output_file"
-                  fi
-                else
-                  echo "No output file found"
-                fi
-                echo "----------------------------------------"
-              fi
-            done
-          fi
-
-          if [ ${#failed_tests[@]} -gt 0 ]; then
-            exit 1
-          fi
-
-      - name: Debug Logs for Failed Tests
-        if: always()
-        run: |
-          cd scale-agentex/agentex
-
-          echo ""
-          echo "================================================================================"
-          echo "🐛 DEBUG LOGS (for troubleshooting)"
-          echo "================================================================================"
-
-          # Show collected AgentEx server container logs
-          echo ""
-          echo "========================================="
-          echo "AGENTEX SERVER LOGS (COLLECTED DURING TESTS)"
-          echo "========================================="
-          if [ -f "/tmp/agentex_container_logs.txt" ]; then
-            echo "📋 AgentEx server logs collected during test execution:"
-            echo "----------------------------------------"
-            cat /tmp/agentex_container_logs.txt
-            echo "----------------------------------------"
-          else
-            echo "⚠️ No AgentEx container logs file found"
-            echo "📋 Attempting to get current container logs:"
-            echo "----------------------------------------"
-            docker logs agentex --tail=50 2>/dev/null || {
-              echo "❌ Failed to get logs from 'agentex' container"
-              echo "Available containers:"
-              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
-            }
-            echo "----------------------------------------"
-          fi
-
-          # Show tutorial agent logs for failed tests
-          cd ../../examples/tutorials
-
-          # Check if there were any failed tests
-          failed_tests=()
-          for i in {0..20}; do  # Check up to 20 possible tests
-            if [ -f "/tmp/failed_$i.txt" ]; then
-              failed_tests+=($(cat "/tmp/failed_$i.txt"))
-            fi
-          done
-
-          if [ ${#failed_tests[@]} -gt 0 ]; then
-            echo ""
-            echo "========================================="
-            echo "TUTORIAL AGENT LOGS FOR FAILED TESTS"
-            echo "========================================="
-
-            for test in "${failed_tests[@]}"; do
-              test_name=$(basename "$test")
-              logfile="/tmp/agentex-${test_name}.log"
-
-              echo ""
-              echo "📋 Tutorial agent logs for $test:"
-              echo "----------------------------------------"
-
-              if [ -f "$logfile" ]; then
-                echo "Tutorial agent logs (last 100 lines):"
-                tail -100 "$logfile"
-              else
-                echo "⚠️  No agent log file found at: $logfile"
-                echo "Available agent log files:"
-                ls -la /tmp/agentex-*.log 2>/dev/null || echo "  (none)"
-              fi
-              echo "----------------------------------------"
-            done
-          else
-            echo ""
-            echo "✅ No failed tests - no agent logs to show"
-          fi
+          echo "Testing tutorial: ${{ matrix.tutorial }}"
+          AGENTEX_API_BASE_URL="http://localhost:5003" \
+            ./run_agent_test.sh --build-cli "${{ matrix.tutorial }}"

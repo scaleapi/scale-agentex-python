@@ -30,15 +30,12 @@ AGENTEX_SERVER_PORT=5003
 TUTORIAL_PATH=""
 VIEW_LOGS=false
 BUILD_CLI=false
-QUIET_MODE=false
 
 for arg in "$@"; do
     if [[ "$arg" == "--view-logs" ]]; then
         VIEW_LOGS=true
     elif [[ "$arg" == "--build-cli" ]]; then
         BUILD_CLI=true
-    elif [[ "$arg" == "--quiet" ]]; then
-        QUIET_MODE=true
     else
         TUTORIAL_PATH="$arg"
     fi
@@ -59,9 +56,7 @@ check_prerequisites() {
         exit 1
     fi
 
-    if [ "$QUIET_MODE" = false ]; then
-        echo -e "${GREEN}✅ Prerequisites check passed${NC}"
-    fi
+    echo -e "${GREEN}✅ Prerequisites check passed${NC}"
 }
 
 # Function to wait for agent to be ready
@@ -71,9 +66,7 @@ wait_for_agent_ready() {
     local timeout=45  # seconds - increased to account for package installation time
     local elapsed=0
 
-    if [ "$QUIET_MODE" = false ]; then
-        echo -e "${YELLOW}⏳ Waiting for ${name} agent to be ready...${NC}"
-    fi
+    echo -e "${YELLOW}⏳ Waiting for ${name} agent to be ready...${NC}"
 
     while [ $elapsed -lt $timeout ]; do
         # Check if agent is successfully registered
@@ -111,9 +104,7 @@ start_agent() {
     local name=$(basename "$tutorial_path")
     local logfile="/tmp/agentex-${name}.log"
 
-    if [ "$QUIET_MODE" = false ]; then
-        echo -e "${YELLOW}🚀 Starting ${name} agent...${NC}"
-    fi
+    echo -e "${YELLOW}🚀 Starting ${name} agent...${NC}"
 
     # Check if tutorial directory exists
     if [[ ! -d "$tutorial_path" ]]; then
@@ -159,9 +150,7 @@ start_agent() {
     cd "$original_dir"
 
     echo "$pid" > "/tmp/agentex-${name}.pid"
-    if [ "$QUIET_MODE" = false ]; then
-        echo -e "${GREEN}✅ ${name} agent started (PID: $pid, logs: $logfile)${NC}"
-    fi
+    echo -e "${GREEN}✅ ${name} agent started (PID: $pid, logs: $logfile)${NC}"
 
     # Wait for agent to be ready
     if ! wait_for_agent_ready "$name"; then
@@ -219,9 +208,7 @@ stop_agent() {
     local pidfile="/tmp/agentex-${name}.pid"
     local logfile="/tmp/agentex-${name}.log"
 
-    if [ "$QUIET_MODE" = false ]; then
-        echo -e "${YELLOW}🛑 Stopping ${name} agent...${NC}"
-    fi
+    echo -e "${YELLOW}🛑 Stopping ${name} agent...${NC}"
 
     # Check if PID file exists
     if [[ ! -f "$pidfile" ]]; then
@@ -234,22 +221,16 @@ stop_agent() {
 
     # Check if process is running and kill it
     if kill -0 "$pid" 2>/dev/null; then
-        if [ "$QUIET_MODE" = false ]; then
-            echo -e "${YELLOW}Stopping ${name} agent (PID: $pid)${NC}"
-        fi
+        echo -e "${YELLOW}Stopping ${name} agent (PID: $pid)${NC}"
         kill "$pid" 2>/dev/null || true
         rm -f "$pidfile"
     else
-        if [ "$QUIET_MODE" = false ]; then
-            echo -e "${YELLOW}⚠️  ${name} agent was not running${NC}"
-        fi
+        echo -e "${YELLOW}⚠️  ${name} agent was not running${NC}"
         rm -f "$pidfile"
     fi
 
-    if [ "$QUIET_MODE" = false ]; then
-        echo -e "${GREEN}✅ ${name} agent stopped${NC}"
-        echo -e "${YELLOW}Logs available at: $logfile${NC}"
-    fi
+    echo -e "${GREEN}✅ ${name} agent stopped${NC}"
+    echo -e "${YELLOW}Logs available at: $logfile${NC}"
 
     return 0
 }
@@ -260,9 +241,7 @@ run_test() {
     local tutorial_path=$1
     local name=$(basename "$tutorial_path")
 
-    if [ "$QUIET_MODE" = false ]; then
-        echo -e "${YELLOW}🧪 Running tests for ${name}...${NC}"
-    fi
+    echo -e "${YELLOW}🧪 Running tests for ${name}...${NC}"
 
     # Check if tutorial directory exists
     if [[ ! -d "$tutorial_path" ]]; then
@@ -293,12 +272,9 @@ run_test() {
             echo -e "${YELLOW}🔄 Retrying tests (attempt $((retry_count + 1))/$max_retries)...${NC}"
         fi
 
-        # Always show pytest output, even in quiet mode
-        echo "========== PYTEST OUTPUT =========="
-        # Use unbuffered output for real-time visibility
-        PYTHONUNBUFFERED=1 uv run pytest tests/test_agent.py -v -s --tb=short
+        # Stream pytest output directly in real-time
+        uv run pytest tests/test_agent.py -v -s
         exit_code=$?
-        echo "========== END PYTEST OUTPUT =========="
 
         if [ $exit_code -eq 0 ]; then
             break
