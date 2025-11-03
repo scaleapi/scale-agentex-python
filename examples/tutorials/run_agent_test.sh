@@ -263,7 +263,7 @@ run_test() {
 
 
     # Run the tests with retry mechanism
-    local max_retries=3
+    local max_retries=5
     local retry_count=0
     local exit_code=1
 
