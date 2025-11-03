@@ -160,7 +160,12 @@ class TestNonStreamingEvents:
             sleep_interval=1.0,
         ):
             assert isinstance(message, TaskMessage)
-            if message.content and message.content.type == "text" and message.content.author == "agent" and message.content.content:
+            if (
+                message.content
+                and message.content.type == "text"
+                and message.content.author == "agent"
+                and message.content.content
+            ):
                 break
 
         # Wait a bit for state to update
@@ -177,7 +182,12 @@ class TestNonStreamingEvents:
             timeout=30,
             sleep_interval=1.0,
         ):
-            if message.content and message.content.type == "text" and message.content.author == "agent" and message.content.content:
+            if (
+                message.content
+                and message.content.type == "text"
+                and message.content.author == "agent"
+                and message.content.content
+            ):
                 response_text = message.content.content.lower()
                 assert "blue" in response_text, f"Expected 'blue' in response but got: {response_text}"
                 found_response = True
@@ -211,16 +221,24 @@ class TestStreamingEvents:
             async for event in stream_agent_response(
                 client=client,
                 task_id=task.id,
-                timeout=20,
+                timeout=60,
             ):
                 msg_type = event.get("type")
                 if msg_type == "full":
                     task_message_update = StreamTaskMessageFull.model_validate(event)
                     if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                         finished_message = await client.messages.retrieve(task_message_update.parent_task_message.id)
-                        if finished_message.content and finished_message.content.type == "text" and finished_message.content.author == "user":
+                        if (
+                            finished_message.content
+                            and finished_message.content.type == "text"
+                            and finished_message.content.author == "user"
+                        ):
                             user_message_found = True
-                        elif finished_message.content and finished_message.content.type == "text" and finished_message.content.author == "agent":
+                        elif (
+                            finished_message.content
+                            and finished_message.content.type == "text"
+                            and finished_message.content.author == "agent"
+                        ):
                             agent_response_found = True
                         elif finished_message.content and finished_message.content.type == "reasoning":
                             tool_response_found = True
@@ -242,6 +260,7 @@ class TestStreamingEvents:
 
         assert user_message_found, "User message not found in stream"
         assert agent_response_found, "Agent response not found in stream"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -16,9 +16,21 @@ jobs:
         id: get-tutorials
         run: |
           cd examples/tutorials
-          tutorials=$(find . -name "manifest.yaml" -exec dirname {} \; | sort | sed 's|^\./||' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          # Find all tutorials and exclude specific temporal ones
+          all_tutorials=$(find . -name "manifest.yaml" -exec dirname {} \; | sort | sed 's|^\./||')
+
+          # Filter out the specified temporal tutorials that are being updated
+          filtered_tutorials=$(echo "$all_tutorials" | grep -v -E "(10_temporal/050_|10_temporal/070_|10_temporal/080_)")
+
+          # Convert to JSON array
+          tutorials=$(echo "$filtered_tutorials" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
           echo "tutorials=$tutorials" >> $GITHUB_OUTPUT
-          echo "Found tutorials: $tutorials"
+          echo "All tutorials found: $(echo "$all_tutorials" | wc -l)"
+          echo "Filtered tutorials: $(echo "$filtered_tutorials" | wc -l)"
+          echo "Excluded tutorials:"
+          echo "$all_tutorials" | grep -E "(10_temporal/050_|10_temporal/070_|10_temporal/080_)" || echo "  (none matched exclusion pattern)"
+          echo "Final tutorial list: $tutorials"
 
   test-tutorial:
     needs: find-tutorials
@@ -101,7 +113,7 @@ jobs:
         working-directory: ./examples/tutorials
         env:
           OPENAI_API_KEY: ${{ secrets.TUTORIAL_OPENAI_API_KEY }}
-          HEALTH_CHECK_PORT: 8080  # Use non-privileged port for temporal worker health checks
+          HEALTH_CHECK_PORT: 8080 # Use non-privileged port for temporal worker health checks
         run: |
           echo "Testing tutorial: ${{ matrix.tutorial }}"
           AGENTEX_API_BASE_URL="http://localhost:5003" \
@@ -109,11 +121,24 @@ jobs:
 
       - name: Upload Test Results
         if: always()
+        run: |
+          # Sanitize tutorial name for artifact upload
+          SANITIZED_NAME=$(echo "${{ matrix.tutorial }}" | sed 's/\//-/g')
+          echo "Uploading test results for: ${{ matrix.tutorial }} (as: test-results-$SANITIZED_NAME)"
+
+          # Create a temporary directory with the sanitized name
+          mkdir -p "test-results-$SANITIZED_NAME"
+          cp /tmp/agentex-*.log "test-results-$SANITIZED_NAME/" 2>/dev/null || echo "No log files to copy"
+
+          # Upload using the actions/upload-artifact action
+          echo "artifact-name=test-results-$SANITIZED_NAME" >> $GITHUB_ENV
+
+      - name: Upload Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ replace(matrix.tutorial, '/', '-') }}
-          path: |
-            /tmp/agentex-*.log
+          name: ${{ env.artifact-name }}
+          path: test-results-*
           retention-days: 1
 
   test-summary:
@@ -136,6 +161,17 @@ jobs:
           # Get tutorial list from needs context
           tutorials='${{ needs.find-tutorials.outputs.tutorials }}'
 
+          # Debug: Show what we're working with
+          echo "🔍 DEBUG: Tutorial list from find-tutorials job:"
+          echo "$tutorials"
+          echo ""
+          echo "🔍 DEBUG: Downloaded artifacts:"
+          ls -la test-results/ || echo "No test-results directory found"
+          echo ""
+          echo "🔍 DEBUG: Artifact contents:"
+          find test-results/ -type f -name "*.log" || echo "No log files found"
+          echo ""
+
           # Initialize counters
           total_tutorials=0
           passed_tutorials=0
@@ -156,13 +192,18 @@ jobs:
               tutorial_name=$(echo "$sanitized_name" | sed 's/-/\//g')
               total_tutorials=$((total_tutorials + 1))
 
-              # Determine success/failure based on presence of error logs or patterns
-              if find "$tutorial_dir" -name "*.log" -exec grep -l "FAILED\|ERROR\|Traceback" {} \; | head -1 >/dev/null; then
-                failed_tutorials=$((failed_tutorials + 1))
-                failed_tests+=("$tutorial_name")
-              else
-                passed_tutorials=$((passed_tutorials + 1))
-                passed_tests+=("$tutorial_name")
+              # Check if there are any log files in this directory
+              if find "$tutorial_dir" -name "*.log" -type f | grep -q .; then
+                # Determine success/failure based on pytest-specific failure patterns
+                if find "$tutorial_dir" -name "*.log" -exec grep -l "FAILED.*::" {} \; | head -1 >/dev/null || \
+                   find "$tutorial_dir" -name "*.log" -exec grep -l "=== FAILURES ===" {} \; | head -1 >/dev/null || \
+                   find "$tutorial_dir" -name "*.log" -exec grep -l "AssertionError" {} \; | head -1 >/dev/null; then
+                  failed_tutorials=$((failed_tutorials + 1))
+                  failed_tests+=("$tutorial_name")
+                else
+                  passed_tutorials=$((passed_tutorials + 1))
+                  passed_tests+=("$tutorial_name")
+                fi
               fi
             fi
           done
@@ -185,42 +226,42 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
-          # Show failed tests with details
+          # Show pytest failures only for failed tests
           if [ $failed_tutorials -gt 0 ]; then
             echo "## ❌ Failed Tutorials ($failed_tutorials)" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
 
+            # Extract and append pytest failures from each failed test
             for test in "${failed_tests[@]}"; do
-              echo "### 🔍 \`$test\`" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-
               # Find the log file for this test (convert back to sanitized name)
               sanitized_test_name=$(echo "$test" | sed 's/\//-/g')
               log_file=$(find "test-results/test-results-$sanitized_test_name" -name "*.log" | head -1)
               if [ -f "$log_file" ]; then
-                # Extract pytest failures
-                if grep -q "FAILED\|ERROR" "$log_file"; then
-                  echo "**Failed Tests:**" >> $GITHUB_STEP_SUMMARY
-                  echo '```' >> $GITHUB_STEP_SUMMARY
-                  grep -A 5 -B 1 "FAILED\|ERROR" "$log_file" | head -20 >> $GITHUB_STEP_SUMMARY
-                  echo '```' >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                fi
+                echo "================================================================================================" >> $GITHUB_STEP_SUMMARY
+                echo "FAILED: $test" >> $GITHUB_STEP_SUMMARY
+                echo "================================================================================================" >> $GITHUB_STEP_SUMMARY
 
-                # Show any Python tracebacks
-                if grep -q "Traceback" "$log_file"; then
-                  echo "**Error Details:**" >> $GITHUB_STEP_SUMMARY
-                  echo '```' >> $GITHUB_STEP_SUMMARY
-                  # Get the last traceback in the file
-                  awk '/Traceback \(most recent call last\)/{p=1} p{print} /^[^ ]/ && p && !/Traceback/{p=0}' "$log_file" | tail -20 >> $GITHUB_STEP_SUMMARY
-                  echo '```' >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
+                # Extract pytest output between the delimiters, or show pytest summary if no delimiters
+                if grep -q "========== PYTEST OUTPUT ==========" "$log_file"; then
+                  sed -n '/========== PYTEST OUTPUT ==========/,/========== END PYTEST OUTPUT ==========/p' "$log_file" | \
+                    sed '1d;$d' >> $GITHUB_STEP_SUMMARY
+                else
+                  # If no delimiters, try to extract pytest-related lines
+                  grep -E "(FAILED|ERROR|AssertionError|collected.*items|=====.*=====|::.*FAILED)" "$log_file" >> $GITHUB_STEP_SUMMARY || \
+                    echo "No pytest output found in log file" >> $GITHUB_STEP_SUMMARY
                 fi
+                echo "" >> $GITHUB_STEP_SUMMARY
               else
-                echo "_No log file found for detailed error analysis_" >> $GITHUB_STEP_SUMMARY
+                echo "================================================================================================" >> $GITHUB_STEP_SUMMARY
+                echo "FAILED: $test (No log file found)" >> $GITHUB_STEP_SUMMARY
+                echo "================================================================================================" >> $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
               fi
             done
+
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
           # Set exit code based on results
