@@ -29,9 +29,13 @@ jobs:
           cd scale-agentex/agentex
           echo "🔧 Configuring AgentEx container for GitHub Actions networking..."
 
+          # Install yq for YAML manipulation
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
           # Add extra_hosts to agentex service to make host.docker.internal work
           # This allows the AgentEx container to reach the GitHub runner host
-          sed -i '/container_name: agentex/a\  extra_hosts:\n    - "host.docker.internal:host-gateway"' docker-compose.yml
+          yq eval '.services.agentex.extra_hosts = ["host.docker.internal:host-gateway"]' -i docker-compose.yml
 
           echo "✅ Added extra_hosts configuration to agentex service"
           echo "🔍 Updated agentex service config:"
