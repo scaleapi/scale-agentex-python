@@ -372,6 +372,9 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
         "ACP_PORT": str(manifest.local_development.agent.port),  # type: ignore[union-attr]
     }
 
+    if manifest.agent.agent_input_type:
+        env_vars["AGENT_INPUT_TYPE"] = manifest.agent.agent_input_type
+
     # Add authorization principal if set - for local development, auth is optional
     from agentex.lib.cli.utils.auth_utils import _encode_principal_context
     encoded_principal = _encode_principal_context(manifest)
