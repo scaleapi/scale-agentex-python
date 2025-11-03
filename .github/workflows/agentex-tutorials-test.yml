@@ -158,8 +158,9 @@ jobs:
               echo "Port: $port" | tee -a "$test_output_file"
               echo "========================================" | tee -a "$test_output_file"
 
+              # Use stdbuf to ensure unbuffered output for real-time visibility
               AGENTEX_API_BASE_URL="http://localhost:5003" \
-                ./run_agent_test.sh --build-cli --quiet "$tutorial" 2>&1 | tee -a "$test_output_file"
+                stdbuf -oL -eL ./run_agent_test.sh --build-cli --quiet "$tutorial" 2>&1 | tee -a "$test_output_file"
 
               exit_code=${PIPESTATUS[0]}
               if [ $exit_code -eq 0 ]; then

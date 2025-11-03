@@ -68,16 +68,26 @@ check_prerequisites() {
 wait_for_agent_ready() {
     local name=$1
     local logfile="/tmp/agentex-${name}.log"
-    local timeout=30  # seconds
+    local timeout=45  # seconds - increased to account for package installation time
     local elapsed=0
 
-    echo -e "${YELLOW}⏳ Waiting for ${name} agent to be ready...${NC}"
+    if [ "$QUIET_MODE" = false ]; then
+        echo -e "${YELLOW}⏳ Waiting for ${name} agent to be ready...${NC}"
+    fi
 
     while [ $elapsed -lt $timeout ]; do
-        if grep -q "Application startup complete" "$logfile" 2>/dev/null || \
-           grep -q "Running workers for task queue" "$logfile" 2>/dev/null; then
-            echo -e "${GREEN}✅ ${name} agent is ready${NC}"
-            return 0
+        # Check if agent is successfully registered
+        if grep -q "Successfully registered agent" "$logfile" 2>/dev/null; then
+
+            # For temporal agents, also wait for workers to be ready
+            if [[ "$tutorial_path" == *"temporal"* ]]; then
+                # This is a temporal agent - wait for workers too
+                if grep -q "Running workers for task queue" "$logfile" 2>/dev/null; then
+                    return 0
+                fi
+            else
+                return 0
+            fi
         fi
         sleep 1
         ((elapsed++))
@@ -285,7 +295,8 @@ run_test() {
 
         # Always show pytest output, even in quiet mode
         echo "========== PYTEST OUTPUT =========="
-        uv run pytest tests/test_agent.py -v -s
+        # Use unbuffered output for real-time visibility
+        PYTHONUNBUFFERED=1 uv run pytest tests/test_agent.py -v -s --tb=short
         exit_code=$?
         echo "========== END PYTEST OUTPUT =========="
 
