@@ -113,9 +113,9 @@ httpx==0.27.2
     # via mcp
     # via openai
     # via respx
-httpx-aiohttp==0.1.9
     # via scale-gp
     # via scale-gp-beta
+httpx-aiohttp==0.1.9
     # via agentex-sdk
 httpx-sse==0.4.1
     # via mcp
@@ -191,11 +191,11 @@ nox==2023.4.22
 oauthlib==3.3.1
     # via kubernetes
     # via requests-oauthlib
-openai==1.99.9
+openai==2.7.1
     # via agentex-sdk
     # via litellm
     # via openai-agents
-openai-agents==0.2.7
+openai-agents==0.4.2
     # via agentex-sdk
 opentelemetry-api==1.37.0
     # via ddtrace
@@ -219,20 +219,6 @@ prompt-toolkit==3.0.51
 propcache==0.3.1
     # via aiohttp
     # via yarl
-pydantic==2.11.9
-    # via agentex-sdk
-    # via agentex-sdk
-    # via fastapi
-    # via litellm
-    # via mcp
-    # via openai
-    # via openai-agents
-    # via pydantic-settings
-    # via python-on-whales
-    # via scale-gp
-    # via scale-gp-beta
-pydantic-core==2.33.2
-    # via pydantic
 protobuf==5.29.5
     # via ddtrace
     # via temporalio
@@ -247,6 +233,19 @@ pyasn1==0.6.1
     # via rsa
 pyasn1-modules==0.4.2
     # via google-auth
+pydantic==2.11.9
+    # via agentex-sdk
+    # via fastapi
+    # via litellm
+    # via mcp
+    # via openai
+    # via openai-agents
+    # via pydantic-settings
+    # via python-on-whales
+    # via scale-gp
+    # via scale-gp-beta
+pydantic-core==2.33.2
+    # via pydantic
 pydantic-settings==2.10.1
     # via mcp
 pygments==2.18.0
@@ -340,7 +339,7 @@ stack-data==0.6.3
 starlette==0.46.2
     # via fastapi
     # via mcp
-temporalio==1.15.0
+temporalio==1.18.2
     # via agentex-sdk
 tiktoken==0.11.0
     # via litellm
@@ -383,9 +382,6 @@ typing-extensions==4.12.2
     # via pydantic
     # via pydantic-core
     # via pyright
-    # via typing-inspection
-typing-inspection==0.4.1
-    # via pydantic
     # via python-on-whales
     # via referencing
     # via scale-gp
@@ -393,6 +389,8 @@ typing-inspection==0.4.1
     # via temporalio
     # via typer
     # via typing-inspection
+typing-inspection==0.4.1
+    # via pydantic
     # via pydantic-settings
 tzdata==2025.2
     # via agentex-sdk
