@@ -139,10 +139,10 @@ jobs:
               # Update port in manifest (modify the line containing 'port: 8000' or 'port: XXXX')
               sed -i "s/port: [0-9]*/port: $port/" "$manifest_path"
 
-              # Update host_address to localhost for CI (Docker can't reach host.docker.internal from inside container)
-              sed -i "s/host_address: host.docker.internal/host_address: localhost/" "$manifest_path"
+              # Keep host_address as host.docker.internal for CI (allows Docker container to reach GitHub runner host)
+              # Note: The AgentEx server runs in Docker and needs host.docker.internal to reach the tutorial agent on the host
 
-              echo "Updated $manifest_path to use port $port and host_address: localhost"
+              echo "Updated $manifest_path to use port $port (keeping host_address: host.docker.internal)"
             fi
 
             # Debug connectivity before running test
