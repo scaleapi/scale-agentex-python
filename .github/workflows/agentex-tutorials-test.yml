@@ -38,8 +38,6 @@ jobs:
           yq eval '.services.agentex.extra_hosts = ["host.docker.internal:host-gateway"]' -i docker-compose.yml
 
           echo "✅ Added extra_hosts configuration to agentex service"
-          echo "🔍 Updated agentex service config:"
-          grep -A 10 "container_name: agentex" docker-compose.yml || echo "Could not find agentex service"
 
       - name: Navigate to scale-agentex repo
         run: |
@@ -72,15 +70,6 @@ jobs:
             sleep 5
           done
 
-          # Debug port mappings
-          echo "🔍 Docker port mappings:"
-          docker compose ps
-          echo ""
-          echo "🔍 Docker port details:"
-          docker compose ps --format "table {{.Name}}\t{{.Image}}\t{{.Ports}}"
-          echo ""
-          echo "🔍 Testing AgentEx server accessibility:"
-          curl -v --max-time 10 http://localhost:5003/health 2>&1 || echo "❌ AgentEx not accessible on localhost:5003"
 
       - name: Build AgentEx SDK
         run: |
@@ -137,8 +126,8 @@ jobs:
           failed_tests=()
           passed_tests=()
 
-          # Run only the first test for sanity check
-          for i in 0; do
+          # Run all tutorial tests
+          for i in "${!tutorial_paths[@]}"; do
             tutorial="${tutorial_paths[$i]}"
             port=$((8000 + i))
 
@@ -162,9 +151,6 @@ jobs:
               echo "Updated $manifest_path to use port $port (keeping host_address: host.docker.internal)"
             fi
 
-            # Debug connectivity before running test
-            echo "🔍 Pre-test connectivity check:"
-            curl -v --max-time 5 http://localhost:5003/agents 2>&1 || echo "❌ /agents endpoint not accessible"
 
             # Run test in background with unique port
             (
@@ -252,34 +238,73 @@ jobs:
               echo "  ❌ $test"
             done
 
-            echo ""
-            echo "========================================="
-            echo "TUTORIAL AGENT LOGS FOR FAILED TESTS"
-            echo "========================================="
-
-            # Show logs for failed tests
-            for test in "${failed_tests[@]}"; do
-              test_name=$(basename "$test")
-              logfile="/tmp/agentex-${test_name}.log"
-
-              echo ""
-              echo "📋 Tutorial agent logs for $test ($logfile):"
-              echo "----------------------------------------"
-
-              if [ -f "$logfile" ]; then
-                echo "Last 100 lines of tutorial agent logs:"
-                tail -100 "$logfile"
-              else
-                echo "⚠️  No log file found at: $logfile"
-                echo "Available log files:"
-                ls -la /tmp/agentex-*.log 2>/dev/null || echo "  (none)"
-              fi
-
-              echo "----------------------------------------"
-            done
 
             exit 1
           else
             echo ""
             echo "🎉 All tests passed!"
+          fi
+
+      - name: Debug Logs for Failed Tests
+        if: always()
+        run: |
+          cd scale-agentex/agentex
+
+          echo ""
+          echo "================================================================================"
+          echo "🐛 DEBUG LOGS (for troubleshooting)"
+          echo "================================================================================"
+
+          # Show AgentEx server container logs
+          echo ""
+          echo "========================================="
+          echo "AGENTEX SERVER LOGS"
+          echo "========================================="
+          echo "📋 AgentEx server container logs (last 200 lines):"
+          echo "----------------------------------------"
+          docker logs agentex --tail=200 2>/dev/null || {
+            echo "❌ Failed to get logs from 'agentex' container"
+            echo "Available containers:"
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+          }
+          echo "----------------------------------------"
+
+          # Show tutorial agent logs for failed tests
+          cd ../../examples/tutorials
+
+          # Check if there were any failed tests
+          failed_tests=()
+          for i in {0..20}; do  # Check up to 20 possible tests
+            if [ -f "/tmp/failed_$i.txt" ]; then
+              failed_tests+=($(cat "/tmp/failed_$i.txt"))
+            fi
+          done
+
+          if [ ${#failed_tests[@]} -gt 0 ]; then
+            echo ""
+            echo "========================================="
+            echo "TUTORIAL AGENT LOGS FOR FAILED TESTS"
+            echo "========================================="
+
+            for test in "${failed_tests[@]}"; do
+              test_name=$(basename "$test")
+              logfile="/tmp/agentex-${test_name}.log"
+
+              echo ""
+              echo "📋 Tutorial agent logs for $test:"
+              echo "----------------------------------------"
+
+              if [ -f "$logfile" ]; then
+                echo "Tutorial agent logs (last 100 lines):"
+                tail -100 "$logfile"
+              else
+                echo "⚠️  No agent log file found at: $logfile"
+                echo "Available agent log files:"
+                ls -la /tmp/agentex-*.log 2>/dev/null || echo "  (none)"
+              fi
+              echo "----------------------------------------"
+            done
+          else
+            echo ""
+            echo "✅ No failed tests - no agent logs to show"
           fi
