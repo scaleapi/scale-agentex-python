@@ -139,7 +139,10 @@ jobs:
               # Update port in manifest (modify the line containing 'port: 8000' or 'port: XXXX')
               sed -i "s/port: [0-9]*/port: $port/" "$manifest_path"
 
-              echo "Updated $manifest_path to use port $port"
+              # Update host_address to localhost for CI (Docker can't reach host.docker.internal from inside container)
+              sed -i "s/host_address: host.docker.internal/host_address: localhost/" "$manifest_path"
+
+              echo "Updated $manifest_path to use port $port and host_address: localhost"
             fi
 
             # Debug connectivity before running test

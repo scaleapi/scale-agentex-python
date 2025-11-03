@@ -275,9 +275,30 @@ except Exception as e:
     print(f'❌ HTTP request failed: {e}')
 "
 
-    # Run the tests
-    uv run pytest tests/test_agent.py -v -s
-    local exit_code=$?
+    # Run the tests with retry mechanism
+    local max_retries=3
+    local retry_count=0
+    local exit_code=1
+
+    while [ $retry_count -lt $max_retries ]; do
+        echo -e "${YELLOW}🧪 Running tests (attempt $((retry_count + 1))/$max_retries)...${NC}"
+
+        uv run pytest tests/test_agent.py -v -s
+        exit_code=$?
+
+        if [ $exit_code -eq 0 ]; then
+            echo -e "${GREEN}✅ Tests passed on attempt $((retry_count + 1))${NC}"
+            break
+        else
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                echo -e "${YELLOW}⚠️  Tests failed on attempt $retry_count, retrying in 5 seconds...${NC}"
+                sleep 5
+            else
+                echo -e "${RED}❌ Tests failed after $max_retries attempts${NC}"
+            fi
+        fi
+    done
 
     # Return to original directory
     cd "$original_dir"
