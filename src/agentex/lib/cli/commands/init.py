@@ -211,7 +211,6 @@ def init():
         "agent_directory_name": agent_directory_name,
         "description": description,
         "use_uv": use_uv,
-
     }
 
     # Derive all names from agent_directory_name and path
