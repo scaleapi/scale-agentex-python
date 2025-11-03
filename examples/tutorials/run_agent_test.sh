@@ -30,12 +30,15 @@ AGENTEX_SERVER_PORT=5003
 TUTORIAL_PATH=""
 VIEW_LOGS=false
 BUILD_CLI=false
+QUIET_MODE=false
 
 for arg in "$@"; do
     if [[ "$arg" == "--view-logs" ]]; then
         VIEW_LOGS=true
     elif [[ "$arg" == "--build-cli" ]]; then
         BUILD_CLI=true
+    elif [[ "$arg" == "--quiet" ]]; then
+        QUIET_MODE=true
     else
         TUTORIAL_PATH="$arg"
     fi
@@ -56,7 +59,9 @@ check_prerequisites() {
         exit 1
     fi
 
-    echo -e "${GREEN}✅ Prerequisites check passed${NC}"
+    if [ "$QUIET_MODE" = false ]; then
+        echo -e "${GREEN}✅ Prerequisites check passed${NC}"
+    fi
 }
 
 # Function to wait for agent to be ready
@@ -96,7 +101,9 @@ start_agent() {
     local name=$(basename "$tutorial_path")
     local logfile="/tmp/agentex-${name}.log"
 
-    echo -e "${YELLOW}🚀 Starting ${name} agent...${NC}"
+    if [ "$QUIET_MODE" = false ]; then
+        echo -e "${YELLOW}🚀 Starting ${name} agent...${NC}"
+    fi
 
     # Check if tutorial directory exists
     if [[ ! -d "$tutorial_path" ]]; then
@@ -121,13 +128,12 @@ start_agent() {
 
     if [ "$BUILD_CLI" = true ]; then
 
-        # From tutorial subdirectory, we need to go up 4 levels to reach repo root
-        # tutorials/00_sync/000_hello_acp -> tutorials -> examples -> agentex-python
-        local wheel_file=$(ls ../../../../dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+        # Use wheel from dist directory at repo root
+        local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
         if [[ -z "$wheel_file" ]]; then
-            echo -e "${RED}❌ No built wheel found in ../../../../dist/agentex_sdk-*.whl${NC}"
+            echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"
             echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"
-            echo -e "${YELLOW}💡 From the repo root directory: /Users/roxanne.farhad/Desktop/scale/agentex-python${NC}"
+            echo -e "${YELLOW}💡 From the repo root directory${NC}"
             cd "$original_dir"
             return 1
         fi
@@ -143,7 +149,9 @@ start_agent() {
     cd "$original_dir"
 
     echo "$pid" > "/tmp/agentex-${name}.pid"
-    echo -e "${GREEN}✅ ${name} agent started (PID: $pid, logs: $logfile)${NC}"
+    if [ "$QUIET_MODE" = false ]; then
+        echo -e "${GREEN}✅ ${name} agent started (PID: $pid, logs: $logfile)${NC}"
+    fi
 
     # Wait for agent to be ready
     if ! wait_for_agent_ready "$name"; then
@@ -201,7 +209,9 @@ stop_agent() {
     local pidfile="/tmp/agentex-${name}.pid"
     local logfile="/tmp/agentex-${name}.log"
 
-    echo -e "${YELLOW}🛑 Stopping ${name} agent...${NC}"
+    if [ "$QUIET_MODE" = false ]; then
+        echo -e "${YELLOW}🛑 Stopping ${name} agent...${NC}"
+    fi
 
     # Check if PID file exists
     if [[ ! -f "$pidfile" ]]; then
@@ -214,16 +224,22 @@ stop_agent() {
 
     # Check if process is running and kill it
     if kill -0 "$pid" 2>/dev/null; then
-        echo -e "${YELLOW}Stopping ${name} agent (PID: $pid)${NC}"
+        if [ "$QUIET_MODE" = false ]; then
+            echo -e "${YELLOW}Stopping ${name} agent (PID: $pid)${NC}"
+        fi
         kill "$pid" 2>/dev/null || true
         rm -f "$pidfile"
     else
-        echo -e "${YELLOW}⚠️  ${name} agent was not running${NC}"
+        if [ "$QUIET_MODE" = false ]; then
+            echo -e "${YELLOW}⚠️  ${name} agent was not running${NC}"
+        fi
         rm -f "$pidfile"
     fi
 
-    echo -e "${GREEN}✅ ${name} agent stopped${NC}"
-    echo -e "${YELLOW}Logs available at: $logfile${NC}"
+    if [ "$QUIET_MODE" = false ]; then
+        echo -e "${GREEN}✅ ${name} agent stopped${NC}"
+        echo -e "${YELLOW}Logs available at: $logfile${NC}"
+    fi
 
     return 0
 }
@@ -234,7 +250,9 @@ run_test() {
     local tutorial_path=$1
     local name=$(basename "$tutorial_path")
 
-    echo -e "${YELLOW}🧪 Running tests for ${name}...${NC}"
+    if [ "$QUIET_MODE" = false ]; then
+        echo -e "${YELLOW}🧪 Running tests for ${name}...${NC}"
+    fi
 
     # Check if tutorial directory exists
     if [[ ! -d "$tutorial_path" ]]; then
@@ -265,8 +283,11 @@ run_test() {
             echo -e "${YELLOW}🔄 Retrying tests (attempt $((retry_count + 1))/$max_retries)...${NC}"
         fi
 
+        # Always show pytest output, even in quiet mode
+        echo "========== PYTEST OUTPUT =========="
         uv run pytest tests/test_agent.py -v -s
         exit_code=$?
+        echo "========== END PYTEST OUTPUT =========="
 
         if [ $exit_code -eq 0 ]; then
             break
@@ -294,10 +315,12 @@ run_test() {
 execute_tutorial_test() {
     local tutorial=$1
 
-    echo ""
-    echo "--------------------------------------------------------------------------------"
-    echo "Testing: $tutorial"
-    echo "--------------------------------------------------------------------------------"
+    if [ "$QUIET_MODE" = false ]; then
+        echo ""
+        echo "--------------------------------------------------------------------------------"
+        echo "Testing: $tutorial"
+        echo "--------------------------------------------------------------------------------"
+    fi
 
     # Start the agent
     if ! start_agent "$tutorial"; then
@@ -338,12 +361,12 @@ check_built_wheel() {
         return 1
     }
 
-    # Check if wheel exists
-    local wheel_file=$(ls dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+    # Check if wheel exists in dist directory at repo root
+    local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
     if [[ -z "$wheel_file" ]]; then
         echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"
         echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"
-        echo -e "${YELLOW}💡 From the repo root directory: $(pwd)${NC}"
+        echo -e "${YELLOW}💡 From the repo root directory${NC}"
         cd "$original_dir"
         return 1
     fi
@@ -378,6 +401,7 @@ main() {
         echo "Usage:"
         echo "  ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test"
         echo "  ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test"
+        echo "  ./run_agent_test.sh --build-cli --quiet <tutorial_path> # Build CLI and run test (minimal output)"
         echo "  ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial"
         echo "  ./run_agent_test.sh --view-logs                         # View most recent agent logs"
         echo ""
@@ -387,10 +411,12 @@ main() {
         exit 1
     fi
 
-    echo "================================================================================"
-    echo "Running Tutorial Test: $TUTORIAL_PATH"
-    echo "================================================================================"
-    echo ""
+    if [ "$QUIET_MODE" = false ]; then
+        echo "================================================================================"
+        echo "Running Tutorial Test: $TUTORIAL_PATH"
+        echo "================================================================================"
+        echo ""
+    fi
 
     # Check prerequisites
     check_prerequisites
@@ -408,16 +434,20 @@ main() {
 
     # Execute the single tutorial test
     if execute_tutorial_test "$TUTORIAL_PATH"; then
-        echo ""
-        echo "================================================================================"
-        echo -e "${GREEN}🎉 Test passed for: $TUTORIAL_PATH${NC}"
-        echo "================================================================================"
+        if [ "$QUIET_MODE" = false ]; then
+            echo ""
+            echo "================================================================================"
+            echo -e "${GREEN}🎉 Test passed for: $TUTORIAL_PATH${NC}"
+            echo "================================================================================"
+        fi
         exit 0
     else
-        echo ""
-        echo "================================================================================"
-        echo -e "${RED}❌ Test failed for: $TUTORIAL_PATH${NC}"
-        echo "================================================================================"
+        if [ "$QUIET_MODE" = false ]; then
+            echo ""
+            echo "================================================================================"
+            echo -e "${RED}❌ Test failed for: $TUTORIAL_PATH${NC}"
+            echo "================================================================================"
+        fi
         exit 1
     fi
 }
