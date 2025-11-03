@@ -24,8 +24,7 @@ app.add_typer(
 
 # Add init command with documentation
 app.command(
-    help="Initialize a new agent project with a template",
-    epilog="Example: agentex init --template temporal my-agent",
+    help="Initialize a new agent project with a template (interactive)",
 )(init)
 
 
