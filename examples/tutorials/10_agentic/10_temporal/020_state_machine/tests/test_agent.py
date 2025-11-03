@@ -72,7 +72,7 @@ async def agent_id(client, agent_name):
 class TestNonStreamingEvents:
     """Test non-streaming event sending and polling with state machine workflow."""
     @pytest.mark.asyncio
-    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, _agent_name: str, agent_id: str):
+    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, agent_id: str):
         """Test sending a simple event and polling for the response (no tool use)."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
@@ -127,7 +127,7 @@ class TestNonStreamingEvents:
 class TestStreamingEvents:
     """Test streaming event sending with state machine workflow."""
     @pytest.mark.asyncio
-    async def test_send_event_and_stream(self, client: AsyncAgentex, _agent_name: str, agent_id: str):
+    async def test_send_event_and_stream(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and streaming the response."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
