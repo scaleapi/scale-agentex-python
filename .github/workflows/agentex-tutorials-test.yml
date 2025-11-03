@@ -70,7 +70,6 @@ jobs:
             sleep 5
           done
 
-
       - name: Build AgentEx SDK
         run: |
           echo "🔨 Building AgentEx SDK wheel..."
@@ -80,6 +79,8 @@ jobs:
 
       - name: Run Parallel Tutorial Tests
         working-directory: ./examples/tutorials
+        env:
+          OPENAI_API_KEY: ${{ secrets.TUTORIAL_OPENAI_API_KEY }}
         run: |
           # Verify uv is working
           echo "UV version: $(uv --version)"

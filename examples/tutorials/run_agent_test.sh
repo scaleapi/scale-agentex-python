@@ -119,11 +119,7 @@ start_agent() {
     # Start the agent in background and capture PID
     local manifest_path="$PWD/manifest.yaml"  # Always use full path
 
-    echo -e "${YELLOW}DEBUG: Manifest path: $manifest_path${NC}"
-    echo -e "${YELLOW}DEBUG: Log file: $logfile${NC}"
-
     if [ "$BUILD_CLI" = true ]; then
-        echo -e "${YELLOW}DEBUG: Using locally built wheel${NC}"
 
         # From tutorial subdirectory, we need to go up 4 levels to reach repo root
         # tutorials/00_sync/000_hello_acp -> tutorials -> examples -> agentex-python
@@ -136,11 +132,9 @@ start_agent() {
             return 1
         fi
 
-        echo -e "${YELLOW}DEBUG: Using wheel: $wheel_file${NC}"
         # Use the built wheel
         uv run --with "$wheel_file" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
     else
-        echo -e "${YELLOW}DEBUG: Using system CLI${NC}"
         uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
     fi
     local pid=$!
@@ -260,20 +254,6 @@ run_test() {
     # Change to tutorial directory
     cd "$tutorial_path" || return 1
 
-    # Debug connectivity inside uv environment
-    echo -e "${YELLOW}🔍 Testing connectivity inside uv environment...${NC}"
-    uv run python -c "
-import os
-print(f'AGENTEX_API_BASE_URL: {os.environ.get(\"AGENTEX_API_BASE_URL\", \"NOT SET\")}')
-try:
-    import agentex; print(agentex.__version__)
-    import httpx
-    response = httpx.get('http://localhost:5003/agents', timeout=10)
-    print(f'✅ HTTP request successful: {response.status_code}')
-    print(f'Response: {response.text}')
-except Exception as e:
-    print(f'❌ HTTP request failed: {e}')
-"
 
     # Run the tests with retry mechanism
     local max_retries=3
@@ -281,21 +261,19 @@ except Exception as e:
     local exit_code=1
 
     while [ $retry_count -lt $max_retries ]; do
-        echo -e "${YELLOW}🧪 Running tests (attempt $((retry_count + 1))/$max_retries)...${NC}"
+        if [ $retry_count -gt 0 ]; then
+            echo -e "${YELLOW}🔄 Retrying tests (attempt $((retry_count + 1))/$max_retries)...${NC}"
+        fi
 
         uv run pytest tests/test_agent.py -v -s
         exit_code=$?
 
         if [ $exit_code -eq 0 ]; then
-            echo -e "${GREEN}✅ Tests passed on attempt $((retry_count + 1))${NC}"
             break
         else
             retry_count=$((retry_count + 1))
             if [ $retry_count -lt $max_retries ]; then
-                echo -e "${YELLOW}⚠️  Tests failed on attempt $retry_count, retrying in 5 seconds...${NC}"
                 sleep 5
-            else
-                echo -e "${RED}❌ Tests failed after $max_retries attempts${NC}"
             fi
         fi
     done
@@ -308,19 +286,6 @@ except Exception as e:
         return 0
     else
         echo -e "${RED}❌ Tests failed for ${name}${NC}"
-
-        # Print agent logs to help with debugging
-        local logfile="/tmp/agentex-${name}.log"
-        if [[ -f "$logfile" ]]; then
-            echo ""
-            echo -e "${YELLOW}📋 Agent logs for debugging:${NC}"
-            echo "----------------------------------------"
-            tail -50 "$logfile"
-            echo "----------------------------------------"
-        else
-            echo -e "${YELLOW}⚠️  No agent log file found at: $logfile${NC}"
-        fi
-
         return 1
     fi
 }
@@ -363,7 +328,6 @@ execute_tutorial_test() {
 
 # Function to check if built wheel is available
 check_built_wheel() {
-    echo -e "${YELLOW}🔍 Checking for locally built wheel...${NC}"
 
     # Navigate to the repo root (two levels up from examples/tutorials)
     local repo_root="../../"
@@ -384,17 +348,12 @@ check_built_wheel() {
         return 1
     fi
 
-    echo -e "${GREEN}✅ Found built wheel: $wheel_file${NC}"
-
     # Test the wheel by running agentex --help
-    echo -e "${YELLOW}Verifying built wheel...${NC}"
     if ! uv run --with "$wheel_file" agentex --help >/dev/null 2>&1; then
         echo -e "${RED}❌ Failed to run agentex with built wheel${NC}"
         cd "$original_dir"
         return 1
     fi
-
-    echo -e "${GREEN}✅ Built wheel verified successfully${NC}"
     cd "$original_dir"
     return 0
 }
