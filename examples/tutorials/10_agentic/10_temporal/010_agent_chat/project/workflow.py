@@ -48,7 +48,7 @@ class StateModel(BaseModel):
     turn_number: int
 
 
-MCP_SERVERS = [ # No longer needed due to reasoning
+MCP_SERVERS = [  # No longer needed due to reasoning
     # StdioServerParameters(
     #     command="npx",
     #     args=["-y", "@modelcontextprotocol/server-sequential-thinking"],
@@ -80,10 +80,7 @@ async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG
         b = parsed_args.get("b")
 
         if operation is None or a is None or b is None:
-            return (
-                "Error: Missing required parameters. "
-                "Please provide 'operation', 'a', and 'b'."
-            )
+            return "Error: Missing required parameters. Please provide 'operation', 'a', and 'b'."
 
         # Convert to numbers
         try:
@@ -105,10 +102,7 @@ async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG
             result = a / b
         else:
             supported_ops = "add, subtract, multiply, divide"
-            return (
-                f"Error: Unknown operation '{operation}'. "
-                f"Supported operations: {supported_ops}."
-            )
+            return f"Error: Unknown operation '{operation}'. Supported operations: {supported_ops}."
 
         # Format the result nicely
         if result == int(result):
@@ -126,10 +120,7 @@ async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG
 # Create the calculator tool
 CALCULATOR_TOOL = FunctionTool(
     name="calculator",
-    description=(
-        "Performs basic arithmetic operations (add, subtract, multiply, divide) "
-        "on two numbers."
-    ),
+    description=("Performs basic arithmetic operations (add, subtract, multiply, divide) on two numbers."),
     params_json_schema={
         "type": "object",
         "properties": {
@@ -171,9 +162,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
             raise ValueError(f"Expected text message, got {params.event.content.type}")
 
         if params.event.content.author != "user":
-            raise ValueError(
-                f"Expected user message, got {params.event.content.author}"
-            )
+            raise ValueError(f"Expected user message, got {params.event.content.author}")
 
         if self._state is None:
             raise ValueError("State is not initialized")
@@ -181,9 +170,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
         # Increment the turn number
         self._state.turn_number += 1
         # Add the new user message to the message history
-        self._state.input_list.append(
-            {"role": "user", "content": params.event.content.content}
-        )
+        self._state.input_list.append({"role": "user", "content": params.event.content.content})
 
         async with adk.tracing.span(
             trace_id=params.task.id,

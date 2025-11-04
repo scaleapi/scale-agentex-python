@@ -29,6 +29,7 @@ Return the follow up question and nothing else.
 Follow up question: 
 """
 
+
 class ClarifyUserQueryWorkflow(StateWorkflow):
     """Workflow for engaging in follow-up questions."""
 
@@ -37,11 +38,11 @@ class ClarifyUserQueryWorkflow(StateWorkflow):
         """Execute the workflow."""
         if state_machine_data is None:
             return DeepResearchState.PERFORMING_DEEP_RESEARCH
-            
+
         if state_machine_data.n_follow_up_questions_to_ask == 0:
             # No more follow-up questions to ask, proceed to deep research
             return DeepResearchState.PERFORMING_DEEP_RESEARCH
-        
+
         # Generate follow-up question prompt
         if state_machine_data.task_id and state_machine_data.current_span:
             follow_up_question_generation_prompt = await adk.utils.templating.render_jinja(
@@ -50,17 +51,19 @@ class ClarifyUserQueryWorkflow(StateWorkflow):
                 variables={
                     "user_query": state_machine_data.user_query,
                     "follow_up_questions": state_machine_data.follow_up_questions,
-                    "follow_up_responses": state_machine_data.follow_up_responses
+                    "follow_up_responses": state_machine_data.follow_up_responses,
                 },
                 parent_span_id=state_machine_data.current_span.id,
             )
-            
+
             task_message = await adk.providers.litellm.chat_completion_stream_auto_send(
                 task_id=state_machine_data.task_id,
                 llm_config=LLMConfig(
                     model="gpt-4o-mini",
                     messages=[
-                        SystemMessage(content="You are assistant that follows exact instructions without outputting any other text except your response to the user's exact request."),
+                        SystemMessage(
+                            content="You are assistant that follows exact instructions without outputting any other text except your response to the user's exact request."
+                        ),
                         UserMessage(content=follow_up_question_generation_prompt),
                     ],
                     stream=True,
@@ -70,8 +73,8 @@ class ClarifyUserQueryWorkflow(StateWorkflow):
             )
             # Safely extract content from task message
             follow_up_question = ""
-            if task_message.content and hasattr(task_message.content, 'content'):
-                content_val = getattr(task_message.content, 'content', '')
+            if task_message.content and hasattr(task_message.content, "content"):
+                content_val = getattr(task_message.content, "content", "")
                 if isinstance(content_val, str):
                     follow_up_question = content_val
 
@@ -86,4 +89,4 @@ class ClarifyUserQueryWorkflow(StateWorkflow):
             # Always go back to waiting for user input to get their response
             return DeepResearchState.WAITING_FOR_USER_INPUT
         else:
-            return DeepResearchState.PERFORMING_DEEP_RESEARCH 
+            return DeepResearchState.PERFORMING_DEEP_RESEARCH

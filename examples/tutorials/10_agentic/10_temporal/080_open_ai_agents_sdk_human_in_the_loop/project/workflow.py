@@ -10,13 +10,13 @@ KEY CONCEPTS:
 - Durable waiting: Agents can wait indefinitely for human input without losing state
 
 WHY THIS MATTERS:
-Without Temporal, if your system crashes while waiting for human approval, you lose 
-all context. With Temporal, the agent resumes exactly where it left off after 
+Without Temporal, if your system crashes while waiting for human approval, you lose
+all context. With Temporal, the agent resumes exactly where it left off after
 system failures, making human-in-the-loop workflows production-ready.
 
 PATTERN:
 1. Agent calls wait_for_confirmation tool
-2. Tool spawns child workflow that waits for signal  
+2. Tool spawns child workflow that waits for signal
 3. Human approves via CLI/web app
 4. Child workflow completes, agent continues
 
@@ -48,17 +48,19 @@ if environment_variables.AGENT_NAME is None:
 
 logger = make_logger(__name__)
 
+
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
 class ExampleTutorialWorkflow(BaseWorkflow):
     """
     Human-in-the-Loop Temporal Workflow
-    
+
     Demonstrates agents that can pause execution and wait for human approval.
     When approval is needed, the agent spawns a child workflow that waits for
     external signals (human input) before continuing.
-    
+
     Benefits: Durable waiting, survives system failures, scalable to millions of workflows.
     """
+
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
@@ -68,12 +70,12 @@ class ExampleTutorialWorkflow(BaseWorkflow):
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """
         Handle user messages with human-in-the-loop approval capability.
-        
+
         When the agent needs human approval, it calls wait_for_confirmation which spawns
         a child workflow that waits for external signals before continuing.
         """
         logger.info(f"Received task message instruction: {params}")
-            
+
         # Echo user message back to UI
         await adk.messages.create(task_id=params.task.id, content=params.event.content)
 
@@ -103,7 +105,7 @@ class ExampleTutorialWorkflow(BaseWorkflow):
     async def on_task_create(self, params: CreateTaskParams) -> str:
         """
         Workflow entry point - starts the long-running human-in-the-loop agent.
-        
+
         Handles both automated decisions and human approval workflows durably.
         To approve waiting actions: temporal workflow signal --workflow-id="child-workflow-id" --name="fulfill_order_signal" --input=true
         """
@@ -130,6 +132,6 @@ class ExampleTutorialWorkflow(BaseWorkflow):
     # - Main workflow shows agent activities + ChildWorkflow activity when approval needed
     # - Child workflow appears as separate "child-workflow-id" that waits for signal
     # - Timeline: invoke_model_activity → ChildWorkflow (waiting) → invoke_model_activity (after approval)
-    # 
+    #
     # To approve: temporal workflow signal --workflow-id="child-workflow-id" --name="fulfill_order_signal" --input=true
     # Production: Replace CLI with web dashboards/APIs that send signals programmatically
