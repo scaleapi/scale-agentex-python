@@ -3,24 +3,192 @@ name: Build and Push Tutorial Agent
 on:
   workflow_dispatch:
     inputs:
-      agent_path:
-        description: "Path to the agent directory (e.g., examples/tutorials/10_agentic/00_base/000_hello_acp)"
-        required: true
-        type: string
-      version_tag:
-        description: "Version tag for the agent build (e.g., v1.0.0, latest)"
-        required: true
-        type: string
-        default: "latest"
+      rebuild_all:
+        description: "Rebuild all tutorial agents regardless of changes, this is reserved for maintainers only."
+        required: false
+        type: boolean
+        default: false
 
-  workflow_call:
-    inputs:
-      agent_path:
-        description: "Path to the agent directory"
-        required: true
-        type: string
-      version_tag:
-        description: "Version tag for the agent build"
-        required: true
-        type: string
-        default: "latest"
+  pull_request:
+    paths:
+      - "examples/tutorials/**"
+
+  push:
+    branches:
+      - main
+    paths:
+      - "examples/tutorials/**"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  check-permissions:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if user is maintainer
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.actor
+            });
+
+            const allowedRoles = ['admin', 'maintain'];
+            if (!allowedRoles.includes(permission.permission)) {
+              throw new Error(`❌ User ${context.actor} does not have sufficient permissions. Required: ${allowedRoles.join(', ')}. Current: ${permission.permission}`);
+            }
+
+  find-agents:
+    runs-on: ubuntu-latest
+    needs: [check-permissions]
+    if: ${{ !cancelled() && !failure() }}
+    outputs:
+      agents: ${{ steps.get-agents.outputs.agents }}
+      has_agents: ${{ steps.get-agents.outputs.has_agents }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full history for git diff
+
+      - name: Find tutorial agents to build
+        id: get-agents
+        env:
+          REBUILD_ALL: ${{ inputs.rebuild_all }}
+        run: |
+          # Find all tutorial directories with manifest.yaml
+          all_agents=$(find examples/tutorials -name "manifest.yaml" -exec dirname {} \; | sort)
+          agents_to_build=()
+
+          if [ "$REBUILD_ALL" = "true" ]; then
+            echo "Rebuild all agents requested"
+            agents_to_build=($(echo "$all_agents"))
+
+            echo "### 🔄 Rebuilding All Tutorial Agents" >> $GITHUB_STEP_SUMMARY
+          else
+            # Determine the base branch for comparison
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              BASE_BRANCH="origin/${{ github.base_ref }}"
+              echo "Comparing against PR base branch: $BASE_BRANCH"
+            else
+              BASE_BRANCH="HEAD~1"
+              echo "Comparing against previous commit: $BASE_BRANCH"
+            fi
+
+            # Check each agent directory for changes
+            for agent_dir in $all_agents; do
+              echo "Checking $agent_dir for changes..."
+
+              # Check if any files in this agent directory have changed
+              if git diff --name-only $BASE_BRANCH HEAD | grep -q "^$agent_dir/"; then
+                echo "  ✅ Changes detected in $agent_dir"
+                agents_to_build+=("$agent_dir")
+              else
+                echo "  ⏭️  No changes in $agent_dir - skipping build"
+              fi
+            done
+
+            echo "### 🔄 Changed Tutorial Agents" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Convert array to JSON format and output summary
+          if [ ${#agents_to_build[@]} -eq 0 ]; then
+            echo "No agents to build"
+            echo "agents=[]" >> $GITHUB_OUTPUT
+            echo "has_agents=false" >> $GITHUB_OUTPUT
+          else
+            echo "Agents to build: ${#agents_to_build[@]}"
+            agents_json=$(printf '%s\n' "${agents_to_build[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "agents=$agents_json" >> $GITHUB_OUTPUT
+            echo "has_agents=true" >> $GITHUB_OUTPUT
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            for agent in "${agents_to_build[@]}"; do
+              echo "- \`$agent\`" >> $GITHUB_STEP_SUMMARY
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  build-agents:
+    needs: find-agents
+    if: ${{ needs.find-agents.outputs.has_agents == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        agent_path: ${{ fromJson(needs.find-agents.outputs.agents) }}
+      fail-fast: false
+
+    name: build-${{ matrix.agent_path }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Get latest agentex-sdk version from PyPI
+        id: get-version
+        run: |
+          LATEST_VERSION=$(curl -s https://pypi.org/pypi/agentex-sdk/json | jq -r '.info.version')
+          echo "Latest agentex-sdk version: $LATEST_VERSION"
+          echo "AGENTEX_SDK_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
+          pip install agentex-sdk==$LATEST_VERSION
+          echo "Installed agentex-sdk version $LATEST_VERSION"
+
+      - name: Generate Image name
+        id: image-name
+        run: |
+          # Remove examples/tutorials/ prefix and replace / with -
+          AGENT_NAME=$(echo "${{ matrix.agent_path }}" | sed 's|^examples/tutorials/||' | sed 's|/|-|g')
+          echo "AGENT_NAME=$AGENT_NAME" >> $GITHUB_ENV
+          echo "agent_name=$AGENT_NAME" >> $GITHUB_OUTPUT
+          echo "Agent name set to $AGENT_NAME"
+
+      - name: Login to GitHub Container Registry
+        # Only login if we're going to push (main branch or rebuild_all)
+        if: ${{ github.event_name == 'push' || inputs.rebuild_all }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Conditionally Push Agent Image
+        env:
+          REGISTRY: ghcr.io
+        run: |
+          AGENT_NAME="${{ steps.image-name.outputs.agent_name }}"
+          REPOSITORY_NAME="${{ github.repository }}/tutorial-agents/${AGENT_NAME}"
+
+          # Determine if we should push based on event type
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.rebuild_all }}" = "true" ]; then
+            SHOULD_PUSH=true
+            VERSION_TAG="latest"
+            echo "🚀 Building and pushing agent: ${{ matrix.agent_path }}"
+          else
+            SHOULD_PUSH=false
+            VERSION_TAG="${{ github.commit.sha }}"
+            echo "🔍 Validating build for agent: ${{ matrix.agent_path }}"
+          fi
+
+          # Build command - add --push only if we should push
+          BUILD_ARGS="--manifest ${{ matrix.agent_path }}/manifest.yaml --registry ${REGISTRY} --tag ${VERSION_TAG} --platforms linux/amd64 --repository-name ${REPOSITORY_NAME}"
+
+          if [ "$SHOULD_PUSH" = "true" ]; then
+            agentex agents build $BUILD_ARGS --push
+            echo "✅ Successfully built and pushed: ${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"
+          else
+            agentex agents build $BUILD_ARGS
+            echo "✅ Build validation successful for: ${{ matrix.agent_path }}"
+          fi
