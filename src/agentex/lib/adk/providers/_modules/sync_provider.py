@@ -164,18 +164,22 @@ class SyncStreamingModel(Model):
                         output_items = response_output if isinstance(response_output, list) else [response_output]
 
                         for item in output_items:
-                            item_dict = _serialize_item(item)
-                            if item_dict:
-                                new_items.append(item_dict)
+                            try:
+                                item_dict = _serialize_item(item)
+                                if item_dict:
+                                    new_items.append(item_dict)
 
-                                # Extract final_output from message type if available
-                                if item_dict.get('type') == 'message' and not final_output:
-                                    content = item_dict.get('content', [])
-                                    if content and isinstance(content, list):
-                                        for content_part in content:
-                                            if isinstance(content_part, dict) and 'text' in content_part:
-                                                final_output = content_part['text']
-                                                break
+                                    # Extract final_output from message type if available
+                                    if item_dict.get('type') == 'message' and not final_output:
+                                        content = item_dict.get('content', [])
+                                        if content and isinstance(content, list):
+                                            for content_part in content:
+                                                if isinstance(content_part, dict) and 'text' in content_part:
+                                                    final_output = content_part['text']
+                                                    break
+                            except Exception as e:
+                                logger.warning(f"Failed to serialize item in get_response: {e}")
+                                continue
 
                     span.output = {
                         "new_items": new_items,
@@ -275,18 +279,22 @@ class SyncStreamingModel(Model):
                     if event_type == 'response.output_item.done':
                         item = getattr(event, 'item', None)
                         if item is not None:
-                            item_dict = _serialize_item(item)
-                            if item_dict:
-                                new_items.append(item_dict)
+                            try:
+                                item_dict = _serialize_item(item)
+                                if item_dict:
+                                    new_items.append(item_dict)
 
-                                # Update final_response_text from message type if available
-                                if item_dict.get('type') == 'message':
-                                    content = item_dict.get('content', [])
-                                    if content and isinstance(content, list):
-                                        for content_part in content:
-                                            if isinstance(content_part, dict) and 'text' in content_part:
-                                                final_response_text = content_part['text']
-                                                break
+                                    # Update final_response_text from message type if available
+                                    if item_dict.get('type') == 'message':
+                                        content = item_dict.get('content', [])
+                                        if content and isinstance(content, list):
+                                            for content_part in content:
+                                                if isinstance(content_part, dict) and 'text' in content_part:
+                                                    final_response_text = content_part['text']
+                                                    break
+                            except Exception as e:
+                                logger.warning(f"Failed to serialize item in stream_response: {e}")
+                                continue
 
                     yield event
 
