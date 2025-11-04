@@ -34,6 +34,13 @@ if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
 
 from agentex.lib.types.fastacp import TemporalACPConfig
 from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model import (
+    TemporalStreamingModelProvider,
+)
+from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import ContextInterceptor
+
+context_interceptor = ContextInterceptor()
+temporal_streaming_model_provider = TemporalStreamingModelProvider()
 
 # Create the ACP server
 acp = FastACP.create(
@@ -44,7 +51,8 @@ acp = FastACP.create(
         # We are also adding the Open AI Agents SDK plugin to the ACP.
         type="temporal",
         temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233"),
-        plugins=[OpenAIAgentsPlugin()]
+        plugins=[OpenAIAgentsPlugin(model_provider=temporal_streaming_model_provider)],
+        interceptors=[context_interceptor]
     )
 )
 

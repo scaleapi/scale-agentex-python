@@ -16,11 +16,18 @@ Configuration:
 """
 
 import os
+import uuid
 
 import pytest
 import pytest_asyncio
+from test_utils.agentic import (
+    poll_messages,
+    send_event_and_poll_yielding,
+)
 
 from agentex import AsyncAgentex
+from agentex.types.task_message import TaskMessage
+from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -57,78 +64,72 @@ class TestNonStreamingEvents:
     @pytest.mark.asyncio
     async def test_send_event_and_poll(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and polling for the response."""
-        # TODO: Create a task for this conversation
-        # task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        # task = task_response.result
-        # assert task is not None
+        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
+        task = task_response.result
+        assert task is not None
 
-        # TODO: Poll for the initial task creation message (if your agent sends one)
-        # async for message in poll_messages(
-        #     client=client,
-        #     task_id=task.id,
-        #     timeout=30,
-        #     sleep_interval=1.0,
-        # ):
-        #     assert isinstance(message, TaskMessage)
-        #     if message.content and message.content.type == "text" and message.content.author == "agent":
-        #         # Check for your expected initial message
-        #         assert "expected initial text" in message.content.content
-        #         break
+        # Poll for the initial task creation message
+        async for message in poll_messages(
+            client=client,
+            task_id=task.id,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                # Check for the Haiku Assistant welcome message
+                assert "Haiku Assistant" in message.content.content
+                assert "Temporal" in message.content.content
+                break
 
-        # TODO: Send an event and poll for response using the yielding helper function
-        # user_message = "Your test message here"
-        # async for message in send_event_and_poll_yielding(
-        #     client=client,
-        #     agent_id=agent_id,
-        #     task_id=task.id,
-        #     user_message=user_message,
-        #     timeout=30,
-        #     sleep_interval=1.0,
-        # ):
-        #     assert isinstance(message, TaskMessage)
-        #     if message.content and message.content.type == "text" and message.content.author == "agent":
-        #         # Check for your expected response
-        #         assert "expected response text" in message.content.content
-        #         break
+        # Send event and poll for response with streaming updates
+        user_message = "Hello how is life?"
+        print(f"[DEBUG 060 POLL] Sending message: '{user_message}'")
+
+        # Use yield_updates=True to get all streaming chunks as they're written
+        final_message = None
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=30,
+            sleep_interval=1.0,
+            yield_updates=True,  # Get updates as streaming writes chunks
+        ):
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                print(
+                    f"[DEBUG 060 POLL] Received update - Status: {message.streaming_status}, "
+                    f"Content length: {len(message.content.content)}"
+                )
+                final_message = message
+
+                # Stop polling once we get a DONE message
+                if message.streaming_status == "DONE":
+                    print(f"[DEBUG 060 POLL] Streaming complete!")
+                    break
+
+        # Verify the final message has content (the haiku)
+        assert final_message is not None, "Should have received an agent message"
+        assert final_message.content is not None, "Final message should have content"
+        assert len(final_message.content.content) > 0, "Final message should have haiku content"
+
+        print(f"[DEBUG 060 POLL] ✅ Successfully received haiku response!")
+        print(f"[DEBUG 060 POLL] Final haiku:\n{final_message.content.content}")
         pass
 
 
 class TestStreamingEvents:
-    """Test streaming event sending."""
+    """Test streaming event sending (backend verification via polling)."""
 
     @pytest.mark.asyncio
     async def test_send_event_and_stream(self, client: AsyncAgentex, agent_id: str):
-        """Test sending an event and streaming the response."""
-        # TODO: Create a task for this conversation
-        # task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        # task = task_response.result
-        # assert task is not None
+        """
+        Streaming test placeholder.
 
-        # user_message = "Your test message here"
-
-        # # Collect events from stream
-        # all_events = []
-
-        # async def collect_stream_events():
-        #     async for event in stream_agent_response(
-        #         client=client,
-        #         task_id=task.id,
-        #         timeout=30,
-        #     ):
-        #         all_events.append(event)
-
-        # # Start streaming task
-        # stream_task = asyncio.create_task(collect_stream_events())
-
-        # # Send the event
-        # event_content = TextContentParam(type="text", author="user", content=user_message)
-        # await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        # # Wait for streaming to complete
-        # await stream_task
-
-        # # TODO: Add your validation here
-        # assert len(all_events) > 0, "No events received in streaming response"
+        NOTE: SSE streaming is tested via the UI (agentex-ui subscribeTaskState).
+        Backend streaming functionality is verified in test_send_event_and_poll.
+        """
         pass
 
 

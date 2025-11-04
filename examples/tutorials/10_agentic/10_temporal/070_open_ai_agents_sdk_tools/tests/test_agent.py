@@ -16,11 +16,18 @@ Configuration:
 """
 
 import os
+import uuid
 
 import pytest
 import pytest_asyncio
+from test_utils.agentic import (
+    poll_messages,
+    send_event_and_poll_yielding,
+)
 
 from agentex import AsyncAgentex
+from agentex.types.task_message import TaskMessage
+from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -57,78 +64,91 @@ class TestNonStreamingEvents:
     @pytest.mark.asyncio
     async def test_send_event_and_poll(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and polling for the response."""
-        # TODO: Create a task for this conversation
-        # task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        # task = task_response.result
-        # assert task is not None
+        # Create a task for this conversation
+        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
+        task = task_response.result
+        assert task is not None
 
-        # TODO: Poll for the initial task creation message (if your agent sends one)
-        # async for message in poll_messages(
-        #     client=client,
-        #     task_id=task.id,
-        #     timeout=30,
-        #     sleep_interval=1.0,
-        # ):
-        #     assert isinstance(message, TaskMessage)
-        #     if message.content and message.content.type == "text" and message.content.author == "agent":
-        #         # Check for your expected initial message
-        #         assert "expected initial text" in message.content.content
-        #         break
+        # Poll for the initial task creation message
+        print(f"[DEBUG 070 POLL] Polling for initial task creation message...")
+        async for message in poll_messages(
+            client=client,
+            task_id=task.id,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                # Check for the initial acknowledgment message
+                print(f"[DEBUG 070 POLL] Initial message: {message.content.content[:100]}")
+                assert "task" in message.content.content.lower() or "received" in message.content.content.lower()
+                break
 
-        # TODO: Send an event and poll for response using the yielding helper function
-        # user_message = "Your test message here"
-        # async for message in send_event_and_poll_yielding(
-        #     client=client,
-        #     agent_id=agent_id,
-        #     task_id=task.id,
-        #     user_message=user_message,
-        #     timeout=30,
-        #     sleep_interval=1.0,
-        # ):
-        #     assert isinstance(message, TaskMessage)
-        #     if message.content and message.content.type == "text" and message.content.author == "agent":
-        #         # Check for your expected response
-        #         assert "expected response text" in message.content.content
-        #         break
-        pass
+        # Send an event asking about the weather in NYC and poll for response with streaming
+        user_message = "What is the weather in New York City?"
+        print(f"[DEBUG 070 POLL] Sending message: '{user_message}'")
+
+        # Track what we've seen to ensure tool calls happened
+        seen_tool_request = False
+        seen_tool_response = False
+        final_message = None
+
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=60,
+            sleep_interval=1.0,
+            yield_updates=True,  # Get all streaming chunks
+        ):
+            assert isinstance(message, TaskMessage)
+            print(f"[DEBUG 070 POLL] Received message - Type: {message.content.type if message.content else 'None'}, Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}")
+
+            # Track tool_request messages (agent calling get_weather)
+            if message.content and message.content.type == "tool_request":
+                print(f"[DEBUG 070 POLL] ✅ Saw tool_request - agent is calling get_weather tool")
+                seen_tool_request = True
+
+            # Track tool_response messages (get_weather result)
+            if message.content and message.content.type == "tool_response":
+                print(f"[DEBUG 070 POLL] ✅ Saw tool_response - get_weather returned result")
+                seen_tool_response = True
+
+            # Track agent text messages and their streaming updates
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                content_length = len(message.content.content) if message.content.content else 0
+                print(f"[DEBUG 070 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}")
+                final_message = message
+
+                # Stop when we get DONE status
+                if message.streaming_status == "DONE" and content_length > 0:
+                    print(f"[DEBUG 070 POLL] ✅ Streaming complete!")
+                    break
+
+        # Verify we got all the expected pieces
+        assert seen_tool_request, "Expected to see tool_request message (agent calling get_weather)"
+        assert seen_tool_response, "Expected to see tool_response message (get_weather result)"
+        assert final_message is not None, "Expected to see final agent text message"
+        assert final_message.content is not None and len(final_message.content.content) > 0, "Final message should have content"
+
+        # Check that the response contains the temperature (22 degrees)
+        # The get_weather activity returns "The weather in New York City is 22 degrees Celsius"
+        print(f"[DEBUG 070 POLL] Final response: {final_message.content.content}")
+        assert "22" in final_message.content.content, "Expected weather response to contain temperature (22 degrees)"
 
 
 class TestStreamingEvents:
-    """Test streaming event sending."""
+    """Test streaming event sending (backend verification via polling)."""
 
     @pytest.mark.asyncio
     async def test_send_event_and_stream(self, client: AsyncAgentex, agent_id: str):
-        """Test sending an event and streaming the response."""
-        # TODO: Create a task for this conversation
-        # task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        # task = task_response.result
-        # assert task is not None
+        """
+        Streaming test placeholder.
 
-        # user_message = "Your test message here"
-
-        # # Collect events from stream
-        # all_events = []
-
-        # async def collect_stream_events():
-        #     async for event in stream_agent_response(
-        #         client=client,
-        #         task_id=task.id,
-        #         timeout=30,
-        #     ):
-        #         all_events.append(event)
-
-        # # Start streaming task
-        # stream_task = asyncio.create_task(collect_stream_events())
-
-        # # Send the event
-        # event_content = TextContentParam(type="text", author="user", content=user_message)
-        # await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        # # Wait for streaming to complete
-        # await stream_task
-
-        # # TODO: Add your validation here
-        # assert len(all_events) > 0, "No events received in streaming response"
+        NOTE: SSE streaming is tested via the UI (agentex-ui subscribeTaskState).
+        Backend streaming functionality is verified in test_send_event_and_poll.
+        """
         pass
 
 

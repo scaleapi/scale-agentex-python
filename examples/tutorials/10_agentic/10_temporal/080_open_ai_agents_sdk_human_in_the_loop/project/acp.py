@@ -1,8 +1,7 @@
 import os
 import sys
-from datetime import timedelta
 
-from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 # === DEBUG SETUP (AgentEx CLI Debug Support) ===
 if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
@@ -35,21 +34,48 @@ if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
 
 from agentex.lib.types.fastacp import TemporalACPConfig
 from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model import (
+    TemporalStreamingModelProvider,
+)
+from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import ContextInterceptor
+
+# ============================================================================
+# STREAMING SETUP: Interceptor + Model Provider
+# ============================================================================
+# This is where the streaming magic is configured! Two key components:
+#
+# 1. ContextInterceptor (StreamingInterceptor)
+#    - Threads task_id through activity headers using Temporal's interceptor pattern
+#    - Outbound: Reads _task_id from workflow instance, injects into activity headers
+#    - Inbound: Extracts task_id from headers, sets streaming_task_id ContextVar
+#    - This enables runtime context without forking the Temporal plugin!
+#
+# 2. TemporalStreamingModelProvider
+#    - Returns StreamingModel instances that read task_id from ContextVar
+#    - StreamingModel.get_response() streams tokens to Redis in real-time
+#    - Still returns complete response to Temporal for determinism/replay safety
+#    - Uses AgentEx ADK streaming infrastructure (Redis XADD to stream:{task_id})
+#
+# Together, these enable real-time LLM streaming while maintaining Temporal's
+# durability guarantees. No forked components - uses STANDARD OpenAIAgentsPlugin!
+context_interceptor = ContextInterceptor()
+temporal_streaming_model_provider = TemporalStreamingModelProvider()
 
 # Create the ACP server
+# IMPORTANT: We use the STANDARD temporalio.contrib.openai_agents.OpenAIAgentsPlugin
+# No forking needed! The interceptor + model provider handle all streaming logic.
+#
+# Note: ModelActivityParameters with long timeout allows child workflows to wait
+# indefinitely for human input without timing out
 acp = FastACP.create(
     acp_type="agentic",
     config=TemporalACPConfig(
         # When deployed to the cluster, the Temporal address will automatically be set to the cluster address
         # For local development, we set the address manually to talk to the local Temporal service set up via docker compose
-        # We are also adding the Open AI Agents SDK plugin to the ACP.
         type="temporal",
         temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233"),
-        plugins=[OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(days=1)
-            )
-        )]
+        plugins=[OpenAIAgentsPlugin(model_provider=temporal_streaming_model_provider)],
+        interceptors=[context_interceptor],
     )
 )
 

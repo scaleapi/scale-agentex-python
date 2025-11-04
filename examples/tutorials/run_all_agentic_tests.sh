@@ -60,6 +60,9 @@ ALL_TUTORIALS=(
     "10_agentic/10_temporal/000_hello_acp"
     "10_agentic/10_temporal/010_agent_chat"
     "10_agentic/10_temporal/020_state_machine"
+    "10_agentic/10_temporal/060_open_ai_agents_sdk_hello_world"
+    "10_agentic/10_temporal/070_open_ai_agents_sdk_tools"
+    "10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop"
 )
 
 PASSED=0
