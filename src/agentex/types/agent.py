@@ -15,7 +15,7 @@ class Agent(BaseModel):
     """The unique identifier of the agent."""
 
     acp_type: AcpType
-    """The type of the ACP Server (Either sync or agentic)"""
+    """The type of the ACP Server (Either sync or async)"""
 
     created_at: datetime
     """The timestamp when the agent was created"""
