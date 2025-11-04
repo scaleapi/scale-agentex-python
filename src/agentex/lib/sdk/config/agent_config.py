@@ -19,6 +19,10 @@ class AgentConfig(BaseModel):
         pattern=r"^[a-z0-9-]+$",
     )
     acp_type: Literal["sync", "agentic"] = Field(..., description="The type of agent.")
+    agent_input_type: Literal["text", "json"] | None = Field(
+        default=None,
+        description="The type of input the agent accepts."
+    )
     description: str = Field(..., description="The description of the agent.")
     env: dict[str, str] | None = Field(
         default=None, description="Environment variables to set directly in the agent deployment"
