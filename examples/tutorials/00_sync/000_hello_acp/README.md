@@ -6,7 +6,7 @@ The simplest agent type: synchronous request/response pattern with a single `@ac
 ## What You'll Learn
 - Building a basic synchronous agent
 - The `@acp.on_message_send` handler pattern
-- When to use sync vs agentic agents
+- When to use sync vs async agents
 
 ## Prerequisites
 - Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
@@ -39,6 +39,6 @@ That's it - one handler, immediate response. No task creation, no state manageme
 - Operations that complete in under a second
 
 ## Why This Matters
-Sync agents are the simplest way to get started with AgentEx. They're perfect for learning the basics and building stateless agents. Once you need conversation memory or task tracking, you'll graduate to agentic agents.
+Sync agents are the simplest way to get started with AgentEx. They're perfect for learning the basics and building stateless agents. Once you need conversation memory or task tracking, you'll graduate to async agents.
 
 **Next:** [010_multiturn](../010_multiturn/) - Add conversation memory to your agent

@@ -1,6 +1,6 @@
 # BaseACPServer Test Suite
 
-This directory contains comprehensive tests for the `BaseACPServer` and its implementations (`SyncACP`, `AgenticBaseACP`, and `TemporalACP`).
+This directory contains comprehensive tests for the `BaseACPServer` and its implementations (`SyncACP`, `AsyncBaseACP`, and `TemporalACP`).
 
 ## Test Structure
 
@@ -29,7 +29,7 @@ The test suite is organized into several categories:
 
 ### 4. Implementation Tests (`test_implementations.py`)
 - **TestSyncACP**: SyncACP-specific functionality
-- **TestAgenticBaseACP**: AgenticBaseACP-specific functionality
+- **TestAsyncBaseACP**: AsyncBaseACP-specific functionality
 - **TestTemporalACP**: TemporalACP-specific functionality
 - **TestImplementationComparison**: Differences between implementations
 - **TestImplementationErrorHandling**: Implementation-specific error handling
@@ -165,7 +165,7 @@ Test components working together:
 ### Implementation Tests
 Test specific ACP implementations:
 - SyncACP behavior
-- AgenticBaseACP send_event functionality
+- AsyncBaseACP send_event functionality
 - TemporalACP workflow integration
 - Implementation differences
 

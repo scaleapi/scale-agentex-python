@@ -359,7 +359,7 @@ def sample_agent():
         id="agent-123",
         name="test-agent",
         description="Test agent",
-        acp_type="agentic",
+        acp_type="async",
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc)
     )

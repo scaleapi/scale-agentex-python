@@ -61,7 +61,7 @@ class EnvironmentVariables(BaseModel):
     AGENT_DESCRIPTION: str | None = None
     AGENT_ID: str | None = None
     AGENT_API_KEY: str | None = None
-    ACP_TYPE: str | None = "agentic"
+    ACP_TYPE: str | None = "async"
     AGENT_INPUT_TYPE: str | None = None
     # ACP Configuration
     ACP_URL: str

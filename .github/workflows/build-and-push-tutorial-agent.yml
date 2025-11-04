@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       agent_path:
-        description: "Path to the agent directory (e.g., examples/tutorials/10_agentic/00_base/000_hello_acp)"
+        description: "Path to the agent directory (e.g., examples/tutorials/10_async/00_base/000_hello_acp)"
         required: true
         type: string
       version_tag:

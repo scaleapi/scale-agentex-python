@@ -301,7 +301,7 @@ def subscribe_to_async_task_messages(
             print_task_message(message, print_messages, rich_print)
 
     # Subscribe to server-side events using tasks.stream_events_by_name
-    # This is the proper way to get agent responses after sending an event in agentic agents
+    # This is the proper way to get agent responses after sending an event in async agents
 
     # Ensure task has a name
     if not task.name:
