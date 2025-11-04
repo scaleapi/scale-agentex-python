@@ -1,14 +1,17 @@
 import os
 from typing import Union, AsyncGenerator
 
+from agents import Agent, Runner, RunConfig
+
 from agentex.lib import adk
+from agentex.types import TextContent
 from agentex.lib.types.acp import SendMessageParams
+from agentex.lib.types.converters import convert_task_messages_to_oai_agents_inputs
 from agentex.lib.utils.model_utils import BaseModel
-from agentex.lib.types.llm_messages import LLMConfig, UserMessage, SystemMessage, AssistantMessage
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.types.task_message_update import TaskMessageUpdate
 from agentex.types.task_message_content import TaskMessageContent
-from agentex.types import TextContent
+from agentex.lib.adk.providers._modules.sync_provider import SyncStreamingProvider
 
 # Create an ACP server
 acp = FastACP.create(
@@ -66,21 +69,27 @@ async def handle_message_send(
     task_messages = await adk.messages.list(task_id=params.task.id)
 
     #########################################################
-    # 3. Convert task messages to LLM messages.
+    # 3. Run the agent with OpenAI Agents SDK
     #########################################################
 
-    # This might seem duplicative, but the split between TaskMessage and LLMMessage is intentional and important.
+    # Initialize the provider and run config to allow for tracing
+    provider = SyncStreamingProvider(
+        trace_id=params.task.id,
+    )
 
-    llm_messages = [
-        SystemMessage(content=state.system_prompt),
-        *[
-            UserMessage(content=getattr(message.content, "content", ""))
-            if getattr(message.content, "author", None) == "user"
-            else AssistantMessage(content=getattr(message.content, "content", ""))
-            for message in task_messages
-            if getattr(message.content, "type", None) == "text"
-        ],
-    ]
+    run_config = RunConfig(
+        model_provider=provider,
+    )
+
+    # Initialize the agent
+    test_agent = Agent(name="assistant", instructions=state.system_prompt, model=state.model)
+
+    # Convert task messages to OpenAI Agents SDK format
+    input_list = convert_task_messages_to_oai_agents_inputs(task_messages)
+
+    # Run the agent
+    result = await Runner.run(test_agent, input_list, run_config=run_config)
+
 
     # TaskMessages are messages that are sent between an Agent and a Client. They are fundamentally decoupled from messages sent to the LLM. This is because you may want to send additional metadata to allow the client to render the message on the UI differently.
 
@@ -94,25 +103,7 @@ async def handle_message_send(
     #   - If using multiple LLMs, but one LLM's output should not be sent to the user (i.e. a critic model), you can leverage the State as an internal storage mechanism to store the critic model's conversation history. This i s a powerful and flexible way to handle complex scenarios.
 
     #########################################################
-    # 4. Call an LLM to respond to the user's message.
+    # 4. Return the agent response to the client.
     #########################################################
 
-    # Call an LLM to respond to the user's message
-    chat_completion = await adk.providers.litellm.chat_completion(
-        llm_config=LLMConfig(model=state.model, messages=llm_messages),
-        trace_id=params.task.id,
-    )
-
-    #########################################################
-    # 5. Return the agent response to the client.
-    #########################################################
-
-    # The Agentex server automatically commits input and output messages to the database so you don't need to do this yourself, simply process the input content and return the output content.
-
-    # Return the agent response to the client
-    if chat_completion.choices[0].message:
-        content_str = chat_completion.choices[0].message.content or ""
-    else:
-        content_str = ""
-
-    return TextContent(author="agent", content=content_str)
+    return TextContent(author="agent", content=result.final_output)

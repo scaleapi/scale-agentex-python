@@ -43,7 +43,7 @@ class AgentsResource(SyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AgentsResourceWithRawResponse(self)
 
@@ -52,7 +52,7 @@ class AgentsResource(SyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AgentsResourceWithStreamingResponse(self)
 
@@ -92,6 +92,8 @@ class AgentsResource(SyncAPIResource):
     def list(
         self,
         *,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -104,6 +106,10 @@ class AgentsResource(SyncAPIResource):
         List all registered agents, optionally filtered by query parameters.
 
         Args:
+          limit: Limit
+
+          page_number: Page number
+
           task_id: Task ID
 
           extra_headers: Send extra headers
@@ -121,7 +127,14 @@ class AgentsResource(SyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=maybe_transform({"task_id": task_id}, agent_list_params.AgentListParams),
+                query=maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "task_id": task_id,
+                    },
+                    agent_list_params.AgentListParams,
+                ),
             ),
             cast_to=AgentListResponse,
         )
@@ -590,7 +603,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AsyncAgentsResourceWithRawResponse(self)
 
@@ -599,7 +612,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AsyncAgentsResourceWithStreamingResponse(self)
 
@@ -639,6 +652,8 @@ class AsyncAgentsResource(AsyncAPIResource):
     async def list(
         self,
         *,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -651,6 +666,10 @@ class AsyncAgentsResource(AsyncAPIResource):
         List all registered agents, optionally filtered by query parameters.
 
         Args:
+          limit: Limit
+
+          page_number: Page number
+
           task_id: Task ID
 
           extra_headers: Send extra headers
@@ -668,7 +687,14 @@ class AsyncAgentsResource(AsyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=await async_maybe_transform({"task_id": task_id}, agent_list_params.AgentListParams),
+                query=await async_maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "task_id": task_id,
+                    },
+                    agent_list_params.AgentListParams,
+                ),
             ),
             cast_to=AgentListResponse,
         )

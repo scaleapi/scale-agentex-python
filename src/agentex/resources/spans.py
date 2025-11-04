@@ -32,7 +32,7 @@ class SpansResource(SyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return SpansResourceWithRawResponse(self)
 
@@ -41,7 +41,7 @@ class SpansResource(SyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return SpansResourceWithStreamingResponse(self)
 
@@ -222,6 +222,8 @@ class SpansResource(SyncAPIResource):
     def list(
         self,
         *,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -249,7 +251,14 @@ class SpansResource(SyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=maybe_transform({"trace_id": trace_id}, span_list_params.SpanListParams),
+                query=maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "trace_id": trace_id,
+                    },
+                    span_list_params.SpanListParams,
+                ),
             ),
             cast_to=SpanListResponse,
         )
@@ -262,7 +271,7 @@ class AsyncSpansResource(AsyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AsyncSpansResourceWithRawResponse(self)
 
@@ -271,7 +280,7 @@ class AsyncSpansResource(AsyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AsyncSpansResourceWithStreamingResponse(self)
 
@@ -452,6 +461,8 @@ class AsyncSpansResource(AsyncAPIResource):
     async def list(
         self,
         *,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -479,7 +490,14 @@ class AsyncSpansResource(AsyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=await async_maybe_transform({"trace_id": trace_id}, span_list_params.SpanListParams),
+                query=await async_maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "trace_id": trace_id,
+                    },
+                    span_list_params.SpanListParams,
+                ),
             ),
             cast_to=SpanListResponse,
         )

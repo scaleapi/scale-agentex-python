@@ -59,7 +59,10 @@ def cleanup_agent_workflows(
         client = Agentex()
         
         # Get all running tasks
-        all_tasks = client.tasks.list()
+        if agent_name:
+            all_tasks = client.tasks.list(agent_name=agent_name)
+        else:
+            all_tasks = client.tasks.list()
         running_tasks = [task for task in all_tasks if hasattr(task, 'status') and task.status == "RUNNING"]
         
         if not running_tasks:

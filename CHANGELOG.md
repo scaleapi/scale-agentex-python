@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.5.3 (2025-10-31)
+
+Full Changelog: [v0.5.2...v0.5.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.2...v0.5.3)
+
+### Chores
+
+* re apply example updates ([043973b](https://github.com/scaleapi/scale-agentex-python/commit/043973bec649ab2304eff7a313938e1e3e5377e5))
+
+## 0.5.2 (2025-10-31)
+
+Full Changelog: [v0.5.0...v0.5.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.0...v0.5.2)
+
+### Features
+
+* **api:** manual updates ([dc66b57](https://github.com/scaleapi/scale-agentex-python/commit/dc66b57618525669b3aa15676343ef542675a5f9))
+* bump the helm chart version ([1ffafb0](https://github.com/scaleapi/scale-agentex-python/commit/1ffafb0406138d6abd84254fa394b88c4a28ce70))
+
+
+### Chores
+
+* sync repo ([0e05416](https://github.com/scaleapi/scale-agentex-python/commit/0e05416219ca93ae347e6175804bc0f2259a6b44))
+
+## 0.5.0 (2025-10-28)
+
+Full Changelog: [v0.4.28...v0.5.0](https://github.com/scaleapi/agentex-python/compare/v0.4.28...v0.5.0)
+
+### Features
+
+* **api:** api update ([129fae6](https://github.com/scaleapi/agentex-python/commit/129fae69844e655b5dd02b6f67c44d15f5dbfa93))
+
+## 0.4.28 (2025-10-28)
+
+Full Changelog: [v0.4.27...v0.4.28](https://github.com/scaleapi/agentex-python/compare/v0.4.27...v0.4.28)
+
+## 0.4.27 (2025-10-27)
+
+Full Changelog: [v0.4.26...v0.4.27](https://github.com/scaleapi/agentex-python/compare/v0.4.26...v0.4.27)
+
+### Features
+
+* **api:** api update ([f5e4fd2](https://github.com/scaleapi/agentex-python/commit/f5e4fd2f2fbb2c7e67e51795fba1f0b2e13048de))
+
 ## 0.4.26 (2025-10-21)
 
 Full Changelog: [v0.4.25...v0.4.26](https://github.com/scaleapi/agentex-python/compare/v0.4.25...v0.4.26)

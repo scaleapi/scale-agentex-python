@@ -25,23 +25,21 @@ Configuration:
 - AGENT_NAME: Name of the agent to test (default: ab040-other-sdks)
 """
 
-from curses import ALL_MOUSE_EVENTS
-from typing import List
 import os
 import uuid
-from agentex.types import TaskMessage, TextContent
-from agentex.types.task import Task
+import asyncio
+
 import pytest
 import pytest_asyncio
-from agentex import AsyncAgentex
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from test_utils.agentic import (
-    send_event_and_poll_yielding,
     stream_agent_response,
+    send_event_and_poll_yielding,
 )
-import asyncio
+
+from agentex import AsyncAgentex
+from agentex.types import TaskMessage, TextContent
+from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from agentex.types.text_content_param import TextContentParam
-from datetime import datetime
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -76,7 +74,7 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling with MCP tools."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, agent_name: str, agent_id: str):
+    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, agent_id: str):
         """Test sending a simple event and polling for the response (no tool use)."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))

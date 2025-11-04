@@ -45,7 +45,7 @@ class MessagesResource(SyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return MessagesResourceWithRawResponse(self)
 
@@ -54,7 +54,7 @@ class MessagesResource(SyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return MessagesResourceWithStreamingResponse(self)
 
@@ -180,7 +180,8 @@ class MessagesResource(SyncAPIResource):
         self,
         *,
         task_id: str,
-        limit: Optional[int] | Omit = omit,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -213,6 +214,7 @@ class MessagesResource(SyncAPIResource):
                     {
                         "task_id": task_id,
                         "limit": limit,
+                        "page_number": page_number,
                     },
                     message_list_params.MessageListParams,
                 ),
@@ -232,7 +234,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AsyncMessagesResourceWithRawResponse(self)
 
@@ -241,7 +243,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AsyncMessagesResourceWithStreamingResponse(self)
 
@@ -367,7 +369,8 @@ class AsyncMessagesResource(AsyncAPIResource):
         self,
         *,
         task_id: str,
-        limit: Optional[int] | Omit = omit,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -400,6 +403,7 @@ class AsyncMessagesResource(AsyncAPIResource):
                     {
                         "task_id": task_id,
                         "limit": limit,
+                        "page_number": page_number,
                     },
                     message_list_params.MessageListParams,
                 ),

@@ -94,7 +94,8 @@ wait_for_agent_ready() {
     echo -e "${YELLOW}⏳ Waiting for ${name} agent to be ready...${NC}"
 
     while [ $elapsed -lt $timeout ]; do
-        if grep -q "Application startup complete" "$logfile" 2>/dev/null; then
+        if grep -q "Application startup complete" "$logfile" 2>/dev/null || \
+           grep -q "Running workers for task queue" "$logfile" 2>/dev/null; then
             echo -e "${GREEN}✅ ${name} agent is ready${NC}"
             return 0
         fi

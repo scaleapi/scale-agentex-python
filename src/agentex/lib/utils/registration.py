@@ -56,6 +56,8 @@ async def register_agent(env_vars: EnvironmentVariables):
 
     if env_vars.AGENT_ID:
         registration_data["agent_id"] = env_vars.AGENT_ID
+    if env_vars.AGENT_INPUT_TYPE:
+        registration_data["agent_input_type"] = env_vars.AGENT_INPUT_TYPE
 
     # Make the registration request
     registration_url = f"{env_vars.AGENTEX_BASE_URL.rstrip('/')}/agents/register"

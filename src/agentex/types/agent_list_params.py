@@ -9,5 +9,11 @@ __all__ = ["AgentListParams"]
 
 
 class AgentListParams(TypedDict, total=False):
+    limit: int
+    """Limit"""
+
+    page_number: int
+    """Page number"""
+
     task_id: Optional[str]
     """Task ID"""

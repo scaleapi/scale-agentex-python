@@ -4,13 +4,14 @@ Utility functions for testing AgentEx agents.
 This module provides helper functions for validating agent responses
 in both streaming and non-streaming scenarios.
 """
+from __future__ import annotations
 
-from typing import Callable, List, Optional, Generator
+from typing import List, Callable, Optional, Generator
 
-from agentex.types import TextContent, TextDelta
-from agentex.types.agent_rpc_response import SendMessageResponse
+from agentex.types import TextDelta, TextContent
 from agentex.types.agent_rpc_result import StreamTaskMessageDone
-from agentex.types.task_message_update import StreamTaskMessageDelta, StreamTaskMessageFull
+from agentex.types.agent_rpc_response import SendMessageResponse
+from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
 
 
 def validate_text_content(content: TextContent, validator: Optional[Callable[[str], bool]] = None) -> str:

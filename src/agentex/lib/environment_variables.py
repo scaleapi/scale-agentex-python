@@ -38,6 +38,7 @@ class EnvVarKeys(str, Enum):
     AUTH_PRINCIPAL_B64 = "AUTH_PRINCIPAL_B64"
     # Build Information
     BUILD_INFO_PATH = "BUILD_INFO_PATH"
+    AGENT_INPUT_TYPE = "AGENT_INPUT_TYPE"
 
 
 class Environment(str, Enum):
@@ -61,6 +62,7 @@ class EnvironmentVariables(BaseModel):
     AGENT_ID: str | None = None
     AGENT_API_KEY: str | None = None
     ACP_TYPE: str | None = "agentic"
+    AGENT_INPUT_TYPE: str | None = None
     # ACP Configuration
     ACP_URL: str
     ACP_PORT: int = 8000
