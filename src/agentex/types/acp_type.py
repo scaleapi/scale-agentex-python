@@ -4,4 +4,4 @@ from typing_extensions import Literal, TypeAlias
 
 __all__ = ["AcpType"]
 
-AcpType: TypeAlias = Literal["sync", "agentic"]
+AcpType: TypeAlias = Literal["sync", "async", "agentic"]
