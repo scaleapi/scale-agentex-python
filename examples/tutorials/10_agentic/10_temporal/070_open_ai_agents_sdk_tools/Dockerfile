@@ -39,10 +39,22 @@ WORKDIR /app/070_open_ai_agents_sdk_tools
 # Copy the project code
 COPY 070_open_ai_agents_sdk_tools/project /app/070_open_ai_agents_sdk_tools/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 070_open_ai_agents_sdk_tools/tests /app/070_open_ai_agents_sdk_tools/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 WORKDIR /app/070_open_ai_agents_sdk_tools
+
+# Set environment variables
+ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=example-tutorial
 
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]

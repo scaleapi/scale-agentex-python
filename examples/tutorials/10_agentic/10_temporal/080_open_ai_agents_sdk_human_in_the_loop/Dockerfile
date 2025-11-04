@@ -39,12 +39,22 @@ WORKDIR /app/080_open_ai_agents_sdk_human_in_the_loop
 # Copy the project code
 COPY 080_open_ai_agents_sdk_human_in_the_loop/project /app/080_open_ai_agents_sdk_human_in_the_loop/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 080_open_ai_agents_sdk_human_in_the_loop/tests /app/080_open_ai_agents_sdk_human_in_the_loop/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 WORKDIR /app/080_open_ai_agents_sdk_human_in_the_loop
 
 ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=example-tutorial
+
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
 

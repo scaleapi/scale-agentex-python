@@ -37,8 +37,20 @@ WORKDIR /app/000_hello_acp
 # Copy the project code
 COPY 000_hello_acp/project /app/000_hello_acp/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 000_hello_acp/tests /app/000_hello_acp/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
+
+# Set environment variables
+ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=at000-hello-acp
 
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]

@@ -37,12 +37,21 @@ WORKDIR /app/020_state_machine
 # Copy the project code
 COPY 020_state_machine/project /app/020_state_machine/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 020_state_machine/tests /app/020_state_machine/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 WORKDIR /app/020_state_machine
 
 ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=at020-state-machine
 
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]

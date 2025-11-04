@@ -39,13 +39,22 @@ WORKDIR /app/060_open_ai_agents_sdk_hello_world
 # Copy the project code
 COPY 060_open_ai_agents_sdk_hello_world/project /app/060_open_ai_agents_sdk_hello_world/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 060_open_ai_agents_sdk_hello_world/tests /app/060_open_ai_agents_sdk_hello_world/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 WORKDIR /app/060_open_ai_agents_sdk_hello_world
 
-
 ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=example-tutorial
+
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
 

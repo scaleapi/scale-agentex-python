@@ -37,8 +37,20 @@ WORKDIR /app/030_custom_activities
 # Copy the project code
 COPY 030_custom_activities/project /app/030_custom_activities/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 030_custom_activities/tests /app/030_custom_activities/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
+
+# Set environment variables
+ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=at030-custom-activities
 
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
