@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0 (2025-11-04)
+
+Full Changelog: [v0.5.3...v0.6.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.3...v0.6.0)
+
+### Features
+
+* **api:** api update ([ec61dd3](https://github.com/scaleapi/scale-agentex-python/commit/ec61dd3124fbf169dcdcced262a30bfbed080b5f))
+
+
+### Chores
+
+* **internal:** grammar fix (it's -&gt; its) ([36e27da](https://github.com/scaleapi/scale-agentex-python/commit/36e27daed52435b300f090ac4643cd502a817a1e))
+
 ## 0.5.3 (2025-10-31)
 
 Full Changelog: [v0.5.2...v0.5.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.2...v0.5.3)
