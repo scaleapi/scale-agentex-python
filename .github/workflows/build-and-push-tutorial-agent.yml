@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       rebuild_all:
-        description: "Rebuild all agents regardless of changes"
+        description: "Rebuild all tutorial agents regardless of changes, this is reserved for maintainers only."
         required: false
         type: boolean
         default: false
@@ -24,8 +24,29 @@ permissions:
   packages: write
 
 jobs:
+  check-permissions:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if user is maintainer
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              username: context.actor
+            });
+
+            const allowedRoles = ['admin', 'maintain'];
+            if (!allowedRoles.includes(permission.permission)) {
+              throw new Error(`❌ User ${context.actor} does not have sufficient permissions. Required: ${allowedRoles.join(', ')}. Current: ${permission.permission}`);
+            }
+
   find-agents:
     runs-on: ubuntu-latest
+    needs: [check-permissions]
+    if: ${{ !cancelled() && !failure() }}
     outputs:
       agents: ${{ steps.get-agents.outputs.agents }}
       has_agents: ${{ steps.get-agents.outputs.has_agents }}
@@ -157,7 +178,7 @@ jobs:
             echo "🚀 Building and pushing agent: ${{ matrix.agent_path }}"
           else
             SHOULD_PUSH=false
-            VERSION_TAG="pr-${{ github.event.number }}"
+            VERSION_TAG="${{ github.commit.sha }}"
             echo "🔍 Validating build for agent: ${{ matrix.agent_path }}"
           fi
 
