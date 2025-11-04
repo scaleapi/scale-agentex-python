@@ -23,6 +23,7 @@ build:
     # These paths are collected and sent to the Docker daemon for building
     include_paths:
       - 060_open_ai_agents_sdk_hello_world
+      - ../../test_utils
 
     # Path to your agent's Dockerfile
     # This defines how your agent's image is built from the context

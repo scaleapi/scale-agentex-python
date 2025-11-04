@@ -24,16 +24,16 @@ ENV UV_HTTP_TIMEOUT=1000
 
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 000_hello_acp/pyproject.toml /app/000_hello_acp/pyproject.toml
-COPY 000_hello_acp/README.md /app/000_hello_acp/README.md
+COPY 00_sync/000_hello_acp/pyproject.toml /app/000_hello_acp/pyproject.toml
+COPY 00_sync/000_hello_acp/README.md /app/000_hello_acp/README.md
 
 WORKDIR /app/000_hello_acp
 
 # Copy the project code
-COPY 000_hello_acp/project /app/000_hello_acp/project
+COPY 00_sync/000_hello_acp/project /app/000_hello_acp/project
 
 # Copy the test files
-COPY 000_hello_acp/tests /app/000_hello_acp/tests
+COPY 00_sync/000_hello_acp/tests /app/000_hello_acp/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

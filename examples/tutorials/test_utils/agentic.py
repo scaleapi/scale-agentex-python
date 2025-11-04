@@ -180,6 +180,7 @@ async def stream_agent_response(
     except Exception as e:
         print(f"[DEBUG] Stream error: {e}")
 
+
 async def stream_task_messages(
     client: AsyncAgentex,
     task_id: str,
@@ -207,22 +208,3 @@ async def stream_task_messages(
                 task_message = finished_message
         if task_message:
             yield task_message
-
-
-
-def validate_text_in_response(expected_text: str, message: TaskMessage) -> bool:
-    """
-    Validate that expected text appears in any of the messages.
-
-    Args:
-        expected_text: The text to search for (case-insensitive)
-        messages: List of message objects to search
-
-    Returns:
-        True if text is found, False otherwise
-    """
-    for message in messages:
-        if message.content and message.content.type == "text":
-            if expected_text.lower() in message.content.content.lower():
-                return True
-    return False

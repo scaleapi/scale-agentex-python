@@ -23,6 +23,7 @@ build:
     # These paths are collected and sent to the Docker daemon for building
     include_paths:
       - 080_open_ai_agents_sdk_human_in_the_loop
+      - ../../test_utils
 
     # Path to your agent's Dockerfile
     # This defines how your agent's image is built from the context
