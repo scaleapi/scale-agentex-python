@@ -51,25 +51,35 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      - name: Pull latest AgentEx image
+        run: |
+          echo "🐳 Pulling latest Scale AgentEx Docker image..."
+          docker pull ghcr.io/scaleapi/scale-agentex/agentex:latest
+          echo "✅ Successfully pulled AgentEx Docker image"
+
       - name: Checkout scale-agentex repo
         uses: actions/checkout@v4
         with:
           repository: scaleapi/scale-agentex
           path: scale-agentex
 
-      - name: Configure Docker Compose for host networking
+      - name: Configure Docker Compose for pulled image and host networking
         run: |
           cd scale-agentex/agentex
-          echo "🔧 Configuring AgentEx container for GitHub Actions networking..."
+          echo "🔧 Configuring AgentEx container to use pulled image and host networking..."
 
           # Install yq for YAML manipulation
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
+          # Override to use pulled image instead of building
+          yq eval '.services.agentex.image = "ghcr.io/scaleapi/scale-agentex/agentex:latest"' -i docker-compose.yml
+          yq eval 'del(.services.agentex.build)' -i docker-compose.yml
+
           # Add extra_hosts to agentex service to make host.docker.internal work
           yq eval '.services.agentex.extra_hosts = ["host.docker.internal:host-gateway"]' -i docker-compose.yml
 
-          echo "✅ Added extra_hosts configuration to agentex service"
+          echo "✅ Configured docker-compose to use pulled image with host access"
 
       - name: Start AgentEx Server
         run: |
