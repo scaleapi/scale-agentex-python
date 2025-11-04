@@ -120,6 +120,7 @@ jobs:
           ls -la dist/
 
       - name: Test Tutorial
+        id: run-test
         working-directory: ./examples/tutorials
         env:
           OPENAI_API_KEY: ${{ secrets.TUTORIAL_OPENAI_API_KEY }}
@@ -129,15 +130,62 @@ jobs:
           AGENTEX_API_BASE_URL="http://localhost:5003" \
             ./run_agent_test.sh --build-cli "${{ matrix.tutorial }}"
 
+      - name: Print agent logs on failure
+        if: failure()
+        working-directory: ./examples/tutorials
+        run: |
+          echo "🚨 Test failed for tutorial: ${{ matrix.tutorial }}"
+          echo "📋 Printing agent logs..."
+
+          # Look for agent log files in the tutorial directory
+          if find "${{ matrix.tutorial }}" -name "*.log" -type f 2>/dev/null | grep -q .; then
+            echo "Found agent log files:"
+            find "${{ matrix.tutorial }}" -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \;
+          else
+            echo "No .log files found, checking for other common log locations..."
+          fi
+
+          # Check for any output files or dumps
+          if find "${{ matrix.tutorial }}" -name "agent_output*" -o -name "debug*" -o -name "*.out" 2>/dev/null | grep -q .; then
+            echo "Found other output files:"
+            find "${{ matrix.tutorial }}" -name "agent_output*" -o -name "debug*" -o -name "*.out" -exec echo "=== {} ===" \; -exec cat {} \;
+          fi
+
+          # Print the last 50 lines of any python processes that might still be running
+          echo "🔍 Checking for running python processes..."
+          ps aux | grep python || echo "No python processes found"
+
       - name: Record test result
         id: test-result
         if: always()
         run: |
+          # Create results directory
+          mkdir -p test-results
+
+          # Determine result
           if [ "${{ steps.run-test.outcome }}" == "success" ]; then
+            result="passed"
             echo "result=passed" >> $GITHUB_OUTPUT
+            echo "tutorial=${{ matrix.tutorial }}" >> $GITHUB_OUTPUT
           else
+            result="failed"
             echo "result=failed" >> $GITHUB_OUTPUT
+            echo "tutorial=${{ matrix.tutorial }}" >> $GITHUB_OUTPUT
           fi
+
+          # Save result to file for artifact upload
+          # Create a safe filename from tutorial path
+          safe_name=$(echo "${{ matrix.tutorial }}" | tr '/' '_' | tr -d ' ')
+          echo "$result" > "test-results/result-${safe_name}.txt"
+          echo "${{ matrix.tutorial }}" > "test-results/tutorial-${safe_name}.txt"
+
+      - name: Upload test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-result-${{ strategy.job-index }}
+          path: test-results/
+          retention-days: 1
 
   test-summary:
     if: always()
@@ -145,10 +193,118 @@ jobs:
     runs-on: ubuntu-latest
     name: Test Summary
     steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-result-*
+          path: all-results/
+          merge-multiple: true
+        continue-on-error: true
+
       - name: Generate Test Summary
         run: |
           echo "# 🧪 Tutorial Tests Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Get tutorial list from needs context
+          # Initialize counters
+          passed_count=0
+          failed_count=0
+          skipped_count=0
+          total_count=0
+
+          # Get all tutorials that were supposed to run
           tutorials='${{ needs.find-tutorials.outputs.tutorials }}'
+
+          if [ -d "all-results" ] && [ "$(ls -A all-results 2>/dev/null)" ]; then
+            echo "📊 Processing individual test results from artifacts..."
+
+            echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Tutorial | Status | Result |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+            # Process each result file
+            for result_file in all-results/result-*.txt; do
+              if [ -f "$result_file" ]; then
+                # Extract the safe name from filename
+                safe_name=$(basename "$result_file" .txt | sed 's/result-//')
+
+                # Get corresponding tutorial name file
+                tutorial_file="all-results/tutorial-${safe_name}.txt"
+
+                if [ -f "$tutorial_file" ]; then
+                  tutorial_name=$(cat "$tutorial_file")
+                  result=$(cat "$result_file")
+
+                  total_count=$((total_count + 1))
+
+                  if [ "$result" = "passed" ]; then
+                    echo "| \`$tutorial_name\` | ✅ | Passed |" >> $GITHUB_STEP_SUMMARY
+                    passed_count=$((passed_count + 1))
+                  else
+                    echo "| \`$tutorial_name\` | ❌ | Failed |" >> $GITHUB_STEP_SUMMARY
+                    failed_count=$((failed_count + 1))
+                  fi
+                fi
+              fi
+            done
+
+            # Check for any tutorials that didn't have results (skipped/cancelled)
+            echo "$tutorials" | jq -r '.[]' | while read expected_tutorial; do
+              safe_expected=$(echo "$expected_tutorial" | tr '/' '_' | tr -d ' ')
+              if [ ! -f "all-results/result-${safe_expected}.txt" ]; then
+                echo "| \`$expected_tutorial\` | ⏭️ | Skipped/Cancelled |" >> $GITHUB_STEP_SUMMARY
+                skipped_count=$((skipped_count + 1))
+                total_count=$((total_count + 1))
+              fi
+            done
+
+          else
+            echo "⚠️ No individual test results found. This could mean:"
+            echo "- Test jobs were cancelled before completion"
+            echo "- Artifacts failed to upload"
+            echo "- No tutorials were found to test"
+            echo ""
+
+            overall_result="${{ needs.test-tutorial.result }}"
+            echo "Overall job status: **$overall_result**"
+
+            if [[ "$overall_result" == "success" ]]; then
+              echo "✅ All tests appear to have passed based on job status."
+            elif [[ "$overall_result" == "failure" ]]; then
+              echo "❌ Some tests appear to have failed based on job status."
+              echo ""
+              echo "💡 **Tip:** Check individual job logs for specific failure details."
+            elif [[ "$overall_result" == "cancelled" ]]; then
+              echo "⏭️ Tests were cancelled."
+            else
+              echo "❓ Test status is unclear: $overall_result"
+            fi
+
+            # Don't show detailed breakdown when we don't have individual results
+            tutorial_count=$(echo "$tutorials" | jq -r '. | length')
+            echo ""
+            echo "Expected tutorial count: $tutorial_count"
+          fi
+
+          # Only show detailed statistics if we have individual results
+          if [ -d "all-results" ] && [ "$(ls -A all-results 2>/dev/null)" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Summary Statistics" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Tests:** $total_count" >> $GITHUB_STEP_SUMMARY
+            echo "- **Passed:** $passed_count ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed:** $failed_count ❌" >> $GITHUB_STEP_SUMMARY
+            echo "- **Skipped:** $skipped_count ⏭️" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [ $failed_count -eq 0 ] && [ $passed_count -gt 0 ]; then
+              echo "🎉 **All tests passed!**" >> $GITHUB_STEP_SUMMARY
+            elif [ $failed_count -gt 0 ]; then
+              echo "⚠️ **Some tests failed.** Check individual job logs for details." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "💡 **Tip:** Look for the 'Print agent logs on failure' step in failed jobs for debugging information." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "ℹ️ **Tests were cancelled or skipped.**" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
