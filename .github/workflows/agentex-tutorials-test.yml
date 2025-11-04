@@ -183,7 +183,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-result-${{ strategy.job-index }}
+          name: test-result-${{ matrix.tutorial }}
           path: test-results/
           retention-days: 1
 
