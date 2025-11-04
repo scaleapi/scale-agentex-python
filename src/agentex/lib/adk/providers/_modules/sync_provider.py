@@ -28,6 +28,7 @@ from openai.types.responses import (
 from agents.models.openai_provider import OpenAIProvider
 
 from agentex import AsyncAgentex
+from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import (
@@ -39,6 +40,44 @@ from agentex.types.task_message_update import (
 from agentex.types.task_message_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
+
+logger = make_logger(__name__)
+
+
+def _serialize_item(item: Any) -> dict[str, Any]:
+    """
+    Universal serializer for any item type from OpenAI Agents SDK.
+
+    Uses model_dump() for Pydantic models, otherwise extracts attributes manually.
+    Filters out internal Pydantic fields that can't be serialized.
+    """
+    if hasattr(item, 'model_dump'):
+        # Pydantic model - use model_dump for proper serialization
+        try:
+            return item.model_dump(mode='json', exclude_unset=True)
+        except Exception:
+            # Fallback to dict conversion
+            return dict(item) if hasattr(item, '__iter__') else {}
+    else:
+        # Not a Pydantic model - extract attributes manually
+        item_dict = {}
+        for attr_name in dir(item):
+            if not attr_name.startswith('_') and attr_name not in ('model_fields', 'model_config', 'model_computed_fields'):
+                try:
+                    attr_value = getattr(item, attr_name, None)
+                    # Skip methods and None values
+                    if attr_value is not None and not callable(attr_value):
+                        # Convert to JSON-serializable format
+                        if hasattr(attr_value, 'model_dump'):
+                            item_dict[attr_name] = attr_value.model_dump()
+                        elif isinstance(attr_value, (str, int, float, bool, list, dict)):
+                            item_dict[attr_name] = attr_value
+                        else:
+                            item_dict[attr_name] = str(attr_value)
+                except Exception:
+                    # Skip attributes that can't be accessed
+                    pass
+        return item_dict
 
 
 class SyncStreamingModel(Model):
@@ -109,10 +148,42 @@ class SyncStreamingModel(Model):
 
                 response = await self.original_model.get_response(**kwargs)
 
-                # Set span output
-                if span:
+                # Set span output with structured data
+                if span and response:
+                    new_items = []
+                    final_output = None
+
+                    # Extract final output text from response
+                    response_final_output = getattr(response, 'final_output', None)
+                    if response_final_output:
+                        final_output = response_final_output
+
+                    # Extract items from the response output
+                    response_output = getattr(response, 'output', None)
+                    if response_output:
+                        output_items = response_output if isinstance(response_output, list) else [response_output]
+
+                        for item in output_items:
+                            try:
+                                item_dict = _serialize_item(item)
+                                if item_dict:
+                                    new_items.append(item_dict)
+
+                                    # Extract final_output from message type if available
+                                    if item_dict.get('type') == 'message' and not final_output:
+                                        content = item_dict.get('content', [])
+                                        if content and isinstance(content, list):
+                                            for content_part in content:
+                                                if isinstance(content_part, dict) and 'text' in content_part:
+                                                    final_output = content_part['text']
+                                                    break
+                            except Exception as e:
+                                logger.warning(f"Failed to serialize item in get_response: {e}")
+                                continue
+
                     span.output = {
-                        "response": str(response) if response else None,
+                        "new_items": new_items,
+                        "final_output": final_output,
                     }
 
                 return response
@@ -160,7 +231,9 @@ class SyncStreamingModel(Model):
         # Wrap the streaming in a tracing span if tracer is available
         if self.tracer and self.trace_id:
             trace = self.tracer.trace(self.trace_id)
-            async with trace.span(
+
+            # Manually start the span instead of using context manager
+            span = await trace.start_span(
                 parent_id=self.parent_span_id,
                 name="run_agent_streamed",
                 input={
@@ -172,7 +245,9 @@ class SyncStreamingModel(Model):
                     "handoffs": [str(h) for h in handoffs] if handoffs else [],
                     "previous_response_id": previous_response_id,
                 },
-            ) as span:
+            )
+
+            try:
                 # Get the stream from the original model
                 stream_kwargs = {
                     "system_instructions": system_instructions,
@@ -193,23 +268,44 @@ class SyncStreamingModel(Model):
                 # Get the stream response from the original model and yield each event
                 stream_response = self.original_model.stream_response(**stream_kwargs)
 
-                # Pass through each event from the original stream
-                event_count = 0
-                final_output = None
+                # Pass through each event from the original stream and track items
+                new_items = []
+                final_response_text = ""
+
                 async for event in stream_response:
-                    event_count += 1
-                    # Track the final output if available
-                    if hasattr(event, 'type') and event.type == 'raw_response_event':
-                        if hasattr(event.data, 'output'):
-                            final_output = event.data.output
+                    event_type = getattr(event, 'type', 'no-type')
+
+                    # Handle response.output_item.done events which contain completed items
+                    if event_type == 'response.output_item.done':
+                        item = getattr(event, 'item', None)
+                        if item is not None:
+                            try:
+                                item_dict = _serialize_item(item)
+                                if item_dict:
+                                    new_items.append(item_dict)
+
+                                    # Update final_response_text from message type if available
+                                    if item_dict.get('type') == 'message':
+                                        content = item_dict.get('content', [])
+                                        if content and isinstance(content, list):
+                                            for content_part in content:
+                                                if isinstance(content_part, dict) and 'text' in content_part:
+                                                    final_response_text = content_part['text']
+                                                    break
+                            except Exception as e:
+                                logger.warning(f"Failed to serialize item in stream_response: {e}")
+                                continue
+
                     yield event
 
-                # Set span output
-                if span:
-                    span.output = {
-                        "event_count": event_count,
-                        "final_output": str(final_output) if final_output else None,
-                    }
+                # Set span output with structured data including tool calls and final response
+                span.output = {
+                    "new_items": new_items,
+                    "final_output": final_response_text if final_response_text else None,
+                }
+            finally:
+                # End the span after all events have been yielded
+                await trace.end_span(span)
         else:
             # No tracing, just stream normally
             # Get the stream from the original model
