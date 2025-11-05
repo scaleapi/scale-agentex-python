@@ -28,6 +28,7 @@ from .state_list_params import StateListParams as StateListParams
 from .agent_rpc_response import AgentRpcResponse as AgentRpcResponse
 from .agent_task_tracker import AgentTaskTracker as AgentTaskTracker
 from .data_content_param import DataContentParam as DataContentParam
+from .deployment_history import DeploymentHistory as DeploymentHistory
 from .span_create_params import SpanCreateParams as SpanCreateParams
 from .span_list_response import SpanListResponse as SpanListResponse
 from .span_update_params import SpanUpdateParams as SpanUpdateParams
@@ -62,4 +63,6 @@ from .task_message_content_param import TaskMessageContentParam as TaskMessageCo
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
 from .tool_response_content_param import ToolResponseContentParam as ToolResponseContentParam
 from .task_retrieve_by_name_params import TaskRetrieveByNameParams as TaskRetrieveByNameParams
+from .deployment_history_list_params import DeploymentHistoryListParams as DeploymentHistoryListParams
 from .task_retrieve_by_name_response import TaskRetrieveByNameResponse as TaskRetrieveByNameResponse
+from .deployment_history_list_response import DeploymentHistoryListResponse as DeploymentHistoryListResponse
