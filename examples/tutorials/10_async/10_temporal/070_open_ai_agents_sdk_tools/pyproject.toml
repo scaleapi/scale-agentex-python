@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "An AgentEx agent"
 requires-python = ">=3.12"
 dependencies = [
-    "agentex-sdk==0.6.0",
-    "openai-agents-sdk==0.4.2",
-    "temporalio==1.18.2",
+    "agentex-sdk>=0.6.0",
+    "openai-agents>=0.4.2",
+    "temporalio>=1.18.2",
     "scale-gp",
 ]
 
