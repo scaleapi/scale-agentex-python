@@ -55,9 +55,8 @@ class TemporalStreamingHooks(RunHooks):
     Power users can ignore this class and subclass agents.RunHooks directly for full control.
 
     Note:
-        Tool arguments are not available in hooks due to OpenAI SDK architecture.
-        The SDK's hook signature doesn't include tool arguments - they're only passed
-        to the actual tool function. This is why arguments={} in ToolRequestContent.
+        Tool arguments are extracted from the ToolContext's tool_arguments field,
+        which contains a JSON string of the arguments passed to the tool.
 
     Attributes:
         task_id: The AgentEx task ID for routing streamed events
@@ -108,20 +107,29 @@ class TemporalStreamingHooks(RunHooks):
     async def on_tool_start(self, context: RunContextWrapper, agent: Agent, tool: Tool) -> None:  # noqa: ARG002
         """Stream tool request when a tool starts execution.
 
-        Extracts the tool_call_id from the context and streams a ToolRequestContent
-        message to the UI showing that the tool is about to execute.
-
-        Note: Tool arguments are not available in the hook context due to OpenAI SDK
-        design. The hook signature doesn't include tool arguments - they're passed
-        directly to the tool function instead. We send an empty dict as a placeholder.
+        Extracts the tool_call_id and tool_arguments from the context and streams a
+        ToolRequestContent message to the UI showing that the tool is about to execute.
 
         Args:
-            context: The run context wrapper (will be a ToolContext with tool_call_id)
+            context: The run context wrapper (will be a ToolContext with tool_call_id and tool_arguments)
             agent: The agent executing the tool
             tool: The tool being executed
         """
+        import json
+
         tool_context = context if isinstance(context, ToolContext) else None
         tool_call_id = tool_context.tool_call_id if tool_context else f"call_{id(tool)}"
+
+        # Extract tool arguments from context
+        tool_arguments = {}
+        if tool_context and hasattr(tool_context, 'tool_arguments'):
+            try:
+                # tool_arguments is a JSON string, parse it
+                tool_arguments = json.loads(tool_context.tool_arguments)
+            except (json.JSONDecodeError, TypeError):
+                # If parsing fails, log and use empty dict
+                logger.warning(f"Failed to parse tool arguments: {tool_context.tool_arguments}")
+                tool_arguments = {}
 
         await workflow.execute_activity_method(
             stream_lifecycle_content,
@@ -131,7 +139,7 @@ class TemporalStreamingHooks(RunHooks):
                     author="agent",
                     tool_call_id=tool_call_id,
                     name=tool.name,
-                    arguments={},  # Not available in hook context - SDK limitation
+                    arguments=tool_arguments,  # Now properly extracted from context
                 ),
             ],
             start_to_close_timeout=self.timeout,
