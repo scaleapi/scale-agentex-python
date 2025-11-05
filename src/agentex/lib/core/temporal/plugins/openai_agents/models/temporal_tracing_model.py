@@ -7,9 +7,10 @@ context interceptor to access task_id, trace_id, and parent_span_id.
 The key innovation is that these are thin wrappers around the standard OpenAI models,
 avoiding code duplication while adding tracing capabilities.
 """
+from __future__ import annotations
 
 import logging
-from typing import List, Union, Optional, override
+from typing import Any, List, Union, Optional, override
 
 from agents import (
     Tool,
@@ -39,6 +40,42 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 )
 
 logger = logging.getLogger("agentex.temporal.tracing")
+
+
+def _serialize_item(item: Any) -> dict[str, Any]:
+    """
+    Universal serializer for any item type from OpenAI Agents SDK.
+
+    Uses model_dump() for Pydantic models, otherwise extracts attributes manually.
+    Filters out internal Pydantic fields that can't be serialized.
+    """
+    if hasattr(item, 'model_dump'):
+        # Pydantic model - use model_dump for proper serialization
+        try:
+            return item.model_dump(mode='json', exclude_unset=True)
+        except Exception:
+            # Fallback to dict conversion
+            return dict(item) if hasattr(item, '__iter__') else {}
+    else:
+        # Not a Pydantic model - extract attributes manually
+        item_dict = {}
+        for attr_name in dir(item):
+            if not attr_name.startswith('_') and attr_name not in ('model_fields', 'model_config', 'model_computed_fields'):
+                try:
+                    attr_value = getattr(item, attr_name, None)
+                    # Skip methods and None values
+                    if attr_value is not None and not callable(attr_value):
+                        # Convert to JSON-serializable format
+                        if hasattr(attr_value, 'model_dump'):
+                            item_dict[attr_name] = attr_value.model_dump()
+                        elif isinstance(attr_value, (str, int, float, bool, list, dict)):
+                            item_dict[attr_name] = attr_value
+                        else:
+                            item_dict[attr_name] = str(attr_value)
+                except Exception:
+                    # Skip attributes that can't be accessed
+                    pass
+        return item_dict
 
 
 class TemporalTracingModelProvider(OpenAIProvider):
@@ -171,15 +208,35 @@ class TemporalTracingResponsesModel(Model):
                         **kwargs,
                     )
 
-                    # Add response info to span output
+                    # Serialize response output items for span tracing
+                    new_items = []
+                    final_output = None
+
+                    if hasattr(response, 'output') and response.output:
+                        response_output = response.output if isinstance(response.output, list) else [response.output]
+
+                        for item in response_output:
+                            try:
+                                item_dict = _serialize_item(item)
+                                if item_dict:
+                                    new_items.append(item_dict)
+
+                                    # Extract final_output from message type if available
+                                    if item_dict.get('type') == 'message' and not final_output:
+                                        content = item_dict.get('content', [])
+                                        if content and isinstance(content, list):
+                                            for content_part in content:
+                                                if isinstance(content_part, dict) and 'text' in content_part:
+                                                    final_output = content_part['text']
+                                                    break
+                            except Exception as e:
+                                logger.warning(f"Failed to serialize item in temporal tracing model: {e}")
+                                continue
+
+                    # Set span output with structured data
                     span.output = {  # type: ignore[attr-defined]
-                        "response_id": getattr(response, "id", None),
-                        "model_used": getattr(response, "model", None),
-                        "usage": {
-                            "input_tokens": response.usage.input_tokens if response.usage else None,
-                            "output_tokens": response.usage.output_tokens if response.usage else None,
-                            "total_tokens": response.usage.total_tokens if response.usage else None,
-                        } if response.usage else None,
+                        "new_items": new_items,
+                        "final_output": final_output,
                     }
 
                     return response
@@ -284,15 +341,35 @@ class TemporalTracingChatCompletionsModel(Model):
                         **kwargs,
                     )
 
-                    # Add response info to span output
+                    # Serialize response output items for span tracing
+                    new_items = []
+                    final_output = None
+
+                    if hasattr(response, 'output') and response.output:
+                        response_output = response.output if isinstance(response.output, list) else [response.output]
+
+                        for item in response_output:
+                            try:
+                                item_dict = _serialize_item(item)
+                                if item_dict:
+                                    new_items.append(item_dict)
+
+                                    # Extract final_output from message type if available
+                                    if item_dict.get('type') == 'message' and not final_output:
+                                        content = item_dict.get('content', [])
+                                        if content and isinstance(content, list):
+                                            for content_part in content:
+                                                if isinstance(content_part, dict) and 'text' in content_part:
+                                                    final_output = content_part['text']
+                                                    break
+                            except Exception as e:
+                                logger.warning(f"Failed to serialize item in temporal tracing model: {e}")
+                                continue
+
+                    # Set span output with structured data
                     span.output = {  # type: ignore[attr-defined]
-                        "response_id": getattr(response, "id", None),
-                        "model_used": getattr(response, "model", None),
-                        "usage": {
-                            "input_tokens": response.usage.input_tokens if response.usage else None,
-                            "output_tokens": response.usage.output_tokens if response.usage else None,
-                            "total_tokens": response.usage.total_tokens if response.usage else None,
-                        } if response.usage else None,
+                        "new_items": new_items,
+                        "final_output": final_output,
                     }
 
                     return response
