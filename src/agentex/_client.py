@@ -21,7 +21,7 @@ from ._types import (
 )
 from ._utils import is_given, get_async_library
 from ._version import __version__
-from .resources import spans, tasks, agents, events, states, tracker
+from .resources import spans, tasks, agents, events, states, tracker, deployment_history
 from ._streaming import Stream as Stream, AsyncStream as AsyncStream
 from ._exceptions import APIStatusError
 from ._base_client import (
@@ -57,6 +57,7 @@ class Agentex(SyncAPIClient):
     states: states.StatesResource
     events: events.EventsResource
     tracker: tracker.TrackerResource
+    deployment_history: deployment_history.DeploymentHistoryResource
     with_raw_response: AgentexWithRawResponse
     with_streaming_response: AgentexWithStreamedResponse
 
@@ -141,6 +142,7 @@ class Agentex(SyncAPIClient):
         self.states = states.StatesResource(self)
         self.events = events.EventsResource(self)
         self.tracker = tracker.TrackerResource(self)
+        self.deployment_history = deployment_history.DeploymentHistoryResource(self)
         self.with_raw_response = AgentexWithRawResponse(self)
         self.with_streaming_response = AgentexWithStreamedResponse(self)
 
@@ -261,6 +263,7 @@ class AsyncAgentex(AsyncAPIClient):
     states: states.AsyncStatesResource
     events: events.AsyncEventsResource
     tracker: tracker.AsyncTrackerResource
+    deployment_history: deployment_history.AsyncDeploymentHistoryResource
     with_raw_response: AsyncAgentexWithRawResponse
     with_streaming_response: AsyncAgentexWithStreamedResponse
 
@@ -345,6 +348,7 @@ class AsyncAgentex(AsyncAPIClient):
         self.states = states.AsyncStatesResource(self)
         self.events = events.AsyncEventsResource(self)
         self.tracker = tracker.AsyncTrackerResource(self)
+        self.deployment_history = deployment_history.AsyncDeploymentHistoryResource(self)
         self.with_raw_response = AsyncAgentexWithRawResponse(self)
         self.with_streaming_response = AsyncAgentexWithStreamedResponse(self)
 
@@ -466,6 +470,7 @@ class AgentexWithRawResponse:
         self.states = states.StatesResourceWithRawResponse(client.states)
         self.events = events.EventsResourceWithRawResponse(client.events)
         self.tracker = tracker.TrackerResourceWithRawResponse(client.tracker)
+        self.deployment_history = deployment_history.DeploymentHistoryResourceWithRawResponse(client.deployment_history)
 
 
 class AsyncAgentexWithRawResponse:
@@ -477,6 +482,9 @@ class AsyncAgentexWithRawResponse:
         self.states = states.AsyncStatesResourceWithRawResponse(client.states)
         self.events = events.AsyncEventsResourceWithRawResponse(client.events)
         self.tracker = tracker.AsyncTrackerResourceWithRawResponse(client.tracker)
+        self.deployment_history = deployment_history.AsyncDeploymentHistoryResourceWithRawResponse(
+            client.deployment_history
+        )
 
 
 class AgentexWithStreamedResponse:
@@ -488,6 +496,9 @@ class AgentexWithStreamedResponse:
         self.states = states.StatesResourceWithStreamingResponse(client.states)
         self.events = events.EventsResourceWithStreamingResponse(client.events)
         self.tracker = tracker.TrackerResourceWithStreamingResponse(client.tracker)
+        self.deployment_history = deployment_history.DeploymentHistoryResourceWithStreamingResponse(
+            client.deployment_history
+        )
 
 
 class AsyncAgentexWithStreamedResponse:
@@ -499,6 +510,9 @@ class AsyncAgentexWithStreamedResponse:
         self.states = states.AsyncStatesResourceWithStreamingResponse(client.states)
         self.events = events.AsyncEventsResourceWithStreamingResponse(client.events)
         self.tracker = tracker.AsyncTrackerResourceWithStreamingResponse(client.tracker)
+        self.deployment_history = deployment_history.AsyncDeploymentHistoryResourceWithStreamingResponse(
+            client.deployment_history
+        )
 
 
 Client = Agentex
