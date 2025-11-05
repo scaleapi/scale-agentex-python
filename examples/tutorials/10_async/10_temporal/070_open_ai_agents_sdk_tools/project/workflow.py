@@ -111,7 +111,7 @@ class StateModel(BaseModel):
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
-class ExampleTutorialWorkflow(BaseWorkflow):
+class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
     """
     Minimal async workflow template for AgentEx Temporal agents.
     """

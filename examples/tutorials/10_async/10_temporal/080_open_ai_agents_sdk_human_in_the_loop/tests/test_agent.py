@@ -39,7 +39,7 @@ from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
-AGENT_NAME = os.environ.get("AGENT_NAME", "example-tutorial")
+AGENT_NAME = os.environ.get("AGENT_NAME", "at080-open-ai-agents-sdk-human-in-the-loop")
 TEMPORAL_ADDRESS = os.environ.get("TEMPORAL_ADDRESS", "localhost:7233")
 
 
