@@ -126,15 +126,15 @@ def init():
     table.add_column("Description", style="white")
     table.add_row(
         "[bold cyan]Async - ACP Only[/bold cyan]",
-        "A simple synchronous agent that handles tasks directly. Best for straightforward agents that don't need long-running operations.",
+        "Asynchronous, non-blocking agent that can process multiple concurrent requests. Best for straightforward asynchronous agents that don't need durable execution. Good for asynchronous workflows, stateful applications, and multi-step analysis.",
     )
     table.add_row(
         "[bold cyan]Async - Temporal[/bold cyan]",
-        "An asynchronous agent powered by Temporal workflows. Best for agents that need to handle long-running tasks, retries, or complex state management.",
+        "Asynchronous, non-blocking agent with durable execution for all steps. Best for production-grade agents that require complex multi-step tool calls, human-in-the-loop approvals, and long-running processes that require transactional reliability.",
     )
     table.add_row(
         "[bold cyan]Sync ACP[/bold cyan]",
-        "A synchronous agent that handles tasks directly. The difference is that this Sync ACP will be required to respond with the results in the same call as the input.Best for straightforward agents that don't need long-running operations.",
+        "Synchronous agent that processes one request per task with a simple request-response pattern. Best for low-latency use cases, FAQ bots, translation services, and data lookups.",
     )
     console.print()
     console.print(table)
