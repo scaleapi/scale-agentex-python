@@ -29,6 +29,9 @@ class Agent(BaseModel):
     updated_at: datetime
     """The timestamp when the agent was last updated"""
 
+    agent_input_type: Optional[Literal["text", "json"]] = None
+    """The type of input the agent expects."""
+
     registered_at: Optional[datetime] = None
     """The timestamp when the agent was last registered"""
 
