@@ -69,7 +69,7 @@ agent:
 
   # Unique name for your agent
   # Used for task routing and monitoring
-  name: example-tutorial
+  name: openai-agents-sdk-hello-world
 
   # Description of what your agent does
   # Helps with documentation and discovery
@@ -82,12 +82,12 @@ agent:
     workflows:
       # Name of the workflow class
       # Must match the @workflow.defn name in your workflow.py
-      - name: example-tutorial
+      - name: openai-agents-sdk-hello-world
 
         # Queue name for task distribution
         # Used by Temporal to route tasks to your agent
         # Convention: <agent_name>_task_queue
-        queue_name: example_tutorial_queue
+        queue_name: openai_agents_sdk_hello_world_queue
 
   # Optional: Credentials mapping
   # Maps Kubernetes secrets to environment variables
@@ -124,8 +124,8 @@ deployment:
   # These can be overridden using --override-file with custom configuration files
   global:
     agent:
-      name: "example-tutorial"
-      description: "An AgentEx agent"
+      name: "openai-agents-sdk-hello-world"
+      description: "OpenAI Agents SDK Hello World tutorial"
     
     # Default replica count
     replicaCount: 1
