@@ -184,16 +184,6 @@ def init():
     ).ask()
     if not description:
         return
-    
-    agent_input_type = questionary.select(
-        "What type of input will your agent handle?",
-        choices=[
-            {"name": "Text Input", "value": "text"},
-            {"name": "Structured Input", "value": "json"},
-        ],    
-    ).ask()
-    if not agent_input_type:
-        return
 
     use_uv = questionary.select(
         "Would you like to use uv for package management?",
@@ -206,7 +196,6 @@ def init():
     answers = {
         "template_type": template_type,
         "project_path": project_path,
-        "agent_input_type": agent_input_type,
         "agent_name": agent_name,
         "agent_directory_name": agent_directory_name,
         "description": description,
