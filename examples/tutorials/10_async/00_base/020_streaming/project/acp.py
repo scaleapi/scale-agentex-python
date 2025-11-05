@@ -1,0 +1,144 @@
+import os
+from typing import List
+
+from agentex.lib import adk
+from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.lib.types.fastacp import AsyncACPConfig
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.types.llm_messages import Message, LLMConfig, UserMessage, SystemMessage, AssistantMessage
+from agentex.lib.sdk.fastacp.fastacp import FastACP
+
+logger = make_logger(__name__)
+
+
+# Create an ACP server
+
+# !!! Warning: Because "Async" ACPs are designed to be fully asynchronous, race conditions can occur if parallel events are sent. It is highly recommended to use the "temporal" type in the AsyncACPConfig instead to handle complex use cases. The "base" ACP is only designed to be used for simple use cases and for learning purposes.
+acp = FastACP.create(
+    acp_type="async",
+    config=AsyncACPConfig(type="base"),
+)
+
+class StateModel(BaseModel):
+    messages: List[Message]
+
+
+@acp.on_task_create
+async def handle_task_create(params: CreateTaskParams):
+    # Upon task creation, we initialize the task state with a system message.
+    # This will be fetched by the `on_task_event_send` handler when each event is sent.
+
+    #########################################################
+    # 1. Initialize the task state.
+    #########################################################
+
+    state = StateModel(messages=[SystemMessage(content="You are a helpful assistant that can answer questions.")])
+    await adk.state.create(task_id=params.task.id, agent_id=params.agent.id, state=state)
+
+@acp.on_task_event_send
+async def handle_event_send(params: SendEventParams):
+    # !!! Warning: Because "Agentic" ACPs are designed to be fully asynchronous, race conditions can occur if parallel events are sent. It is highly recommended to use the "temporal" type in the AgenticACPConfig instead to handle complex use cases. The "base" ACP is only designed to be used for simple use cases and for learning purposes.
+
+    #########################################################
+    # 2. Validate the event content. 
+    #########################################################
+    if not params.event.content:
+        return
+
+    if params.event.content.type != "text":
+        raise ValueError(f"Expected text message, got {params.event.content.type}")
+
+    if params.event.content.author != "user":
+        raise ValueError(f"Expected user message, got {params.event.content.author}")
+
+    #########################################################
+    # 3. Echo back the user's message.
+    #########################################################
+
+    await adk.messages.create(
+        task_id=params.task.id,
+        trace_id=params.task.id,
+        content=params.event.content,
+    )
+
+    #########################################################
+    # 4. If the OpenAI API key is not set, send a message to the user to let them know.
+    #########################################################
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        await adk.messages.create(
+            task_id=params.task.id,
+            trace_id=params.task.id,
+            content=TextContent(
+                author="agent",
+                content="Hey, sorry I'm unable to respond to your message because you're running this example without an OpenAI API key. Please set the OPENAI_API_KEY environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
+            ),
+        )
+
+    #########################################################
+    # 5. Retrieve the task state.
+    #########################################################
+
+    task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
+    if not task_state:
+        raise ValueError("Task state not found - ensure task was properly initialized")
+    state = StateModel.model_validate(task_state.state)
+
+    #########################################################
+    # 6. Add the new user message to the message history
+    #########################################################
+
+    # Safely extract content from the event
+    content_text = ""
+    if hasattr(params.event.content, 'content'):
+        content_val = getattr(params.event.content, 'content', '')
+        if isinstance(content_val, str):
+            content_text = content_val
+    state.messages.append(UserMessage(content=content_text))
+
+    #########################################################
+    # 7. (👋) Call an LLM to respond to the user's message
+    #########################################################
+
+    # When we use the streaming version of chat completion, we can either use the `chat_completion_stream_auto_send` method, or we can use the `chat_completion_stream` method. Here is the difference:
+
+    # `chat_completion_stream_auto_send` - This is the "managed version" of the streaming method. It will automatically send the response to the client as an agent TaskMessage.
+
+    # `chat_completion_stream` - This is the "unmanaged version" of the streaming method. It will return a generator of chat completion chunks. You can then do whatever you want with the chunks, such as sending them to the client as an agent message, or storing them in the task state, or whatever you want.
+
+    # Here we use the `chat_completion_stream_auto_send` method.
+    #########################################################
+
+    task_message = await adk.providers.litellm.chat_completion_stream_auto_send(
+        task_id=params.task.id,
+        llm_config=LLMConfig(model="gpt-4o-mini", messages=state.messages, stream=True),
+        trace_id=params.task.id,
+    )
+    
+    # Safely extract content from the task message
+    response_text = ""
+    if task_message.content and hasattr(task_message.content, 'content'):  # type: ignore[union-attr]
+        content_val = getattr(task_message.content, 'content', '')  # type: ignore[union-attr]
+        if isinstance(content_val, str):
+            response_text = content_val
+    state.messages.append(AssistantMessage(content=response_text))
+
+    #########################################################
+    # 8. Store the messages in the task state for the next turn
+    #########################################################
+
+    await adk.state.update(
+        state_id=task_state.id,
+        task_id=params.task.id,
+        agent_id=params.agent.id,
+        state=state,
+        trace_id=params.task.id,
+    )
+
+@acp.on_task_cancel
+async def handle_task_cancel(params: CancelTaskParams):
+    """Default task cancel handler"""
+    logger.info(f"Task canceled: {params.task}")
+

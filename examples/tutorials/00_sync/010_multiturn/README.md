@@ -46,9 +46,9 @@ The handler accepts history, builds context, and returns responses that referenc
 ## When to Use
 - Simple chatbots that need conversation memory
 - When client can maintain and send conversation history
-- Quick prototypes before building full agentic agents
+- Quick prototypes before building full async agents
 
 ## Why This Matters
-While sync agents can handle conversations, you're responsible for managing state on the client side. This becomes complex quickly. For production conversational agents, consider agentic agents ([10_agentic/00_base/010_multiturn](../../10_agentic/00_base/010_multiturn/)) where the platform manages state automatically.
+While sync agents can handle conversations, you're responsible for managing state on the client side. This becomes complex quickly. For production conversational agents, consider async agents ([10_async/00_base/010_multiturn](../../10_async/00_base/010_multiturn/)) where the platform manages state automatically.
 
 **Next:** [020_streaming](../020_streaming/) - Stream responses in real-time

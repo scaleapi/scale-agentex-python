@@ -299,7 +299,7 @@ class BaseACPServer(FastAPI):
     Define all possible decorators to be overriden and implemented by each ACP implementation
     Then the users can override the default handlers by implementing their own handlers
 
-    ACP Type: Agentic
+    ACP Type: Async
     Decorators:
     - on_task_create
     - on_task_event_send
@@ -310,14 +310,14 @@ class BaseACPServer(FastAPI):
     - on_message_send
     """
 
-    # Type: Agentic
+    # Type: Async
     def on_task_create(self, fn: Callable[[CreateTaskParams], Awaitable[Any]]):
         """Handle task/init method"""
         wrapped = self._wrap_handler(fn)
         self._handlers[RPCMethod.TASK_CREATE] = wrapped
         return fn
 
-    # Type: Agentic
+    # Type: Async
     def on_task_event_send(self, fn: Callable[[SendEventParams], Awaitable[Any]]):
         """Handle event/send method"""
 
@@ -335,7 +335,7 @@ class BaseACPServer(FastAPI):
         self._handlers[RPCMethod.EVENT_SEND] = wrapped
         return fn
 
-    # Type: Agentic
+    # Type: Async
     def on_task_cancel(self, fn: Callable[[CancelTaskParams], Awaitable[Any]]):
         """Handle task/cancel method"""
         wrapped = self._wrap_handler(fn)

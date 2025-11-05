@@ -29,9 +29,9 @@ class SyncACPConfig(BaseACPConfig):
     pass
 
 
-class AgenticACPConfig(BaseACPConfig):
+class AsyncACPConfig(BaseACPConfig):
     """
-    Base class for agentic ACP configurations
+    Base class for async ACP configurations
 
     Attributes:
         type: The type of ACP implementation
@@ -39,8 +39,9 @@ class AgenticACPConfig(BaseACPConfig):
 
     type: Literal["temporal", "base"] = Field(..., frozen=True)
 
+AgenticACPConfig = AsyncACPConfig
 
-class TemporalACPConfig(AgenticACPConfig):
+class TemporalACPConfig(AsyncACPConfig):
     """
     Configuration for TemporalACP implementation
 
@@ -71,11 +72,13 @@ class TemporalACPConfig(AgenticACPConfig):
         return v
 
 
-class AgenticBaseACPConfig(AgenticACPConfig):
-    """Configuration for AgenticBaseACP implementation
+class AsyncBaseACPConfig(AsyncACPConfig):
+    """Configuration for AsyncBaseACP implementation
 
     Attributes:
         type: The type of ACP implementation
     """
 
     type: Literal["base"] = Field(default="base", frozen=True)
+
+AgenticBaseACPConfig = AsyncBaseACPConfig

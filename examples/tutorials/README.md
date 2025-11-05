@@ -24,7 +24,7 @@ graph TD
     C --> D[00_sync/020_streaming]
 
     D --> E{Need Task<br/>Management?}
-    E -->|Yes| F[10_agentic/00_base/<br/>000_hello_acp]
+    E -->|Yes| F[10_async/00_base/<br/>000_hello_acp]
     E -->|No| G[Continue with<br/>sync patterns]
 
     F --> H[00_base/010_multiturn]
@@ -69,18 +69,18 @@ Simple request-response patterns without task management. Start here if you're n
 
 ---
 
-### 10_agentic/ - Task-Based Agents
+### 10_async/ - Task-Based Agents
 
 #### 00_base/ - Non-Temporal Patterns
 Task-based architecture without workflow orchestration. Adds task management on top of sync patterns.
 
-- **[000_hello_acp](10_agentic/00_base/000_hello_acp/)** - Task-based hello world
-- **[010_multiturn](10_agentic/00_base/010_multiturn/)** - Multiturn with task management
-- **[020_streaming](10_agentic/00_base/020_streaming/)** - Streaming with tasks
-- **[030_tracing](10_agentic/00_base/030_tracing/)** - Observability with Scale Groundplane
-- **[040_other_sdks](10_agentic/00_base/040_other_sdks/)** - Integrating OpenAI, Anthropic, etc.
-- **[080_batch_events](10_agentic/00_base/080_batch_events/)** - Event batching (shows limitations → Temporal)
-- **[090_multi_agent_non_temporal](10_agentic/00_base/090_multi_agent_non_temporal/)** - Complex multi-agent coordination
+- **[000_hello_acp](10_async/00_base/000_hello_acp/)** - Task-based hello world
+- **[010_multiturn](10_async/00_base/010_multiturn/)** - Multiturn with task management
+- **[020_streaming](10_async/00_base/020_streaming/)** - Streaming with tasks
+- **[030_tracing](10_async/00_base/030_tracing/)** - Observability with Scale Groundplane
+- **[040_other_sdks](10_async/00_base/040_other_sdks/)** - Integrating OpenAI, Anthropic, etc.
+- **[080_batch_events](10_async/00_base/080_batch_events/)** - Event batching (shows limitations → Temporal)
+- **[090_multi_agent_non_temporal](10_async/00_base/090_multi_agent_non_temporal/)** - Complex multi-agent coordination
 
 **When to use:** Task tracking needed but workflows are simple, no durability requirements
 
@@ -90,16 +90,16 @@ Task-based architecture without workflow orchestration. Adds task management on 
 Durable, fault-tolerant agents with Temporal workflow orchestration.
 
 **Core Patterns:**
-- **[000_hello_acp](10_agentic/10_temporal/000_hello_acp/)** - Temporal basics
-- **[010_agent_chat](10_agentic/10_temporal/010_agent_chat/)** - Stateful conversations
-- **[020_state_machine](10_agentic/10_temporal/020_state_machine/)** - Structured state management
-- **[030_custom_activities](10_agentic/10_temporal/030_custom_activities/)** - Custom Temporal activities
-- **[050_agent_chat_guardrails](10_agentic/10_temporal/050_agent_chat_guardrails/)** - Safety & validation
+- **[000_hello_acp](10_async/10_temporal/000_hello_acp/)** - Temporal basics
+- **[010_agent_chat](10_async/10_temporal/010_agent_chat/)** - Stateful conversations
+- **[020_state_machine](10_async/10_temporal/020_state_machine/)** - Structured state management
+- **[030_custom_activities](10_async/10_temporal/030_custom_activities/)** - Custom Temporal activities
+- **[050_agent_chat_guardrails](10_async/10_temporal/050_agent_chat_guardrails/)** - Safety & validation
 
 **OpenAI Agents SDK Series:**
-- **[060_openai_hello_world](10_agentic/10_temporal/060_open_ai_agents_sdk_hello_world/)** - Plugin-based agents
-- **[070_openai_tools](10_agentic/10_temporal/070_open_ai_agents_sdk_tools/)** - Tool integration patterns
-- **[080_openai_hitl](10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/)** - Human oversight workflows
+- **[060_openai_hello_world](10_async/10_temporal/060_open_ai_agents_sdk_hello_world/)** - Plugin-based agents
+- **[070_openai_tools](10_async/10_temporal/070_open_ai_agents_sdk_tools/)** - Tool integration patterns
+- **[080_openai_hitl](10_async/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/)** - Human oversight workflows
 
 **When to use:** Production systems requiring durability, fault tolerance, long-running workflows, or complex state management
 
@@ -124,9 +124,9 @@ uv run python hello_acp.py
 # Format tutorial code (always scope to specific files you're modifying)
 rye run format examples/tutorials/00_sync/000_hello_acp/
 
-# Run all agentic tutorial tests
+# Run all async tutorial tests
 cd examples/tutorials
-./run_all_agentic_tests.sh
+./run_all_async_tests.sh
 
 # Run specific tutorial test
 cd examples/tutorials
@@ -141,7 +141,7 @@ open http://localhost:8233
 | Category | Tutorials | Focus | Use When |
 |----------|-----------|-------|----------|
 | **Sync** | 3 | Request-response basics | Learning fundamentals, simple chatbots |
-| **Agentic Base** | 7 | Task management without workflows | Need task tracking, simple coordination |
+| **Async Base** | 7 | Task management without workflows | Need task tracking, simple coordination |
 | **Temporal** | 8 | Production-grade workflows | Need durability, fault tolerance, complex state |
 
 ## Getting Help

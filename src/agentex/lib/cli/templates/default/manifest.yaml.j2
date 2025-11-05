@@ -57,7 +57,7 @@ local_development:
 # Agent Configuration
 # -----------------
 agent:
-  acp_type: agentic
+  acp_type: async
   
   # Unique name for your agent
   # Used for task routing and monitoring
@@ -66,9 +66,6 @@ agent:
   # Description of what your agent does
   # Helps with documentation and discovery
   description: {{ description }}
-
-  # Type of input the agent will handle: text or json
-  agent_input_type: {{ agent_input_type }}
 
   # Temporal workflow configuration
   # Set enabled: true to use Temporal workflows for long-running tasks

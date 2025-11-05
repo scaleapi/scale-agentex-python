@@ -62,6 +62,43 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 # Create logger for this module
 logger = logging.getLogger("agentex.temporal.streaming")
 
+
+def _serialize_item(item: Any) -> dict[str, Any]:
+    """
+    Universal serializer for any item type from OpenAI Agents SDK.
+
+    Uses model_dump() for Pydantic models, otherwise extracts attributes manually.
+    Filters out internal Pydantic fields that can't be serialized.
+    """
+    if hasattr(item, 'model_dump'):
+        # Pydantic model - use model_dump for proper serialization
+        try:
+            return item.model_dump(mode='json', exclude_unset=True)
+        except Exception:
+            # Fallback to dict conversion
+            return dict(item) if hasattr(item, '__iter__') else {}
+    else:
+        # Not a Pydantic model - extract attributes manually
+        item_dict = {}
+        for attr_name in dir(item):
+            if not attr_name.startswith('_') and attr_name not in ('model_fields', 'model_config', 'model_computed_fields'):
+                try:
+                    attr_value = getattr(item, attr_name, None)
+                    # Skip methods and None values
+                    if attr_value is not None and not callable(attr_value):
+                        # Convert to JSON-serializable format
+                        if hasattr(attr_value, 'model_dump'):
+                            item_dict[attr_name] = attr_value.model_dump()
+                        elif isinstance(attr_value, (str, int, float, bool, list, dict)):
+                            item_dict[attr_name] = attr_value
+                        else:
+                            item_dict[attr_name] = str(attr_value)
+                except Exception:
+                    # Skip attributes that can't be accessed
+                    pass
+        return item_dict
+
+
 class TemporalStreamingModel(Model):
     """Custom model implementation with streaming support."""
 
@@ -738,6 +775,35 @@ class TemporalStreamingModel(Model):
                     input_tokens_details=InputTokensDetails(cached_tokens=0),
                     output_tokens_details=OutputTokensDetails(reasoning_tokens=len(''.join(reasoning_contents)) // 4),  # Approximate
                 )
+
+                # Serialize response output items for span tracing
+                new_items = []
+                final_output = None
+
+                for item in response_output:
+                    try:
+                        item_dict = _serialize_item(item)
+                        if item_dict:
+                            new_items.append(item_dict)
+
+                            # Extract final_output from message type if available
+                            if item_dict.get('type') == 'message' and not final_output:
+                                content = item_dict.get('content', [])
+                                if content and isinstance(content, list):
+                                    for content_part in content:
+                                        if isinstance(content_part, dict) and 'text' in content_part:
+                                            final_output = content_part['text']
+                                            break
+                    except Exception as e:
+                        logger.warning(f"Failed to serialize item in temporal_streaming_model: {e}")
+                        continue
+
+                # Set span output with structured data
+                if span:
+                    span.output = {
+                        "new_items": new_items,
+                        "final_output": final_output,
+                    }
 
                 # Return the response
                 return ModelResponse(
