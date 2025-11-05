@@ -44,6 +44,6 @@ Three handlers instead of one, giving you full control over task lifecycle. Task
 - Building towards production systems
 
 ## Why This Matters
-The task-based model is the foundation of production agents. Unlike sync agents where each message is independent, agentic agents maintain persistent tasks that can receive multiple events, store state, and have full lifecycle management. This is the stepping stone to Temporal-based agents.
+The task-based model is the foundation of production agents. Unlike sync agents where each message is independent, async agents maintain persistent tasks that can receive multiple events, store state, and have full lifecycle management. This is the stepping stone to Temporal-based agents.
 
 **Next:** [010_multiturn](../010_multiturn/) - Add conversation memory

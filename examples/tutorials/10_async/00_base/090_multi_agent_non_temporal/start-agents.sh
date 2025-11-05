@@ -18,7 +18,7 @@ CRITIC_PORT=8002
 FORMATTER_PORT=8003
 
 # Base directory
-BASE_DIR="examples/tutorials/10_agentic/00_base/090_multi_agent_non_temporal"
+BASE_DIR="examples/tutorials/10_async/00_base/090_multi_agent_non_temporal"
 
 echo -e "${BLUE}🎭 Multi-Agent Content Assembly Line (Flattened)${NC}"
 echo -e "${BLUE}===============================================${NC}"

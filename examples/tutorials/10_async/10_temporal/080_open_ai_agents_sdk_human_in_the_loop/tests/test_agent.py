@@ -28,7 +28,7 @@ import pytest_asyncio
 
 # Temporal imports for signaling child workflows
 from temporalio.client import Client as TemporalClient
-from test_utils.agentic import (
+from test_utils.async_utils import (
     poll_messages,
     send_event_and_poll_yielding,
 )

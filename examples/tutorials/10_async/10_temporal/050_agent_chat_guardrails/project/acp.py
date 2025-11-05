@@ -5,7 +5,7 @@ from agentex.lib.sdk.fastacp.fastacp import FastACP
 
 # Create the ACP server
 acp = FastACP.create(
-    acp_type="agentic",
+    acp_type="async",
     config=TemporalACPConfig(
         # When deployed to the cluster, the Temporal address will automatically be set to the cluster address
         # For local development, we set the address manually to talk to the local Temporal service set up via docker compose

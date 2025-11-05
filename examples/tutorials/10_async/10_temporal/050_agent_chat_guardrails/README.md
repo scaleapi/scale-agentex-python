@@ -17,7 +17,7 @@ This tutorial demonstrates how to implement streaming multiturn tool-enabled cha
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/10_temporal/050_agent_chat_guardrails
+cd examples/tutorials/10_async/10_temporal/050_agent_chat_guardrails
 uv run agentex agents run --manifest manifest.yaml
 ```
 

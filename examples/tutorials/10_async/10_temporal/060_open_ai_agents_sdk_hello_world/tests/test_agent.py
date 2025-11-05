@@ -20,7 +20,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from test_utils.agentic import (
+from test_utils.async_utils import (
     poll_messages,
     send_event_and_poll_yielding,
 )

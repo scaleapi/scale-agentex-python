@@ -17,7 +17,7 @@ Build complex multi-state workflows using state machines with Temporal. This tut
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/10_temporal/020_state_machine
+cd examples/tutorials/10_async/10_temporal/020_state_machine
 uv run agentex agents run --manifest manifest.yaml
 ```
 

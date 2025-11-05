@@ -17,7 +17,7 @@ Combine streaming responses, multi-turn chat, tool calling, and tracing - all wi
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/10_temporal/010_agent_chat
+cd examples/tutorials/10_async/10_temporal/010_agent_chat
 uv run agentex agents run --manifest manifest.yaml
 ```
 
@@ -33,7 +33,7 @@ uv run agentex agents run --manifest manifest.yaml
 
 ## Key Insight
 
-In base agentic agents, all this state lives in memory and is lost on crash. With Temporal, the entire conversation - history, tool calls, intermediate state - is durably persisted. The agent can pick up a conversation that paused days ago as if no time passed.
+In base async agents, all this state lives in memory and is lost on crash. With Temporal, the entire conversation - history, tool calls, intermediate state - is durably persisted. The agent can pick up a conversation that paused days ago as if no time passed.
 
 ## When to Use
 - Production chatbots with tool capabilities

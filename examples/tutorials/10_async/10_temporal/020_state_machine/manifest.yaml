@@ -73,7 +73,7 @@ agent:
 
   # Description of what your agent does
   # Helps with documentation and discovery
-  description: An AgentEx agentthat demonstrates how to uose state machines to manage complex agentic workflows
+  description: An AgentEx agentthat demonstrates how to uose state machines to manage complex async workflows
 
   # Temporal workflow configuration
   # This enables your agent to run as a Temporal workflow for long-running tasks
@@ -122,7 +122,7 @@ deployment:
   global:
     agent:
       name: "at020-state-machine"
-      description: "An AgentEx agentthat demonstrates how to uose state machines to manage complex agentic workflows"
+      description: "An AgentEx agentthat demonstrates how to uose state machines to manage complex async workflows"
     
     # Default replica count
     replicaCount: 1

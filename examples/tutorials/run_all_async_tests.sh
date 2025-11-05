@@ -45,9 +45,9 @@ done
 # Find all async tutorial directories
 ALL_TUTORIALS=(
     # sync tutorials
-    "00_sync/000_hello_acp"
-    "00_sync/010_multiturn"
-    "00_sync/020_streaming"
+    #"00_sync/000_hello_acp"
+    #"00_sync/010_multiturn"
+    #"00_sync/020_streaming"
     # base tutorials
     "10_async/00_base/000_hello_acp"
     "10_async/00_base/010_multiturn"
@@ -55,14 +55,13 @@ ALL_TUTORIALS=(
     "10_async/00_base/030_tracing"
     "10_async/00_base/040_other_sdks"
     "10_async/00_base/080_batch_events"
-#    "10_async/00_base/090_multi_agent_non_temporal" This will require its own version of this
     # temporal tutorials
     "10_async/10_temporal/000_hello_acp"
     "10_async/10_temporal/010_agent_chat"
     "10_async/10_temporal/020_state_machine"
-    "10_agentic/10_temporal/060_open_ai_agents_sdk_hello_world"
-    "10_agentic/10_temporal/070_open_ai_agents_sdk_tools"
-    "10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop"
+    "10_async/10_temporal/060_open_ai_agents_sdk_hello_world"
+    "10_async/10_temporal/070_open_ai_agents_sdk_tools"
+    "10_async/10_temporal/080_open_ai_agents_sdk_human_in_the_loop"
 )
 
 PASSED=0

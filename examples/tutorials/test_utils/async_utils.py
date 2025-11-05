@@ -46,8 +46,9 @@ async def send_event_and_poll_yielding(
     event_content = TextContentParam(type="text", author="user", content=user_message)
 
     # Capture timestamp before sending to account for clock skew
-    # Subtract 1 second buffer to ensure we don't filter out messages we just created
-    messages_created_after = time.time() - 1.0
+    # Subtract 2 second buffer to ensure we don't filter out messages we just created
+    # (accounts for clock skew between client and server)
+    messages_created_after = time.time() - 2.0
 
     await client.agents.send_event(
         agent_id=agent_id, params=ParamsSendEventRequest(task_id=task_id, content=event_content)
@@ -78,9 +79,16 @@ async def poll_messages(
     # Poll continuously until timeout
     while (datetime.now() - start_time).seconds < timeout:
         messages = await client.messages.list(task_id=task_id)
-        # print("DEBGUG: Messages found: ", messages)
+
+        # Sort messages by created_at to ensure chronological order
+        # Use datetime.min for messages without created_at timestamp
+        sorted_messages = sorted(
+            messages,
+            key=lambda m: m.created_at if m.created_at else datetime.min.replace(tzinfo=timezone.utc)
+        )
+
         new_messages_found = 0
-        for message in messages:
+        for message in sorted_messages:
             # Skip if we've already yielded this message
             if message.id in seen_message_ids:
                 continue

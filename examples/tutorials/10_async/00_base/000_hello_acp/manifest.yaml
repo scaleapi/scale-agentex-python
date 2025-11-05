@@ -106,7 +106,7 @@ deployment:
   global:
     agent:
       name: "ab000-hello-acp"
-      description: "An AgentEx agent that is not intelligent. It just shows how to implement the base agentic ACP type."
+      description: "An AgentEx agent that is not intelligent. It just shows how to implement the base async ACP type."
     
     # Default replica count
     replicaCount: 1
