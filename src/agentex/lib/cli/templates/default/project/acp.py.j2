@@ -1,12 +1,12 @@
 from agentex.lib.sdk.fastacp.fastacp import FastACP
-from agentex.lib.types.fastacp import AgenticACPConfig
+from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
 
 
 # Create an ACP server
 acp = FastACP.create(
-    acp_type="agentic",
-    config=AgenticACPConfig(type="base")
+    acp_type="async",
+    config=AsyncACPConfig(type="base")
 )
 
 

@@ -125,11 +125,11 @@ def init():
     table.add_column("Template", style="cyan", no_wrap=True)
     table.add_column("Description", style="white")
     table.add_row(
-        "[bold cyan]Agentic - ACP Only[/bold cyan]",
+        "[bold cyan]Async - ACP Only[/bold cyan]",
         "A simple synchronous agent that handles tasks directly. Best for straightforward agents that don't need long-running operations.",
     )
     table.add_row(
-        "[bold cyan]Agentic - Temporal[/bold cyan]",
+        "[bold cyan]Async - Temporal[/bold cyan]",
         "An asynchronous agent powered by Temporal workflows. Best for agents that need to handle long-running tasks, retries, or complex state management.",
     )
     table.add_row(
@@ -151,8 +151,8 @@ def init():
     template_type = questionary.select(
         "What type of template would you like to create?",
         choices=[
-            {"name": "Agentic - ACP Only", "value": TemplateType.DEFAULT},
-            {"name": "Agentic - Temporal", "value": TemplateType.TEMPORAL},
+            {"name": "Async - ACP Only", "value": TemplateType.DEFAULT},
+            {"name": "Async - Temporal", "value": TemplateType.TEMPORAL},
             {"name": "Sync ACP", "value": TemplateType.SYNC},
         ],
     ).ask()
