@@ -25,7 +25,7 @@ DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
 class SGPModule:
     """
     Module for managing SGP agent operations in Agentex.
-    Provides high-level methods for chat completion, streaming, agentic streaming, and message classification.
+    Provides high-level methods for chat completion, streaming, and message classification.
     """
 
     def __init__(

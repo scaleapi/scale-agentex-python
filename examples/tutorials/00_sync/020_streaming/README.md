@@ -42,4 +42,4 @@ Return an async generator instead of a single response - each `yield` sends an u
 ## Why This Matters
 Streaming dramatically improves user experience for longer operations. Instead of waiting 10 seconds for a complete response, users see results immediately as they're generated. This is essential for modern AI agents.
 
-**Next:** Ready for task management? → [10_agentic/00_base/000_hello_acp](../../10_agentic/00_base/000_hello_acp/)
+**Next:** Ready for task management? → [10_async/00_base/000_hello_acp](../../10_async/00_base/000_hello_acp/)
