@@ -29,16 +29,16 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 030_custom_activities/pyproject.toml /app/030_custom_activities/pyproject.toml
-COPY 030_custom_activities/README.md /app/030_custom_activities/README.md
+COPY 10_agentic/10_temporal/030_custom_activities/pyproject.toml /app/030_custom_activities/pyproject.toml
+COPY 10_agentic/10_temporal/030_custom_activities/README.md /app/030_custom_activities/README.md
 
 WORKDIR /app/030_custom_activities
 
 # Copy the project code
-COPY 030_custom_activities/project /app/030_custom_activities/project
+COPY 10_agentic/10_temporal/030_custom_activities/project /app/030_custom_activities/project
 
 # Copy the test files
-COPY 030_custom_activities/tests /app/030_custom_activities/tests
+COPY 10_agentic/10_temporal/030_custom_activities/tests /app/030_custom_activities/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

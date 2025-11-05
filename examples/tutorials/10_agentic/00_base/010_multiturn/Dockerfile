@@ -23,15 +23,15 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 010_multiturn/pyproject.toml /app/010_multiturn/pyproject.toml
-COPY 010_multiturn/README.md /app/010_multiturn/README.md
+COPY 10_agentic/00_base/010_multiturn/pyproject.toml /app/010_multiturn/pyproject.toml
+COPY 10_agentic/00_base/010_multiturn/README.md /app/010_multiturn/README.md
 
 WORKDIR /app/010_multiturn
 
-COPY 010_multiturn/project /app/010_multiturn/project
+COPY 10_agentic/00_base/010_multiturn/project /app/010_multiturn/project
 
 # Copy the test files
-COPY 010_multiturn/tests /app/010_multiturn/tests
+COPY 10_agentic/00_base/010_multiturn/tests /app/010_multiturn/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

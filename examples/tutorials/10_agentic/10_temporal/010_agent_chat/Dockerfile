@@ -29,16 +29,16 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 010_agent_chat/pyproject.toml /app/010_agent_chat/pyproject.toml
-COPY 010_agent_chat/README.md /app/010_agent_chat/README.md
+COPY 10_agentic/10_temporal/010_agent_chat/pyproject.toml /app/010_agent_chat/pyproject.toml
+COPY 10_agentic/10_temporal/010_agent_chat/README.md /app/010_agent_chat/README.md
 
 WORKDIR /app/010_agent_chat
 
 # Copy the project code
-COPY 010_agent_chat/project /app/010_agent_chat/project
+COPY 10_agentic/10_temporal/010_agent_chat/project /app/010_agent_chat/project
 
 # Copy the test files
-COPY 010_agent_chat/tests /app/010_agent_chat/tests
+COPY 10_agentic/10_temporal/010_agent_chat/tests /app/010_agent_chat/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils
