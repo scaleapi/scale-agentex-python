@@ -78,10 +78,37 @@ async def test_multiturn_with_state_management():
 @pytest.mark.asyncio
 async def test_streaming_events():
     """Test streaming events from agentic agent."""
+    # Need client access to check state
+    client = AsyncAgentex(api_key="test", base_url="http://localhost:5003")
+
+    # Get agent ID
+    agents = await client.agents.list()
+    agent = next((a for a in agents if a.name == AGENT_NAME), None)
+    assert agent is not None, f"Agent {AGENT_NAME} not found"
+
     async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+        # Wait for state initialization
+        await asyncio.sleep(1)
+
+        # Check initial state
+        states = await client.states.list(agent_id=agent.id, task_id=test.task_id)
+        assert len(states) == 1
+
+        state = states[0].state
+        assert state is not None
+        messages = state.get("messages", [])
+        assert isinstance(messages, list)
+        assert len(messages) == 1  # Initial system message
+        assert messages[0] == {
+            "role": "system",
+            "content": "You are a helpful assistant that can answer questions.",
+        }
+
+        # Send message and stream response
         user_message = "Hello! Stream this response"
 
         events_received = []
+        agent_response_found = False
 
         # Stream events
         async for event in test.send_event_and_stream(user_message, timeout_seconds=30.0):
@@ -90,9 +117,25 @@ async def test_streaming_events():
 
             if event_type == "done":
                 break
+            elif event_type == "full":
+                content = event.get("content", {})
+                if content.get("author") == "agent":
+                    agent_response_found = True
 
         # Validate we received events
         assert len(events_received) > 0, "Should receive streaming events"
+        assert agent_response_found, "Should receive agent response event"
+
+        # Verify state has been updated
+        await asyncio.sleep(1) # Wait for state update
+        
+        states = await client.states.list(agent_id=agent.id, task_id=test.task_id)
+        assert len(states) == 1
+        state = states[0].state
+        messages = state.get("messages", [])
+
+        assert isinstance(messages, list)
+        assert len(messages) == 3
 
 
 if __name__ == "__main__":

@@ -106,6 +106,10 @@ class MessagePoller:
                     if msg_id in self._seen_message_ids:
                         continue
 
+                    # Skip if still streaming
+                    if msg.streaming_status == 'IN_PROGRESS':
+                        continue
+
                     # Check if it's from expected author
                     if isinstance(msg.content, TextContent) and msg.content.author == expected_author:
                         new_agent_messages.append((msg_id, msg.content))

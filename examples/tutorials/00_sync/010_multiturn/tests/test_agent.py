@@ -20,6 +20,7 @@ from agentex.lib.testing import (
     test_sync_agent,
     collect_streaming_deltas,
     assert_valid_agent_response,
+    assert_conversation_maintains_context
 )
 
 AGENT_NAME = "s010-multiturn"
@@ -29,9 +30,9 @@ def test_multiturn_conversation():
     """Test multi-turn conversation with non-streaming messages."""
     with test_sync_agent(agent_name=AGENT_NAME) as test:
         messages = [
-            "Hello",
-            "How are you?",
-            "Thank you",
+            "Hello, can you tell me a litle bit about tennis? I want to you make sure you use the word 'tennis' in each response.",
+            "Pick one of the things you just mentioned, and dive deeper into it.",
+            "Can you now output a summary of this conversation",
         ]
 
         for msg in messages:
@@ -39,6 +40,9 @@ def test_multiturn_conversation():
 
             # Validate response (agent may require OpenAI key)
             assert_valid_agent_response(response)
+
+            # Validate that "tennis" appears in the response because that is what our model does
+            assert "tennis" in response.content.lower()
 
         # Verify conversation history
         history = test.get_conversation_history()
@@ -49,9 +53,9 @@ def test_multiturn_streaming():
     """Test multi-turn conversation with streaming messages."""
     with test_sync_agent(agent_name=AGENT_NAME) as test:
         messages = [
-            "Hello",
-            "How are you?",
-            "Thank you",
+            "Hello, can you tell me a litle bit about tennis? I want to you make sure you use the word 'tennis' in each response.",
+            "Pick one of the things you just mentioned, and dive deeper into it.",
+            "Can you now output a summary of this conversation",
         ]
 
         for msg in messages:
@@ -64,6 +68,9 @@ def test_multiturn_streaming():
             # Validate we got content
             assert len(chunks) > 0, "Should receive chunks"
             assert len(aggregated_content) > 0, "Should receive content"
+
+            # Validate that "tennis" appears in the response because that is what our model does
+            assert "tennis" in aggregated_content.lower()
 
         # Verify conversation history (only user messages tracked with streaming)
         history = test.get_conversation_history()

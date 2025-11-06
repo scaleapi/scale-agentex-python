@@ -36,7 +36,7 @@ def test_multiturn_conversation_with_state():
 
     with test_sync_agent(agent_name=AGENT_NAME) as test:
         messages = [
-            "Hello, can you tell me a little bit about tennis? I want to you make sure you use the word 'tennis' in each response.",
+            "Hello, can you tell me a little bit about tennis? I want you to make sure you use the word 'tennis' in each response.",
             "Pick one of the things you just mentioned, and dive deeper into it.",
             "Can you now output a summary of this conversation",
         ]
