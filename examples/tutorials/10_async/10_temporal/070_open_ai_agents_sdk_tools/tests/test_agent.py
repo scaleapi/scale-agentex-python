@@ -99,9 +99,8 @@ class TestNonStreamingEvents:
             task_id=task.id,
             user_message=user_message,
             timeout=60,
-            sleep_interval=1.0,
-            yield_updates=True,  # Get all streaming chunks
-        ):
+            sleep_interval=1.0
+            ):
             assert isinstance(message, TaskMessage)
             print(f"[DEBUG 070 POLL] Received message - Type: {message.content.type if message.content else 'None'}, Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}")
 

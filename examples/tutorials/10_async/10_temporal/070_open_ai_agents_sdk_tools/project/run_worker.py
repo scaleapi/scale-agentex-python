@@ -36,15 +36,15 @@ async def main():
     # ============================================================================
     # This is where the streaming magic is configured! Two key components:
     #
-    # 1. ContextInterceptor (StreamingInterceptor)
+    # 1. ContextInterceptor
     #    - Threads task_id through activity headers using Temporal's interceptor pattern
     #    - Outbound: Reads _task_id from workflow instance, injects into activity headers
     #    - Inbound: Extracts task_id from headers, sets streaming_task_id ContextVar
     #    - This enables runtime context without forking the Temporal plugin!
     #
     # 2. TemporalStreamingModelProvider
-    #    - Returns StreamingModel instances that read task_id from ContextVar
-    #    - StreamingModel.get_response() streams tokens to Redis in real-time
+    #    - Returns TemporalStreamingModel instances that read task_id from ContextVar
+    #    - TemporalStreamingModel.get_response() streams tokens to Redis in real-time
     #    - Still returns complete response to Temporal for determinism/replay safety
     #    - Uses AgentEx ADK streaming infrastructure (Redis XADD to stream:{task_id})
     #

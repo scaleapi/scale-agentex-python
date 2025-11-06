@@ -176,8 +176,8 @@ class At060OpenAiAgentsSdkHelloWorldWorkflow(BaseWorkflow):
             # 5. The conversation state is preserved even if the worker restarts
             #
             # STREAMING MAGIC (via Interceptors + Model Provider):
-            # - The StreamingInterceptor threads task_id through activity headers
-            # - The StreamingModelProvider returns a model that streams to Redis
+            # - The ContextInterceptor threads task_id through activity headers
+            # - The TemporalStreamingModelProvider returns a model that streams to Redis
             # - The model streams tokens in real-time while maintaining determinism
             # - Complete response is still returned to Temporal for replay safety
             #
