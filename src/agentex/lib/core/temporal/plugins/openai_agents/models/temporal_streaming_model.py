@@ -497,12 +497,32 @@ class TemporalStreamingModel(Model):
                     include_list.append("message.output_text.logprobs")
                 # Build response format for verbosity and structured output
                 response_format = NOT_GIVEN
+
                 if output_schema is not None:
-                    # Handle structured output schema
-                    # This would need conversion logic similar to Converter.get_response_format
-                    pass  # TODO: Implement output_schema conversion
-                elif model_settings.verbosity is not None:
-                    response_format = {"verbosity": model_settings.verbosity}
+                    # Handle structured output schema for Responses API
+                    # The Responses API expects the schema in the 'text' parameter with a 'format' key
+                    logger.debug(f"[TemporalStreamingModel] Converting output_schema to Responses API format")
+                    try:
+                        # Get the JSON schema from the output schema
+                        schema_dict = output_schema.json_schema()
+                        response_format = {
+                            "format": {
+                                "type": "json_schema",
+                                "name": "final_output",
+                                "schema": schema_dict,
+                                "strict": output_schema.is_strict_json_schema() if hasattr(output_schema, 'is_strict_json_schema') else True,
+                            }
+                        }
+                        logger.debug(f"[TemporalStreamingModel] Built response_format with json_schema: {response_format}")
+                    except Exception as e:
+                        logger.warning(f"Failed to convert output_schema: {e}")
+                        response_format = NOT_GIVEN
+
+                if model_settings.verbosity is not None:
+                    if response_format is not NOT_GIVEN and isinstance(response_format, dict):
+                        response_format["verbosity"] = model_settings.verbosity
+                    else:
+                        response_format = {"verbosity": model_settings.verbosity}
 
                 # Build extra_args dict for additional parameters
                 extra_args = dict(model_settings.extra_args or {})
@@ -529,7 +549,7 @@ class TemporalStreamingModel(Model):
                     parallel_tool_calls=self._non_null_or_not_given(model_settings.parallel_tool_calls),
                     # Context and truncation
                     truncation=self._non_null_or_not_given(model_settings.truncation),
-                    # Response configuration
+                    # Response configuration (includes structured output schema)
                     text=response_format,
                     include=include_list if include_list else NOT_GIVEN,
                     # Metadata and storage
