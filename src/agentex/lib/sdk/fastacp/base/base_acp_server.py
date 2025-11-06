@@ -78,6 +78,9 @@ class BaseACPServer(FastAPI):
         self.add_middleware(RequestIDMiddleware)
         self._handlers: dict[RPCMethod, Callable] = {}
 
+        # Agent info to return in healthz
+        self.agent_id: str | None = None
+
     @classmethod
     def create(cls):
         """Create and initialize BaseACPServer instance"""
@@ -96,6 +99,7 @@ class BaseACPServer(FastAPI):
             env_vars = EnvironmentVariables.refresh()
             if env_vars.AGENTEX_BASE_URL:
                 await register_agent(env_vars)
+                self.agent_id = env_vars.AGENT_ID
             else:
                 logger.warning("AGENTEX_BASE_URL not set, skipping agent registration")
 
@@ -105,7 +109,10 @@ class BaseACPServer(FastAPI):
 
     async def _healthz(self):
         """Health check endpoint"""
-        return {"status": "healthy"}
+        result = {"status": "healthy"}
+        if self.agent_id:
+            result["agent_id"] = self.agent_id
+        return result
 
     def _wrap_handler(self, fn: Callable[..., Awaitable[Any]]):
         """Wraps handler functions to provide JSON-RPC 2.0 response format"""
