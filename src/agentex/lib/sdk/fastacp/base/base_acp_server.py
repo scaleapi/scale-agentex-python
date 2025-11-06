@@ -97,9 +97,9 @@ class BaseACPServer(FastAPI):
         @asynccontextmanager
         async def lifespan_context(app: FastAPI):  # noqa: ARG001
             env_vars = EnvironmentVariables.refresh()
-            self.agent_id = env_vars.AGENT_ID
             if env_vars.AGENTEX_BASE_URL:
                 await register_agent(env_vars)
+                self.agent_id = env_vars.AGENT_ID
             else:
                 logger.warning("AGENTEX_BASE_URL not set, skipping agent registration")
 
