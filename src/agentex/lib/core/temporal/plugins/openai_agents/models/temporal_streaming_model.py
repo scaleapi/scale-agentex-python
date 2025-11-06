@@ -102,10 +102,22 @@ def _serialize_item(item: Any) -> dict[str, Any]:
 class TemporalStreamingModel(Model):
     """Custom model implementation with streaming support."""
 
-    def __init__(self, model_name: str = "gpt-4o", _use_responses_api: bool = True):
-        """Initialize the streaming model with OpenAI client and model name."""
-        # Match the default behavior with no retries (Temporal handles retries)
-        self.client = AsyncOpenAI(max_retries=0)
+    def __init__(
+        self,
+        model_name: str = "gpt-4o",
+        _use_responses_api: bool = True,
+        openai_client: Optional[AsyncOpenAI] = None,
+    ):
+        """Initialize the streaming model with OpenAI client and model name.
+
+        Args:
+            model_name: The name of the OpenAI model to use (default: "gpt-4o")
+            _use_responses_api: Internal flag for responses API (deprecated, always True)
+            openai_client: Optional custom AsyncOpenAI client. If not provided, a default
+                          client with max_retries=0 will be created (since Temporal handles retries)
+        """
+        # Use provided client or create default (Temporal handles retries)
+        self.client = openai_client if openai_client is not None else AsyncOpenAI(max_retries=0)
         self.model_name = model_name
         # Always use Responses API for all models
         self.use_responses_api = True
@@ -114,7 +126,7 @@ class TemporalStreamingModel(Model):
         agentex_client = create_async_agentex_client()
         self.tracer = AsyncTracer(agentex_client)
 
-        logger.info(f"[TemporalStreamingModel] Initialized model={self.model_name}, use_responses_api={self.use_responses_api}, tracer=initialized")
+        logger.info(f"[TemporalStreamingModel] Initialized model={self.model_name}, use_responses_api={self.use_responses_api}, custom_client={openai_client is not None}, tracer=initialized")
 
     def _non_null_or_not_given(self, value: Any) -> Any:
         """Convert None to NOT_GIVEN sentinel, matching OpenAI SDK pattern."""

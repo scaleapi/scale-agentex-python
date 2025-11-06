@@ -23,6 +23,7 @@ from agents import (
     TResponseInputItem,
     AgentOutputSchemaBase,
 )
+from openai import AsyncOpenAI
 from openai.types.responses import ResponsePromptParam
 from agents.models.openai_responses import OpenAIResponsesModel
 from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
@@ -86,17 +87,25 @@ class TemporalTracingModelProvider(OpenAIProvider):
     the context interceptor enabled.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, openai_client: Optional[AsyncOpenAI] = None, **kwargs):
         """Initialize the tracing model provider.
 
-        Accepts all the same arguments as OpenAIProvider.
+        Args:
+            openai_client: Optional custom AsyncOpenAI client. If provided, this client
+                          will be used for all model calls. If not provided, OpenAIProvider
+                          will create a default client.
+            **kwargs: All other arguments are passed to OpenAIProvider.
         """
-        super().__init__(*args, **kwargs)
+        # Pass openai_client to parent if provided
+        if openai_client is not None:
+            super().__init__(openai_client=openai_client, **kwargs)
+        else:
+            super().__init__(**kwargs)
 
         # Initialize tracer for all models
         agentex_client = create_async_agentex_client()
         self._tracer = AsyncTracer(agentex_client)
-        logger.info("[TemporalTracingModelProvider] Initialized with AgentEx tracer")
+        logger.info(f"[TemporalTracingModelProvider] Initialized with AgentEx tracer, custom_client={openai_client is not None}")
 
     @override
     def get_model(self, model_name: Optional[str]) -> Model:
