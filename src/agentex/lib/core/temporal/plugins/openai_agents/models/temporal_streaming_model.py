@@ -689,9 +689,34 @@ class TemporalStreamingModel(Model):
                             output_index = getattr(event, 'output_index', 0)
 
                             if item and getattr(item, 'type', None) == 'reasoning':
-                                logger.debug(f"[TemporalStreamingModel] Reasoning item completed")
-                                # Don't close the context here - let it stay open for more reasoning events
-                                # It will be closed when we send the final update or at the end
+                                if reasoning_context and reasoning_summaries:
+                                    logger.debug(f"[TemporalStreamingModel] Reasoning itme completed, sending final update")
+                                    try:
+                                        # Send a full message update with the complete reasoning content
+                                        complete_reasoning_content = ReasoningContent(
+                                            author="agent",
+                                            summary=reasoning_summaries,  # Use accumulated summaries
+                                            content=reasoning_contents if reasoning_contents else [],
+                                            type="reasoning",
+                                            style="static",
+                                        )
+
+                                        await reasoning_context.stream_update(
+                                            update=StreamTaskMessageFull(
+                                                parent_task_message=reasoning_context.task_message,
+                                                content=complete_reasoning_content,
+                                                type="full",
+                                            ),
+                                        )
+
+                                        # Close the reasoning context after sending the final update
+                                        # This matches the reference implementation pattern
+                                        await reasoning_context.close()
+                                        reasoning_context = None
+                                        logger.debug(f"[TemporalStreamingModel] Closed reasoning context after final update")
+                                    except Exception as e:
+                                        logger.warning(f"Failed to send reasoning part done update: {e}")
+
                             elif item and getattr(item, 'type', None) == 'function_call':
                                 # Function call completed - add to output
                                 if output_index in function_calls_in_progress:
@@ -718,34 +743,8 @@ class TemporalStreamingModel(Model):
                                 current_reasoning_summary = ""
 
                         elif isinstance(event, ResponseReasoningSummaryPartDoneEvent):
-                            # Reasoning part completed - send final update and close if this is the last part
-                            if reasoning_context and reasoning_summaries:
-                                logger.debug(f"[TemporalStreamingModel] Reasoning part completed, sending final update")
-                                try:
-                                    # Send a full message update with the complete reasoning content
-                                    complete_reasoning_content = ReasoningContent(
-                                        author="agent",
-                                        summary=reasoning_summaries,  # Use accumulated summaries
-                                        content=reasoning_contents if reasoning_contents else [],
-                                        type="reasoning",
-                                        style="static",
-                                    )
-
-                                    await reasoning_context.stream_update(
-                                        update=StreamTaskMessageFull(
-                                            parent_task_message=reasoning_context.task_message,
-                                            content=complete_reasoning_content,
-                                            type="full",
-                                        ),
-                                    )
-
-                                    # Close the reasoning context after sending the final update
-                                    # This matches the reference implementation pattern
-                                    await reasoning_context.close()
-                                    reasoning_context = None
-                                    logger.debug(f"[TemporalStreamingModel] Closed reasoning context after final update")
-                                except Exception as e:
-                                    logger.warning(f"Failed to send reasoning part done update: {e}")
+                            # Reasoning part completed - ResponseOutputItemDoneEvent will handle the final update
+                            logger.debug(f"[TemporalStreamingModel] Reasoning part completed")
 
                         elif isinstance(event, ResponseCompletedEvent):
                             # Response completed
