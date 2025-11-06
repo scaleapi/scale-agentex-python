@@ -11,12 +11,12 @@ Add observability to your agents with spans and traces using `adk.tracing.start_
 ## Prerequisites
 - Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
 - Backend services running: `make dev` from repository root
-- Understanding of agentic agents (see [000_hello_acp](../000_hello_acp/))
+- Understanding of async agents (see [000_hello_acp](../000_hello_acp/))
 
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/00_base/030_tracing
+cd examples/tutorials/10_async/00_base/030_tracing
 uv run agentex agents run --manifest manifest.yaml
 ```
 

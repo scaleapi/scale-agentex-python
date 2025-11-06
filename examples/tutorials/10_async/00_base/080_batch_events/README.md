@@ -1,9 +1,9 @@
 # [Agentic] Batch Events
 
-Demonstrates limitations of the base agentic protocol with concurrent event processing. When multiple events arrive rapidly, base agentic agents handle them sequentially, which can cause issues.
+Demonstrates limitations of the base async protocol with concurrent event processing. When multiple events arrive rapidly, base async agents handle them sequentially, which can cause issues.
 
 ## What You'll Learn
-- Limitations of non-Temporal agentic agents
+- Limitations of non-Temporal async agents
 - Race conditions and ordering issues in concurrent scenarios
 - When you need workflow orchestration
 - Why this motivates Temporal adoption
@@ -11,12 +11,12 @@ Demonstrates limitations of the base agentic protocol with concurrent event proc
 ## Prerequisites
 - Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
 - Backend services running: `make dev` from repository root
-- Understanding of agentic patterns (see previous tutorials)
+- Understanding of async patterns (see previous tutorials)
 
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/00_base/080_batch_events
+cd examples/tutorials/10_async/00_base/080_batch_events
 uv run agentex agents run --manifest manifest.yaml
 ```
 
@@ -27,7 +27,7 @@ This tutorial shows **when you need Temporal**. If your agent needs to:
 - Process multiple events in parallel safely
 - Maintain consistent state under concurrent load
 
-Then you should use Temporal workflows (see tutorials 10_agentic/10_temporal/) which provide:
+Then you should use Temporal workflows (see tutorials 10_async/10_temporal/) which provide:
 - Deterministic event ordering
 - Safe concurrent processing
 - Guaranteed state consistency
@@ -35,7 +35,7 @@ Then you should use Temporal workflows (see tutorials 10_agentic/10_temporal/) w
 This is the "breaking point" tutorial that motivates moving to Temporal for production agents.
 
 ## When to Use (This Pattern)
-This tutorial shows what NOT to use for production. Use base agentic agents only when:
+This tutorial shows what NOT to use for production. Use base async agents only when:
 - Events are infrequent (< 1 per second)
 - Order doesn't matter
 - State consistency isn't critical

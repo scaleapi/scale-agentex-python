@@ -2,7 +2,7 @@ import asyncio
 
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
-from project.workflow import ExampleTutorialWorkflow
+from project.workflow import At060OpenAiAgentsSdkHelloWorldWorkflow
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
@@ -62,7 +62,7 @@ async def main():
 
     await worker.run(
         activities=all_activities,
-        workflow=ExampleTutorialWorkflow,
+        workflow=At060OpenAiAgentsSdkHelloWorldWorkflow,
     )
 
 if __name__ == "__main__":

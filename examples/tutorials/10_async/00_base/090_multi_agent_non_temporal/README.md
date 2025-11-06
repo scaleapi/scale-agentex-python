@@ -49,13 +49,13 @@ The system uses a shared build configuration with type-safe interfaces:
 - Backend services running: `make dev` from repository root
 - Python 3.12+ and uv package manager
 - OpenAI API key (set `OPENAI_API_KEY` or create `.env` file)
-- Understanding of agentic patterns (see previous tutorials)
+- Understanding of async patterns (see previous tutorials)
 
 ### Running the System
 
 1. **Start all agents**:
    ```bash
-   cd examples/tutorials/10_agentic/00_base/090_multi_agent_non_temporal
+   cd examples/tutorials/10_async/00_base/090_multi_agent_non_temporal
    ./start-agents.sh start
    ```
 

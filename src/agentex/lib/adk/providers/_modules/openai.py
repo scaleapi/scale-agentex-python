@@ -392,7 +392,7 @@ class OpenAIModule:
 
     @deprecated(
         "Use the OpenAI Agents SDK integration with Temporal instead. "
-        "See examples in tutorials/10_agentic/10_temporal/ for migration guidance."
+        "See examples in tutorials/10_async/10_temporal/ for migration guidance."
     )
     async def run_agent_streamed_auto_send(
         self,
@@ -426,7 +426,7 @@ class OpenAIModule:
 
         .. deprecated::
             Use the OpenAI Agents SDK integration with Temporal instead.
-            See examples in tutorials/10_agentic/10_temporal/ for migration guidance.
+            See examples in tutorials/10_async/10_temporal/ for migration guidance.
 
         Args:
             task_id: The ID of the task to run the agent for.

@@ -18,7 +18,7 @@ Learn how to extend Temporal workflows with custom activities for external opera
 
 **Terminal 1 - Start Worker:**
 ```bash
-cd examples/tutorials/10_agentic/10_temporal/030_custom_activities
+cd examples/tutorials/10_async/10_temporal/030_custom_activities
 uv run python project/run_worker.py
 ```
 

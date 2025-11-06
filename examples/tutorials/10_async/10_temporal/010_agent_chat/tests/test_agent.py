@@ -7,7 +7,7 @@ This test suite demonstrates how to test agents that integrate:
 - Multi-turn conversations with state management
 - Tool usage (calculator and web search via MCP)
 
-Key differences from base agentic (040_other_sdks):
+Key differences from base async (040_other_sdks):
 1. Temporal Integration: Uses Temporal workflows for durable execution
 2. State Management: State is managed within the workflow instance
 3. No Race Conditions: Temporal ensures sequential event processing

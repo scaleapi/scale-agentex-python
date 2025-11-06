@@ -1,27 +1,27 @@
-# [Agentic] Multiturn
+# [Async] Multiturn
 
-Handle multi-turn conversations in agentic agents with task-based state management. Each task maintains its own conversation history automatically.
+Handle multi-turn conversations in async agents with task-based state management. Each task maintains its own conversation history automatically.
 
 ## What You'll Learn
 - How tasks maintain conversation state across multiple exchanges
-- Difference between sync and agentic multiturn patterns
+- Difference between sync and async multiturn patterns
 - Building stateful conversational agents with minimal code
 
 ## Prerequisites
 - Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
 - Backend services running: `make dev` from repository root
-- Understanding of basic agentic agents (see [000_hello_acp](../000_hello_acp/))
+- Understanding of basic async agents (see [000_hello_acp](../000_hello_acp/))
 
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/00_base/010_multiturn
+cd examples/tutorials/10_async/00_base/010_multiturn
 uv run agentex agents run --manifest manifest.yaml
 ```
 
 ## Key Pattern
 
-Unlike sync agents where you manually track conversation history, agentic agents automatically maintain state within each task:
+Unlike sync agents where you manually track conversation history, async agents automatically maintain state within each task:
 
 ```python
 @app.on_task_event_send()

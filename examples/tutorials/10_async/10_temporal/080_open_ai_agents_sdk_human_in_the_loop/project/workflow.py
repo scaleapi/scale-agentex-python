@@ -86,7 +86,7 @@ class StateModel(BaseModel):
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
-class ExampleTutorialWorkflow(BaseWorkflow):
+class At080OpenAiAgentsSdkHumanInTheLoopWorkflow(BaseWorkflow):
     """
     Human-in-the-Loop Temporal Workflow
 

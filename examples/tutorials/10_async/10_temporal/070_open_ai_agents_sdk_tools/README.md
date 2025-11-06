@@ -26,7 +26,7 @@ Two patterns for making agent tools durable with Temporal:
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/10_temporal/070_open_ai_agents_sdk_tools
+cd examples/tutorials/10_async/10_temporal/070_open_ai_agents_sdk_tools
 uv run agentex agents run --manifest manifest.yaml
 ```
 

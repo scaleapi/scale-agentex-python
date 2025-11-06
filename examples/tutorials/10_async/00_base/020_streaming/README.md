@@ -1,21 +1,21 @@
 # [Agentic] Streaming
 
-Stream responses in agentic agents using `adk.messages.create()` to send progressive updates. More flexible than sync streaming since you can send multiple messages at any time.
+Stream responses in async agents using `adk.messages.create()` to send progressive updates. More flexible than sync streaming since you can send multiple messages at any time.
 
 ## What You'll Learn
 - How to stream with explicit message creation
-- Difference between sync and agentic streaming patterns
+- Difference between sync and async streaming patterns
 - When to send multiple messages vs single streamed response
 
 ## Prerequisites
 - Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
 - Backend services running: `make dev` from repository root
-- Understanding of agentic basics (see [000_hello_acp](../000_hello_acp/))
+- Understanding of async basics (see [000_hello_acp](../000_hello_acp/))
 
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/00_base/020_streaming
+cd examples/tutorials/10_async/00_base/020_streaming
 uv run agentex agents run --manifest manifest.yaml
 ```
 
@@ -33,7 +33,7 @@ async def handle_event_send(params: SendEventParams):
     await adk.messages.create(task_id=task_id, content=...)
 ```
 
-Unlike sync streaming (which uses async generators), agentic streaming uses explicit message creation calls, giving you more control over when and what to send.
+Unlike sync streaming (which uses async generators), async streaming uses explicit message creation calls, giving you more control over when and what to send.
 
 ## When to Use
 - Multi-step processes with intermediate results

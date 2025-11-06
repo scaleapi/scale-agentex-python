@@ -2,7 +2,7 @@ import asyncio
 
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
-from project.workflow import ExampleTutorialWorkflow
+from project.workflow import At080OpenAiAgentsSdkHumanInTheLoopWorkflow
 from project.activities import confirm_order, deposit_money, withdraw_money
 from project.child_workflow import ChildWorkflow
 from agentex.lib.utils.debug import setup_debug_if_enabled
@@ -66,7 +66,7 @@ async def main():
 
     await worker.run(
         activities=all_activities,
-        workflows=[ExampleTutorialWorkflow, ChildWorkflow]
+        workflows=[At080OpenAiAgentsSdkHumanInTheLoopWorkflow, ChildWorkflow]
     )
 
 if __name__ == "__main__":

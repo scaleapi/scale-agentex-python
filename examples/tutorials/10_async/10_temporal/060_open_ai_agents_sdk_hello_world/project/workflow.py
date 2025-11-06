@@ -78,7 +78,7 @@ class StateModel(BaseModel):
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
-class ExampleTutorialWorkflow(BaseWorkflow):
+class At060OpenAiAgentsSdkHelloWorldWorkflow(BaseWorkflow):
     """
     Hello World Temporal Workflow with OpenAI Agents SDK Integration
 

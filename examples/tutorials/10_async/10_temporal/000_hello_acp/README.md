@@ -6,18 +6,18 @@ Temporal workflows make agents durable - they survive restarts and can run indef
 - Building durable agents with Temporal workflows
 - The workflow and signal pattern
 - How workflows survive failures and resume automatically
-- When to use Temporal vs base agentic agents
+- When to use Temporal vs base async agents
 
 ## Prerequisites
 - Development environment set up (see [main repo README](https://github.com/scaleapi/scale-agentex))
 - Backend services running: `make dev` from repository root (includes Temporal)
 - Temporal UI available at http://localhost:8233
-- Understanding of base agentic agents (see [../../00_base/080_batch_events](../../00_base/080_batch_events/) to understand why Temporal)
+- Understanding of base async agents (see [../../00_base/080_batch_events](../../00_base/080_batch_events/) to understand why Temporal)
 
 ## Quick Start
 
 ```bash
-cd examples/tutorials/10_agentic/10_temporal/000_hello_acp
+cd examples/tutorials/10_async/10_temporal/000_hello_acp
 uv run agentex agents run --manifest manifest.yaml
 ```
 

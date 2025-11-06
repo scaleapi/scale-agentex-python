@@ -69,7 +69,7 @@ agent:
 
   # Unique name for your agent
   # Used for task routing and monitoring
-  name: example-tutorial
+  name: at060-open-ai-agents-sdk-hello-world
 
   # Description of what your agent does
   # Helps with documentation and discovery
@@ -82,12 +82,12 @@ agent:
     workflows:
       # Name of the workflow class
       # Must match the @workflow.defn name in your workflow.py
-      - name: example-tutorial
+      - name: at060-open-ai-agents-sdk-hello-world
 
         # Queue name for task distribution
         # Used by Temporal to route tasks to your agent
         # Convention: <agent_name>_task_queue
-        queue_name: example_tutorial_queue
+        queue_name: at060_open_ai_agents_sdk_hello_world_queue
 
   # Optional: Credentials mapping
   # Maps Kubernetes secrets to environment variables
@@ -102,10 +102,10 @@ agent:
   
   # Optional: Set Environment variables for running your agent locally as well 
   # as for deployment later on
-  env:
-    OPENAI_API_KEY: ""
+  env: {}
+    # OPENAI_API_KEY: ""
     # OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
-    OPENAI_ORG_ID: ""
+    # OPENAI_ORG_ID: ""
 
 
 # Deployment Configuration
@@ -124,7 +124,7 @@ deployment:
   # These can be overridden using --override-file with custom configuration files
   global:
     agent:
-      name: "example-tutorial"
+      name: "at060-open-ai-agents-sdk-hello-world"
       description: "An AgentEx agent"
     
     # Default replica count

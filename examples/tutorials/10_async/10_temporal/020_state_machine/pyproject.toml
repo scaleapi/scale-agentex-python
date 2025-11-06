@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "at020-state-machine"
 version = "0.1.0"
-description = "An AgentEx agentthat demonstrates how to uose state machines to manage complex agentic workflows"
+description = "An AgentEx agentthat demonstrates how to uose state machines to manage complex async workflows"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
