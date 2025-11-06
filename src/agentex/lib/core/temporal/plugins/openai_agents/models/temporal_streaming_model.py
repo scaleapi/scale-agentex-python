@@ -357,9 +357,19 @@ class TemporalStreamingModel(Model):
             reasoning_param = {
                 "effort": model_settings.reasoning.effort,
             }
-            # Add generate_summary if specified and not None
-            if hasattr(model_settings.reasoning, 'generate_summary') and model_settings.reasoning.generate_summary is not None:
-                reasoning_param["summary"] = model_settings.reasoning.generate_summary
+            # Add summary if specified (check both 'summary' and 'generate_summary' for compatibility)
+            summary_value = None
+            if hasattr(model_settings.reasoning, 'summary') and model_settings.reasoning.summary is not None:
+                summary_value = model_settings.reasoning.summary
+            elif (
+                hasattr(model_settings.reasoning, 'generate_summary')
+                and model_settings.reasoning.generate_summary is not None
+            ):
+                summary_value = model_settings.reasoning.generate_summary
+
+            if summary_value is not None:
+                reasoning_param["summary"] = summary_value
+
             logger.debug(f"[TemporalStreamingModel] Using reasoning param: {reasoning_param}")
             return reasoning_param
 
@@ -842,10 +852,16 @@ class TemporalStreamingModel(Model):
 class TemporalStreamingModelProvider(ModelProvider):
     """Custom model provider that returns a streaming-capable model."""
 
-    def __init__(self):
-        """Initialize the provider."""
+    def __init__(self, openai_client: Optional[AsyncOpenAI] = None):
+        """Initialize the provider.
+
+        Args:
+            openai_client: Optional custom AsyncOpenAI client to use for all models.
+                          If not provided, each model will create its own default client.
+        """
         super().__init__()
-        logger.info("[TemporalStreamingModelProvider] Initialized")
+        self.openai_client = openai_client
+        logger.info(f"[TemporalStreamingModelProvider] Initialized, custom_client={openai_client is not None}")
 
     @override
     def get_model(self, model_name: Union[str, None]) -> Model:
@@ -860,5 +876,5 @@ class TemporalStreamingModelProvider(ModelProvider):
         # Use the provided model_name or default to gpt-4o
         actual_model = model_name if model_name else "gpt-4o"
         logger.info(f"[TemporalStreamingModelProvider] Creating TemporalStreamingModel for model_name: {actual_model}")
-        model = TemporalStreamingModel(model_name=actual_model)
+        model = TemporalStreamingModel(model_name=actual_model, openai_client=self.openai_client)
         return model
