@@ -210,17 +210,17 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
         # ============================================================================
         # STREAMING SETUP: Store task_id for the Interceptor
         # ============================================================================
-        # These instance variables are read by StreamingWorkflowOutboundInterceptor
+        # These instance variables are read by ContextWorkflowOutboundInterceptor
         # which injects them into activity headers. This enables streaming without
         # forking the Temporal plugin!
         #
         # How streaming works (Interceptor + Model Provider + Hooks):
         # 1. We store task_id in workflow instance variable (here)
-        # 2. StreamingWorkflowOutboundInterceptor reads it via workflow.instance()
+        # 2. ContextWorkflowOutboundInterceptor reads it via workflow.instance()
         # 3. Interceptor injects task_id into activity headers
-        # 4. StreamingActivityInboundInterceptor extracts from headers
+        # 4. ContextActivityInboundInterceptor extracts from headers
         # 5. Sets streaming_task_id ContextVar inside the activity
-        # 6. StreamingModel reads from ContextVar and streams to Redis
+        # 6. TemporalStreamingModel reads from ContextVar and streams to Redis
         # 7. TemporalStreamingHooks creates placeholder messages for tool calls
         #
         # This approach uses STANDARD Temporal components - no forked plugin needed!
@@ -237,7 +237,7 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
         # What hooks do:
         # - on_tool_call_start(): Creates tool_request message with arguments
         # - on_tool_call_done(): Creates tool_response message with result
-        # - on_model_stream_part(): Called for each streaming chunk (handled by StreamingModel)
+        # - on_model_stream_part(): Called for each streaming chunk (handled by TemporalStreamingModel)
         # - on_run_done(): Marks the final response as complete
         #
         # These hooks create the messages you see in the test output:

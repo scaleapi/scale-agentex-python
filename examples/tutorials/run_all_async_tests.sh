@@ -45,9 +45,9 @@ done
 # Find all async tutorial directories
 ALL_TUTORIALS=(
     # sync tutorials
-    #"00_sync/000_hello_acp"
-    #"00_sync/010_multiturn"
-    #"00_sync/020_streaming"
+    "00_sync/000_hello_acp"
+    "00_sync/010_multiturn"
+    "00_sync/020_streaming"
     # base tutorials
     # "10_async/00_base/000_hello_acp"
     # "10_async/00_base/010_multiturn"

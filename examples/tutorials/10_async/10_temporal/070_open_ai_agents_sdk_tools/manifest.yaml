@@ -100,10 +100,10 @@ agent:
 
   # Optional: Set Environment variables for running your agent locally as well 
   # as for deployment later on
-  env: {}
-    # OPENAI_API_KEY: ""
+  env:
+    OPENAI_API_KEY: ""
     # OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
-    # OPENAI_ORG_ID: ""
+    OPENAI_ORG_ID: ""
 
 
 # Deployment Configuration
