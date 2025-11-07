@@ -302,12 +302,10 @@ run_test() {
 execute_tutorial_test() {
     local tutorial=$1
 
-    if [ "$QUIET_MODE" = false ]; then
-        echo ""
-        echo "--------------------------------------------------------------------------------"
-        echo "Testing: $tutorial"
-        echo "--------------------------------------------------------------------------------"
-    fi
+    echo ""
+    echo "================================================================================"
+    echo "Testing: $tutorial"
+    echo "================================================================================"
 
     # Start the agent
     if ! start_agent "$tutorial"; then
@@ -380,15 +378,13 @@ main() {
         fi
         exit 0
     fi
-
-    # Require tutorial path
+        # Require tutorial path
     if [[ -z "$TUTORIAL_PATH" ]]; then
         echo -e "${RED}❌ Error: Tutorial path is required${NC}"
         echo ""
         echo "Usage:"
         echo "  ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test"
         echo "  ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test"
-        echo "  ./run_agent_test.sh --build-cli --quiet <tutorial_path> # Build CLI and run test (minimal output)"
         echo "  ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial"
         echo "  ./run_agent_test.sh --view-logs                         # View most recent agent logs"
         echo ""
@@ -398,12 +394,9 @@ main() {
         exit 1
     fi
 
-    if [ "$QUIET_MODE" = false ]; then
-        echo "================================================================================"
-        echo "Running Tutorial Test: $TUTORIAL_PATH"
-        echo "================================================================================"
-        echo ""
-    fi
+    echo "================================================================================"
+    echo "Running Tutorial Test: $TUTORIAL_PATH"
+    echo "================================================================================"
 
     # Check prerequisites
     check_prerequisites
@@ -421,20 +414,16 @@ main() {
 
     # Execute the single tutorial test
     if execute_tutorial_test "$TUTORIAL_PATH"; then
-        if [ "$QUIET_MODE" = false ]; then
-            echo ""
-            echo "================================================================================"
-            echo -e "${GREEN}🎉 Test passed for: $TUTORIAL_PATH${NC}"
-            echo "================================================================================"
-        fi
+        echo ""
+        echo "================================================================================"
+        echo -e "${GREEN}🎉 Test passed for: $TUTORIAL_PATH${NC}"
+        echo "================================================================================"
         exit 0
     else
-        if [ "$QUIET_MODE" = false ]; then
-            echo ""
-            echo "================================================================================"
-            echo -e "${RED}❌ Test failed for: $TUTORIAL_PATH${NC}"
-            echo "================================================================================"
-        fi
+        echo ""
+        echo "================================================================================"
+        echo -e "${RED}❌ Test failed for: $TUTORIAL_PATH${NC}"
+        echo "================================================================================"
         exit 1
     fi
 }

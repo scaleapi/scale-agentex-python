@@ -23,8 +23,8 @@ from agentex.types.task_message import TaskMessageContent
 from agentex.types.task_message_content import TextContent
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
 from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
+from agentex.lib.sdk.fastacp.impl.async_base_acp import AsyncBaseACP
 from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
-from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
 
 # Configure pytest-asyncio
 pytest_plugins = ("pytest_asyncio",)
@@ -216,17 +216,17 @@ def agentic_base_acp_server():
     with patch.dict(
         "os.environ", {"AGENTEX_BASE_URL": ""}
     ):  # Disable agent registration
-        server = AgenticBaseACP()
+        server = AsyncBaseACP()
         return server
 
 
 @pytest_asyncio.fixture
 async def async_agentic_base_acp_server():
-    """Fixture that provides an AgenticBaseACP instance for async tests"""
+    """Fixture that provides an AsyncBaseACP instance for async tests"""
     with patch.dict(
         "os.environ", {"AGENTEX_BASE_URL": ""}
     ):  # Disable agent registration
-        server = AgenticBaseACP.create()
+        server = AsyncBaseACP.create()
         return server
 
 

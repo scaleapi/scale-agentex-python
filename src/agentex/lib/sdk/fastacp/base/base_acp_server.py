@@ -78,6 +78,9 @@ class BaseACPServer(FastAPI):
         self.add_middleware(RequestIDMiddleware)
         self._handlers: dict[RPCMethod, Callable] = {}
 
+        # Agent info to return in healthz
+        self.agent_id: str | None = None
+
     @classmethod
     def create(cls):
         """Create and initialize BaseACPServer instance"""
@@ -96,6 +99,7 @@ class BaseACPServer(FastAPI):
             env_vars = EnvironmentVariables.refresh()
             if env_vars.AGENTEX_BASE_URL:
                 await register_agent(env_vars)
+                self.agent_id = env_vars.AGENT_ID
             else:
                 logger.warning("AGENTEX_BASE_URL not set, skipping agent registration")
 
@@ -105,7 +109,10 @@ class BaseACPServer(FastAPI):
 
     async def _healthz(self):
         """Health check endpoint"""
-        return {"status": "healthy"}
+        result = {"status": "healthy"}
+        if self.agent_id:
+            result["agent_id"] = self.agent_id
+        return result
 
     def _wrap_handler(self, fn: Callable[..., Awaitable[Any]]):
         """Wraps handler functions to provide JSON-RPC 2.0 response format"""
@@ -299,7 +306,7 @@ class BaseACPServer(FastAPI):
     Define all possible decorators to be overriden and implemented by each ACP implementation
     Then the users can override the default handlers by implementing their own handlers
 
-    ACP Type: Agentic
+    ACP Type: Async
     Decorators:
     - on_task_create
     - on_task_event_send
@@ -310,14 +317,14 @@ class BaseACPServer(FastAPI):
     - on_message_send
     """
 
-    # Type: Agentic
+    # Type: Async
     def on_task_create(self, fn: Callable[[CreateTaskParams], Awaitable[Any]]):
         """Handle task/init method"""
         wrapped = self._wrap_handler(fn)
         self._handlers[RPCMethod.TASK_CREATE] = wrapped
         return fn
 
-    # Type: Agentic
+    # Type: Async
     def on_task_event_send(self, fn: Callable[[SendEventParams], Awaitable[Any]]):
         """Handle event/send method"""
 
@@ -335,7 +342,7 @@ class BaseACPServer(FastAPI):
         self._handlers[RPCMethod.EVENT_SEND] = wrapped
         return fn
 
-    # Type: Agentic
+    # Type: Async
     def on_task_cancel(self, fn: Callable[[CancelTaskParams], Awaitable[Any]]):
         """Handle task/cancel method"""
         wrapped = self._wrap_handler(fn)

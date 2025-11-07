@@ -62,13 +62,62 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 # Create logger for this module
 logger = logging.getLogger("agentex.temporal.streaming")
 
+
+def _serialize_item(item: Any) -> dict[str, Any]:
+    """
+    Universal serializer for any item type from OpenAI Agents SDK.
+
+    Uses model_dump() for Pydantic models, otherwise extracts attributes manually.
+    Filters out internal Pydantic fields that can't be serialized.
+    """
+    if hasattr(item, 'model_dump'):
+        # Pydantic model - use model_dump for proper serialization
+        try:
+            return item.model_dump(mode='json', exclude_unset=True)
+        except Exception:
+            # Fallback to dict conversion
+            return dict(item) if hasattr(item, '__iter__') else {}
+    else:
+        # Not a Pydantic model - extract attributes manually
+        item_dict = {}
+        for attr_name in dir(item):
+            if not attr_name.startswith('_') and attr_name not in ('model_fields', 'model_config', 'model_computed_fields'):
+                try:
+                    attr_value = getattr(item, attr_name, None)
+                    # Skip methods and None values
+                    if attr_value is not None and not callable(attr_value):
+                        # Convert to JSON-serializable format
+                        if hasattr(attr_value, 'model_dump'):
+                            item_dict[attr_name] = attr_value.model_dump()
+                        elif isinstance(attr_value, (str, int, float, bool, list, dict)):
+                            item_dict[attr_name] = attr_value
+                        else:
+                            item_dict[attr_name] = str(attr_value)
+                except Exception:
+                    # Skip attributes that can't be accessed
+                    pass
+        return item_dict
+
+
 class TemporalStreamingModel(Model):
     """Custom model implementation with streaming support."""
 
-    def __init__(self, model_name: str = "gpt-4o", _use_responses_api: bool = True):
-        """Initialize the streaming model with OpenAI client and model name."""
-        # Match the default behavior with no retries (Temporal handles retries)
-        self.client = AsyncOpenAI(max_retries=0)
+    def __init__(
+        self,
+        model_name: str = "gpt-4o",
+        _use_responses_api: bool = True,
+        openai_client: Optional[AsyncOpenAI] = None,
+    ):
+        """Initialize the streaming model with OpenAI client and model name.
+
+        Args:
+            model_name: The name of the OpenAI model to use (default: "gpt-4o")
+            _use_responses_api: Internal flag for responses API (deprecated, always True)
+            openai_client: Optional custom AsyncOpenAI client. If not provided, a default
+                          client with max_retries=0 will be created (since Temporal handles retries)
+        """
+        # Use provided client or create default (Temporal handles retries)
+        self.client = openai_client if openai_client is not None else AsyncOpenAI(max_retries=0)
         self.model_name = model_name
         # Always use Responses API for all models
         self.use_responses_api = True
@@ -77,7 +126,7 @@ class TemporalStreamingModel(Model):
         agentex_client = create_async_agentex_client()
         self.tracer = AsyncTracer(agentex_client)
 
-        logger.info(f"[TemporalStreamingModel] Initialized model={self.model_name}, use_responses_api={self.use_responses_api}, tracer=initialized")
+        logger.info(f"[TemporalStreamingModel] Initialized model={self.model_name}, use_responses_api={self.use_responses_api}, custom_client={openai_client is not None}, tracer=initialized")
 
     def _non_null_or_not_given(self, value: Any) -> Any:
         """Convert None to NOT_GIVEN sentinel, matching OpenAI SDK pattern."""
@@ -308,9 +357,19 @@ class TemporalStreamingModel(Model):
             reasoning_param = {
                 "effort": model_settings.reasoning.effort,
             }
-            # Add generate_summary if specified and not None
-            if hasattr(model_settings.reasoning, 'generate_summary') and model_settings.reasoning.generate_summary is not None:
-                reasoning_param["summary"] = model_settings.reasoning.generate_summary
+            # Add summary if specified (check both 'summary' and 'generate_summary' for compatibility)
+            summary_value = None
+            if hasattr(model_settings.reasoning, 'summary') and model_settings.reasoning.summary is not None:
+                summary_value = model_settings.reasoning.summary
+            elif (
+                hasattr(model_settings.reasoning, 'generate_summary')
+                and model_settings.reasoning.generate_summary is not None
+            ):
+                summary_value = model_settings.reasoning.generate_summary
+
+            if summary_value is not None:
+                reasoning_param["summary"] = summary_value
+
             logger.debug(f"[TemporalStreamingModel] Using reasoning param: {reasoning_param}")
             return reasoning_param
 
@@ -438,12 +497,32 @@ class TemporalStreamingModel(Model):
                     include_list.append("message.output_text.logprobs")
                 # Build response format for verbosity and structured output
                 response_format = NOT_GIVEN
+
                 if output_schema is not None:
-                    # Handle structured output schema
-                    # This would need conversion logic similar to Converter.get_response_format
-                    pass  # TODO: Implement output_schema conversion
-                elif model_settings.verbosity is not None:
-                    response_format = {"verbosity": model_settings.verbosity}
+                    # Handle structured output schema for Responses API
+                    # The Responses API expects the schema in the 'text' parameter with a 'format' key
+                    logger.debug(f"[TemporalStreamingModel] Converting output_schema to Responses API format")
+                    try:
+                        # Get the JSON schema from the output schema
+                        schema_dict = output_schema.json_schema()
+                        response_format = {
+                            "format": {
+                                "type": "json_schema",
+                                "name": "final_output",
+                                "schema": schema_dict,
+                                "strict": output_schema.is_strict_json_schema() if hasattr(output_schema, 'is_strict_json_schema') else True,
+                            }
+                        }
+                        logger.debug(f"[TemporalStreamingModel] Built response_format with json_schema: {response_format}")
+                    except Exception as e:
+                        logger.warning(f"Failed to convert output_schema: {e}")
+                        response_format = NOT_GIVEN
+
+                if model_settings.verbosity is not None:
+                    if response_format is not NOT_GIVEN and isinstance(response_format, dict):
+                        response_format["verbosity"] = model_settings.verbosity
+                    else:
+                        response_format = {"verbosity": model_settings.verbosity}
 
                 # Build extra_args dict for additional parameters
                 extra_args = dict(model_settings.extra_args or {})
@@ -470,7 +549,7 @@ class TemporalStreamingModel(Model):
                     parallel_tool_calls=self._non_null_or_not_given(model_settings.parallel_tool_calls),
                     # Context and truncation
                     truncation=self._non_null_or_not_given(model_settings.truncation),
-                    # Response configuration
+                    # Response configuration (includes structured output schema)
                     text=response_format,
                     include=include_list if include_list else NOT_GIVEN,
                     # Metadata and storage
@@ -487,181 +566,154 @@ class TemporalStreamingModel(Model):
                 # Process the stream of events from Responses API
                 output_items = []
                 current_text = ""
+                streaming_context = None
                 reasoning_context = None
                 reasoning_summaries = []
                 reasoning_contents = []
-                current_reasoning_summary = ""
                 event_count = 0
 
                 # We expect task_id to always be provided for streaming
                 if not task_id:
                     raise ValueError("[TemporalStreamingModel] task_id is required for streaming model")
 
-                # Use proper async with context manager for streaming to Redis
-                async with adk.streaming.streaming_task_message_context(
-                    task_id=task_id,
-                    initial_content=TextContent(
-                        author="agent",
-                        content="",
-                        format="markdown",
-                    ),
-                ) as streaming_context:
-                    # Process events from the Responses API stream
-                    function_calls_in_progress = {}  # Track function calls being streamed
+                # Process events from the Responses API stream
+                function_calls_in_progress = {}  # Track function calls being streamed
 
-                    async for event in stream:
-                        event_count += 1
+                async for event in stream:
+                    event_count += 1
 
-                        # Log event type
-                        logger.debug(f"[TemporalStreamingModel] Event {event_count}: {type(event).__name__}")
+                    # Log event type
+                    logger.debug(f"[TemporalStreamingModel] Event {event_count}: {type(event).__name__}")
 
-                        # Handle different event types using isinstance for type safety
-                        if isinstance(event, ResponseOutputItemAddedEvent):
-                            # New output item (reasoning, function call, or message)
-                            item = getattr(event, 'item', None)
-                            output_index = getattr(event, 'output_index', 0)
+                    # Handle different event types using isinstance for type safety
+                    if isinstance(event, ResponseOutputItemAddedEvent):
+                        # New output item (reasoning, function call, or message)
+                        item = getattr(event, 'item', None)
+                        output_index = getattr(event, 'output_index', 0)
 
-                            if item and getattr(item, 'type', None) == 'reasoning':
-                                logger.debug(f"[TemporalStreamingModel] Starting reasoning item")
-                                if not reasoning_context:
-                                    # Start a reasoning context for streaming reasoning to UI
-                                    reasoning_context = await adk.streaming.streaming_task_message_context(
-                                        task_id=task_id,
-                                        initial_content=ReasoningContent(
-                                            author="agent",
-                                            summary=[],
-                                            content=[],
-                                            type="reasoning",
-                                            style="active",
-                                        ),
-                                    ).__aenter__()
-                            elif item and getattr(item, 'type', None) == 'function_call':
-                                # Track the function call being streamed
-                                function_calls_in_progress[output_index] = {
-                                    'id': getattr(item, 'id', ''),
-                                    'call_id': getattr(item, 'call_id', ''),
-                                    'name': getattr(item, 'name', ''),
-                                    'arguments': getattr(item, 'arguments', ''),
-                                }
-                                logger.debug(f"[TemporalStreamingModel] Starting function call: {item.name}")
+                        if item and getattr(item, 'type', None) == 'reasoning':
+                            logger.debug(f"[TemporalStreamingModel] Starting reasoning item")
+                            if not reasoning_context:
+                                # Start a reasoning context for streaming reasoning to UI
+                                reasoning_context = await adk.streaming.streaming_task_message_context(
+                                    task_id=task_id,
+                                    initial_content=ReasoningContent(
+                                        author="agent",
+                                        summary=[],
+                                        content=[],
+                                        type="reasoning",
+                                        style="active",
+                                    ),
+                                ).__aenter__()
+                        elif item and getattr(item, 'type', None) == 'function_call':
+                            # Track the function call being streamed
+                            function_calls_in_progress[output_index] = {
+                                'id': getattr(item, 'id', ''),
+                                'call_id': getattr(item, 'call_id', ''),
+                                'name': getattr(item, 'name', ''),
+                                'arguments': getattr(item, 'arguments', ''),
+                            }
+                            logger.debug(f"[TemporalStreamingModel] Starting function call: {item.name}")
 
-                        elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):
-                            # Stream function call arguments
-                            output_index = getattr(event, 'output_index', 0)
-                            delta = getattr(event, 'delta', '')
+                        elif item and getattr(item, 'type', None) == 'message':
+                            # Track the message being streamed
+                            streaming_context = await adk.streaming.streaming_task_message_context(
+                                task_id=task_id,
+                                initial_content=TextContent(
+                                    author="agent",
+                                    content="",
+                                    format="markdown",
+                                ),
+                            ).__aenter__()
 
-                            if output_index in function_calls_in_progress:
-                                function_calls_in_progress[output_index]['arguments'] += delta
-                                logger.debug(f"[TemporalStreamingModel] Function call args delta: {delta[:50]}...")
+                    elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):
+                        # Stream function call arguments
+                        output_index = getattr(event, 'output_index', 0)
+                        delta = getattr(event, 'delta', '')
 
-                        elif isinstance(event, ResponseFunctionCallArgumentsDoneEvent):
-                            # Function call arguments complete
-                            output_index = getattr(event, 'output_index', 0)
-                            arguments = getattr(event, 'arguments', '')
+                        if output_index in function_calls_in_progress:
+                            function_calls_in_progress[output_index]['arguments'] += delta
+                            logger.debug(f"[TemporalStreamingModel] Function call args delta: {delta[:50]}...")
 
-                            if output_index in function_calls_in_progress:
-                                function_calls_in_progress[output_index]['arguments'] = arguments
-                                logger.debug(f"[TemporalStreamingModel] Function call args done")
+                    elif isinstance(event, ResponseFunctionCallArgumentsDoneEvent):
+                        # Function call arguments complete
+                        output_index = getattr(event, 'output_index', 0)
+                        arguments = getattr(event, 'arguments', '')
 
-                        elif isinstance(event, (ResponseReasoningTextDeltaEvent, ResponseReasoningSummaryTextDeltaEvent, ResponseTextDeltaEvent)):
-                            # Handle text streaming
-                            delta = getattr(event, 'delta', '')
+                        if output_index in function_calls_in_progress:
+                            function_calls_in_progress[output_index]['arguments'] = arguments
+                            logger.debug(f"[TemporalStreamingModel] Function call args done")
 
-                            if isinstance(event, ResponseReasoningSummaryTextDeltaEvent) and reasoning_context:
-                                # Stream reasoning summary deltas - these are the actual reasoning tokens!
-                                try:
-                                    # Use ReasoningSummaryDelta for reasoning summaries
-                                    summary_index = getattr(event, 'summary_index', 0)
-                                    delta_obj = ReasoningSummaryDelta(
-                                        summary_index=summary_index,
-                                        summary_delta=delta,
-                                        type="reasoning_summary",
-                                    )
-                                    update = StreamTaskMessageDelta(
-                                        parent_task_message=reasoning_context.task_message,
-                                        delta=delta_obj,
-                                        type="delta",
-                                    )
-                                    await reasoning_context.stream_update(update)
-                                    # Accumulate the reasoning summary
-                                    if len(reasoning_summaries) <= summary_index:
-                                        reasoning_summaries.extend([""] * (summary_index + 1 - len(reasoning_summaries)))
-                                    reasoning_summaries[summary_index] += delta
-                                    logger.debug(f"[TemporalStreamingModel] Streamed reasoning summary: {delta[:30]}..." if len(delta) > 30 else f"[TemporalStreamingModel] Streamed reasoning summary: {delta}")
-                                except Exception as e:
-                                    logger.warning(f"Failed to send reasoning delta: {e}")
-                            elif isinstance(event, ResponseReasoningTextDeltaEvent) and reasoning_context:
-                                # Regular reasoning delta (if these ever appear)
-                                try:
-                                    delta_obj = ReasoningContentDelta(
-                                        content_index=0,
-                                        content_delta=delta,
-                                        type="reasoning_content",
-                                    )
-                                    update = StreamTaskMessageDelta(
-                                        parent_task_message=reasoning_context.task_message,
-                                        delta=delta_obj,
-                                        type="delta",
-                                    )
-                                    await reasoning_context.stream_update(update)
-                                    reasoning_contents.append(delta)
-                                except Exception as e:
-                                    logger.warning(f"Failed to send reasoning delta: {e}")
-                            elif isinstance(event, ResponseTextDeltaEvent):
-                                # Stream regular text output
-                                current_text += delta
-                                try:
-                                    delta_obj = TextDelta(
-                                        type="text",
-                                        text_delta=delta,
-                                    )
-                                    update = StreamTaskMessageDelta(
-                                        parent_task_message=streaming_context.task_message,
-                                        delta=delta_obj,
-                                        type="delta",
-                                    )
-                                    await streaming_context.stream_update(update)
-                                except Exception as e:
-                                    logger.warning(f"Failed to send text delta: {e}")
+                    elif isinstance(event, (ResponseReasoningTextDeltaEvent, ResponseReasoningSummaryTextDeltaEvent, ResponseTextDeltaEvent)):
+                        # Handle text streaming
+                        delta = getattr(event, 'delta', '')
 
-                        elif isinstance(event, ResponseOutputItemDoneEvent):
-                            # Output item completed
-                            item = getattr(event, 'item', None)
-                            output_index = getattr(event, 'output_index', 0)
+                        if isinstance(event, ResponseReasoningSummaryTextDeltaEvent) and reasoning_context:
+                            # Stream reasoning summary deltas - these are the actual reasoning tokens!
+                            try:
+                                # Use ReasoningSummaryDelta for reasoning summaries
+                                summary_index = getattr(event, 'summary_index', 0)
+                                delta_obj = ReasoningSummaryDelta(
+                                    summary_index=summary_index,
+                                    summary_delta=delta,
+                                    type="reasoning_summary",
+                                )
+                                update = StreamTaskMessageDelta(
+                                    parent_task_message=reasoning_context.task_message,
+                                    delta=delta_obj,
+                                    type="delta",
+                                )
+                                await reasoning_context.stream_update(update)
+                                # Accumulate the reasoning summary
+                                if len(reasoning_summaries) <= summary_index:
+                                    logger.debug(f"[TemporalStreamingModel] Extending reasoning summaries: {summary_index}")
+                                    reasoning_summaries.extend([""] * (summary_index + 1 - len(reasoning_summaries)))
+                                reasoning_summaries[summary_index] += delta
+                                logger.debug(f"[TemporalStreamingModel] Streamed reasoning summary: {delta[:30]}..." if len(delta) > 30 else f"[TemporalStreamingModel] Streamed reasoning summary: {delta}")
+                            except Exception as e:
+                                logger.warning(f"Failed to send reasoning delta: {e}")
+                        elif isinstance(event, ResponseReasoningTextDeltaEvent) and reasoning_context:
+                            # Regular reasoning delta (if these ever appear)
+                            try:
+                                delta_obj = ReasoningContentDelta(
+                                    content_index=0,
+                                    content_delta=delta,
+                                    type="reasoning_content",
+                                )
+                                update = StreamTaskMessageDelta(
+                                    parent_task_message=reasoning_context.task_message,
+                                    delta=delta_obj,
+                                    type="delta",
+                                )
+                                await reasoning_context.stream_update(update)
+                                reasoning_contents.append(delta)
+                            except Exception as e:
+                                logger.warning(f"Failed to send reasoning delta: {e}")
+                        elif isinstance(event, ResponseTextDeltaEvent):
+                            # Stream regular text output
+                            current_text += delta
+                            try:
+                                delta_obj = TextDelta(
+                                    type="text",
+                                    text_delta=delta,
+                                )
+                                update = StreamTaskMessageDelta(
+                                    parent_task_message=streaming_context.task_message if streaming_context else None,
+                                    delta=delta_obj,
+                                    type="delta",
+                                )
+                                await streaming_context.stream_update(update) if streaming_context else None
+                            except Exception as e:
+                                logger.warning(f"Failed to send text delta: {e}")
 
-                            if item and getattr(item, 'type', None) == 'reasoning':
-                                logger.debug(f"[TemporalStreamingModel] Reasoning item completed")
-                                # Don't close the context here - let it stay open for more reasoning events
-                                # It will be closed when we send the final update or at the end
-                            elif item and getattr(item, 'type', None) == 'function_call':
-                                # Function call completed - add to output
-                                if output_index in function_calls_in_progress:
-                                    call_data = function_calls_in_progress[output_index]
-                                    logger.debug(f"[TemporalStreamingModel] Function call completed: {call_data['name']}")
+                    elif isinstance(event, ResponseOutputItemDoneEvent):
+                        # Output item completed
+                        item = getattr(event, 'item', None)
+                        output_index = getattr(event, 'output_index', 0)
 
-                                    # Create proper function call object
-                                    tool_call = ResponseFunctionToolCall(
-                                        id=call_data['id'],
-                                        call_id=call_data['call_id'],
-                                        type="function_call",
-                                        name=call_data['name'],
-                                        arguments=call_data['arguments'],
-                                    )
-                                    output_items.append(tool_call)
-
-                        elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
-                            # New reasoning part/summary started - reset accumulator
-                            part = getattr(event, 'part', None)
-                            if part:
-                                part_type = getattr(part, 'type', 'unknown')
-                                logger.debug(f"[TemporalStreamingModel] New reasoning part: type={part_type}")
-                                # Reset the current reasoning summary for this new part
-                                current_reasoning_summary = ""
-
-                        elif isinstance(event, ResponseReasoningSummaryPartDoneEvent):
-                            # Reasoning part completed - send final update and close if this is the last part
+                        if item and getattr(item, 'type', None) == 'reasoning':
                             if reasoning_context and reasoning_summaries:
-                                logger.debug(f"[TemporalStreamingModel] Reasoning part completed, sending final update")
+                                logger.debug(f"[TemporalStreamingModel] Reasoning itme completed, sending final update")
                                 try:
                                     # Send a full message update with the complete reasoning content
                                     complete_reasoning_content = ReasoningContent(
@@ -688,19 +740,51 @@ class TemporalStreamingModel(Model):
                                 except Exception as e:
                                     logger.warning(f"Failed to send reasoning part done update: {e}")
 
-                        elif isinstance(event, ResponseCompletedEvent):
-                            # Response completed
-                            logger.debug(f"[TemporalStreamingModel] Response completed")
-                            response = getattr(event, 'response', None)
-                            if response and hasattr(response, 'output'):
-                                # Use the final output from the response
-                                output_items = response.output
-                                logger.debug(f"[TemporalStreamingModel] Found {len(output_items)} output items in final response")
+                        elif item and getattr(item, 'type', None) == 'function_call':
+                            # Function call completed - add to output
+                            if output_index in function_calls_in_progress:
+                                call_data = function_calls_in_progress[output_index]
+                                logger.debug(f"[TemporalStreamingModel] Function call completed: {call_data['name']}")
 
-                    # End of event processing loop - close any open contexts
-                    if reasoning_context:
-                        await reasoning_context.close()
-                        reasoning_context = None
+                                # Create proper function call object
+                                tool_call = ResponseFunctionToolCall(
+                                    id=call_data['id'],
+                                    call_id=call_data['call_id'],
+                                    type="function_call",
+                                    name=call_data['name'],
+                                    arguments=call_data['arguments'],
+                                )
+                                output_items.append(tool_call)
+
+                    elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
+                        # New reasoning part/summary started - reset accumulator
+                        part = getattr(event, 'part', None)
+                        if part:
+                            part_type = getattr(part, 'type', 'unknown')
+                            logger.debug(f"[TemporalStreamingModel] New reasoning part: type={part_type}")
+                            # Reset the current reasoning summary for this new part
+
+                    elif isinstance(event, ResponseReasoningSummaryPartDoneEvent):
+                        # Reasoning part completed - ResponseOutputItemDoneEvent will handle the final update
+                        logger.debug(f"[TemporalStreamingModel] Reasoning part completed")
+
+                    elif isinstance(event, ResponseCompletedEvent):
+                        # Response completed
+                        logger.debug(f"[TemporalStreamingModel] Response completed")
+                        response = getattr(event, 'response', None)
+                        if response and hasattr(response, 'output'):
+                            # Use the final output from the response
+                            output_items = response.output
+                            logger.debug(f"[TemporalStreamingModel] Found {len(output_items)} output items in final response")
+
+                # End of event processing loop - close any open contexts
+                if reasoning_context:
+                    await reasoning_context.close()
+                    reasoning_context = None
+
+                if streaming_context:
+                    await streaming_context.close()
+                    streaming_context = None
 
                 # Build the response from output items collected during streaming
                 # Create output from the items we collected
@@ -739,6 +823,35 @@ class TemporalStreamingModel(Model):
                     output_tokens_details=OutputTokensDetails(reasoning_tokens=len(''.join(reasoning_contents)) // 4),  # Approximate
                 )
 
+                # Serialize response output items for span tracing
+                new_items = []
+                final_output = None
+
+                for item in response_output:
+                    try:
+                        item_dict = _serialize_item(item)
+                        if item_dict:
+                            new_items.append(item_dict)
+
+                            # Extract final_output from message type if available
+                            if item_dict.get('type') == 'message' and not final_output:
+                                content = item_dict.get('content', [])
+                                if content and isinstance(content, list):
+                                    for content_part in content:
+                                        if isinstance(content_part, dict) and 'text' in content_part:
+                                            final_output = content_part['text']
+                                            break
+                    except Exception as e:
+                        logger.warning(f"Failed to serialize item in temporal_streaming_model: {e}")
+                        continue
+
+                # Set span output with structured data
+                if span:
+                    span.output = {
+                        "new_items": new_items,
+                        "final_output": final_output,
+                    }
+
                 # Return the response
                 return ModelResponse(
                     output=response_output,
@@ -764,10 +877,16 @@ class TemporalStreamingModel(Model):
 class TemporalStreamingModelProvider(ModelProvider):
     """Custom model provider that returns a streaming-capable model."""
 
-    def __init__(self):
-        """Initialize the provider."""
+    def __init__(self, openai_client: Optional[AsyncOpenAI] = None):
+        """Initialize the provider.
+
+        Args:
+            openai_client: Optional custom AsyncOpenAI client to use for all models.
+                          If not provided, each model will create its own default client.
+        """
         super().__init__()
-        logger.info("[TemporalStreamingModelProvider] Initialized")
+        self.openai_client = openai_client
+        logger.info(f"[TemporalStreamingModelProvider] Initialized, custom_client={openai_client is not None}")
 
     @override
     def get_model(self, model_name: Union[str, None]) -> Model:
@@ -782,5 +901,5 @@ class TemporalStreamingModelProvider(ModelProvider):
         # Use the provided model_name or default to gpt-4o
         actual_model = model_name if model_name else "gpt-4o"
         logger.info(f"[TemporalStreamingModelProvider] Creating TemporalStreamingModel for model_name: {actual_model}")
-        model = TemporalStreamingModel(model_name=actual_model)
+        model = TemporalStreamingModel(model_name=actual_model, openai_client=self.openai_client)
         return model

@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.6.5 (2025-11-06)
+
+Full Changelog: [v0.6.4...v0.6.5](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.4...v0.6.5)
+
+## 0.6.4 (2025-11-06)
+
+Full Changelog: [v0.6.3...v0.6.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.3...v0.6.4)
+
+## 0.6.3 (2025-11-06)
+
+Full Changelog: [v0.6.2...v0.6.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.2...v0.6.3)
+
+## 0.6.2 (2025-11-05)
+
+Full Changelog: [v0.6.1...v0.6.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.1...v0.6.2)
+
+### Features
+
+* **api:** update via SDK Studio ([b732dfa](https://github.com/scaleapi/scale-agentex-python/commit/b732dfac50cacc90c84a751fd6c75d18fa5b43ed))
+
+## 0.6.1 (2025-11-05)
+
+Full Changelog: [v0.6.0...v0.6.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.0...v0.6.1)
+
+### Features
+
+* **api:** api update ([f6189a4](https://github.com/scaleapi/scale-agentex-python/commit/f6189a43e1430fdd16c8d10e6ad835d9dfa5871c))
+* **api:** api update ([714c719](https://github.com/scaleapi/scale-agentex-python/commit/714c7194e488e6070c99e200b91189f50dcdb831))
+
+## 0.6.0 (2025-11-04)
+
+Full Changelog: [v0.5.3...v0.6.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.3...v0.6.0)
+
+### Features
+
+* **api:** api update ([ec61dd3](https://github.com/scaleapi/scale-agentex-python/commit/ec61dd3124fbf169dcdcced262a30bfbed080b5f))
+
+
+### Chores
+
+* **internal:** grammar fix (it's -&gt; its) ([36e27da](https://github.com/scaleapi/scale-agentex-python/commit/36e27daed52435b300f090ac4643cd502a817a1e))
+
 ## 0.5.3 (2025-10-31)
 
 Full Changelog: [v0.5.2...v0.5.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.5.2...v0.5.3)
@@ -179,7 +221,7 @@ Full Changelog: [v0.4.10...v0.4.11](https://github.com/scaleapi/agentex-python/c
 
 ### Bug Fixes
 
-* Adding new example for guardrails instead of using 10_agentic ([15dc44b](https://github.com/scaleapi/agentex-python/commit/15dc44b333a977564c9974cc089d5ef578840714))
+* Adding new example for guardrails instead of using 10_async ([15dc44b](https://github.com/scaleapi/agentex-python/commit/15dc44b333a977564c9974cc089d5ef578840714))
 * avoid newer type syntax ([6b5c82a](https://github.com/scaleapi/agentex-python/commit/6b5c82aab9ebcf755575b641aced2b77a13a71c3))
 
 

@@ -13,5 +13,5 @@ Temporal integration:
 Agent framework:
 
 - Agents are manifest-driven and support multiple agent types (sync and Temporal-based)
-- Use the examples under `examples/10_agentic/` and `examples/10_temporal/` for patterns
+- Use the examples under `examples/10_async/` and `examples/10_temporal/` for patterns
 - For debugging agents, use the CLI flags `--debug-worker` and `--debug-port`
