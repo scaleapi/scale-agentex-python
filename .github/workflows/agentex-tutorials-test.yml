@@ -1,6 +1,10 @@
 name: Test Tutorial Agents
 
 on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -178,12 +182,13 @@ jobs:
           safe_name=$(echo "${{ matrix.tutorial }}" | tr '/' '_' | tr -d ' ')
           echo "$result" > "test-results/result-${safe_name}.txt"
           echo "${{ matrix.tutorial }}" > "test-results/tutorial-${safe_name}.txt"
+          echo "safe_name=${safe_name}" >> $GITHUB_OUTPUT
 
       - name: Upload test result
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-result-${{ matrix.tutorial }}
+          name: test-result-${{ steps.test-result.outputs.safe_name }}
           path: test-results/
           retention-days: 1
 

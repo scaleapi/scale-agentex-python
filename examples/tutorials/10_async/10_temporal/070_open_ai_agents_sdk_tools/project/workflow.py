@@ -98,8 +98,6 @@ if not os.environ.get("OPENAI_API_KEY"):
 logger = make_logger(__name__)
 
 
-<<<<<<< HEAD:examples/tutorials/10_agentic/10_temporal/070_open_ai_agents_sdk_tools/project/workflow.py
-=======
 class StateModel(BaseModel):
     """
     State model for preserving conversation history across turns.
@@ -112,7 +110,6 @@ class StateModel(BaseModel):
     turn_number: int
 
 
->>>>>>> main:examples/tutorials/10_async/10_temporal/070_open_ai_agents_sdk_tools/project/workflow.py
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
 class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
     """
@@ -132,8 +129,6 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
     async def on_task_event_send(self, params: SendEventParams) -> None:
         logger.info(f"Received task message instruction: {params}")
 
-<<<<<<< HEAD:examples/tutorials/10_agentic/10_temporal/070_open_ai_agents_sdk_tools/project/workflow.py
-=======
         if self._state is None:
             raise ValueError("State is not initialized")
 
@@ -146,7 +141,6 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
         # Add the user message to conversation history
         self._state.input_list.append({"role": "user", "content": params.event.content.content})
 
->>>>>>> main:examples/tutorials/10_async/10_temporal/070_open_ai_agents_sdk_tools/project/workflow.py
         # Echo back the client's message to show it in the UI. This is not done by default
         # so the agent developer has full control over what is shown to the user.
         await adk.messages.create(task_id=params.task.id, content=params.event.content)
@@ -235,8 +229,6 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
         self._parent_span_id = params.task.id
 
         # ============================================================================
-<<<<<<< HEAD:examples/tutorials/10_agentic/10_temporal/070_open_ai_agents_sdk_tools/project/workflow.py
-=======
         # HOOKS: Create Streaming Lifecycle Messages
         # ============================================================================
         # TemporalStreamingHooks integrates with OpenAI Agents SDK lifecycle events
@@ -281,7 +273,6 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
             span.output = self._state.model_dump()
 
         # ============================================================================
->>>>>>> main:examples/tutorials/10_async/10_temporal/070_open_ai_agents_sdk_tools/project/workflow.py
         # PATTERN 2: Multiple Activities Within Tools
         # ============================================================================
         # Use this pattern when:
@@ -365,7 +356,3 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
     async def fulfill_order_signal(self, success: bool) -> None:
         if success == True:
             await self._pending_confirmation.put(True)
-<<<<<<< HEAD:examples/tutorials/10_agentic/10_temporal/070_open_ai_agents_sdk_tools/project/workflow.py
-
-=======
->>>>>>> main:examples/tutorials/10_async/10_temporal/070_open_ai_agents_sdk_tools/project/workflow.py

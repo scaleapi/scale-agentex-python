@@ -23,9 +23,6 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-AGENT_PORT=8000
-AGENTEX_SERVER_PORT=5003
-
 # Parse arguments
 TUTORIAL_PATH=""
 VIEW_LOGS=false

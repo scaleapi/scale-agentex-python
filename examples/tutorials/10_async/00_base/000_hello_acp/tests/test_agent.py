@@ -96,7 +96,7 @@ class TestNonStreamingEvents:
         ):
             assert isinstance(message, TaskMessage)
             if message.content and message.content.type == "text" and message.content.author == "agent":
-                assert "Hello! I've received your message" in message.content.content
+                assert "Hello! I've received your task" in message.content.content
                 break
 
 
