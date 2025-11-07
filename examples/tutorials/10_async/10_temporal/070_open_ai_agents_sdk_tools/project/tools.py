@@ -29,24 +29,19 @@ async def move_money(from_account: str, to_account: str, amount: float) -> str:
     
     # STEP 1: Start the withdrawal activity
     # This creates a Temporal activity that will be retried if it fails
-    withdraw_handle = workflow.start_activity_method(
+    withdraw_result = await workflow.execute_activity(
         withdraw_money,
+        args=[from_account, amount],
         start_to_close_timeout=timedelta(days=1)  # Long timeout for banking operations
     )
 
-    # Wait for withdrawal to complete before proceeding
-    # If this fails, the entire tool call fails and can be retried
-    await withdraw_handle.result()
-
     # STEP 2: Only after successful withdrawal, start the deposit activity
     # This guarantees the sequence: withdraw THEN deposit
-    deposit_handle = workflow.start_activity_method(
+    deposit_result = await workflow.execute_activity(
         deposit_money,
+        args=[to_account, amount],
         start_to_close_timeout=timedelta(days=1)
     )
-
-    # Wait for deposit to complete
-    await deposit_handle.result()
 
     # PATTERN 2 BENEFIT: From the agent's perspective, this was ONE tool call
     # But in Temporal UI, you'll see TWO activities executed in sequence
