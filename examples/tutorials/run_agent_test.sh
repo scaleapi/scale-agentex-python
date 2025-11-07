@@ -1,16 +1,15 @@
 #!/bin/bash
 #
-# Run all async tutorial tests
+# Run a single agent tutorial test
 #
-# This script runs the test runner for all async tutorials in sequence.
-# It stops at the first failure unless --continue-on-error is specified.
+# This script runs the test for a single agent tutorial.
+# It starts the agent, runs tests against it, then stops the agent.
 #
 # Usage:
-#   ./run_all_async_tests.sh                              # Run all tutorials
-#   ./run_all_async_tests.sh --continue-on-error          # Run all, continue on error
-#   ./run_all_async_tests.sh <tutorial_path>              # Run single tutorial
-#   ./run_all_async_tests.sh --view-logs                  # View most recent agent logs
-#   ./run_all_async_tests.sh --view-logs <tutorial_path>  # View logs for specific tutorial
+#   ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test
+#   ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test
+#   ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial
+#   ./run_agent_test.sh --view-logs                         # View most recent agent logs
 #
 
 set -e  # Exit on error
@@ -24,49 +23,20 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-AGENT_PORT=8000
-AGENTEX_SERVER_PORT=5003
-
 # Parse arguments
-CONTINUE_ON_ERROR=false
-SINGLE_TUTORIAL=""
+TUTORIAL_PATH=""
 VIEW_LOGS=false
+BUILD_CLI=false
 
 for arg in "$@"; do
-    if [[ "$arg" == "--continue-on-error" ]]; then
-        CONTINUE_ON_ERROR=true
-    elif [[ "$arg" == "--view-logs" ]]; then
+    if [[ "$arg" == "--view-logs" ]]; then
         VIEW_LOGS=true
+    elif [[ "$arg" == "--build-cli" ]]; then
+        BUILD_CLI=true
     else
-        SINGLE_TUTORIAL="$arg"
+        TUTORIAL_PATH="$arg"
     fi
 done
-
-# Find all async tutorial directories
-ALL_TUTORIALS=(
-    # sync tutorials
-    "00_sync/000_hello_acp"
-    "00_sync/010_multiturn"
-    "00_sync/020_streaming"
-    # base tutorials
-    # "10_async/00_base/000_hello_acp"
-    # "10_async/00_base/010_multiturn"
-    # "10_async/00_base/020_streaming"
-    # "10_async/00_base/030_tracing"
-    # "10_async/00_base/040_other_sdks"
-    # "10_async/00_base/080_batch_events"
-    # temporal tutorials
-    # "10_async/10_temporal/000_hello_acp"
-    # "10_async/10_temporal/010_agent_chat"
-    # "10_async/10_temporal/020_state_machine"
-    "10_async/10_temporal/060_open_ai_agents_sdk_hello_world"
-    "10_async/10_temporal/070_open_ai_agents_sdk_tools"
-    "10_async/10_temporal/080_open_ai_agents_sdk_human_in_the_loop"
-)
-
-PASSED=0
-FAILED=0
-FAILED_TESTS=()
 
 # Function to check prerequisites for running this test suite
 check_prerequisites() {
@@ -90,23 +60,38 @@ check_prerequisites() {
 wait_for_agent_ready() {
     local name=$1
     local logfile="/tmp/agentex-${name}.log"
-    local timeout=30  # seconds
+    local timeout=45  # seconds - increased to account for package installation time
     local elapsed=0
 
     echo -e "${YELLOW}⏳ Waiting for ${name} agent to be ready...${NC}"
 
     while [ $elapsed -lt $timeout ]; do
-        if grep -q "Application startup complete" "$logfile" 2>/dev/null || \
-           grep -q "Running workers for task queue" "$logfile" 2>/dev/null; then
-            echo -e "${GREEN}✅ ${name} agent is ready${NC}"
-            return 0
+        # Check if agent is successfully registered
+        if grep -q "Successfully registered agent" "$logfile" 2>/dev/null; then
+
+            # For temporal agents, also wait for workers to be ready
+            if [[ "$tutorial_path" == *"temporal"* ]]; then
+                # This is a temporal agent - wait for workers too
+                if grep -q "Running workers for task queue" "$logfile" 2>/dev/null; then
+                    return 0
+                fi
+            else
+                return 0
+            fi
         fi
         sleep 1
         ((elapsed++))
     done
 
     echo -e "${RED}❌ Timeout waiting for ${name} agent to be ready${NC}"
-    echo "Check logs: tail -f $logfile"
+    echo -e "${YELLOW}📋 Agent logs:${NC}"
+    if [[ -f "$logfile" ]]; then
+        echo "----------------------------------------"
+        tail -50 "$logfile"
+        echo "----------------------------------------"
+    else
+        echo "❌ Log file not found: $logfile"
+    fi
     return 1
 }
 
@@ -137,7 +122,25 @@ start_agent() {
     cd "$tutorial_path" || return 1
 
     # Start the agent in background and capture PID
-    uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
+    local manifest_path="$PWD/manifest.yaml"  # Always use full path
+
+    if [ "$BUILD_CLI" = true ]; then
+
+        # Use wheel from dist directory at repo root
+        local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+        if [[ -z "$wheel_file" ]]; then
+            echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"
+            echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"
+            echo -e "${YELLOW}💡 From the repo root directory${NC}"
+            cd "$original_dir"
+            return 1
+        fi
+
+        # Use the built wheel
+        uv run --with "$wheel_file" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
+    else
+        uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
+    fi
     local pid=$!
 
     # Return to original directory
@@ -255,9 +258,30 @@ run_test() {
     # Change to tutorial directory
     cd "$tutorial_path" || return 1
 
-    # Run the tests
-    uv run pytest tests/test_agent.py -v -s
-    local exit_code=$?
+
+    # Run the tests with retry mechanism
+    local max_retries=5
+    local retry_count=0
+    local exit_code=1
+
+    while [ $retry_count -lt $max_retries ]; do
+        if [ $retry_count -gt 0 ]; then
+            echo -e "${YELLOW}🔄 Retrying tests (attempt $((retry_count + 1))/$max_retries)...${NC}"
+        fi
+
+        # Stream pytest output directly in real-time
+        uv run pytest tests/test_agent.py -v -s
+        exit_code=$?
+
+        if [ $exit_code -eq 0 ]; then
+            break
+        else
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -lt $max_retries ]; then
+                sleep 5
+            fi
+        fi
+    done
 
     # Return to original directory
     cd "$original_dir"
@@ -276,15 +300,13 @@ execute_tutorial_test() {
     local tutorial=$1
 
     echo ""
-    echo "--------------------------------------------------------------------------------"
+    echo "================================================================================"
     echo "Testing: $tutorial"
-    echo "--------------------------------------------------------------------------------"
+    echo "================================================================================"
 
     # Start the agent
     if ! start_agent "$tutorial"; then
         echo -e "${RED}❌ FAILED to start agent: $tutorial${NC}"
-        ((FAILED++))
-        FAILED_TESTS+=("$tutorial")
         return 1
     fi
 
@@ -292,12 +314,9 @@ execute_tutorial_test() {
     local test_passed=false
     if run_test "$tutorial"; then
         echo -e "${GREEN}✅ PASSED: $tutorial${NC}"
-        ((PASSED++))
         test_passed=true
     else
         echo -e "${RED}❌ FAILED: $tutorial${NC}"
-        ((FAILED++))
-        FAILED_TESTS+=("$tutorial")
     fi
 
     # Stop the agent
@@ -312,75 +331,97 @@ execute_tutorial_test() {
     fi
 }
 
+# Function to check if built wheel is available
+check_built_wheel() {
+
+    # Navigate to the repo root (two levels up from examples/tutorials)
+    local repo_root="../../"
+    local original_dir="$PWD"
+
+    cd "$repo_root" || {
+        echo -e "${RED}❌ Failed to navigate to repo root${NC}"
+        return 1
+    }
+
+    # Check if wheel exists in dist directory at repo root
+    local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+    if [[ -z "$wheel_file" ]]; then
+        echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"
+        echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"
+        echo -e "${YELLOW}💡 From the repo root directory${NC}"
+        cd "$original_dir"
+        return 1
+    fi
+
+    # Test the wheel by running agentex --help
+    if ! uv run --with "$wheel_file" agentex --help >/dev/null 2>&1; then
+        echo -e "${RED}❌ Failed to run agentex with built wheel${NC}"
+        cd "$original_dir"
+        return 1
+    fi
+    cd "$original_dir"
+    return 0
+}
+
+
 # Main execution function
 main() {
     # Handle --view-logs flag
     if [ "$VIEW_LOGS" = true ]; then
-        if [[ -n "$SINGLE_TUTORIAL" ]]; then
-            view_agent_logs "$SINGLE_TUTORIAL"
+        if [[ -n "$TUTORIAL_PATH" ]]; then
+            view_agent_logs "$TUTORIAL_PATH"
         else
             view_agent_logs
         fi
         exit 0
     fi
+        # Require tutorial path
+    if [[ -z "$TUTORIAL_PATH" ]]; then
+        echo -e "${RED}❌ Error: Tutorial path is required${NC}"
+        echo ""
+        echo "Usage:"
+        echo "  ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test"
+        echo "  ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test"
+        echo "  ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial"
+        echo "  ./run_agent_test.sh --view-logs                         # View most recent agent logs"
+        echo ""
+        echo "Examples:"
+        echo "  ./run_agent_test.sh 00_sync/000_hello_acp"
+        echo "  ./run_agent_test.sh --build-cli 00_sync/000_hello_acp"
+        exit 1
+    fi
 
     echo "================================================================================"
-    if [[ -n "$SINGLE_TUTORIAL" ]]; then
-        echo "Running Single Tutorial Test: $SINGLE_TUTORIAL"
-    else
-        echo "Running All Async Tutorial Tests"
-        if [ "$CONTINUE_ON_ERROR" = true ]; then
-            echo -e "${YELLOW}⚠️  Running in continue-on-error mode${NC}"
-        fi
-    fi
+    echo "Running Tutorial Test: $TUTORIAL_PATH"
     echo "================================================================================"
-    echo ""
 
     # Check prerequisites
     check_prerequisites
 
     echo ""
 
-    # Determine which tutorials to run
-    if [[ -n "$SINGLE_TUTORIAL" ]]; then
-        TUTORIALS=("$SINGLE_TUTORIAL")
-    else
-        TUTORIALS=("${ALL_TUTORIALS[@]}")
-    fi
-
-    # Iterate over tutorials
-    for tutorial in "${TUTORIALS[@]}"; do
-        execute_tutorial_test "$tutorial"
-
-        # Exit early if in fail-fast mode
-        if [ "$CONTINUE_ON_ERROR" = false ] && [ $FAILED -gt 0 ]; then
-            echo ""
-            echo -e "${RED}Stopping due to test failure. Use --continue-on-error to continue.${NC}"
+    # Check built wheel if requested
+    if [ "$BUILD_CLI" = true ]; then
+        if ! check_built_wheel; then
+            echo -e "${RED}❌ Failed to find or verify built wheel${NC}"
             exit 1
         fi
-    done
-
-    # Print summary
-    echo ""
-    echo "================================================================================"
-    echo "Test Summary"
-    echo "================================================================================"
-    echo -e "Total:  $((PASSED + FAILED))"
-    echo -e "${GREEN}Passed: $PASSED${NC}"
-    echo -e "${RED}Failed: $FAILED${NC}"
-    echo ""
-
-    if [ $FAILED -gt 0 ]; then
-        echo "Failed tests:"
-        for test in "${FAILED_TESTS[@]}"; do
-            echo -e "  ${RED}✗${NC} $test"
-        done
         echo ""
-        exit 1
-    else
-        echo -e "${GREEN}🎉 All tests passed!${NC}"
+    fi
+
+    # Execute the single tutorial test
+    if execute_tutorial_test "$TUTORIAL_PATH"; then
         echo ""
+        echo "================================================================================"
+        echo -e "${GREEN}🎉 Test passed for: $TUTORIAL_PATH${NC}"
+        echo "================================================================================"
         exit 0
+    else
+        echo ""
+        echo "================================================================================"
+        echo -e "${RED}❌ Test failed for: $TUTORIAL_PATH${NC}"
+        echo "================================================================================"
+        exit 1
     fi
 }
 

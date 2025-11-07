@@ -114,7 +114,7 @@ class TestNonStreamingEvents:
                 break
 
         # Verify state has been updated by polling the states for 10 seconds
-        for i in range(10):
+        for i in range(20):
             if i == 9:
                 raise Exception("Timeout waiting for state updates")
             states = await client.states.list(agent_id=agent_id, task_id=task.id)
@@ -187,7 +187,12 @@ class TestNonStreamingEvents:
             sleep_interval=1.0,
         ):
             assert isinstance(message, TaskMessage)
-            if message.content and message.content.type == "text" and message.content.author == "agent" and message.content.content:
+            if (
+                message.content
+                and message.content.type == "text"
+                and message.content.author == "agent"
+                and message.content.content
+            ):
                 break
 
         ## keep polling the states for 10 seconds for the input_list and turn_number to be updated
@@ -216,7 +221,12 @@ class TestNonStreamingEvents:
             timeout=30,
             sleep_interval=1.0,
         ):
-            if message.content and message.content.type == "text" and message.content.author == "agent" and message.content.content:
+            if (
+                message.content
+                and message.content.type == "text"
+                and message.content.author == "agent"
+                and message.content.content
+            ):
                 response_text = message.content.content.lower()
                 assert "blue" in response_text
                 found_response = True
@@ -273,7 +283,10 @@ class TestStreamingEvents:
                 # For full messages, content is at the top level
                 # For delta messages, we need to check parent_task_message
                 if msg_type == "full":
-                    if event.get("content", {}).get("type") == "text" and event.get("content", {}).get("author") == "user":
+                    if (
+                        event.get("content", {}).get("type") == "text"
+                        and event.get("content", {}).get("author") == "user"
+                    ):
                         user_message_found = True
                 elif msg_type == "done":
                     break
