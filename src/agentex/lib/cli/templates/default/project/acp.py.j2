@@ -1,15 +1,27 @@
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib import adk
+
+
+logger = make_logger(__name__)
 
 
 # Create an ACP server
+# This sets up the core server that will handle task creation, events, and cancellation
+# The `type="base"` configuration is the default configuration for the ACP server
 acp = FastACP.create(
     acp_type="async",
-    config=AsyncACPConfig(type="base")
+    config=AsyncACPConfig(
+        type="base",
+    ),
 )
 
 
+# This handler is called first whenever a new task is created.
+# It's a good place to initialize any state or resources needed for the task.
 @acp.on_task_event_send
 async def handle_task_event_send(params: SendEventParams):
     # For this tutorial, we log the parameters sent to the handler 
