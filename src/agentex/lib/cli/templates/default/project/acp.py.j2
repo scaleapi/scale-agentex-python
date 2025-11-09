@@ -1,29 +1,56 @@
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib import adk
+
+
+logger = make_logger(__name__)
 
 
 # Create an ACP server
+# This sets up the core server that will handle task creation, events, and cancellation
+# The `type="base"` configuration is the default configuration for the ACP server
 acp = FastACP.create(
     acp_type="async",
-    config=AsyncACPConfig(type="base")
+    config=AsyncACPConfig(
+        type="base",
+    ),
 )
 
 
+# This handler is called first whenever a new task is created.
+# It's a good place to initialize any state or resources needed for the task.
 @acp.on_task_event_send
 async def handle_task_event_send(params: SendEventParams):
-    # For this tutorial, we print the parameters sent to the handler 
-    # so you can see where and how messages within a task are handled
-    print(f"Hello world! I just received this message: {params}")
+    # For this tutorial, we log the parameters sent to the handler 
+    # so you can see where and how messages within a long running task are handled
+    logger.info(f"Received task event send rpc: {params}")
+        
+    # 1. Echo back the client's message to show it in the UI. This is not done by default so the agent developer has full control over what is shown to the user.
+    await adk.messages.create(task_id=params.task.id, content=params.event.content)
+
+    # 2. Send a simple response message.
+    # In future tutorials, this is where we'll add more sophisticated response logic.
+    await adk.messages.create(
+        task_id=params.task.id,
+        content=TextContent(
+            author="agent",
+            content=f"Hello! I've received your message. I can't respond right now, but in future tutorials we'll see how you can get me to intelligently respond to your message.",
+        ),
+    )
 
 @acp.on_task_cancel
 async def handle_task_canceled(params: CancelTaskParams):
     # For this tutorial, we print the parameters sent to the handler 
     # so you can see where and how task cancellation is handled
-    print(f"Hello world! Task canceled: {params.task.id}") 
+    logger.info(f"Received task cancel rpc: {params}")
 
 @acp.on_task_create
 async def handle_task_create(params: CreateTaskParams):
-    # For this tutorial, we print the parameters sent to the handler 
+    # For this tutorial, we log the parameters sent to the handler 
     # so you can see where and how task creation is handled
-    print(f"Hello world! Task created: {params.task.id}")
+
+    # Here is where you can initialize any state or resources needed for the task.
+    logger.info(f"Received task create rpc: {params}")

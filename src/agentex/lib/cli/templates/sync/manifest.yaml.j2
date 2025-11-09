@@ -74,14 +74,14 @@ agent:
   # Optional: Credentials mapping
   # Maps Kubernetes secrets to environment variables
   # Common credentials include:
-  # credentials:
+  credentials: [] # Update with your credentials
   #   - env_var_name: OPENAI_API_KEY
   #     secret_name: openai-api-key
   #     secret_key: api-key
 
   # Optional: Set Environment variables for running your agent locally as well 
   # as for deployment later on
-  # env:
+  env: {} # Update with your environment variables
   #   OPENAI_API_KEY: "<YOUR_OPENAI_API_KEY_HERE>"
   #   OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
   #   OPENAI_ORG_ID: "<YOUR_OPENAI_ORG_ID_HERE>"
@@ -95,14 +95,13 @@ deployment:
   image:
     repository: "" # Update with your container registry
     tag: "latest"  # Default tag, should be versioned in production
+  
+  imagePullSecrets: [] # Update with your image pull secret names
+    # - name: my-registry-secret
 
   # Global deployment settings that apply to all clusters
-  # These can be overridden in cluster-specific files (deploy/*.yaml)
+  # These can be overridden in cluster-specific environments (environments.yaml)
   global:
-    agent:
-      name: "{{ agent_name }}"
-      description: "{{ description }}"
-    
     # Default replica count
     replicaCount: 1
     
