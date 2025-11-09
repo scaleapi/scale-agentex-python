@@ -16,6 +16,24 @@ async def handle_task_event_send(params: SendEventParams):
     # so you can see where and how messages within a task are handled
     print(f"Hello world! I just received this message: {params}")
 
+    await adk.messages.create(
+        task_id=params.task.id,
+        trace_id=params.task.id,
+        content=TextContent(
+            author="user",
+            content=params.event.content,
+        ),
+    )   
+
+    await adk.messages.create(
+        task_id=params.task.id,
+        trace_id=params.task.id,
+        content=TextContent(
+            author="agent",
+            content="Hello world! I just received this message: {params.event.content}",
+        ),
+    )    
+
 @acp.on_task_cancel
 async def handle_task_canceled(params: CancelTaskParams):
     # For this tutorial, we print the parameters sent to the handler 
