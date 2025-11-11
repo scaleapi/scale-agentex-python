@@ -14,6 +14,8 @@ Prerequisites:
 Run: pytest tests/test_agent.py -v
 """
 
+import pytest
+
 from agentex import Agentex
 from agentex.lib.testing import (
     test_sync_agent,
@@ -24,67 +26,53 @@ from agentex.lib.testing import (
 AGENT_NAME = "s020-streaming"
 
 
-def test_multiturn_conversation_with_state():
-    """Test multi-turn non-streaming conversation with state management validation."""
-    # Need direct client for state checks
-    client = Agentex(api_key="test", base_url="http://localhost:5003")
+@pytest.fixture
+def agent_name():
+    """Return the agent name for testing."""
+    return AGENT_NAME
 
-    # Get agent
-    agents = client.agents.list()
-    agent = next((a for a in agents if a.name == AGENT_NAME), None)
-    assert agent is not None, f"Agent {AGENT_NAME} not found"
+@pytest.fixture
+def test_agent(agent_name: str):
+    """Fixture to create a test sync agent."""
+    with test_sync_agent(agent_name=agent_name) as test:
+        yield test
 
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+class TestNonStreamingMessages:
+    """Test non-streaming message sending."""
+
+    def test_send_message(self, test_agent):
         messages = [
-            "Hello, can you tell me a little bit about tennis? I want you to make sure you use the word 'tennis' in each response.",
+            "Hello, can you tell me a little bit about tennis? I want to you make sure you use the word 'tennis' in each response.",
             "Pick one of the things you just mentioned, and dive deeper into it.",
             "Can you now output a summary of this conversation",
         ]
 
         for i, msg in enumerate(messages):
-            # Send message
-            response = test.send_message(msg)
+            response = test_agent.send_message(msg)
 
-            # Validate response structure
+            # Validate response (agent may require OpenAI key)
             assert_valid_agent_response(response)
 
-            # Check message history count
-            message_history = client.messages.list(task_id=test.task_id)
-            expected_count = (i + 1) * 2  # Each turn: user + agent
-            assert (
-                len(message_history) == expected_count
-            ), f"Expected {expected_count} messages, got {len(message_history)}"
+            # Validate that "tennis" appears in the response because that is what our model does
+            assert "tennis" in response.content.lower()
 
-            # Check state (agent should maintain system prompt)
-            # Note: states.list API may have changed - handle gracefully
-            try:
-                states = client.states.list(agent_id=agent.id, task_id=test.task_id)
-                if states and len(states) > 0:
-                    # Filter to our task
-                    task_states = [s for s in states if s.task_id == test.task_id]
-                    if task_states:
-                        state = task_states[0]
-                        assert state.state is not None
-                        assert (
-                            state.state.get("system_prompt")
-                            == "You are a helpful assistant that can answer questions."
-                        )
-            except Exception as e:
-                # If states API has changed, skip this check
-                print(f"State check skipped (API may have changed): {e}")
+            states = test_agent.client.states.list(task_id=test_agent.task_id)
+            assert len(states) == 1
+
+            state = states[0]
+            assert state.state is not None
+            assert state.state.get("system_prompt") == "You are a helpful assistant that can answer questions."
+
+            # Verify conversation history
+            message_history = test_agent.client.messages.list(task_id=test_agent.task_id)
+            assert len(message_history) == (i + 1) * 2  # user + agent messages
 
 
-def test_multiturn_streaming_with_state():
-    """Test multi-turn streaming conversation with state management validation."""
-    # Need direct client for state checks
-    client = Agentex(api_key="test", base_url="http://localhost:5003")
+class TestStreamingMessages:
+    """Test streaming message sending."""
 
-    # Get agent
-    agents = client.agents.list()
-    agent = next((a for a in agents if a.name == AGENT_NAME), None)
-    assert agent is not None, f"Agent {AGENT_NAME} not found"
-
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    def test_send_stream_message(self, test_agent):
+        """Test streaming messages in a multi-turn conversation."""
         messages = [
             "Hello, can you tell me a little bit about tennis? I want you to make sure you use the word 'tennis' in each response.",
             "Pick one of the things you just mentioned, and dive deeper into it.",
@@ -93,39 +81,24 @@ def test_multiturn_streaming_with_state():
 
         for i, msg in enumerate(messages):
             # Get streaming response
-            response_gen = test.send_message_streaming(msg)
+            response_gen = test_agent.send_message_streaming(msg)
 
-            # Collect streaming deltas
+            # Collect the streaming response
             aggregated_content, chunks = collect_streaming_deltas(response_gen)
 
-            # Validate streaming response
-            assert aggregated_content is not None, "Should receive aggregated content"
-            assert len(chunks) > 1, "Should receive multiple chunks in streaming response"
+            assert len(chunks) > 1
 
-            # Check message history count
-            message_history = client.messages.list(task_id=test.task_id)
-            expected_count = (i + 1) * 2
-            assert (
-                len(message_history) == expected_count
-            ), f"Expected {expected_count} messages, got {len(message_history)}"
+            # Validate we got content
+            assert len(aggregated_content) > 0, "Should receive content"
 
-            # Check state (agent should maintain system prompt)
-            # Note: states.list API may have changed - handle gracefully
-            try:
-                states = client.states.list(agent_id=agent.id, task_id=test.task_id)
-                if states and len(states) > 0:
-                    # Filter to our task
-                    task_states = [s for s in states if s.task_id == test.task_id]
-                    if task_states:
-                        state = task_states[0]
-                        assert state.state is not None
-                        assert (
-                            state.state.get("system_prompt")
-                            == "You are a helpful assistant that can answer questions."
-                        )
-            except Exception as e:
-                # If states API has changed, skip this check
-                print(f"State check skipped (API may have changed): {e}")
+            # Validate that "tennis" appears in the response because that is what our model does
+            assert "tennis" in aggregated_content.lower()
+
+            states = test_agent.client.states.list(task_id=test_agent.task_id)
+            assert len(states) == 1
+
+            message_history = test_agent.client.messages.list(task_id=test_agent.task_id)
+            assert len(message_history) == (i + 1) * 2 # user + agent messages
 
 
 if __name__ == "__main__":
