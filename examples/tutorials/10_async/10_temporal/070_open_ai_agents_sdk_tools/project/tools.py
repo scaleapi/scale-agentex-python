@@ -14,10 +14,11 @@ from project.activities import deposit_money, withdraw_money
 # 2. Make the entire operation atomic from the agent's perspective
 # 3. Avoid relying on the LLM to correctly sequence multiple tool calls
 
+
 @function_tool
 async def move_money(from_account: str, to_account: str, amount: float) -> str:
     """Move money from one account to another atomically.
-    
+
     This tool demonstrates PATTERN 2: Instead of having the LLM make two separate
     tool calls (withdraw + deposit), we create ONE tool that internally coordinates
     multiple activities. This guarantees:
@@ -26,7 +27,7 @@ async def move_money(from_account: str, to_account: str, amount: float) -> str:
     - Both operations are durable and will retry on failure
     - The entire operation appears atomic to the agent
     """
-    
+
     # STEP 1: Start the withdrawal activity
     # This creates a Temporal activity that will be retried if it fails
     withdraw_result = await workflow.execute_activity(

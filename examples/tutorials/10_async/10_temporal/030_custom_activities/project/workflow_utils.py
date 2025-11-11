@@ -24,7 +24,7 @@ class BatchProcessingUtils:
     Utility class containing batch processing logic extracted from the main workflow.
     This keeps the workflow clean while maintaining all the same functionality.
     """
-    
+
     @staticmethod
     async def dequeue_pending_data(queue: asyncio.Queue[Any], data_to_process: List[Any], max_items: int) -> None:
         """
@@ -50,18 +50,15 @@ class BatchProcessingUtils:
         """
         try:
             logger.info(f"🚀 Batch #{batch_number}: Starting concurrent processing of {len(events)} events")
-            
+
             # This is the key: calling a custom activity from within the workflow
             await workflow.execute_activity(
                 PROCESS_BATCH_EVENTS_ACTIVITY,
-                ProcessBatchEventsActivityParams(
-                    events=events,
-                    batch_number=batch_number
-                ),
+                ProcessBatchEventsActivityParams(events=events, batch_number=batch_number),
                 start_to_close_timeout=timedelta(minutes=5),
-                retry_policy=RetryPolicy(maximum_attempts=3)
+                retry_policy=RetryPolicy(maximum_attempts=3),
             )
-            
+
             await adk.messages.create(
                 task_id=task_id,
                 content=TextContent(
@@ -69,10 +66,10 @@ class BatchProcessingUtils:
                     content=f"✅ Batch #{batch_number} completed! Processed {len(events)} events using custom activity.",
                 ),
             )
-            
+
             logger.info(f"✅ Batch #{batch_number}: Processing completed successfully")
             return {"success": True, "events_processed": len(events), "batch_number": batch_number}
-            
+
         except Exception as e:
             await adk.messages.create(
                 task_id=task_id,
@@ -85,26 +82,28 @@ class BatchProcessingUtils:
             return {"success": False, "events_processed": 0, "batch_number": batch_number, "error": str(e)}
 
     @staticmethod
-    async def update_progress(processing_tasks: List[asyncio.Task[Any]], state: StateModel, task_id: str) -> List[asyncio.Task[Any]]:
+    async def update_progress(
+        processing_tasks: List[asyncio.Task[Any]], state: StateModel, task_id: str
+    ) -> List[asyncio.Task[Any]]:
         """
         Check for completed tasks and update progress in real-time.
         This is key for tutorials - showing progress as things happen!
-        
+
         Returns the updated list of still-running tasks.
         """
         if not processing_tasks:
             return processing_tasks
-            
+
         # Check which tasks have completed
         completed_tasks: List[asyncio.Task[Any]] = []
         still_running: List[asyncio.Task[Any]] = []
-        
+
         for task in processing_tasks:
             if task.done():
                 completed_tasks.append(task)
             else:
                 still_running.append(task)
-        
+
         # Update state based on completed tasks
         if completed_tasks:
             for task in completed_tasks:
@@ -120,7 +119,7 @@ class BatchProcessingUtils:
                 except Exception:
                     # Task failed with exception
                     state.num_batches_failed += 1
-            
+
             await workflow.execute_activity(
                 REPORT_PROGRESS_ACTIVITY,
                 ReportProgressActivityParams(
@@ -130,8 +129,8 @@ class BatchProcessingUtils:
                     task_id=task_id,
                 ),
                 start_to_close_timeout=timedelta(minutes=1),
-                retry_policy=RetryPolicy(maximum_attempts=3)
-            )                    
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            )
         return still_running
 
     @staticmethod
@@ -164,7 +163,7 @@ class BatchProcessingUtils:
         for task in processing_tasks:
             if not task.done():
                 task.cancel()
-        
+
         processing_tasks.clear()
         await adk.messages.create(
             task_id=task_id,
@@ -188,12 +187,12 @@ class BatchProcessingUtils:
                     content=f"⏳ Waiting for {len(processing_tasks)} remaining batches to complete...",
                 ),
             )
-            
+
             # Wait a bit, then update progress
             try:
                 await workflow.wait_condition(
                     lambda: not any(task for task in processing_tasks if not task.done()),
-                    timeout=10  # Check progress every 10 seconds
+                    timeout=10,  # Check progress every 10 seconds
                 )
                 # All tasks are done!
                 processing_tasks[:] = await BatchProcessingUtils.update_progress(processing_tasks, state, task_id)

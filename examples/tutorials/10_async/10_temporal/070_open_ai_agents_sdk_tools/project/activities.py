@@ -10,7 +10,7 @@ logger = make_logger(__name__)
 # Temporal Activities for OpenAI Agents SDK Integration
 # ============================================================================
 # This file defines Temporal activities that can be used in two different patterns:
-# 
+#
 # PATTERN 1: Direct conversion to agent tools using activity_as_tool()
 # PATTERN 2: Called internally by function_tools for multi-step operations
 #
@@ -27,13 +27,14 @@ logger = make_logger(__name__)
 # - Converted directly to an agent tool using activity_as_tool()
 # - Each tool call creates exactly ONE activity in the workflow
 
+
 @activity.defn
 async def get_weather(city: str) -> str:
     """Get the weather for a given city.
-    
+
     PATTERN 1 USAGE: This activity gets converted to an agent tool using:
     activity_as_tool(get_weather, start_to_close_timeout=timedelta(seconds=10))
-    
+
     When the agent calls the weather tool:
     1. This activity runs with Temporal durability guarantees
     2. If it fails, Temporal automatically retries it
@@ -45,6 +46,7 @@ async def get_weather(city: str) -> str:
     else:
         return "The weather is unknown"
 
+
 # ============================================================================
 # PATTERN 2 EXAMPLES: Activities Used Within Function Tools
 # ============================================================================
@@ -53,10 +55,11 @@ async def get_weather(city: str) -> str:
 # - Multiple activities coordinated by a single tool
 # - Guarantees execution sequence and atomicity
 
+
 @activity.defn
 async def withdraw_money(from_account: str, amount: float) -> str:
     """Withdraw money from an account.
-    
+
     PATTERN 2 USAGE: This activity is called internally by the move_money tool.
     It's NOT converted to an agent tool directly - instead, it's orchestrated
     by code inside the function_tool to guarantee proper sequencing.
@@ -64,30 +67,32 @@ async def withdraw_money(from_account: str, amount: float) -> str:
     # Simulate variable API call latency (realistic for banking operations)
     random_delay = random.randint(1, 5)
     await asyncio.sleep(random_delay)
-    
+
     # In a real implementation, this would make an API call to a banking service
     logger.info(f"Withdrew ${amount} from {from_account}")
     return f"Successfully withdrew ${amount} from {from_account}"
 
+
 @activity.defn
 async def deposit_money(to_account: str, amount: float) -> str:
     """Deposit money into an account.
-    
+
     PATTERN 2 USAGE: This activity is called internally by the move_money tool
     AFTER the withdraw_money activity succeeds. This guarantees the proper
     sequence: withdraw → deposit, making the operation atomic.
     """
     # Simulate banking API latency
     await asyncio.sleep(2)
-    
+
     # In a real implementation, this would make an API call to a banking service
     logger.info(f"Successfully deposited ${amount} into {to_account}")
     return f"Successfully deposited ${amount} into {to_account}"
 
+
 # ============================================================================
 # KEY INSIGHTS:
 # ============================================================================
-# 
+#
 # 1. ACTIVITY DURABILITY: All activities are automatically retried by Temporal
 #    if they fail, providing resilience against network issues, service outages, etc.
 #

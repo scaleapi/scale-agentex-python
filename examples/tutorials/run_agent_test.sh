@@ -6,10 +6,12 @@
 # It starts the agent, runs tests against it, then stops the agent.
 #
 # Usage:
-#   ./run_agent_test.sh <tutorial_path>                     # Run single tutorial test
-#   ./run_agent_test.sh --build-cli <tutorial_path>         # Build CLI from source and run test
-#   ./run_agent_test.sh --view-logs <tutorial_path>         # View logs for specific tutorial
-#   ./run_agent_test.sh --view-logs                         # View most recent agent logs
+#   ./run_all_agentic_tests.sh                              # Run all tutorials
+#   ./run_all_agentic_tests.sh --continue-on-error          # Run all, continue on error
+#   ./run_all_agentic_tests.sh --from-repo-root             # Run from repo root (uses main .venv)
+#   ./run_all_agentic_tests.sh <tutorial_path>              # Run single tutorial
+#   ./run_all_agentic_tests.sh --view-logs                  # View most recent agent logs
+#   ./run_all_agentic_tests.sh --view-logs <tutorial_path>  # View logs for specific tutorial
 #
 
 set -e  # Exit on error
@@ -27,12 +29,15 @@ NC='\033[0m' # No Color
 TUTORIAL_PATH=""
 VIEW_LOGS=false
 BUILD_CLI=false
+FROM_REPO_ROOT=false
 
 for arg in "$@"; do
     if [[ "$arg" == "--view-logs" ]]; then
         VIEW_LOGS=true
     elif [[ "$arg" == "--build-cli" ]]; then
         BUILD_CLI=true
+    elif [[ "$arg" == "--from-repo-root" ]]; then
+        FROM_REPO_ROOT=true
     else
         TUTORIAL_PATH="$arg"
     fi
@@ -115,8 +120,12 @@ start_agent() {
         return 1
     fi
 
-    # Save current directory
-    local original_dir="$PWD"
+    # Determine how to run the agent
+    local pid
+    if [[ "$FROM_REPO_ROOT" == "true" ]]; then
+        # Run from repo root using absolute manifest path
+        local repo_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
+        local abs_manifest="$repo_root/examples/tutorials/$tutorial_path/manifest.yaml"
 
     # Change to tutorial directory
     cd "$tutorial_path" || return 1
@@ -145,6 +154,19 @@ start_agent() {
 
     # Return to original directory
     cd "$original_dir"
+        local original_dir="$PWD"
+        cd "$repo_root" || return 1
+        uv run agentex agents run --manifest "$abs_manifest" > "$logfile" 2>&1 &
+        pid=$!
+        cd "$original_dir"  # Return to examples/tutorials
+    else
+        # Traditional mode: cd into tutorial and run
+        local original_dir="$PWD"
+        cd "$tutorial_path" || return 1
+        uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
+        pid=$!
+        cd "$original_dir"
+    fi
 
     echo "$pid" > "/tmp/agentex-${name}.pid"
     echo -e "${GREEN}✅ ${name} agent started (PID: $pid, logs: $logfile)${NC}"
@@ -240,10 +262,48 @@ run_test() {
 
     echo -e "${YELLOW}🧪 Running tests for ${name}...${NC}"
 
-    # Check if tutorial directory exists
-    if [[ ! -d "$tutorial_path" ]]; then
-        echo -e "${RED}❌ Tutorial directory not found: $tutorial_path${NC}"
-        return 1
+    local exit_code
+
+    if [[ "$FROM_REPO_ROOT" == "true" ]]; then
+        # Run from repo root using repo's .venv (has testing framework)
+        local repo_root="$(cd "$SCRIPT_DIR/../.." && pwd)"
+        local abs_tutorial_path="$repo_root/examples/tutorials/$tutorial_path"
+        local abs_test_path="$abs_tutorial_path/tests/test_agent.py"
+
+        # Check paths from repo root perspective
+        if [[ ! -d "$abs_tutorial_path" ]]; then
+            echo -e "${RED}❌ Tutorial directory not found: $abs_tutorial_path${NC}"
+            return 1
+        fi
+
+        if [[ ! -f "$abs_test_path" ]]; then
+            echo -e "${RED}❌ Test file not found: $abs_test_path${NC}"
+            return 1
+        fi
+
+        # Run from repo root
+        cd "$repo_root" || return 1
+        uv run pytest "$abs_test_path" -v -s
+        exit_code=$?
+        cd "$SCRIPT_DIR" || return 1  # Return to examples/tutorials
+    else
+        # Traditional mode: paths relative to examples/tutorials
+        if [[ ! -d "$tutorial_path" ]]; then
+            echo -e "${RED}❌ Tutorial directory not found: $tutorial_path${NC}"
+            return 1
+        fi
+
+        if [[ ! -f "$tutorial_path/tests/test_agent.py" ]]; then
+            echo -e "${RED}❌ Test file not found: $tutorial_path/tests/test_agent.py${NC}"
+            return 1
+        fi
+
+        # cd into tutorial and use its venv
+        local original_dir="$PWD"
+        cd "$tutorial_path" || return 1
+        uv run pytest tests/test_agent.py -v -s
+        exit_code=$?
+        cd "$original_dir"
     fi
 
     # Check if test file exists

@@ -15,7 +15,7 @@ logger = make_logger(__name__)
 async def main():
     # Setup debug mode if enabled
     setup_debug_if_enabled()
-    
+
     task_queue_name = environment_variables.WORKFLOW_TASK_QUEUE
     if task_queue_name is None:
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")
@@ -30,5 +30,6 @@ async def main():
         workflow=At000HelloAcpWorkflow,
     )
 
+
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

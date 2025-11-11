@@ -1,11 +1,10 @@
 """
-Sample tests for AgentEx Temporal agent with OpenAI Agents SDK integration.
+Tests for at010-agent-chat (temporal agent)
 
-This test suite demonstrates how to test agents that integrate:
-- OpenAI Agents SDK with streaming (via Temporal workflows)
-- MCP (Model Context Protocol) servers for tool access
-- Multi-turn conversations with state management
-- Tool usage (calculator and web search via MCP)
+Prerequisites:
+    - AgentEx services running (make dev)
+    - Temporal server running
+    - Agent running: agentex agents run --manifest manifest.yaml
 
 Key differences from base async (040_other_sdks):
 1. Temporal Integration: Uses Temporal workflows for durable execution
@@ -13,98 +12,34 @@ Key differences from base async (040_other_sdks):
 3. No Race Conditions: Temporal ensures sequential event processing
 4. Durable Execution: Workflow state survives restarts
 
-To run these tests:
-1. Make sure the agent is running (via docker-compose or `agentex agents run`)
-2. Set the AGENTEX_API_BASE_URL environment variable if not using default
-3. Ensure OPENAI_API_KEY is set in the environment
-4. Run: pytest test_agent.py -v
-
-Configuration:
-- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
-- AGENT_NAME: Name of the agent to test (default: at010-agent-chat)
+Run: pytest tests/test_agent.py -v
 """
 
-import os
-import uuid
-import asyncio
-
 import pytest
-import pytest_asyncio
-from test_utils.async_utils import (
-    stream_agent_response,
-    send_event_and_poll_yielding,
-)
 
-from agentex import AsyncAgentex
-from agentex.types import TaskMessage, TextContent
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
-from agentex.types.agent_rpc_result import StreamTaskMessageDone, StreamTaskMessageFull
-from agentex.types.text_content_param import TextContentParam
+from agentex.lib.testing import test_agentic_agent, assert_valid_agent_response
 
-# Configuration from environment variables
-AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
-AGENT_NAME = os.environ.get("AGENT_NAME", "at010-agent-chat")
+AGENT_NAME = "at010-agent-chat"
 
 
-@pytest_asyncio.fixture
-async def client():
-    """Create an AsyncAgentex client instance for testing."""
-    client = AsyncAgentex(base_url=AGENTEX_API_BASE_URL)
-    yield client
-    await client.close()
+@pytest.mark.asyncio
+async def test_agent_basic():
+    """Test basic agent functionality."""
+    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+        response = await test.send_event("Test message", timeout_seconds=60.0)
+        assert_valid_agent_response(response)
 
 
-@pytest.fixture
-def agent_name():
-    """Return the agent name for testing."""
-    return AGENT_NAME
-
-
-@pytest_asyncio.fixture
-async def agent_id(client, agent_name):
-    """Retrieve the agent ID based on the agent name."""
-    agents = await client.agents.list()
-    for agent in agents:
-        if agent.name == agent_name:
-            return agent.id
-    raise ValueError(f"Agent with name {agent_name} not found.")
-
-
-class TestNonStreamingEvents:
-    """Test non-streaming event sending and polling with OpenAI Agents SDK."""
-
-    @pytest.mark.asyncio
-    async def test_send_event_and_poll_simple_query(self, client: AsyncAgentex, agent_id: str):
-        """Test sending a simple event and polling for the response (no tool use)."""
-        # Create a task for this conversation
-        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        task = task_response.result
-        assert task is not None
-
-        # Wait for workflow to initialize
-        await asyncio.sleep(1)
-
-        # Send a simple message that shouldn't require tool use
-        user_message = "Hello! Please introduce yourself briefly."
-        messages = []
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            messages.append(message)
-
-            if len(messages) == 1:
-                assert message.content == TextContent(
-                    author="user",
-                    content=user_message,
-                    type="text",
-                )
+@pytest.mark.asyncio
+async def test_agent_streaming():
+    """Test streaming responses."""
+    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+        events = []
+        async for event in test.send_event_and_stream("Stream test", timeout_seconds=60.0):
+            events.append(event)
+            if event.get("type") == "done":
                 break
+        assert len(events) > 0
 
     @pytest.mark.asyncio
     async def test_send_event_and_poll_with_calculator(self, client: AsyncAgentex, agent_id: str):
