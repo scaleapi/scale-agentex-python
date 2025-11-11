@@ -41,12 +41,13 @@ def test_agent(agent_name: str):
 class TestNonStreamingMessages:
     """Test non-streaming message sending."""
 
-    def test_send_simple_message(self, test_agent):
+    def test_send_message(self, test_agent):
         messages = [
-            "Hello, can you tell me a litle bit about tennis? I want to you make sure you use the word 'tennis' in each response.",
+            "Hello, can you tell me a little bit about tennis? I want to you make sure you use the word 'tennis' in each response.",
             "Pick one of the things you just mentioned, and dive deeper into it.",
             "Can you now output a summary of this conversation",
         ]
+
         for i, msg in enumerate(messages):
             response = test_agent.send_message(msg)
 
@@ -61,27 +62,20 @@ class TestNonStreamingMessages:
             assert len(message_history) == (i + 1) * 2  # user + agent messages
 
 
+class TestStreamingMessages:
+    """Test streaming message sending."""
 
-def test_multiturn_conversation():
-    """Test multi-turn conversation with non-streaming messages."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
-
-
-
-
-
-def test_multiturn_streaming():
-    """Test multi-turn conversation with streaming messages."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    def test_stream_message(self, test_agent):
+        """Test streaming messages in a multi-turn conversation."""
         messages = [
-            "Hello, can you tell me a litle bit about tennis? I want to you make sure you use the word 'tennis' in each response.",
+            "Hello, can you tell me a little bit about tennis? I want you to make sure you use the word 'tennis' in each response.",
             "Pick one of the things you just mentioned, and dive deeper into it.",
             "Can you now output a summary of this conversation",
         ]
 
-        for msg in messages:
+        for i, msg in enumerate(messages):
             # Get streaming response
-            response_gen = test.send_message_streaming(msg)
+            response_gen = test_agent.send_message_streaming(msg)
 
             # Collect streaming deltas
             aggregated_content, chunks = collect_streaming_deltas(response_gen)
@@ -93,9 +87,9 @@ def test_multiturn_streaming():
             # Validate that "tennis" appears in the response because that is what our model does
             assert "tennis" in aggregated_content.lower()
 
-        # Verify conversation history (only user messages tracked with streaming)
-        history = test.get_conversation_history()
-        assert len(history) >= 3, f"Expected >= 3 user messages, got {len(history)}"
+            # Verify conversation history (only user messages tracked with streaming)
+            history = test_agent.get_conversation_history()
+            assert len(history) == (i + 1), f"Expected {(i + 1)} user messages, got {len(history)}"
 
 
 if __name__ == "__main__":
