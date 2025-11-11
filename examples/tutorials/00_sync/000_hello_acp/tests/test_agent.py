@@ -15,6 +15,8 @@ Run tests:
     pytest tests/test_agent.py -v
 """
 
+import pytest 
+
 from agentex.lib.testing import (
     test_sync_agent,
     collect_streaming_deltas,
@@ -24,11 +26,25 @@ from agentex.lib.testing import (
 AGENT_NAME = "s000-hello-acp"
 
 
-def test_send_simple_message():
-    """Test sending a simple message and receiving a response."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+@pytest.fixture
+def agent_name():
+    """Return the agent name for testing."""
+    return AGENT_NAME
+
+@pytest.fixture
+def test_agent(agent_name: str):
+    """Fixture to create a test sync agent."""
+    with test_sync_agent(agent_name=agent_name) as test:
+        yield test
+
+
+class TestNonStreamingMessages:
+    """Tests for non-streaming message sending."""
+
+    def test_send_simple_message(self, test_agent):
+        """Test sending a simple message and receiving a response."""
         message_content = "Hello, Agent! How are you?"
-        response = test.send_message(message_content)
+        response = test_agent.send_message(message_content)
 
         # Validate response
         assert_valid_agent_response(response)
@@ -37,14 +53,16 @@ def test_send_simple_message():
         expected = f"Hello! I've received your message. Here's a generic response, but in future tutorials we'll see how you can get me to intelligently respond to your message. This is what I heard you say: {message_content}"
         assert response.content == expected, f"Expected: {expected}\nGot: {response.content}"
 
+class TestStreamingMessages:
+    """Tests for streaming message sending."""
 
-def test_stream_simple_message():
-    """Test streaming a simple message and aggregating deltas."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+
+    def test_stream_simple_message(self, test_agent):
+        """Test streaming a simple message and aggregating deltas."""
         message_content = "Hello, Agent! Can you stream your response?"
 
         # Get streaming response
-        response_gen = test.send_message_streaming(message_content)
+        response_gen = test_agent.send_message_streaming(message_content)
 
         # Collect streaming deltas
         aggregated_content, chunks = collect_streaming_deltas(response_gen)
