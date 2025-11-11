@@ -86,7 +86,8 @@ class TestStreamingMessages:
             # Collect the streaming response
             aggregated_content, chunks = collect_streaming_deltas(response_gen)
 
-            assert len(chunks) > 1
+             # this is using the chat_completion_stream, so we will be getting chunks of data
+            assert len(chunks) > 1, "No chunks received in streaming response."
 
             # Validate we got content
             assert len(aggregated_content) > 0, "Should receive content"
@@ -97,6 +98,9 @@ class TestStreamingMessages:
             states = test_agent.client.states.list(task_id=test_agent.task_id)
             assert len(states) == 1
 
+            state = states[0]
+            assert state.state is not None
+            assert state.state.get("system_prompt") == "You are a helpful assistant that can answer questions."
             message_history = test_agent.client.messages.list(task_id=test_agent.task_id)
             assert len(message_history) == (i + 1) * 2 # user + agent messages
 
