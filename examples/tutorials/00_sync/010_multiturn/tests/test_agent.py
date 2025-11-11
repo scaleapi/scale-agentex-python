@@ -57,8 +57,15 @@ class TestNonStreamingMessages:
             # Validate that "tennis" appears in the response because that is what our model does
             assert "tennis" in response.content.lower()
 
+            states = test_agent.client.states.list(task_id=test_agent.task_id)
+            assert len(states) == 1
+
+            state = states[0]
+            assert state.state is not None
+            assert state.state.get("system_prompt") == "You are a helpful assistant that can answer questions."
+
             # Verify conversation history
-            message_history = test_agent.get_conversation_history()
+            message_history = test_agent.client.messages.list(task_id=test_agent.task_id)
             assert len(message_history) == (i + 1) * 2  # user + agent messages
 
 
@@ -88,9 +95,11 @@ class TestStreamingMessages:
             # Validate that "tennis" appears in the response because that is what our model does
             assert "tennis" in aggregated_content.lower()
 
-            # Verify conversation history (only user messages tracked with streaming)
-            message_history = test_agent.get_conversation_history()
-            assert len(message_history) == (i + 1), f"Expected {(i + 1)} user messages, got {len(message_history)}"
+            states = test_agent.client.states.list(task_id=test_agent.task_id)
+            assert len(states) == 1
+
+            message_history = test_agent.client.messages.list(task_id=test_agent.task_id)
+            assert len(message_history) == (i + 1) * 2 # user + agent messages
 
 
 if __name__ == "__main__":
