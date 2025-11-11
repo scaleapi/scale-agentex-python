@@ -39,7 +39,7 @@ def test_agent(agent_name: str):
 
 
 class TestNonStreamingMessages:
-    """Tests for non-streaming message sending."""
+    """Test non-streaming message sending."""
 
     def test_send_simple_message(self, test_agent):
         """Test sending a simple message and receiving a response."""
@@ -54,8 +54,7 @@ class TestNonStreamingMessages:
         assert response.content == expected, f"Expected: {expected}\nGot: {response.content}"
 
 class TestStreamingMessages:
-    """Tests for streaming message sending."""
-
+    """Test streaming message sending."""
 
     def test_stream_simple_message(self, test_agent):
         """Test streaming a simple message and aggregating deltas."""

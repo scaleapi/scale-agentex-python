@@ -16,27 +16,39 @@ Run tests:
     pytest tests/test_agent.py -v
 """
 
+import pytest
+
 from agentex.lib.testing import (
     test_sync_agent,
     collect_streaming_deltas,
     assert_valid_agent_response,
-    assert_conversation_maintains_context
 )
 
 AGENT_NAME = "s010-multiturn"
 
+@pytest.fixture
+def agent_name():
+    """Return the agent name for testing."""
+    return AGENT_NAME
 
-def test_multiturn_conversation():
-    """Test multi-turn conversation with non-streaming messages."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+@pytest.fixture
+def test_agent(agent_name: str):
+    """Fixture to create a test sync agent."""
+    with test_sync_agent(agent_name=agent_name) as test:
+        yield test
+
+
+class TestNonStreamingMessages:
+    """Test non-streaming message sending."""
+
+    def test_send_simple_message(self, test_agent):
         messages = [
             "Hello, can you tell me a litle bit about tennis? I want to you make sure you use the word 'tennis' in each response.",
             "Pick one of the things you just mentioned, and dive deeper into it.",
             "Can you now output a summary of this conversation",
         ]
-
-        for msg in messages:
-            response = test.send_message(msg)
+        for i, msg in enumerate(messages):
+            response = test_agent.send_message(msg)
 
             # Validate response (agent may require OpenAI key)
             assert_valid_agent_response(response)
@@ -44,9 +56,18 @@ def test_multiturn_conversation():
             # Validate that "tennis" appears in the response because that is what our model does
             assert "tennis" in response.content.lower()
 
-        # Verify conversation history
-        history = test.get_conversation_history()
-        assert len(history) >= 6, f"Expected >= 6 messages (3 user + 3 agent), got {len(history)}"
+            # Verify conversation history
+            message_history = test_agent.get_conversation_history()
+            assert len(message_history) == (i + 1) * 2  # user + agent messages
+
+
+
+def test_multiturn_conversation():
+    """Test multi-turn conversation with non-streaming messages."""
+    with test_sync_agent(agent_name=AGENT_NAME) as test:
+
+
+
 
 
 def test_multiturn_streaming():
