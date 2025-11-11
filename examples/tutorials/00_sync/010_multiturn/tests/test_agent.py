@@ -77,19 +77,20 @@ class TestStreamingMessages:
             # Get streaming response
             response_gen = test_agent.send_message_streaming(msg)
 
-            # Collect streaming deltas
+            # Collect the streaming response
             aggregated_content, chunks = collect_streaming_deltas(response_gen)
 
+            assert len(chunks) == 1
+
             # Validate we got content
-            assert len(chunks) > 0, "Should receive chunks"
             assert len(aggregated_content) > 0, "Should receive content"
 
             # Validate that "tennis" appears in the response because that is what our model does
             assert "tennis" in aggregated_content.lower()
 
             # Verify conversation history (only user messages tracked with streaming)
-            history = test_agent.get_conversation_history()
-            assert len(history) == (i + 1), f"Expected {(i + 1)} user messages, got {len(history)}"
+            message_history = test_agent.get_conversation_history()
+            assert len(message_history) == (i + 1), f"Expected {(i + 1)} user messages, got {len(message_history)}"
 
 
 if __name__ == "__main__":
