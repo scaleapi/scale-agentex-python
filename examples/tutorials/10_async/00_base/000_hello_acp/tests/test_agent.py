@@ -17,6 +17,7 @@ Run tests:
 """
 
 import pytest
+import pytest_asyncio
 
 from agentex.lib.testing import (
     test_agentic_agent,
@@ -26,19 +27,32 @@ from agentex.lib.testing import (
 
 AGENT_NAME = "ab000-hello-acp"
 
+@pytest.fixture
+def agent_name():
+    """Return the agent name for testing."""
+    return AGENT_NAME
 
-@pytest.mark.asyncio
-async def test_send_event_and_poll():
-    """Test sending an event and polling for the response."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
-        # First event - should get initial task creation message
-        initial_response = await test.send_event("Start task", timeout_seconds=30.0)
-        assert_valid_agent_response(initial_response)
-        assert_agent_response_contains(initial_response, "Hello! I've received your task")
+@pytest_asyncio.fixture
+async def test_agent(agent_name: str):
+    """Fixture to create a test agentic agent."""
+    async with test_agentic_agent(agent_name=agent_name) as test:
+        yield test
+
+
+class TestNonStreamingEvents:
+    """Test non-streaming event sending and polling."""
+
+    @pytest.mark.asyncio
+    async def test_send_event_and_poll(self, agent_name):
+        """Test sending an event and polling for the response."""
+        async with test_agentic_agent(agent_name=agent_name) as test:
+            # First event - should get initial task creation message
+            initial_response = await test.send_event("Start task", timeout_seconds=30.0)
+            assert_valid_agent_response(initial_response)
+            assert_agent_response_contains(initial_response, "Hello! I've received your task")
 
         # Second event - send user message
         user_message = "Hello, this is a test message!"
-        #TODO(stas): Received task message is not validated
         response = await test.send_event(user_message, timeout_seconds=30.0)
 
         # Validate response
@@ -46,20 +60,22 @@ async def test_send_event_and_poll():
         assert_agent_response_contains(response, "Hello! I've received your message")
 
 
-@pytest.mark.asyncio
-async def test_send_event_and_stream():
-    """Test sending an event and streaming the response."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+class TestStreamingEvents:
+    """Test streaming event sending."""
+
+    @pytest.mark.asyncio
+    async def test_send_event_and_stream(self, test_agent):
+        """Test sending an event and streaming the response."""
         user_message = "Hello, this is a test message!"
 
-        # Track what events we see
+        # Flags to track what we've received
         task_creation_found = False
         user_echo_found = False
         agent_response_found = False
         all_events = []
 
         # Stream events
-        async for event in test.send_event_and_stream(user_message, timeout_seconds=30.0):
+        async for event in test_agent.send_event_and_stream(user_message, timeout_seconds=30.0):
             all_events.append(event)
             event_type = event.get("type")
 
