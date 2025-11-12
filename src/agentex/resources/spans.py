@@ -8,7 +8,7 @@ from datetime import datetime
 import httpx
 
 from ..types import span_list_params, span_create_params, span_update_params
-from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
+from .._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
 from .._utils import maybe_transform, async_maybe_transform
 from .._compat import cached_property
 from .._resource import SyncAPIResource, AsyncAPIResource
@@ -32,7 +32,7 @@ class SpansResource(SyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return SpansResourceWithRawResponse(self)
 
@@ -41,7 +41,7 @@ class SpansResource(SyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return SpansResourceWithStreamingResponse(self)
 
@@ -51,18 +51,18 @@ class SpansResource(SyncAPIResource):
         name: str,
         start_time: Union[str, datetime],
         trace_id: str,
-        id: Optional[str] | NotGiven = NOT_GIVEN,
-        data: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        end_time: Union[str, datetime, None] | NotGiven = NOT_GIVEN,
-        input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        parent_id: Optional[str] | NotGiven = NOT_GIVEN,
+        id: Optional[str] | Omit = omit,
+        data: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        end_time: Union[str, datetime, None] | Omit = omit,
+        input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        parent_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Span:
         """
         Create a new span with the provided parameters
@@ -125,7 +125,7 @@ class SpansResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Span:
         """
         Get a span by ID
@@ -153,20 +153,20 @@ class SpansResource(SyncAPIResource):
         self,
         span_id: str,
         *,
-        data: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        end_time: Union[str, datetime, None] | NotGiven = NOT_GIVEN,
-        input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        name: Optional[str] | NotGiven = NOT_GIVEN,
-        output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        parent_id: Optional[str] | NotGiven = NOT_GIVEN,
-        start_time: Union[str, datetime, None] | NotGiven = NOT_GIVEN,
-        trace_id: Optional[str] | NotGiven = NOT_GIVEN,
+        data: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        end_time: Union[str, datetime, None] | Omit = omit,
+        input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        name: Optional[str] | Omit = omit,
+        output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        parent_id: Optional[str] | Omit = omit,
+        start_time: Union[str, datetime, None] | Omit = omit,
+        trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Span:
         """
         Update a span with the provided output data and mark it as complete
@@ -222,13 +222,15 @@ class SpansResource(SyncAPIResource):
     def list(
         self,
         *,
-        trace_id: Optional[str] | NotGiven = NOT_GIVEN,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
+        trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> SpanListResponse:
         """
         List all spans for a given trace ID
@@ -249,7 +251,14 @@ class SpansResource(SyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=maybe_transform({"trace_id": trace_id}, span_list_params.SpanListParams),
+                query=maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "trace_id": trace_id,
+                    },
+                    span_list_params.SpanListParams,
+                ),
             ),
             cast_to=SpanListResponse,
         )
@@ -262,7 +271,7 @@ class AsyncSpansResource(AsyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AsyncSpansResourceWithRawResponse(self)
 
@@ -271,7 +280,7 @@ class AsyncSpansResource(AsyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AsyncSpansResourceWithStreamingResponse(self)
 
@@ -281,18 +290,18 @@ class AsyncSpansResource(AsyncAPIResource):
         name: str,
         start_time: Union[str, datetime],
         trace_id: str,
-        id: Optional[str] | NotGiven = NOT_GIVEN,
-        data: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        end_time: Union[str, datetime, None] | NotGiven = NOT_GIVEN,
-        input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        parent_id: Optional[str] | NotGiven = NOT_GIVEN,
+        id: Optional[str] | Omit = omit,
+        data: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        end_time: Union[str, datetime, None] | Omit = omit,
+        input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        parent_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Span:
         """
         Create a new span with the provided parameters
@@ -355,7 +364,7 @@ class AsyncSpansResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Span:
         """
         Get a span by ID
@@ -383,20 +392,20 @@ class AsyncSpansResource(AsyncAPIResource):
         self,
         span_id: str,
         *,
-        data: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        end_time: Union[str, datetime, None] | NotGiven = NOT_GIVEN,
-        input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        name: Optional[str] | NotGiven = NOT_GIVEN,
-        output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | NotGiven = NOT_GIVEN,
-        parent_id: Optional[str] | NotGiven = NOT_GIVEN,
-        start_time: Union[str, datetime, None] | NotGiven = NOT_GIVEN,
-        trace_id: Optional[str] | NotGiven = NOT_GIVEN,
+        data: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        end_time: Union[str, datetime, None] | Omit = omit,
+        input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        name: Optional[str] | Omit = omit,
+        output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
+        parent_id: Optional[str] | Omit = omit,
+        start_time: Union[str, datetime, None] | Omit = omit,
+        trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Span:
         """
         Update a span with the provided output data and mark it as complete
@@ -452,13 +461,15 @@ class AsyncSpansResource(AsyncAPIResource):
     async def list(
         self,
         *,
-        trace_id: Optional[str] | NotGiven = NOT_GIVEN,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
+        trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> SpanListResponse:
         """
         List all spans for a given trace ID
@@ -479,7 +490,14 @@ class AsyncSpansResource(AsyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=await async_maybe_transform({"trace_id": trace_id}, span_list_params.SpanListParams),
+                query=await async_maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "trace_id": trace_id,
+                    },
+                    span_list_params.SpanListParams,
+                ),
             ),
             cast_to=SpanListResponse,
         )

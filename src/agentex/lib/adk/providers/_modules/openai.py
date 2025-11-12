@@ -1,34 +1,42 @@
-from datetime import timedelta
-from typing import Any, Literal
+from __future__ import annotations
 
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+import sys
+from typing import Any, Literal
+from datetime import timedelta
+
+from mcp import StdioServerParameters
 from agents import Agent, RunResult, RunResultStreaming
+from agents.tool import Tool
 from agents.agent import StopAtTools, ToolsToFinalOutputFunction
 from agents.guardrail import InputGuardrail, OutputGuardrail
+from temporalio.common import RetryPolicy
 from agents.agent_output import AgentOutputSchemaBase
 from agents.model_settings import ModelSettings
-from agents.tool import Tool
-from mcp import StdioServerParameters
-from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
-from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
-from agentex.lib.core.services.adk.providers.openai import OpenAIService
-from agentex.lib.core.services.adk.streaming import StreamingService
-from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
-from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
-    OpenAIActivityName,
-    RunAgentAutoSendParams,
-    RunAgentParams,
-    RunAgentStreamedAutoSendParams,
-)
+# Use warnings.deprecated in Python 3.13+, typing_extensions.deprecated for older versions
+if sys.version_info >= (3, 13):
+    from warnings import deprecated
+else:
+    from typing_extensions import deprecated
+
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.temporal import in_temporal_workflow
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.types.agent_results import (
     SerializableRunResult,
     SerializableRunResultStreaming,
 )
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.services.adk.streaming import StreamingService
+from agentex.lib.core.services.adk.providers.openai import OpenAIService
+from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
+from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
+from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+    RunAgentParams,
+    OpenAIActivityName,
+    RunAgentAutoSendParams,
+    RunAgentStreamedAutoSendParams,
+)
 
 logger = make_logger(__name__)
 
@@ -66,9 +74,9 @@ class OpenAIModule:
     async def run_agent(
         self,
         input_list: list[dict[str, Any]],
-        mcp_server_params: list[StdioServerParameters],
         agent_name: str,
         agent_instructions: str,
+        mcp_server_params: list[StdioServerParameters] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=600),
@@ -120,6 +128,10 @@ class OpenAIModule:
         Returns:
             Union[SerializableRunResult, RunResult]: SerializableRunResult when in Temporal, RunResult otherwise.
         """
+        # Default to empty list if not provided
+        if mcp_server_params is None:
+            mcp_server_params = []
+
         if in_temporal_workflow():
             params = RunAgentParams(
                 trace_id=trace_id,
@@ -129,15 +141,15 @@ class OpenAIModule:
                 agent_name=agent_name,
                 agent_instructions=agent_instructions,
                 handoff_description=handoff_description,
-                handoffs=handoffs,
+                handoffs=handoffs,  # type: ignore[arg-type]
                 model=model,
-                model_settings=model_settings,
-                tools=tools,
+                model_settings=model_settings,  # type: ignore[arg-type]
+                tools=tools,  # type: ignore[arg-type]
                 output_type=output_type,
-                tool_use_behavior=tool_use_behavior,
+                tool_use_behavior=tool_use_behavior,  # type: ignore[arg-type]
                 mcp_timeout_seconds=mcp_timeout_seconds,
-                input_guardrails=input_guardrails,
-                output_guardrails=output_guardrails,
+                input_guardrails=input_guardrails,  # type: ignore[arg-type]
+                output_guardrails=output_guardrails,  # type: ignore[arg-type]
                 max_turns=max_turns,
                 previous_response_id=previous_response_id,
             )
@@ -175,9 +187,9 @@ class OpenAIModule:
         self,
         task_id: str,
         input_list: list[dict[str, Any]],
-        mcp_server_params: list[StdioServerParameters],
         agent_name: str,
         agent_instructions: str,
+        mcp_server_params: list[StdioServerParameters] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=600),
@@ -228,6 +240,10 @@ class OpenAIModule:
         Returns:
             Union[SerializableRunResult, RunResult]: SerializableRunResult when in Temporal, RunResult otherwise.
         """
+        # Default to empty list if not provided
+        if mcp_server_params is None:
+            mcp_server_params = []
+
         if in_temporal_workflow():
             params = RunAgentAutoSendParams(
                 trace_id=trace_id,
@@ -238,15 +254,15 @@ class OpenAIModule:
                 agent_name=agent_name,
                 agent_instructions=agent_instructions,
                 handoff_description=handoff_description,
-                handoffs=handoffs,
+                handoffs=handoffs,  # type: ignore[arg-type]
                 model=model,
-                model_settings=model_settings,
-                tools=tools,
+                model_settings=model_settings,  # type: ignore[arg-type]
+                tools=tools,  # type: ignore[arg-type]
                 output_type=output_type,
-                tool_use_behavior=tool_use_behavior,
+                tool_use_behavior=tool_use_behavior,  # type: ignore[arg-type]
                 mcp_timeout_seconds=mcp_timeout_seconds,
-                input_guardrails=input_guardrails,
-                output_guardrails=output_guardrails,
+                input_guardrails=input_guardrails,  # type: ignore[arg-type]
+                output_guardrails=output_guardrails,  # type: ignore[arg-type]
                 max_turns=max_turns,
                 previous_response_id=previous_response_id,
             )
@@ -284,9 +300,9 @@ class OpenAIModule:
     async def run_agent_streamed(
         self,
         input_list: list[dict[str, Any]],
-        mcp_server_params: list[StdioServerParameters],
         agent_name: str,
         agent_instructions: str,
+        mcp_server_params: list[StdioServerParameters] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         handoff_description: str | None = None,
@@ -341,6 +357,10 @@ class OpenAIModule:
         Raises:
             ValueError: If called from within a Temporal workflow
         """
+        # Default to empty list if not provided
+        if mcp_server_params is None:
+            mcp_server_params = []
+
         # Temporal workflows should use the auto_send variant
         if in_temporal_workflow():
             raise ValueError(
@@ -370,13 +390,17 @@ class OpenAIModule:
             previous_response_id=previous_response_id,
         )
 
+    @deprecated(
+        "Use the OpenAI Agents SDK integration with Temporal instead. "
+        "See examples in tutorials/10_async/10_temporal/ for migration guidance."
+    )
     async def run_agent_streamed_auto_send(
         self,
         task_id: str,
         input_list: list[dict[str, Any]],
-        mcp_server_params: list[StdioServerParameters],
         agent_name: str,
         agent_instructions: str,
+        mcp_server_params: list[StdioServerParameters] | None = None,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=600),
@@ -399,6 +423,10 @@ class OpenAIModule:
     ) -> SerializableRunResultStreaming | RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
+
+        .. deprecated::
+            Use the OpenAI Agents SDK integration with Temporal instead.
+            See examples in tutorials/10_async/10_temporal/ for migration guidance.
 
         Args:
             task_id: The ID of the task to run the agent for.
@@ -427,6 +455,10 @@ class OpenAIModule:
         Returns:
             Union[SerializableRunResultStreaming, RunResultStreaming]: SerializableRunResultStreaming when in Temporal, RunResultStreaming otherwise.
         """
+        # Default to empty list if not provided
+        if mcp_server_params is None:
+            mcp_server_params = []
+
         if in_temporal_workflow():
             params = RunAgentStreamedAutoSendParams(
                 trace_id=trace_id,

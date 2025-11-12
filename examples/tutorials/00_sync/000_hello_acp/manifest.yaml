@@ -15,7 +15,7 @@
 build:
   context:
     # Root directory for the build context
-    root: ../  # Keep this as the default root
+    root: ../ # Keep this as the default root
 
     # Paths to include in the Docker build context
     # Must include:
@@ -34,14 +34,13 @@ build:
     # Helps keep build context small and builds fast
     dockerignore: 000_hello_acp/.dockerignore
 
-
 # Local Development Configuration
 # -----------------------------
 # Only used when running the agent locally
 local_development:
   agent:
-    port: 8000  # Port where your local ACP server is running
-    host_address: host.docker.internal  # Host address for Docker networking (host.docker.internal for Docker, localhost for direct) 
+    port: 8000 # Port where your local ACP server is running
+    host_address: host.docker.internal # Host address for Docker networking (host.docker.internal for Docker, localhost for direct)
 
   # File paths for local development (relative to this manifest.yaml)
   paths:
@@ -53,7 +52,6 @@ local_development:
     #   /absolute/path/acp.py   (absolute path)
     acp: project/acp.py
 
-
 # Agent Configuration
 # -----------------
 agent:
@@ -63,7 +61,7 @@ agent:
 
   # Type of ACP to use
   # sync: Simple synchronous ACP implementation
-  # agentic: Advanced ACP with sub-types "base" or "temporal" (requires config)
+  # async: Asynchronous, non-blocking ACP implementation
   acp_type: sync
 
   # Description of what your agent does
@@ -83,14 +81,13 @@ agent:
   #     secret_name: openai-api-key
   #     secret_key: api-key
 
-  # Optional: Set Environment variables for running your agent locally as well 
+  # Optional: Set Environment variables for running your agent locally as well
   # as for deployment later on
   # env:
   #   - name: OPENAI_BASE_URL
   #     value: "https://api.openai.com/v1"
   #   - name: ACCOUNT_ID
   #     value: "your_account_id_here"
-
 
 # Deployment Configuration
 # -----------------------
@@ -99,7 +96,7 @@ deployment:
   # Container image configuration
   image:
     repository: "" # Update with your container registry
-    tag: "latest"  # Default tag, should be versioned in production
+    tag: "latest" # Default tag, should be versioned in production
 
   # Global deployment settings that apply to all clusters
   # These can be overridden in cluster-specific files (deploy/*.yaml)
@@ -107,10 +104,10 @@ deployment:
     agent:
       name: "s000-hello-acp"
       description: "An AgentEx agent that just says hello and acknowledges the user's message"
-    
+
     # Default replica count
     replicaCount: 1
-    
+
     # Default resource requirements
     resources:
       requests:
@@ -118,4 +115,5 @@ deployment:
         memory: "1Gi"
       limits:
         cpu: "1000m"
-        memory: "2Gi" 
+        memory: "2Gi"
+

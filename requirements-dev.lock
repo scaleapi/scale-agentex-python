@@ -40,6 +40,8 @@ attrs==25.3.0
     # via aiohttp
     # via jsonschema
     # via referencing
+bytecode==0.17.0
+    # via ddtrace
 cachetools==5.5.2
     # via google-auth
 certifi==2023.7.22
@@ -61,6 +63,10 @@ colorlog==6.7.0
     # via nox
 comm==0.2.3
     # via ipykernel
+datadog==0.52.1
+    # via agentex-sdk
+ddtrace==3.15.0
+    # via agentex-sdk
 debugpy==1.8.16
     # via ipykernel
 decorator==5.2.1
@@ -73,6 +79,8 @@ distro==1.8.0
     # via openai
     # via scale-gp
     # via scale-gp-beta
+envier==0.6.1
+    # via ddtrace
 execnet==2.1.1
     # via pytest-xdist
 executing==2.2.0
@@ -107,7 +115,7 @@ httpx==0.27.2
     # via respx
     # via scale-gp
     # via scale-gp-beta
-httpx-aiohttp==0.1.8
+httpx-aiohttp==0.1.9
     # via agentex-sdk
 httpx-sse==0.4.1
     # via mcp
@@ -120,6 +128,7 @@ idna==3.4
     # via yarl
 importlib-metadata==7.0.0
     # via litellm
+    # via opentelemetry-api
 iniconfig==2.0.0
     # via pytest
 ipykernel==6.30.1
@@ -135,6 +144,8 @@ jinja2==3.1.6
     # via litellm
 jiter==0.10.0
     # via openai
+json-log-formatter==1.1.1
+    # via agentex-sdk
 jsonref==1.1.0
     # via agentex-sdk
 jsonschema==4.25.0
@@ -180,12 +191,14 @@ nox==2023.4.22
 oauthlib==3.3.1
     # via kubernetes
     # via requests-oauthlib
-openai==1.99.9
+openai==2.7.1
     # via agentex-sdk
     # via litellm
     # via openai-agents
-openai-agents==0.2.7
+openai-agents==0.4.2
     # via agentex-sdk
+opentelemetry-api==1.37.0
+    # via ddtrace
 packaging==23.2
     # via huggingface-hub
     # via ipykernel
@@ -207,6 +220,7 @@ propcache==0.3.1
     # via aiohttp
     # via yarl
 protobuf==5.29.5
+    # via ddtrace
     # via temporalio
 psutil==7.0.0
     # via ipykernel
@@ -219,7 +233,7 @@ pyasn1==0.6.1
     # via rsa
 pyasn1-modules==0.4.2
     # via google-auth
-pydantic==2.10.3
+pydantic==2.11.9
     # via agentex-sdk
     # via fastapi
     # via litellm
@@ -230,7 +244,7 @@ pydantic==2.10.3
     # via python-on-whales
     # via scale-gp
     # via scale-gp-beta
-pydantic-core==2.27.1
+pydantic-core==2.33.2
     # via pydantic
 pydantic-settings==2.10.1
     # via mcp
@@ -280,6 +294,7 @@ referencing==0.36.2
 regex==2025.7.34
     # via tiktoken
 requests==2.32.4
+    # via datadog
     # via huggingface-hub
     # via kubernetes
     # via openai-agents
@@ -324,7 +339,7 @@ stack-data==0.6.3
 starlette==0.46.2
     # via fastapi
     # via mcp
-temporalio==1.15.0
+temporalio==1.18.2
     # via agentex-sdk
 tiktoken==0.11.0
     # via litellm
@@ -363,6 +378,7 @@ typing-extensions==4.12.2
     # via nexus-rpc
     # via openai
     # via openai-agents
+    # via opentelemetry-api
     # via pydantic
     # via pydantic-core
     # via pyright
@@ -374,6 +390,7 @@ typing-extensions==4.12.2
     # via typer
     # via typing-inspection
 typing-inspection==0.4.1
+    # via pydantic
     # via pydantic-settings
 tzdata==2025.2
     # via agentex-sdk
@@ -393,6 +410,8 @@ wcwidth==0.2.13
     # via prompt-toolkit
 websocket-client==1.8.0
     # via kubernetes
+wrapt==1.17.3
+    # via ddtrace
 yarl==1.20.0
     # via aiohttp
 zipp==3.17.0

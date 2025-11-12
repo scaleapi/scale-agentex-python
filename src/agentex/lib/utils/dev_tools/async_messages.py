@@ -6,26 +6,25 @@ to new streaming messages, handling mid-stream connections gracefully.
 """
 
 import json
-from datetime import datetime, timezone
 from typing import List, Optional
+from datetime import datetime, timezone
 
-from yaspin.core import Yaspin
+from yaspin import yaspin  # type: ignore[import-untyped]
+from rich.panel import Panel
+from yaspin.core import Yaspin  # type: ignore[import-untyped]
+from rich.console import Console
+from rich.markdown import Markdown
 
 from agentex import Agentex
-from agentex.types import Task, TaskMessage, TextContent, ToolRequestContent, ToolResponseContent, ReasoningContent
+from agentex.types import Task, TaskMessage, TextContent, ReasoningContent, ToolRequestContent, ToolResponseContent
+from agentex.types.text_delta import TextDelta
 from agentex.types.task_message_update import (
     TaskMessageUpdate,
-    StreamTaskMessageStart,
-    StreamTaskMessageDelta,
+    StreamTaskMessageDone,
     StreamTaskMessageFull,
-    StreamTaskMessageDone
+    StreamTaskMessageDelta,
+    StreamTaskMessageStart,
 )
-from agentex.types.text_delta import TextDelta
-
-from rich.console import Console
-from rich.panel import Panel
-from rich.markdown import Markdown
-from yaspin import yaspin
 
 
 def print_task_message(
@@ -50,8 +49,8 @@ def print_task_message(
     
     # Skip empty reasoning messages
     if isinstance(message.content, ReasoningContent):
-        has_summary = message.content.summary and any(s for s in message.content.summary if s)
-        has_content = message.content.content and any(c for c in message.content.content if c)
+        has_summary = bool(message.content.summary) and any(s for s in message.content.summary if s)
+        has_content = bool(message.content.content) and any(c for c in message.content.content if c) if message.content.content is not None else False
         if not has_summary and not has_content:
             return
     
@@ -136,18 +135,19 @@ def print_task_message(
     
     if rich_print and console:
         author_color = "bright_cyan" if message.content.author == "user" else "green"
-        title = f"[bold {author_color}]{message.content.author.upper()}[/bold {author_color}] [{timestamp}]"
         
-        # Use different border styles for tool messages
+        # Use different border styles and colors for different content types
         if content_type == "tool_request":
             border_style = "yellow"
         elif content_type == "tool_response":
             border_style = "bright_green"
         elif content_type == "reasoning":
             border_style = "bright_magenta"
+            author_color = "bright_magenta"  # Also make the author text magenta
         else:
             border_style = author_color
-            
+        
+        title = f"[bold {author_color}]{message.content.author.upper()}[/bold {author_color}] [{timestamp}]"
         panel = Panel(Markdown(content), title=title, border_style=border_style, width=80)
         console.print(panel)
     else:
@@ -301,7 +301,7 @@ def subscribe_to_async_task_messages(
             print_task_message(message, print_messages, rich_print)
 
     # Subscribe to server-side events using tasks.stream_events_by_name
-    # This is the proper way to get agent responses after sending an event in agentic agents
+    # This is the proper way to get agent responses after sending an event in async agents
 
     # Ensure task has a name
     if not task.name:
@@ -330,7 +330,7 @@ def subscribe_to_async_task_messages(
                             
                             # Deserialize the discriminated union TaskMessageUpdate based on the "type" field
                             message_type = task_message_update_data.get("type", "unknown")
-                            
+
                             # Handle different message types for streaming progress
                             if message_type == "start":
                                 task_message_update = StreamTaskMessageStart.model_validate(task_message_update_data)
@@ -360,6 +360,9 @@ def subscribe_to_async_task_messages(
                                 if index in active_spinners:
                                     active_spinners[index].stop()
                                     del active_spinners[index]
+                                    # Ensure clean line after spinner
+                                    if print_messages:
+                                        print()
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)
@@ -374,6 +377,9 @@ def subscribe_to_async_task_messages(
                                 if index in active_spinners:
                                     active_spinners[index].stop()
                                     del active_spinners[index]
+                                    # Ensure clean line after spinner
+                                    if print_messages:
+                                        print()
                                 
                                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                                     finished_message = client.messages.retrieve(task_message_update.parent_task_message.id)

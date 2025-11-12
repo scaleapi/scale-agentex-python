@@ -1,16 +1,18 @@
-from collections.abc import AsyncGenerator
-from typing import Any, override
+from __future__ import annotations
 
-from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+from typing import Any, override
+from collections.abc import AsyncGenerator
+
 from agentex.lib.types.acp import SendMessageParams
-from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
-    StreamTaskMessageFull,
-    TaskMessageUpdate,
-)
-from agentex.types.task_message_delta import TextDelta
-from agentex.types.task_message_content import TaskMessageContent, TextContent
 from agentex.lib.utils.logging import make_logger
+from agentex.types.task_message_delta import TextDelta
+from agentex.types.task_message_update import (
+    TaskMessageUpdate,
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+)
+from agentex.types.task_message_content import TextContent, TaskMessageContent
+from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
 
 logger = make_logger(__name__)
 

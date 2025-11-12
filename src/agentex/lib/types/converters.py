@@ -1,9 +1,13 @@
+from __future__ import annotations
+
+import json
+
+from agents import TResponseInputItem
+
 from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
-import json
-from agents import TResponseInputItem
 
 
 def convert_task_messages_to_oai_agents_inputs(

@@ -57,7 +57,7 @@ local_development:
 # Agent Configuration
 # -----------------
 agent:
-  acp_type: agentic
+  acp_type: async
   
   # Unique name for your agent
   # Used for task routing and monitoring
@@ -86,7 +86,7 @@ agent:
 
   # Optional: Set Environment variables for running your agent locally as well 
   # as for deployment later on
-  # env:
+  env: {}
   #   OPENAI_API_KEY: "<YOUR_OPENAI_API_KEY_HERE>"
   #   OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
   #   OPENAI_ORG_ID: "<YOUR_OPENAI_ORG_ID_HERE>"
@@ -100,13 +100,12 @@ deployment:
     repository: "" # Update with your container registry
     tag: "latest"  # Default tag, should be versioned in production
 
+  imagePullSecrets: [] # Update with your image pull secret names
+    # - name: my-registry-secret
+
   # Global deployment settings that apply to all clusters
-  # These can be overridden in cluster-specific files (deploy/*.yaml)
+  # These can be overridden in cluster-specific environments (environments.yaml)
   global:
-    agent:
-      name: "{{ agent_name }}"
-      description: "{{ description }}"
-    
     # Default replica count
     replicaCount: 1
     

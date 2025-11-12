@@ -8,11 +8,12 @@ from typing import Any, cast
 import pytest
 
 from agentex import Agentex, AsyncAgentex
-from tests.utils import assert_matches_type
 from agentex.types import (
     TaskMessage,
     MessageListResponse,
 )
+
+from ..utils import assert_matches_type
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 
@@ -240,6 +241,7 @@ class TestMessages:
         message = client.messages.list(
             task_id="task_id",
             limit=0,
+            page_number=0,
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
 
@@ -495,6 +497,7 @@ class TestAsyncMessages:
         message = await async_client.messages.list(
             task_id="task_id",
             limit=0,
+            page_number=0,
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
 

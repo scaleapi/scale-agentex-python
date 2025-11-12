@@ -15,7 +15,7 @@ class Agent(BaseModel):
     """The unique identifier of the agent."""
 
     acp_type: AcpType
-    """The type of the ACP Server (Either sync or agentic)"""
+    """The type of the ACP Server (Either sync or async)"""
 
     created_at: datetime
     """The timestamp when the agent was created"""
@@ -29,13 +29,16 @@ class Agent(BaseModel):
     updated_at: datetime
     """The timestamp when the agent was last updated"""
 
+    agent_input_type: Optional[Literal["text", "json"]] = None
+    """The type of input the agent expects."""
+
     registered_at: Optional[datetime] = None
     """The timestamp when the agent was last registered"""
 
     registration_metadata: Optional[Dict[str, object]] = None
     """The metadata for the agent's registration."""
 
-    status: Optional[Literal["Pending", "Building", "Ready", "Failed", "Unknown"]] = None
+    status: Optional[Literal["Ready", "Failed", "Unknown", "Deleted", "Unhealthy"]] = None
     """The status of the action, indicating if it's building, ready, failed, etc."""
 
     status_reason: Optional[str] = None

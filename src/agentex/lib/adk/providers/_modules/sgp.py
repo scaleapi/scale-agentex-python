@@ -1,20 +1,21 @@
+from __future__ import annotations
+
 from datetime import timedelta
 
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from scale_gp import SGPClient, SGPClientError
 from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.services.adk.providers.sgp import SGPService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
 from agentex.lib.core.temporal.activities.adk.providers.sgp_activities import (
+    SGPActivityName,
     DownloadFileParams,
     FileContentResponse,
-    SGPActivityName,
 )
-from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
 
 logger = make_logger(__name__)
 
@@ -24,7 +25,7 @@ DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
 class SGPModule:
     """
     Module for managing SGP agent operations in Agentex.
-    Provides high-level methods for chat completion, streaming, agentic streaming, and message classification.
+    Provides high-level methods for chat completion, streaming, and message classification.
     """
 
     def __init__(

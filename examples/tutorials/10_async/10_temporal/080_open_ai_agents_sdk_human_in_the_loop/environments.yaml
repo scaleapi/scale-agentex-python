@@ -1,0 +1,64 @@
+# Agent Environment Configuration
+# ------------------------------
+# This file defines environment-specific settings for your agent.
+# This DIFFERS from the manifest.yaml file in that it is used to program things that are ONLY per environment.
+
+# ********** EXAMPLE **********
+# schema_version: "v1" # This is used to validate the file structure and is not used by the agentex CLI
+# environments:
+#   dev:
+#     auth:
+#       principal:
+#         user_id: "1234567890"
+#         user_name: "John Doe"
+#         user_email: "john.doe@example.com"
+#         user_role: "admin"
+#       user_permissions: "read, write, delete"
+#     helm_overrides: # This is used to override the global helm values.yaml file in the agentex-agent helm charts
+#       replicas: 3
+#       resources:
+#         requests:
+#           cpu: "1000m"
+#           memory: "2Gi"
+#         limits:
+#           cpu: "2000m"
+#           memory: "4Gi"
+#       env:
+#         - name: LOG_LEVEL
+#           value: "DEBUG"
+#         - name: ENVIRONMENT
+#           value: "staging"
+#
+#     kubernetes: 
+#       # OPTIONAL - Otherwise it will be derived from separately. However, this can be used to override the derived
+#       #   namespace and deploy it with in the same namespace that already exists for a separate agent.
+#       namespace: "team-example-tutorial"
+# ********** END EXAMPLE **********
+
+schema_version: "v1" # This is used to validate the file structure and is not used by the agentex CLI
+environments:
+  dev:
+    auth:
+      principal:
+        user_id: # TODO: Fill in
+        account_id: # TODO: Fill in
+    helm_overrides: 
+      # This is used to override the global helm values.yaml file in the agentex-agent helm charts
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+      temporal-worker:
+        enabled: true
+        replicaCount: 2
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"

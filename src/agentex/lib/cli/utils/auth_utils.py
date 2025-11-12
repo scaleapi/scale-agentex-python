@@ -1,13 +1,16 @@
-import base64
+from __future__ import annotations
+
 import json
+import base64
 from typing import Any, Dict
 
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.sdk.config.environment_config import AgentAuthConfig
 
+
 # DEPRECATED: Old function for backward compatibility
 # Will be removed in future version
-def _encode_principal_context(manifest: AgentManifest) -> str | None:
+def _encode_principal_context(manifest: AgentManifest) -> str | None:  # noqa: ARG001
     """
     DEPRECATED: This function is deprecated as AgentManifest no longer contains auth.
     Use _encode_principal_context_from_env_config instead.

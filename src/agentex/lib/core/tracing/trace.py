@@ -1,19 +1,21 @@
-import asyncio
-from contextlib import asynccontextmanager, contextmanager
-from datetime import UTC, datetime
-from typing import Any, AsyncGenerator
+from __future__ import annotations
+
 import uuid
+import asyncio
+from typing import Any, AsyncGenerator
+from datetime import UTC, datetime
+from contextlib import contextmanager, asynccontextmanager
 
 from pydantic import BaseModel
 
 from agentex import Agentex, AsyncAgentex
-from agentex.lib.core.tracing.processors.tracing_processor_interface import (
-    AsyncTracingProcessor,
-    SyncTracingProcessor,
-)
+from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
-from agentex.types.span import Span
+from agentex.lib.core.tracing.processors.tracing_processor_interface import (
+    SyncTracingProcessor,
+    AsyncTracingProcessor,
+)
 
 logger = make_logger(__name__)
 

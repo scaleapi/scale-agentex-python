@@ -1,13 +1,14 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+from __future__ import annotations
 
 from typing import Union, Optional
 from typing_extensions import Literal
 
-from .._models import BaseModel
-from .agent_rpc_result import AgentRpcResult
-from .event import Event
 from .task import Task
+from .event import Event
+from .._models import BaseModel
 from .task_message import TaskMessage
+from .agent_rpc_result import AgentRpcResult
 from .task_message_update import TaskMessageUpdate
 
 __all__ = ["AgentRpcResponse"]

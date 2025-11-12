@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
 from agentex.lib import adk
+from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.sdk.state_machine.state import State
 from agentex.lib.sdk.state_machine.state_workflow import StateWorkflow
-from agentex.lib.utils.model_utils import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -55,7 +57,13 @@ class StateMachine(ABC, Generic[T]):
             raise ValueError(f"State {target_state_name} not found")
         self._current_state = self._state_map[target_state_name]
 
-    def get_state_machine_data(self) -> T:
+    def get_state_machine_data(self) -> T | None:
+        return self.state_machine_data
+
+    def require_state_machine_data(self) -> T:
+        """Get state machine data, raising an error if not set."""
+        if self.state_machine_data is None:
+            raise ValueError("State machine data not initialized - ensure data is provided")
         return self.state_machine_data
 
     @abstractmethod
@@ -70,7 +78,10 @@ class StateMachine(ABC, Generic[T]):
     async def step(self) -> str:
         current_state_name = self.get_current_state()
         current_state = self._state_map.get(current_state_name)
+        if current_state is None:
+            raise ValueError(f"Current state '{current_state_name}' not found in state map")
 
+        span = None
         if self._trace_transitions:
             if self._task_id is None:
                 raise ValueError(
@@ -79,7 +90,7 @@ class StateMachine(ABC, Generic[T]):
             span = await adk.tracing.start_span(
                 trace_id=self._task_id,
                 name="state_transition",
-                input=self.state_machine_data.model_dump(),
+                input=self.require_state_machine_data().model_dump(),
                 data={"input_state": current_state_name},
             )
 
@@ -87,13 +98,10 @@ class StateMachine(ABC, Generic[T]):
             state_machine=self, state_machine_data=self.state_machine_data
         )
 
-        if self._trace_transitions:
-            if self._task_id is None:
-                raise ValueError(
-                    "Task ID is must be set before tracing can be enabled"
-                )
-            span.output = self.state_machine_data.model_dump()
-            span.data["output_state"] = next_state_name
+        if self._trace_transitions and span is not None:
+            span.output = self.require_state_machine_data().model_dump()  # type: ignore[assignment]
+            if span.data is not None:
+                span.data["output_state"] = next_state_name  # type: ignore[index]
             await adk.tracing.end_span(trace_id=self._task_id, span=span)
 
         await self.transition(next_state_name)
@@ -118,7 +126,7 @@ class StateMachine(ABC, Generic[T]):
         await self.transition(self._initial_state)
 
         if self._trace_transitions:
-            span.output = {"output_state": self._initial_state}
+            span.output = {"output_state": self._initial_state}  # type: ignore[assignment,union-attr]
             await adk.tracing.end_span(trace_id=self._task_id, span=span)
 
     def dump(self) -> dict[str, Any]:
@@ -168,7 +176,7 @@ class StateMachine(ABC, Generic[T]):
             state_machine_data = None
             if state_machine_data_dict is not None:
                 # Get the actual model type from the class's type parameters
-                model_type = cls.__orig_bases__[0].__args__[0]
+                model_type = cls.__orig_bases__[0].__args__[0]  # type: ignore[attr-defined]
                 state_machine_data = model_type.model_validate(state_machine_data_dict)
 
             # Create a new instance

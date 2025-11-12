@@ -1,32 +1,37 @@
+from __future__ import annotations
+
+import uuid
 import asyncio
 import inspect
-from datetime import datetime
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import asynccontextmanager
 from typing import Any
+from datetime import datetime
+from contextlib import asynccontextmanager
+from collections.abc import Callable, Awaitable, AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
 from pydantic import TypeAdapter, ValidationError
+from fastapi.responses import StreamingResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+from agentex.lib.types.acp import (
+    RPC_SYNC_METHODS,
+    PARAMS_MODEL_BY_METHOD,
+    RPCMethod,
+    SendEventParams,
+    CancelTaskParams,
+    CreateTaskParams,
+    SendMessageParams,
+)
+from agentex.lib.utils.logging import make_logger, ctx_var_request_id
+from agentex.lib.types.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.utils.registration import register_agent
 
 # from agentex.lib.sdk.fastacp.types import BaseACPConfig
 from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
-from agentex.lib.types.acp import (
-    PARAMS_MODEL_BY_METHOD,
-    RPC_SYNC_METHODS,
-    CancelTaskParams,
-    CreateTaskParams,
-    RPCMethod,
-    SendEventParams,
-    SendMessageParams,
-)
-from agentex.lib.types.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
-from agentex.types.task_message_update import StreamTaskMessageFull, TaskMessageUpdate
+from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
 from agentex.types.task_message_content import TaskMessageContent
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.model_utils import BaseModel
-from agentex.lib.utils.registration import register_agent
 from agentex.lib.sdk.fastacp.base.constants import (
     FASTACP_HEADER_SKIP_EXACT,
     FASTACP_HEADER_SKIP_PREFIXES,
@@ -36,6 +41,19 @@ logger = make_logger(__name__)
 
 # Create a TypeAdapter for TaskMessageUpdate validation
 task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """Middleware to extract or generate request IDs and add them to logs and response headers"""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        # Extract request ID from header or generate a new one if there isn't one
+        request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
+        # Store request ID in request state for access in handlers
+        ctx_var_request_id.set(request_id)
+        # Process request
+        response = await call_next(request)
+        return response
 
 
 class BaseACPServer(FastAPI):
@@ -56,7 +74,12 @@ class BaseACPServer(FastAPI):
         self.post("/api")(self._handle_jsonrpc)
 
         # Method handlers
+        # this just adds a request ID to the request and response headers
+        self.add_middleware(RequestIDMiddleware)
         self._handlers: dict[RPCMethod, Callable] = {}
+
+        # Agent info to return in healthz
+        self.agent_id: str | None = None
 
     @classmethod
     def create(cls):
@@ -72,10 +95,11 @@ class BaseACPServer(FastAPI):
 
     def get_lifespan_function(self):
         @asynccontextmanager
-        async def lifespan_context(app: FastAPI):
+        async def lifespan_context(app: FastAPI):  # noqa: ARG001
             env_vars = EnvironmentVariables.refresh()
             if env_vars.AGENTEX_BASE_URL:
                 await register_agent(env_vars)
+                self.agent_id = env_vars.AGENT_ID
             else:
                 logger.warning("AGENTEX_BASE_URL not set, skipping agent registration")
 
@@ -85,7 +109,10 @@ class BaseACPServer(FastAPI):
 
     async def _healthz(self):
         """Health check endpoint"""
-        return {"status": "healthy"}
+        result = {"status": "healthy"}
+        if self.agent_id:
+            result["agent_id"] = self.agent_id
+        return result
 
     def _wrap_handler(self, fn: Callable[..., Awaitable[Any]]):
         """Wraps handler functions to provide JSON-RPC 2.0 response format"""
@@ -134,12 +161,14 @@ class BaseACPServer(FastAPI):
                     ),
                 )
 
-            # Extract application headers, excluding sensitive/transport headers per FASTACP_* rules
+            # Extract application headers using allowlist approach (only x-* headers)
+            # Matches gateway's security filtering rules
             # Forward filtered headers via params.request.headers to agent handlers
             custom_headers = {
                 key: value
                 for key, value in request.headers.items()
-                if key.lower() not in FASTACP_HEADER_SKIP_EXACT
+                if key.lower().startswith("x-")
+                and key.lower() not in FASTACP_HEADER_SKIP_EXACT
                 and not any(key.lower().startswith(p) for p in FASTACP_HEADER_SKIP_PREFIXES)
             }
             
@@ -148,6 +177,7 @@ class BaseACPServer(FastAPI):
             params_data = dict(rpc_request.params) if rpc_request.params else {}
             
             # Add custom headers to the request structure if any headers were provided
+            # Gateway sends filtered headers via HTTP, SDK extracts and populates params.request
             if custom_headers:
                 params_data["request"] = {"headers": custom_headers}
             params = params_model.model_validate(params_data)
@@ -276,7 +306,7 @@ class BaseACPServer(FastAPI):
     Define all possible decorators to be overriden and implemented by each ACP implementation
     Then the users can override the default handlers by implementing their own handlers
 
-    ACP Type: Agentic
+    ACP Type: Async
     Decorators:
     - on_task_create
     - on_task_event_send
@@ -287,14 +317,14 @@ class BaseACPServer(FastAPI):
     - on_message_send
     """
 
-    # Type: Agentic
+    # Type: Async
     def on_task_create(self, fn: Callable[[CreateTaskParams], Awaitable[Any]]):
         """Handle task/init method"""
         wrapped = self._wrap_handler(fn)
         self._handlers[RPCMethod.TASK_CREATE] = wrapped
         return fn
 
-    # Type: Agentic
+    # Type: Async
     def on_task_event_send(self, fn: Callable[[SendEventParams], Awaitable[Any]]):
         """Handle event/send method"""
 
@@ -312,7 +342,7 @@ class BaseACPServer(FastAPI):
         self._handlers[RPCMethod.EVENT_SEND] = wrapped
         return fn
 
-    # Type: Agentic
+    # Type: Async
     def on_task_cancel(self, fn: Callable[[CancelTaskParams], Awaitable[Any]]):
         """Handle task/cancel method"""
         wrapped = self._wrap_handler(fn)
@@ -345,8 +375,12 @@ class BaseACPServer(FastAPI):
             else:
                 # The client wants streaming, but the function is not an async generator, so we turn it into one and yield each TaskMessageContent as a StreamTaskMessageFull which will be streamed to the client by the Agentex server.
                 task_message_content_response = await fn(params)
-                if isinstance(task_message_content_response, list):
-                    task_message_content_list = task_message_content_response
+                # Handle None returns gracefully - treat as empty list
+                if task_message_content_response is None:
+                    task_message_content_list = []
+                elif isinstance(task_message_content_response, list):
+                    # Filter out None values from lists
+                    task_message_content_list = [content for content in task_message_content_response if content is not None]
                 else:
                     task_message_content_list = [task_message_content_response]
 

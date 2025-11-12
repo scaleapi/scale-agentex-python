@@ -56,6 +56,14 @@ from .messages import (
     MessagesResourceWithStreamingResponse,
     AsyncMessagesResourceWithStreamingResponse,
 )
+from .deployment_history import (
+    DeploymentHistoryResource,
+    AsyncDeploymentHistoryResource,
+    DeploymentHistoryResourceWithRawResponse,
+    AsyncDeploymentHistoryResourceWithRawResponse,
+    DeploymentHistoryResourceWithStreamingResponse,
+    AsyncDeploymentHistoryResourceWithStreamingResponse,
+)
 
 __all__ = [
     "AgentsResource",
@@ -100,4 +108,10 @@ __all__ = [
     "AsyncTrackerResourceWithRawResponse",
     "TrackerResourceWithStreamingResponse",
     "AsyncTrackerResourceWithStreamingResponse",
+    "DeploymentHistoryResource",
+    "AsyncDeploymentHistoryResource",
+    "DeploymentHistoryResourceWithRawResponse",
+    "AsyncDeploymentHistoryResourceWithRawResponse",
+    "DeploymentHistoryResourceWithStreamingResponse",
+    "AsyncDeploymentHistoryResourceWithStreamingResponse",
 ]

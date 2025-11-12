@@ -1,10 +1,10 @@
 from typing import Optional
 
 from agentex import AsyncAgentex
-from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.agent import Agent
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
 
 logger = make_logger(__name__)
 

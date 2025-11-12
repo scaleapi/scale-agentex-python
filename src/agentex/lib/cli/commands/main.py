@@ -1,10 +1,10 @@
 import typer
 
-from agentex.lib.cli.commands.agents import agents
-from agentex.lib.cli.commands.init import init
-from agentex.lib.cli.commands.secrets import secrets
-from agentex.lib.cli.commands.tasks import tasks
 from agentex.lib.cli.commands.uv import uv
+from agentex.lib.cli.commands.init import init
+from agentex.lib.cli.commands.tasks import tasks
+from agentex.lib.cli.commands.agents import agents
+from agentex.lib.cli.commands.secrets import secrets
 
 # Create the main Typer application
 app = typer.Typer(
@@ -24,8 +24,7 @@ app.add_typer(
 
 # Add init command with documentation
 app.command(
-    help="Initialize a new agent project with a template",
-    epilog="Example: agentex init --template temporal my-agent",
+    help="Initialize a new agent project with a template (interactive)",
 )(init)
 
 

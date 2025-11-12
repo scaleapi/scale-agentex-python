@@ -8,8 +8,9 @@ from typing import Any, cast
 import pytest
 
 from agentex import Agentex, AsyncAgentex
-from tests.utils import assert_matches_type
 from agentex.types.messages import BatchCreateResponse, BatchUpdateResponse
+
+from ...utils import assert_matches_type
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 
@@ -25,6 +26,7 @@ class TestBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -39,6 +41,7 @@ class TestBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -57,6 +60,7 @@ class TestBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -78,6 +82,7 @@ class TestBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         )
@@ -92,6 +97,7 @@ class TestBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         )
@@ -110,6 +116,7 @@ class TestBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         ) as response:
@@ -135,6 +142,7 @@ class TestAsyncBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -149,6 +157,7 @@ class TestAsyncBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -167,6 +176,7 @@ class TestAsyncBatch:
                 {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             ],
             task_id="task_id",
@@ -188,6 +198,7 @@ class TestAsyncBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         )
@@ -202,6 +213,7 @@ class TestAsyncBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         )
@@ -220,6 +232,7 @@ class TestAsyncBatch:
                 "foo": {
                     "author": "user",
                     "content": "content",
+                    "type": "text",
                 }
             },
         ) as response:

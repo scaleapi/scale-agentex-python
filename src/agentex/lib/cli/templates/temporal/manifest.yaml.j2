@@ -64,8 +64,8 @@ local_development:
 # Agent Configuration
 # -----------------
 agent:
-  # Type of agent - either sync or agentic
-  acp_type: agentic
+  # Type of agent - either sync or async
+  acp_type: async
 
   # Unique name for your agent
   # Used for task routing and monitoring
@@ -89,6 +89,10 @@ agent:
         # Convention: <agent_name>_task_queue
         queue_name: {{ queue_name }}
 
+    # Optional: Health check port for temporal worker
+    # Defaults to 80 if not specified
+    # health_check_port: 80
+
   # Optional: Credentials mapping
   # Maps Kubernetes secrets to environment variables
   # Common credentials include:
@@ -102,7 +106,7 @@ agent:
   
   # Optional: Set Environment variables for running your agent locally as well 
   # as for deployment later on
-  # env:
+  env: {}
   #   OPENAI_API_KEY: "<YOUR_OPENAI_API_KEY_HERE>"
   #   OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
   #   OPENAI_ORG_ID: "<YOUR_OPENAI_ORG_ID_HERE>"
@@ -117,16 +121,12 @@ deployment:
     repository: "" # Update with your container registry
     tag: "latest"  # Default tag, should be versioned in production
 
-  imagePullSecrets:
-    - name: my-registry-secret  # Update with your image pull secret name
+  imagePullSecrets: [] # Update with your image pull secret name
+    # - name: my-registry-secret
 
   # Global deployment settings that apply to all clusters
-  # These can be overridden using --override-file with custom configuration files
+  # These can be overridden in cluster-specific environments (environments.yaml)
   global:
-    agent:
-      name: "{{ agent_name }}"
-      description: "{{ description }}"
-    
     # Default replica count
     replicaCount: 1
     

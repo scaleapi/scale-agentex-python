@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import json
-from typing import AsyncGenerator, Generator, Union, Optional
+from typing import Union, Optional, Generator, AsyncGenerator
 from typing_extensions import Literal
 
 import httpx
 from pydantic import ValidationError
 
 from ..types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
-from .._types import NOT_GIVEN, Body, Query, Headers, NotGiven
+from .._types import NOT_GIVEN, Body, Omit, Query, Headers, NotGiven, omit, not_given
 from .._utils import maybe_transform, async_maybe_transform
 from .._compat import cached_property
 from .._resource import SyncAPIResource, AsyncAPIResource
@@ -22,7 +22,14 @@ from .._response import (
 )
 from ..types.agent import Agent
 from .._base_client import make_request_options
-from ..types.agent_rpc_response import AgentRpcResponse, CancelTaskResponse, CreateTaskResponse, SendEventResponse, SendMessageResponse, SendMessageStreamResponse
+from ..types.agent_rpc_response import (
+    AgentRpcResponse,
+    SendEventResponse,
+    CancelTaskResponse,
+    CreateTaskResponse,
+    SendMessageResponse,
+    SendMessageStreamResponse,
+)
 from ..types.agent_list_response import AgentListResponse
 from ..types.shared.delete_response import DeleteResponse
 
@@ -36,7 +43,7 @@ class AgentsResource(SyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AgentsResourceWithRawResponse(self)
 
@@ -45,7 +52,7 @@ class AgentsResource(SyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AgentsResourceWithStreamingResponse(self)
 
@@ -58,7 +65,7 @@ class AgentsResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Agent:
         """
         Get an agent by its unique ID.
@@ -85,18 +92,24 @@ class AgentsResource(SyncAPIResource):
     def list(
         self,
         *,
-        task_id: Optional[str] | NotGiven = NOT_GIVEN,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
+        task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentListResponse:
         """
         List all registered agents, optionally filtered by query parameters.
 
         Args:
+          limit: Limit
+
+          page_number: Page number
+
           task_id: Task ID
 
           extra_headers: Send extra headers
@@ -114,7 +127,14 @@ class AgentsResource(SyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=maybe_transform({"task_id": task_id}, agent_list_params.AgentListParams),
+                query=maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "task_id": task_id,
+                    },
+                    agent_list_params.AgentListParams,
+                ),
             ),
             cast_to=AgentListResponse,
         )
@@ -128,7 +148,7 @@ class AgentsResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> DeleteResponse:
         """
         Delete an agent by its unique ID.
@@ -161,7 +181,7 @@ class AgentsResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> DeleteResponse:
         """
         Delete an agent by its unique name.
@@ -194,7 +214,7 @@ class AgentsResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Agent:
         """
         Get an agent by its unique name.
@@ -224,14 +244,14 @@ class AgentsResource(SyncAPIResource):
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
         params: agent_rpc_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        id: Union[int, str, None] | Omit = omit,
+        jsonrpc: Literal["2.0"] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
@@ -272,14 +292,14 @@ class AgentsResource(SyncAPIResource):
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
         params: agent_rpc_by_name_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        id: Union[int, str, None] | Omit = omit,
+        jsonrpc: Literal["2.0"] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique name.
@@ -583,7 +603,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AsyncAgentsResourceWithRawResponse(self)
 
@@ -592,7 +612,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AsyncAgentsResourceWithStreamingResponse(self)
 
@@ -605,7 +625,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Agent:
         """
         Get an agent by its unique ID.
@@ -632,18 +652,24 @@ class AsyncAgentsResource(AsyncAPIResource):
     async def list(
         self,
         *,
-        task_id: Optional[str] | NotGiven = NOT_GIVEN,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
+        task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentListResponse:
         """
         List all registered agents, optionally filtered by query parameters.
 
         Args:
+          limit: Limit
+
+          page_number: Page number
+
           task_id: Task ID
 
           extra_headers: Send extra headers
@@ -661,7 +687,14 @@ class AsyncAgentsResource(AsyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=await async_maybe_transform({"task_id": task_id}, agent_list_params.AgentListParams),
+                query=await async_maybe_transform(
+                    {
+                        "limit": limit,
+                        "page_number": page_number,
+                        "task_id": task_id,
+                    },
+                    agent_list_params.AgentListParams,
+                ),
             ),
             cast_to=AgentListResponse,
         )
@@ -675,7 +708,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> DeleteResponse:
         """
         Delete an agent by its unique ID.
@@ -708,7 +741,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> DeleteResponse:
         """
         Delete an agent by its unique name.
@@ -741,7 +774,7 @@ class AsyncAgentsResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> Agent:
         """
         Get an agent by its unique name.
@@ -771,14 +804,14 @@ class AsyncAgentsResource(AsyncAPIResource):
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
         params: agent_rpc_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        id: Union[int, str, None] | Omit = omit,
+        jsonrpc: Literal["2.0"] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique ID.
@@ -819,14 +852,14 @@ class AsyncAgentsResource(AsyncAPIResource):
         *,
         method: Literal["event/send", "task/create", "message/send", "task/cancel"],
         params: agent_rpc_by_name_params.Params,
-        id: Union[int, str, None] | NotGiven = NOT_GIVEN,
-        jsonrpc: Literal["2.0"] | NotGiven = NOT_GIVEN,
+        id: Union[int, str, None] | Omit = omit,
+        jsonrpc: Literal["2.0"] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> AgentRpcResponse:
         """
         Handle JSON-RPC requests for an agent by its unique name.
@@ -1074,8 +1107,8 @@ class AsyncAgentsResource(AsyncAPIResource):
           except json.JSONDecodeError:
             # Skip invalid JSON lines
             continue
-          except ValidationError:
-            raise ValueError(f"Invalid SendMessageStreamResponse returned: {line}")
+          except ValidationError as e:
+            raise ValueError(f"Invalid SendMessageStreamResponse returned: {line}") from e
     
     async def send_event(
       self,

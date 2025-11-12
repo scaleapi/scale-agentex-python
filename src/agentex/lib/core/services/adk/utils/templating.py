@@ -1,10 +1,12 @@
-from datetime import datetime
+from __future__ import annotations
+
 from typing import Any
+from datetime import datetime
 
 from jinja2 import BaseLoader, Environment
 
-from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
 
 # Create a Jinja environment
 JINJA_ENV = Environment(
@@ -38,6 +40,8 @@ class TemplatingService:
         Returns:
             The rendered template as a string
         """
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to TemplatingService")
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,

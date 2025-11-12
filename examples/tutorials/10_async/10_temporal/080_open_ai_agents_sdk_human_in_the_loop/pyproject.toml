@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "at080_open_ai_agents_sdk_human_in_the_loop"
+version = "0.1.0"
+description = "An AgentEx agent"
+requires-python = ">=3.12"
+dependencies = [
+    "agentex-sdk>=0.6.0",
+    "openai-agents>=0.4.2",
+    "temporalio>=1.18.2",
+    "scale-gp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+    "flake8",
+    "debugpy>=1.8.15",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["project"]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88

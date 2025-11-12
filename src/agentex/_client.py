@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Union, Mapping, cast
+from typing import Any, Dict, Mapping, cast
 from typing_extensions import Self, Literal, override
 
 import httpx
@@ -11,17 +11,17 @@ import httpx
 from . import _exceptions
 from ._qs import Querystring
 from ._types import (
-    NOT_GIVEN,
     Omit,
     Timeout,
     NotGiven,
     Transport,
     ProxiesTypes,
     RequestOptions,
+    not_given,
 )
 from ._utils import is_given, get_async_library
 from ._version import __version__
-from .resources import spans, tasks, agents, events, states, tracker
+from .resources import spans, tasks, agents, events, states, tracker, deployment_history
 from ._streaming import Stream as Stream, AsyncStream as AsyncStream
 from ._exceptions import APIStatusError
 from ._base_client import (
@@ -57,6 +57,7 @@ class Agentex(SyncAPIClient):
     states: states.StatesResource
     events: events.EventsResource
     tracker: tracker.TrackerResource
+    deployment_history: deployment_history.DeploymentHistoryResource
     with_raw_response: AgentexWithRawResponse
     with_streaming_response: AgentexWithStreamedResponse
 
@@ -69,9 +70,9 @@ class Agentex(SyncAPIClient):
         self,
         *,
         api_key: str | None = None,
-        environment: Literal["production", "development"] | NotGiven = NOT_GIVEN,
-        base_url: str | httpx.URL | None | NotGiven = NOT_GIVEN,
-        timeout: Union[float, Timeout, None, NotGiven] = NOT_GIVEN,
+        environment: Literal["production", "development"] | NotGiven = not_given,
+        base_url: str | httpx.URL | None | NotGiven = not_given,
+        timeout: float | Timeout | None | NotGiven = not_given,
         max_retries: int = DEFAULT_MAX_RETRIES,
         default_headers: Mapping[str, str] | None = None,
         default_query: Mapping[str, object] | None = None,
@@ -141,6 +142,7 @@ class Agentex(SyncAPIClient):
         self.states = states.StatesResource(self)
         self.events = events.EventsResource(self)
         self.tracker = tracker.TrackerResource(self)
+        self.deployment_history = deployment_history.DeploymentHistoryResource(self)
         self.with_raw_response = AgentexWithRawResponse(self)
         self.with_streaming_response = AgentexWithStreamedResponse(self)
 
@@ -172,9 +174,9 @@ class Agentex(SyncAPIClient):
         api_key: str | None = None,
         environment: Literal["production", "development"] | None = None,
         base_url: str | httpx.URL | None = None,
-        timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | Timeout | None | NotGiven = not_given,
         http_client: httpx.Client | None = None,
-        max_retries: int | NotGiven = NOT_GIVEN,
+        max_retries: int | NotGiven = not_given,
         default_headers: Mapping[str, str] | None = None,
         set_default_headers: Mapping[str, str] | None = None,
         default_query: Mapping[str, object] | None = None,
@@ -261,6 +263,7 @@ class AsyncAgentex(AsyncAPIClient):
     states: states.AsyncStatesResource
     events: events.AsyncEventsResource
     tracker: tracker.AsyncTrackerResource
+    deployment_history: deployment_history.AsyncDeploymentHistoryResource
     with_raw_response: AsyncAgentexWithRawResponse
     with_streaming_response: AsyncAgentexWithStreamedResponse
 
@@ -273,9 +276,9 @@ class AsyncAgentex(AsyncAPIClient):
         self,
         *,
         api_key: str | None = None,
-        environment: Literal["production", "development"] | NotGiven = NOT_GIVEN,
-        base_url: str | httpx.URL | None | NotGiven = NOT_GIVEN,
-        timeout: Union[float, Timeout, None, NotGiven] = NOT_GIVEN,
+        environment: Literal["production", "development"] | NotGiven = not_given,
+        base_url: str | httpx.URL | None | NotGiven = not_given,
+        timeout: float | Timeout | None | NotGiven = not_given,
         max_retries: int = DEFAULT_MAX_RETRIES,
         default_headers: Mapping[str, str] | None = None,
         default_query: Mapping[str, object] | None = None,
@@ -345,6 +348,7 @@ class AsyncAgentex(AsyncAPIClient):
         self.states = states.AsyncStatesResource(self)
         self.events = events.AsyncEventsResource(self)
         self.tracker = tracker.AsyncTrackerResource(self)
+        self.deployment_history = deployment_history.AsyncDeploymentHistoryResource(self)
         self.with_raw_response = AsyncAgentexWithRawResponse(self)
         self.with_streaming_response = AsyncAgentexWithStreamedResponse(self)
 
@@ -376,9 +380,9 @@ class AsyncAgentex(AsyncAPIClient):
         api_key: str | None = None,
         environment: Literal["production", "development"] | None = None,
         base_url: str | httpx.URL | None = None,
-        timeout: float | Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | Timeout | None | NotGiven = not_given,
         http_client: httpx.AsyncClient | None = None,
-        max_retries: int | NotGiven = NOT_GIVEN,
+        max_retries: int | NotGiven = not_given,
         default_headers: Mapping[str, str] | None = None,
         set_default_headers: Mapping[str, str] | None = None,
         default_query: Mapping[str, object] | None = None,
@@ -466,6 +470,7 @@ class AgentexWithRawResponse:
         self.states = states.StatesResourceWithRawResponse(client.states)
         self.events = events.EventsResourceWithRawResponse(client.events)
         self.tracker = tracker.TrackerResourceWithRawResponse(client.tracker)
+        self.deployment_history = deployment_history.DeploymentHistoryResourceWithRawResponse(client.deployment_history)
 
 
 class AsyncAgentexWithRawResponse:
@@ -477,6 +482,9 @@ class AsyncAgentexWithRawResponse:
         self.states = states.AsyncStatesResourceWithRawResponse(client.states)
         self.events = events.AsyncEventsResourceWithRawResponse(client.events)
         self.tracker = tracker.AsyncTrackerResourceWithRawResponse(client.tracker)
+        self.deployment_history = deployment_history.AsyncDeploymentHistoryResourceWithRawResponse(
+            client.deployment_history
+        )
 
 
 class AgentexWithStreamedResponse:
@@ -488,6 +496,9 @@ class AgentexWithStreamedResponse:
         self.states = states.StatesResourceWithStreamingResponse(client.states)
         self.events = events.EventsResourceWithStreamingResponse(client.events)
         self.tracker = tracker.TrackerResourceWithStreamingResponse(client.tracker)
+        self.deployment_history = deployment_history.DeploymentHistoryResourceWithStreamingResponse(
+            client.deployment_history
+        )
 
 
 class AsyncAgentexWithStreamedResponse:
@@ -499,6 +510,9 @@ class AsyncAgentexWithStreamedResponse:
         self.states = states.AsyncStatesResourceWithStreamingResponse(client.states)
         self.events = events.AsyncEventsResourceWithStreamingResponse(client.events)
         self.tracker = tracker.AsyncTrackerResourceWithStreamingResponse(client.tracker)
+        self.deployment_history = deployment_history.AsyncDeploymentHistoryResourceWithStreamingResponse(
+            client.deployment_history
+        )
 
 
 Client = Agentex

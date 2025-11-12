@@ -1,8 +1,11 @@
+# ruff: noqa: I001
+# Import order matters - AsyncTracer must come after client import to avoid circular imports
+from __future__ import annotations
 from datetime import timedelta
 
 from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
+from agentex import AsyncAgentex  # noqa: F401
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.services.adk.tasks import TasksService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
@@ -13,6 +16,8 @@ from agentex.lib.core.temporal.activities.adk.tasks_activities import (
 )
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task import Task
+from agentex.types.task_retrieve_response import TaskRetrieveResponse
+from agentex.types.task_retrieve_by_name_response import TaskRetrieveByNameResponse
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import in_temporal_workflow
 
@@ -50,7 +55,7 @@ class TasksModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
-    ) -> Task:
+    ) -> TaskRetrieveResponse | TaskRetrieveByNameResponse:
         """
         Get a task by ID or name.
         Args:
@@ -117,7 +122,7 @@ class TasksModule:
                 heartbeat_timeout=heartbeat_timeout,
             )
         else:
-            return await self._tasks_service.delete_task(
+            return await self._tasks_service.delete_task(  # type: ignore[return-value]
                 task_id=task_id,
                 task_name=task_name,
                 trace_id=trace_id,

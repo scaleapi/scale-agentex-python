@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 from typing import Any
-from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
-from agentex.lib.core.clients.temporal.types import WorkflowState
-from agentex.lib.core.temporal.types.workflow import SignalName
-from agentex.lib.environment_variables import EnvironmentVariables
-from agentex.lib.types.acp import CreateTaskParams
-from agentex.lib.types.acp import SendEventParams
+
+from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
-from agentex.types.task import Task
+from agentex.lib.types.acp import SendEventParams, CreateTaskParams
+from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.clients.temporal.types import WorkflowState
+from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
 
 
 class TemporalTaskService:
@@ -22,6 +24,7 @@ class TemporalTaskService:
     ):
         self._temporal_client = temporal_client
         self._env_vars = env_vars
+
 
     async def submit_task(self, agent: Agent, task: Task, params: dict[str, Any] | None) -> str:
         """
@@ -48,7 +51,7 @@ class TemporalTaskService:
             workflow_id=task_id,
         )
 
-    async def send_event(self, agent: Agent, task: Task, event: Event) -> None:
+    async def send_event(self, agent: Agent, task: Task, event: Event, request: dict | None = None) -> None:
         return await self._temporal_client.send_signal(
             workflow_id=task.id,
             signal=SignalName.RECEIVE_EVENT.value,
@@ -56,6 +59,7 @@ class TemporalTaskService:
                 agent=agent,
                 task=task,
                 event=event,
+                request=request,
             ).model_dump(),
         )
 

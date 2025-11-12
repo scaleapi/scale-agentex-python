@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import os
 import re
-from pathlib import Path
 from typing import Any, TypeVar
+from pathlib import Path
 
 import yaml
-from jinja2 import BaseLoader, Environment, StrictUndefined, TemplateError
+from jinja2 import BaseLoader, Environment, TemplateError, StrictUndefined
 
 T = TypeVar("T")
 
@@ -35,10 +37,10 @@ def _extract_variables_section(raw_config_str: str) -> str:
 def ProjectConfigLoader(
     config_path: str, model: type[T] | None = None, env_path: str | None = None
 ) -> dict[str, Any] | T:
-    config_path = Path(config_path)
-    env_path = Path(env_path) if env_path else config_path.parent / ".env"
-    env = _load_env(env_path)
-    raw_config_str = _load_file_as_str(config_path)
+    config_path_obj = Path(config_path)
+    env_path_obj = Path(env_path) if env_path else config_path_obj.parent / ".env"
+    env = _load_env(env_path_obj)
+    raw_config_str = _load_file_as_str(config_path_obj)
     raw_config_str = _preprocess_template(raw_config_str)
 
     # Extract and render only the variables section

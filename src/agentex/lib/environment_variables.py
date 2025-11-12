@@ -5,9 +5,9 @@ import os
 from enum import Enum
 from pathlib import Path
 
-from agentex.lib.utils.logging import make_logger
 from dotenv import load_dotenv
 
+from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -32,19 +32,23 @@ class EnvVarKeys(str, Enum):
     # Workflow Configuration
     WORKFLOW_NAME = "WORKFLOW_NAME"
     WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
+    # Temporal Worker Configuration
+    HEALTH_CHECK_PORT = "HEALTH_CHECK_PORT"
     # Auth Configuration
     AUTH_PRINCIPAL_B64 = "AUTH_PRINCIPAL_B64"
     # Build Information
     BUILD_INFO_PATH = "BUILD_INFO_PATH"
+    AGENT_INPUT_TYPE = "AGENT_INPUT_TYPE"
 
 
 class Environment(str, Enum):
+    LOCAL = "local"
     DEV = "development"
     STAGING = "staging"
     PROD = "production"
 
 
-refreshed_environment_variables: "EnvironmentVariables" | None = None
+refreshed_environment_variables: EnvironmentVariables | None = None
 
 
 class EnvironmentVariables(BaseModel):
@@ -57,13 +61,17 @@ class EnvironmentVariables(BaseModel):
     AGENT_DESCRIPTION: str | None = None
     AGENT_ID: str | None = None
     AGENT_API_KEY: str | None = None
-    ACP_TYPE: str | None = "agentic"
+    ACP_TYPE: str | None = "async"
+    AGENT_INPUT_TYPE: str | None = None
     # ACP Configuration
     ACP_URL: str
     ACP_PORT: int = 8000
     # Workflow Configuration
     WORKFLOW_TASK_QUEUE: str | None = None
     WORKFLOW_NAME: str | None = None
+    # Temporal Worker Configuration
+    HEALTH_CHECK_PORT: int = 80
+    # Auth Configuration
     AUTH_PRINCIPAL_B64: str | None = None
     # Build Information
     BUILD_INFO_PATH: str | None = None
@@ -79,13 +87,13 @@ class EnvironmentVariables(BaseModel):
             # Load global .env file first
             global_env_path = PROJECT_ROOT / ".env"
             if global_env_path.exists():
-                print(f"Loading global environment variables FROM: {global_env_path}")
+                logger.debug(f"Loading global environment variables FROM: {global_env_path}")
                 load_dotenv(dotenv_path=global_env_path, override=False)
 
             # Load local project .env.local file (takes precedence)
             local_env_path = Path.cwd().parent / ".env.local"
             if local_env_path.exists():
-                print(f"Loading local environment variables FROM: {local_env_path}")
+                logger.debug(f"Loading local environment variables FROM: {local_env_path}")
                 load_dotenv(dotenv_path=local_env_path, override=True)
 
         # Create kwargs dict with environment variables, using None for missing values

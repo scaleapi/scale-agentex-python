@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 
 import jsonref
@@ -10,10 +12,10 @@ def resolve_refs(schema: dict) -> dict:
     """
     resolved = jsonref.replace_refs(schema, proxies=False, lazy_load=False)
     serializable = {
-        "type": resolved.get("type"),
-        "properties": resolved.get("properties"),
-        "required": list(resolved.get("required", [])),
-        "additionalProperties": resolved.get("additionalProperties", False),
+        "type": resolved.get("type"),  # type: ignore[union-attr]
+        "properties": resolved.get("properties"),  # type: ignore[union-attr]
+        "required": list(resolved.get("required", [])),  # type: ignore[union-attr]
+        "additionalProperties": resolved.get("additionalProperties", False),  # type: ignore[union-attr]
     }
     return serializable
 

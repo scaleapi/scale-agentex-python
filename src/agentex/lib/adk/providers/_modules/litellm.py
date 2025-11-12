@@ -1,26 +1,27 @@
-from collections.abc import AsyncGenerator
-from datetime import timedelta
+from __future__ import annotations
 
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from datetime import timedelta
+from collections.abc import AsyncGenerator
+
 from temporalio.common import RetryPolicy
 
-from agentex import AsyncAgentex
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.types.task_message import TaskMessage
+from agentex.lib.types.llm_messages import LLMConfig, Completion
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.services.adk.streaming import StreamingService
 from agentex.lib.core.adapters.llm.adapter_litellm import LiteLLMGateway
 from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
 from agentex.lib.core.services.adk.providers.litellm import LiteLLMService
-from agentex.lib.core.services.adk.streaming import StreamingService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
 from agentex.lib.core.temporal.activities.adk.providers.litellm_activities import (
-    ChatCompletionAutoSendParams,
-    ChatCompletionParams,
-    ChatCompletionStreamAutoSendParams,
     LiteLLMActivityName,
+    ChatCompletionParams,
+    ChatCompletionAutoSendParams,
+    ChatCompletionStreamAutoSendParams,
 )
-from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.lib.types.llm_messages import Completion, LLMConfig
-from agentex.types.task_message import TaskMessage
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
 
 logger = make_logger(__name__)
 
@@ -31,7 +32,7 @@ DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
 class LiteLLMModule:
     """
     Module for managing LiteLLM agent operations in Agentex.
-    Provides high-level methods for chat completion, streaming, agentic streaming.
+    Provides high-level methods for chat completion, streaming.
     """
 
     def __init__(

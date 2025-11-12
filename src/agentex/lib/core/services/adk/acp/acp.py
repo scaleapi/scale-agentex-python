@@ -1,18 +1,20 @@
+from __future__ import annotations
+
 from typing import Any, List, cast
 
 from agentex import AsyncAgentex
-from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.task import Task
+from agentex.types.event import Event
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
-from agentex.types.event import Event
-from agentex.types.task import Task
 from agentex.types.task_message import TaskMessage
+from agentex.types.agent_rpc_params import (
+    ParamsSendEventRequest as RpcParamsSendEventRequest,
+    ParamsCancelTaskRequest as RpcParamsCancelTaskRequest,
+)
+from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.types.task_message_content_param import TaskMessageContentParam
-from agentex.types.agent_rpc_params import (
-    ParamsCancelTaskRequest as RpcParamsCancelTaskRequest,
-    ParamsSendEventRequest as RpcParamsSendEventRequest,
-)
 
 logger = make_logger(__name__)
 

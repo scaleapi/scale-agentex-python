@@ -1,18 +1,20 @@
+from __future__ import annotations
+
 from copy import deepcopy
-from functools import reduce, singledispatch
 from typing import Any
+from functools import reduce, singledispatch
 
 from agentex.lib.types.llm_messages import (
-    Choice,
-    Completion,
     Delta,
+    Choice,
     ToolCall,
+    Completion,
     ToolCallRequest,
 )
 
 
 @singledispatch
-def _concat_chunks(a: None, b: Any):
+def _concat_chunks(_a: None, b: Any):
     return b
 
 
@@ -116,7 +118,7 @@ def concat_completion_chunks(chunks: list[Completion]) -> Completion:
     single `CompletionChunk`. Finally we convert the type to the appropriate non-streaming type `Completion` and return it.
     """
     if not chunks:
-        return None
+        raise ValueError("Cannot concatenate empty chunks list")
 
     chunks_copy = chunks.copy()
     chunks_copy[0] = deepcopy(chunks_copy[0])  # _concat_chunks mutates first argument

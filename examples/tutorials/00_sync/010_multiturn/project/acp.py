@@ -1,14 +1,17 @@
 import os
-from typing import AsyncGenerator, Union
+from typing import Union, AsyncGenerator
+
+from agents import Agent, Runner, RunConfig
 
 from agentex.lib import adk
-from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.types import TextContent
 from agentex.lib.types.acp import SendMessageParams
-from agentex.lib.types.llm_messages import AssistantMessage, LLMConfig, SystemMessage, UserMessage
-from agentex.types.task_message_update import TaskMessageUpdate
-from agentex.types.task_message import TaskMessageContent
-from agentex.types.task_message_content import TextContent
+from agentex.lib.types.converters import convert_task_messages_to_oai_agents_inputs
 from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.types.task_message_update import TaskMessageUpdate
+from agentex.types.task_message_content import TaskMessageContent
+from agentex.lib.adk.providers._modules.sync_provider import SyncStreamingProvider
 
 # Create an ACP server
 acp = FastACP.create(
@@ -24,7 +27,7 @@ class StateModel(BaseModel):
 # Note: The return of this handler is required to be persisted by the Agentex Server
 @acp.on_message_send
 async def handle_message_send(
-    params: SendMessageParams
+    params: SendMessageParams,
 ) -> Union[TaskMessageContent, AsyncGenerator[TaskMessageUpdate, None]]:
     """
     In this tutorial, we'll see how to handle a basic multi-turn conversation without streaming.
@@ -33,12 +36,12 @@ async def handle_message_send(
     # 0. Validate the message.
     #########################################################
 
-    if params.content.type != "text":
-        raise ValueError(f"Expected text message, got {params.content.type}")
+    if not hasattr(params.content, "type") or params.content.type != "text":
+        raise ValueError(f"Expected text message, got {getattr(params.content, 'type', 'unknown')}")
 
-    if params.content.author != "user":
-        raise ValueError(f"Expected user message, got {params.content.author}")
-    
+    if not hasattr(params.content, "author") or params.content.author != "user":
+        raise ValueError(f"Expected user message, got {getattr(params.content, 'author', 'unknown')}")
+
     if not os.environ.get("OPENAI_API_KEY"):
         return TextContent(
             author="agent",
@@ -66,20 +69,28 @@ async def handle_message_send(
     task_messages = await adk.messages.list(task_id=params.task.id)
 
     #########################################################
-    # 3. Convert task messages to LLM messages.
+    # 3. Run the agent with OpenAI Agents SDK
     #########################################################
 
-    # This might seem duplicative, but the split between TaskMessage and LLMMessage is intentional and important.
+    # Initialize the provider and run config to allow for tracing
+    provider = SyncStreamingProvider(
+        trace_id=params.task.id,
+    )
 
-    llm_messages = [
-        SystemMessage(content=state.system_prompt),
-        *[
-            UserMessage(content=message.content.content) if message.content.author == "user" else AssistantMessage(content=message.content.content)
-            for message in task_messages
-            if message.content.type == "text"
-        ]
-    ]
-    
+    run_config = RunConfig(
+        model_provider=provider,
+    )
+
+    # Initialize the agent
+    test_agent = Agent(name="assistant", instructions=state.system_prompt, model=state.model)
+
+    # Convert task messages to OpenAI Agents SDK format
+    input_list = convert_task_messages_to_oai_agents_inputs(task_messages)
+
+    # Run the agent
+    result = await Runner.run(test_agent, input_list, run_config=run_config)
+
+
     # TaskMessages are messages that are sent between an Agent and a Client. They are fundamentally decoupled from messages sent to the LLM. This is because you may want to send additional metadata to allow the client to render the message on the UI differently.
 
     # LLMMessages are OpenAI-compatible messages that are sent to the LLM, and are used to track the state of a conversation with a model.
@@ -90,30 +101,9 @@ async def handle_message_send(
     #   - Taking a markdown document output by an LLM, postprocessing it into a JSON object to clearly denote title, content, and footers. This can be sent as a DataContent TaskMessage to the client and converted back to markdown here to send back to the LLM.
     #   - If using multiple LLMs (like in an actor-critic framework), you may want to send DataContent that denotes which LLM generated which part of the output and write conversion logic to split the TaskMessagehistory into multiple LLM conversations.
     #   - If using multiple LLMs, but one LLM's output should not be sent to the user (i.e. a critic model), you can leverage the State as an internal storage mechanism to store the critic model's conversation history. This i s a powerful and flexible way to handle complex scenarios.
-    
-    #########################################################
-    # 4. Call an LLM to respond to the user's message.
-    #########################################################
-
-    # Call an LLM to respond to the user's message
-    chat_completion = await adk.providers.litellm.chat_completion(
-        llm_config=LLMConfig(model=state.model, messages=llm_messages),
-        trace_id=params.task.id,
-    )
 
     #########################################################
-    # 5. Return the agent response to the client.
+    # 4. Return the agent response to the client.
     #########################################################
 
-    # The Agentex server automatically commits input and output messages to the database so you don't need to do this yourself, simply process the input content and return the output content.
-
-    # Return the agent response to the client
-    if chat_completion.choices[0].message:
-        content_str = chat_completion.choices[0].message.content or ""
-    else:
-        content_str = ""
-
-    return TextContent(
-        author="agent",
-        content=content_str
-    )
+    return TextContent(author="agent", content=result.final_output)

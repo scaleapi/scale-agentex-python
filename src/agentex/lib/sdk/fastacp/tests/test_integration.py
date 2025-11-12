@@ -1,18 +1,19 @@
+# ruff: noqa: ARG001
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
-from agentex.lib.sdk.fastacp.impl.agentic_base_acp import AgenticBaseACP
-from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
-from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
 from agentex.lib.types.acp import (
-    CancelTaskParams,
-    CreateTaskParams,
     RPCMethod,
     SendEventParams,
+    CancelTaskParams,
+    CreateTaskParams,
 )
+from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
+from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
+from agentex.lib.sdk.fastacp.impl.async_base_acp import AsyncBaseACP
 
 
 class TestImplementationBehavior:
@@ -28,15 +29,15 @@ class TestImplementationBehavior:
             assert RPCMethod.MESSAGE_SEND in sync_acp._handlers
 
     @pytest.mark.asyncio()
-    async def test_agentic_acp_default_handlers(self):
-        """Test AgenticBaseACP has expected default handlers"""
+    async def test_async_acp_default_handlers(self):
+        """Test AsyncBaseACP has expected default handlers"""
         with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):
-            agentic_acp = AgenticBaseACP.create()
+            async_acp = AsyncBaseACP.create()
 
             # Should have create, message, and cancel handlers by default
-            assert RPCMethod.TASK_CREATE in agentic_acp._handlers
-            assert RPCMethod.EVENT_SEND in agentic_acp._handlers
-            assert RPCMethod.TASK_CANCEL in agentic_acp._handlers
+            assert RPCMethod.TASK_CREATE in async_acp._handlers
+            assert RPCMethod.EVENT_SEND in async_acp._handlers
+            assert RPCMethod.TASK_CANCEL in async_acp._handlers
 
     @pytest.mark.asyncio()
     async def test_temporal_acp_creation_with_mocked_client(self):
@@ -48,7 +49,7 @@ class TestImplementationBehavior:
                 mock_temporal_instance.temporal_client = MagicMock()
                 mock_create.return_value = mock_temporal_instance
 
-                temporal_acp = await TemporalACP.create()
+                temporal_acp = TemporalACP.create(temporal_address="localhost:7233")
 
                 assert temporal_acp == mock_temporal_instance
                 assert hasattr(temporal_acp, "temporal_client")
@@ -67,8 +68,8 @@ class TestRealWorldScenarios:
             messages_received.append(
                 {
                     "task_id": params.task.id,
-                    "message_content": params.message.content,
-                    "author": params.message.author,
+                    "message_content": params.message.content,  # type: ignore[attr-defined]
+                    "author": params.message.author,  # type: ignore[attr-defined]
                 }
             )
             return {"processed": True}
@@ -113,23 +114,23 @@ class TestRealWorldScenarios:
         await runner.stop()
 
     @pytest.mark.asyncio()
-    async def test_task_lifecycle_management(self, agentic_base_acp, free_port, test_server_runner):
+    async def test_task_lifecycle_management(self, async_base_acp, free_port, test_server_runner):
         """Test complete task lifecycle: create -> message -> cancel"""
         task_events = []
 
-        @agentic_base_acp.on_task_create
+        @async_base_acp.on_task_create
         async def create_handler(params: CreateTaskParams):
             task_events.append(("created", params.task.id))
 
-        @agentic_base_acp.on_task_event_send
+        @async_base_acp.on_task_event_send
         async def message_handler(params: SendEventParams):
             task_events.append(("message", params.task.id))
 
-        @agentic_base_acp.on_task_cancel
+        @async_base_acp.on_task_cancel
         async def cancel_handler(params: CancelTaskParams):
-            task_events.append(("cancelled", params.task_id))
+            task_events.append(("cancelled", params.task_id))  # type: ignore[attr-defined]
 
-        runner = test_server_runner(agentic_base_acp, free_port)
+        runner = test_server_runner(async_base_acp, free_port)
         await runner.start()
 
         async with httpx.AsyncClient() as client:
@@ -209,7 +210,7 @@ class TestErrorRecovery:
         @sync_acp.on_task_event_send
         async def unreliable_handler(params: SendEventParams):
             nonlocal failure_count, success_count
-            if "fail" in params.message.content:
+            if "fail" in params.message.content:  # type: ignore[attr-defined]
                 failure_count += 1
                 raise RuntimeError("Simulated handler failure")
             else:
@@ -326,7 +327,7 @@ class TestSpecialCases:
         @sync_acp.on_task_event_send
         async def tracking_handler(params: SendEventParams):
             nonlocal notifications_received, requests_received
-            if "notification" in params.message.content:
+            if "notification" in params.message.content:  # type: ignore[attr-defined]
                 notifications_received += 1
             else:
                 requests_received += 1
@@ -397,7 +398,7 @@ class TestSpecialCases:
         @sync_acp.on_task_event_send
         async def unicode_handler(params: SendEventParams):
             nonlocal received_message
-            received_message = params.message.content
+            received_message = params.message.content  # type: ignore[attr-defined]
             return {"unicode_handled": True}
 
         runner = test_server_runner(sync_acp, free_port)
@@ -440,10 +441,10 @@ class TestImplementationIsolation:
         """Test handlers registered on one implementation don't affect others"""
         with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):
             sync_acp = SyncACP.create()
-            agentic_acp = AgenticBaseACP.create()
+            async_acp = AsyncBaseACP.create()
 
             sync_handled = False
-            agentic_handled = False
+            async_handled = False
 
             @sync_acp.on_task_event_send
             async def sync_handler(params: SendEventParams):
@@ -451,27 +452,27 @@ class TestImplementationIsolation:
                 sync_handled = True
                 return {"sync": True}
 
-            @agentic_acp.on_task_event_send
-            async def agentic_handler(params: SendEventParams):
-                nonlocal agentic_handled
-                agentic_handled = True
-                return {"agentic": True}
+            @async_acp.on_task_event_send
+            async def async_handler(params: SendEventParams):
+                nonlocal async_handled
+                async_handled = True
+                return {"async": True}
 
             # Create test parameters
-            message_params = SendEventParams(
+            message_params = SendEventParams(  # type: ignore[call-arg]
                 task={"id": "isolation-test-task", "agent_id": "test-agent", "status": "RUNNING"},
-                message={"type": "text", "author": "user", "content": "Isolation test"},
+                event={"type": "text", "author": "user", "content": "Isolation test"},  # type: ignore[misc]
             )
 
             # Execute sync handler
             sync_result = await sync_acp._handlers[RPCMethod.EVENT_SEND](message_params)
             assert sync_handled is True
-            assert agentic_handled is False
+            assert async_handled is False
             assert sync_result == {"sync": True}
 
-            # Reset and execute agentic handler
+            # Reset and execute async handler
             sync_handled = False
-            agentic_result = await agentic_acp._handlers[RPCMethod.EVENT_SEND](message_params)
+            async_result = await async_acp._handlers[RPCMethod.EVENT_SEND](message_params)
             assert sync_handled is False
-            assert agentic_handled is True
-            assert agentic_result == {"agentic": True}
+            assert async_handled is True
+            assert async_result == {"async": True}

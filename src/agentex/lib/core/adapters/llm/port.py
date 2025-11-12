@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import Generator, AsyncGenerator
 
 from agentex.lib.types.llm_messages import Completion
 

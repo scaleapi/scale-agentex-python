@@ -41,15 +41,15 @@ declare -a TUTORIALS=(
     "tutorials/00_sync/000_hello_acp|Basic Hello ACP (Sync)"
     "tutorials/00_sync/010_multiturn|Multi-turn Chat (Sync)"
     "tutorials/00_sync/020_streaming|Streaming Response (Sync)"
-    "tutorials/10_agentic/00_base/000_hello_acp|Basic Hello ACP (Agentic)"
-    "tutorials/10_agentic/00_base/010_multiturn|Multi-turn Chat (Agentic)"
-    "tutorials/10_agentic/00_base/020_streaming|Streaming Response (Agentic)"
-    "tutorials/10_agentic/00_base/030_tracing|Tracing Example (Agentic)"
-    "tutorials/10_agentic/00_base/040_other_sdks|Other SDKs Integration (Agentic)"
-    "tutorials/10_agentic/00_base/080_batch_events|Batch Events (Agentic)"
-    "tutorials/10_agentic/10_temporal/000_hello_acp|Basic Hello ACP (Temporal)"
-    "tutorials/10_agentic/10_temporal/010_agent_chat|Agent Chat (Temporal)"
-    "tutorials/10_agentic/10_temporal/020_state_machine|State Machine (Temporal)"
+    "tutorials/10_async/00_base/000_hello_acp|Basic Hello ACP (Async)"
+    "tutorials/10_async/00_base/010_multiturn|Multi-turn Chat (Async)"
+    "tutorials/10_async/00_base/020_streaming|Streaming Response (Async)"
+    "tutorials/10_async/00_base/030_tracing|Tracing Example (Async)"
+    "tutorials/10_async/00_base/040_other_sdks|Other SDKs Integration (Async)"
+    "tutorials/10_async/00_base/080_batch_events|Batch Events (Async)"
+    "tutorials/10_async/10_temporal/000_hello_acp|Basic Hello ACP (Temporal)"
+    "tutorials/10_async/10_temporal/010_agent_chat|Agent Chat (Temporal)"
+    "tutorials/10_async/10_temporal/020_state_machine|State Machine (Temporal)"
 )
 
 # Function to print colored output
@@ -90,7 +90,7 @@ show_menu() {
     print_colored $GREEN "  c. Clean up any orphaned tutorial processes"
     print_colored $GREEN "  q. Quit"
     echo ""
-    print_colored $YELLOW "📌 Note: The multi-agent system tutorial (tutorials/10_agentic/90_multi_agent_non_temporal) is excluded"
+    print_colored $YELLOW "📌 Note: The multi-agent system tutorial (tutorials/10_async/90_multi_agent_non_temporal) is excluded"
     print_colored $YELLOW "   as it has a special launch process. Use its own start-agents.sh script."
     echo ""
 }
@@ -118,9 +118,14 @@ run_tutorial() {
     print_colored $GREEN "🚀 Executing: cd .. && uv run agentex agents run --manifest examples/$manifest_path"
     print_colored $YELLOW "💡 Press Ctrl+C to stop the tutorial"
     echo ""
-    
+
     # Run the tutorial directly (need to go to parent dir where uv project is)
-    (cd .. && uv run agentex agents run --manifest "examples/$manifest_path")
+    # Load .env file if it exists and pass variables to the subshell
+    if [[ -f "../.env" ]]; then
+        (cd .. && set -a && source .env && set +a && uv run agentex agents run --manifest "examples/$manifest_path")
+    else
+        (cd .. && uv run agentex agents run --manifest "examples/$manifest_path")
+    fi
     
     local exit_code=$?
     if [[ $exit_code -eq 0 ]]; then

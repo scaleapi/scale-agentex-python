@@ -1,5 +1,7 @@
-from datetime import timedelta
+from __future__ import annotations
+
 from enum import Enum
+from datetime import timedelta
 
 from pydantic import Field
 

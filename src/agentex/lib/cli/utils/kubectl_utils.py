@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 import subprocess
 
 from kubernetes import client, config
-from kubernetes.client.rest import ApiException
 from rich.console import Console
+from kubernetes.client.rest import ApiException
 
-from agentex.lib.cli.utils.exceptions import DeploymentError
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.exceptions import DeploymentError
 
 logger = make_logger(__name__)
 console = Console()
@@ -59,7 +61,7 @@ def list_available_contexts() -> list[str]:
     """List all available kubectl contexts"""
     try:
         contexts, _ = config.list_kube_config_contexts()
-        return [ctx["name"] for ctx in contexts]
+        return [ctx["name"] for ctx in contexts]  # type: ignore[index]
     except Exception as e:
         raise DeploymentError(f"Failed to list kubectl contexts: {e}") from e
 

@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 from typing import Any, Literal
 
 from pydantic import Field
 
-from agentex.lib.types.agent_configs import TemporalConfig, TemporalWorkflowConfig
-from agentex.lib.types.credentials import CredentialMapping
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.types.credentials import CredentialMapping
 from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.types.agent_configs import TemporalConfig, TemporalWorkflowConfig
 
 logger = make_logger(__name__)
 
@@ -16,7 +18,11 @@ class AgentConfig(BaseModel):
         description="The name of the agent.",
         pattern=r"^[a-z0-9-]+$",
     )
-    acp_type: Literal["sync", "agentic"] = Field(..., description="The type of agent.")
+    acp_type: Literal["sync", "async", "agentic"] = Field(..., description="The type of agent.")
+    agent_input_type: Literal["text", "json"] | None = Field(
+        default=None,
+        description="The type of input the agent accepts."
+    )
     description: str = Field(..., description="The description of the agent.")
     env: dict[str, str] | None = Field(
         default=None, description="Environment variables to set directly in the agent deployment"

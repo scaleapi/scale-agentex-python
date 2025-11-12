@@ -1,26 +1,23 @@
-import asyncio
+from __future__ import annotations
+
 import os
 import sys
+import asyncio
 from pathlib import Path
 
-from rich.console import Console
 from rich.panel import Panel
-
-from agentex.lib.cli.handlers.cleanup_handlers import (
-    cleanup_agent_workflows,
-    should_cleanup_on_restart
-)
-from agentex.lib.cli.utils.path_utils import (
-    get_file_paths,
-    calculate_uvicorn_target_for_local,
-)
-
-from agentex.lib.environment_variables import EnvVarKeys
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
+from rich.console import Console
 
 # Import debug functionality
 from agentex.lib.cli.debug import DebugConfig, start_acp_server_debug, start_temporal_worker_debug
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.path_utils import (
+    get_file_paths,
+    calculate_uvicorn_target_for_local,
+)
+from agentex.lib.environment_variables import EnvVarKeys
+from agentex.lib.sdk.config.agent_manifest import AgentManifest
+from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows, should_cleanup_on_restart
 
 logger = make_logger(__name__)
 console = Console()
@@ -242,6 +239,8 @@ async def start_temporal_worker(
 async def stream_process_output(process: asyncio.subprocess.Process, prefix: str):
     """Stream process output with prefix"""
     try:
+        if process.stdout is None:
+            return
         while True:
             line = await process.stdout.readline()
             if not line:
@@ -297,11 +296,11 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
         manifest_dir = Path(manifest_path).parent
         if debug_config and debug_config.should_debug_acp():
             acp_process = await start_acp_server_debug(
-                file_paths["acp"], manifest.local_development.agent.port, agent_env, debug_config
+                file_paths["acp"], manifest.local_development.agent.port, agent_env, debug_config  # type: ignore[union-attr]
             )
         else:
             acp_process = await start_acp_server(
-                file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir
+                file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir  # type: ignore[union-attr]
             )
         process_manager.add_process(acp_process)
 
@@ -325,7 +324,7 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
             tasks.append(worker_task)
 
         console.print(
-            f"\n[green]✓ Agent running at: http://localhost:{manifest.local_development.agent.port}[/green]"
+            f"\n[green]✓ Agent running at: http://localhost:{manifest.local_development.agent.port}[/green]"  # type: ignore[union-attr]
         )
         console.print("[dim]Press Ctrl+C to stop[/dim]\n")
 
@@ -369,9 +368,12 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
         "REDIS_URL": "redis://localhost:6379",
         "AGENT_NAME": manifest.agent.name,
         "ACP_TYPE": manifest.agent.acp_type,
-        "ACP_URL": f"http://{manifest.local_development.agent.host_address}",
-        "ACP_PORT": str(manifest.local_development.agent.port),
+        "ACP_URL": f"http://{manifest.local_development.agent.host_address}",  # type: ignore[union-attr]
+        "ACP_PORT": str(manifest.local_development.agent.port),  # type: ignore[union-attr]
     }
+
+    if manifest.agent.agent_input_type:
+        env_vars["AGENT_INPUT_TYPE"] = manifest.agent.agent_input_type
 
     # Add authorization principal if set - for local development, auth is optional
     from agentex.lib.cli.utils.auth_utils import _encode_principal_context
@@ -391,6 +393,10 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
         if temporal_config:
             env_vars["WORKFLOW_NAME"] = temporal_config.name
             env_vars["WORKFLOW_TASK_QUEUE"] = temporal_config.queue_name
+
+        # Set health check port from temporal config
+        if manifest.agent.temporal and manifest.agent.temporal.health_check_port is not None:
+            env_vars["HEALTH_CHECK_PORT"] = str(manifest.agent.temporal.health_check_port)
 
     if agent_config.env:
         for key, value in agent_config.env.items():

@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field, BaseModel
 
+from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
 from agentex.types.task_message_content import TaskMessageContent
-from agentex.types.task import Task
 
 
 class RPCMethod(str, Enum):

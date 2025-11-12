@@ -1,28 +1,21 @@
-import base64
+from __future__ import annotations
+
 import json
-from collections import defaultdict
-from pathlib import Path
+import base64
 from typing import Any
+from pathlib import Path
+from collections import defaultdict
 
-import questionary
-import typer
 import yaml
-from kubernetes.client.rest import ApiException
+import typer
+import questionary
 from rich.console import Console
+from kubernetes.client.rest import ApiException
 
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.types.credentials import CredentialMapping
 from agentex.lib.cli.utils.cli_utils import handle_questionary_cancellation
 from agentex.lib.cli.utils.kubectl_utils import get_k8s_client
-from agentex.lib.cli.utils.kubernetes_secrets_utils import (
-    KUBERNETES_SECRET_TO_MANIFEST_KEY,
-    KUBERNETES_SECRET_TYPE_DOCKERCONFIGJSON,
-    KUBERNETES_SECRET_TYPE_OPAQUE,
-    VALID_SECRET_TYPES,
-    create_image_pull_secret_with_data,
-    create_secret_with_data,
-    get_secret_data,
-    update_image_pull_secret_with_data,
-    update_secret_with_data,
-)
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.sdk.config.deployment_config import (
@@ -30,8 +23,17 @@ from agentex.lib.sdk.config.deployment_config import (
     ImagePullSecretConfig,
     InjectedSecretsValues,
 )
-from agentex.lib.types.credentials import CredentialMapping
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.cli.utils.kubernetes_secrets_utils import (
+    VALID_SECRET_TYPES,
+    KUBERNETES_SECRET_TYPE_OPAQUE,
+    KUBERNETES_SECRET_TO_MANIFEST_KEY,
+    KUBERNETES_SECRET_TYPE_DOCKERCONFIGJSON,
+    get_secret_data,
+    create_secret_with_data,
+    update_secret_with_data,
+    create_image_pull_secret_with_data,
+    update_image_pull_secret_with_data,
+)
 
 logger = make_logger(__name__)
 console = Console()
@@ -131,16 +133,16 @@ def interactive_secret_input(secret_name: str, secret_key: str) -> str:
         return handle_questionary_cancellation(result, "text input")
 
 
-def get_secret(name: str, namespace: str, context: str | None = None) -> dict:
+def get_secret(name: str, namespace: str, context: str | None = None) -> dict[str, Any]:
     """Get details about a secret"""
     v1 = get_k8s_client(context)
 
     try:
         secret = v1.read_namespaced_secret(name=name, namespace=namespace)
         return {
-            "name": secret.metadata.name,
+            "name": secret.metadata.name,  # type: ignore[union-attr]
             "namespace": namespace,
-            "created": secret.metadata.creation_timestamp.isoformat(),
+            "created": secret.metadata.creation_timestamp.isoformat(),  # type: ignore[union-attr]
             "exists": True,
         }
     except ApiException as e:
@@ -173,7 +175,7 @@ def delete_secret(name: str, namespace: str, context: str | None = None) -> None
 
 def get_kubernetes_secrets_by_type(
     namespace: str, context: str | None = None
-) -> dict[str, list[dict]]:
+) -> dict[str, list[dict[str, Any]]]:
     """List metadata about secrets in the namespace"""
     v1 = get_k8s_client(context)
 
@@ -218,7 +220,7 @@ def sync_user_defined_secrets(
     cluster_secret_names = {secret["name"] for secret in found_secrets}
     # Get the secrets from the manifest
     agent_config: AgentConfig = manifest_obj.agent
-    manifest_credentials: list[CredentialMapping] = agent_config.credentials or []
+    manifest_credentials: list[CredentialMapping] = agent_config.credentials or []  # type: ignore[assignment]
 
     if not manifest_credentials:
         console.print("[yellow]No credentials found in manifest[/yellow]")
@@ -465,7 +467,7 @@ def sync_image_pull_secrets(
     }
 
     # Get the secrets from the manifest
-    deployment_config: DeploymentConfig = manifest_obj.deployment
+    deployment_config: DeploymentConfig = manifest_obj.deployment  # type: ignore[assignment]
     manifest_image_pull_secrets: list[ImagePullSecretConfig] = (
         deployment_config.imagePullSecrets or []
     )

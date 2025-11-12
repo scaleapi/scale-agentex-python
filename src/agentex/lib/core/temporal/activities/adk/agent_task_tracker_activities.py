@@ -1,11 +1,13 @@
+from __future__ import annotations
+
 from enum import Enum
 
 from temporalio import activity
 
-from agentex.lib.core.services.adk.agent_task_tracker import AgentTaskTrackerService
 from agentex.lib.types.tracing import BaseModelWithTraceParams
 from agentex.lib.utils.logging import make_logger
 from agentex.types.agent_task_tracker import AgentTaskTracker
+from agentex.lib.core.services.adk.agent_task_tracker import AgentTaskTrackerService
 
 logger = make_logger(__name__)
 

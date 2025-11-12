@@ -16,7 +16,7 @@ from .batch import (
     AsyncBatchResourceWithStreamingResponse,
 )
 from ...types import message_list_params, message_create_params, message_update_params
-from ..._types import NOT_GIVEN, Body, Query, Headers, NotGiven
+from ..._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
 from ..._utils import maybe_transform, async_maybe_transform
 from ..._compat import cached_property
 from ..._resource import SyncAPIResource, AsyncAPIResource
@@ -45,7 +45,7 @@ class MessagesResource(SyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return MessagesResourceWithRawResponse(self)
 
@@ -54,7 +54,7 @@ class MessagesResource(SyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return MessagesResourceWithStreamingResponse(self)
 
@@ -63,13 +63,13 @@ class MessagesResource(SyncAPIResource):
         *,
         content: TaskMessageContentParam,
         task_id: str,
-        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | NotGiven = NOT_GIVEN,
+        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskMessage:
         """
         Create Message
@@ -108,7 +108,7 @@ class MessagesResource(SyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskMessage:
         """
         Get Message
@@ -138,13 +138,13 @@ class MessagesResource(SyncAPIResource):
         *,
         content: TaskMessageContentParam,
         task_id: str,
-        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | NotGiven = NOT_GIVEN,
+        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskMessage:
         """
         Update Message
@@ -180,13 +180,14 @@ class MessagesResource(SyncAPIResource):
         self,
         *,
         task_id: str,
-        limit: Optional[int] | NotGiven = NOT_GIVEN,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> MessageListResponse:
         """
         List Messages
@@ -213,6 +214,7 @@ class MessagesResource(SyncAPIResource):
                     {
                         "task_id": task_id,
                         "limit": limit,
+                        "page_number": page_number,
                     },
                     message_list_params.MessageListParams,
                 ),
@@ -232,7 +234,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         This property can be used as a prefix for any HTTP method call to return
         the raw response object instead of the parsed content.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#accessing-raw-response-data-eg-headers
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#accessing-raw-response-data-eg-headers
         """
         return AsyncMessagesResourceWithRawResponse(self)
 
@@ -241,7 +243,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         """
         An alternative to `.with_raw_response` that doesn't eagerly read the response body.
 
-        For more information, see https://www.github.com/scaleapi/agentex-python#with_streaming_response
+        For more information, see https://www.github.com/scaleapi/scale-agentex-python#with_streaming_response
         """
         return AsyncMessagesResourceWithStreamingResponse(self)
 
@@ -250,13 +252,13 @@ class AsyncMessagesResource(AsyncAPIResource):
         *,
         content: TaskMessageContentParam,
         task_id: str,
-        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | NotGiven = NOT_GIVEN,
+        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskMessage:
         """
         Create Message
@@ -295,7 +297,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskMessage:
         """
         Get Message
@@ -325,13 +327,13 @@ class AsyncMessagesResource(AsyncAPIResource):
         *,
         content: TaskMessageContentParam,
         task_id: str,
-        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | NotGiven = NOT_GIVEN,
+        streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskMessage:
         """
         Update Message
@@ -367,13 +369,14 @@ class AsyncMessagesResource(AsyncAPIResource):
         self,
         *,
         task_id: str,
-        limit: Optional[int] | NotGiven = NOT_GIVEN,
+        limit: int | Omit = omit,
+        page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
         extra_query: Query | None = None,
         extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> MessageListResponse:
         """
         List Messages
@@ -400,6 +403,7 @@ class AsyncMessagesResource(AsyncAPIResource):
                     {
                         "task_id": task_id,
                         "limit": limit,
+                        "page_number": page_number,
                     },
                     message_list_params.MessageListParams,
                 ),

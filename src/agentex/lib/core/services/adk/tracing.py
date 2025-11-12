@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from typing import Any
-from agentex.lib.core.tracing.tracer import AsyncTracer
+
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.core.tracing.tracer import AsyncTracer
 
 logger = make_logger(__name__)
 

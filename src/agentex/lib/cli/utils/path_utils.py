@@ -1,8 +1,10 @@
-from pathlib import Path
-from typing import Dict
+from __future__ import annotations
 
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
+from typing import Dict
+from pathlib import Path
+
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.sdk.config.agent_manifest import AgentManifest
 
 logger = make_logger(__name__)
 

@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from enum import Enum
 from typing import Any
 
 from temporalio import activity
 
-from agentex.lib.core.services.adk.utils.templating import TemplatingService
 from agentex.lib.types.tracing import BaseModelWithTraceParams
+from agentex.lib.core.services.adk.utils.templating import TemplatingService
 
 
 class JinjaActivityName(str, Enum):

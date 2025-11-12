@@ -8,9 +8,10 @@ from typing import Any, cast
 import pytest
 
 from agentex import Agentex, AsyncAgentex
-from tests.utils import assert_matches_type
 from agentex.types import Span, SpanListResponse
 from agentex._utils import parse_datetime
+
+from ..utils import assert_matches_type
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 
@@ -184,6 +185,8 @@ class TestSpans:
     @parametrize
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         span = client.spans.list(
+            limit=0,
+            page_number=0,
             trace_id="trace_id",
         )
         assert_matches_type(SpanListResponse, span, path=["response"])
@@ -382,6 +385,8 @@ class TestAsyncSpans:
     @parametrize
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.list(
+            limit=0,
+            page_number=0,
             trace_id="trace_id",
         )
         assert_matches_type(SpanListResponse, span, path=["response"])

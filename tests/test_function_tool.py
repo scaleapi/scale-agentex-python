@@ -1,8 +1,12 @@
-import json
-import pytest
-from typing import Any
+from __future__ import annotations
 
-from src.agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+import json
+from typing import Any, override
+
+import pytest
+from pydantic import ValidationError
+
+from src.agentex.lib.core.temporal.activities.adk.providers.openai_activities import (  # type: ignore[import-untyped]
     FunctionTool,
 )
 
@@ -189,6 +193,7 @@ class TestFunctionTool:
             def __call__(self, context, args):
                 return "test"
 
+            @override
             def __getstate__(self):
                 raise Exception("Cannot serialize this object")
 
@@ -224,7 +229,7 @@ class TestFunctionTool:
         )
 
         # This should raise an error during model validation due to invalid base64
-        with pytest.raises(Exception):  # Could be ValidationError or ValueError
+        with pytest.raises((ValidationError, ValueError)):
             FunctionTool.model_validate(serialized_data)
 
     def test_full_roundtrip_with_serialization(self):

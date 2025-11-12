@@ -1,13 +1,15 @@
-import base64
+from __future__ import annotations
+
 import os
+import base64
 import tempfile
 
 from scale_gp import SGPClient
 
-from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.types.files import FileContentResponse
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
 
 logger = make_logger(__name__)
 
@@ -91,7 +93,7 @@ class SGPService:
                 )
 
             # Record metadata for tracing
-            span.output = {
+            span.output = {  # type: ignore[union-attr]
                 "file_id": file_id,
                 "mime_type": result.mime_type,
                 "content_size": len(result.base64_content),

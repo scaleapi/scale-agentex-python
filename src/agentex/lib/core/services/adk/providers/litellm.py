@@ -1,23 +1,25 @@
+from __future__ import annotations
+
 from collections.abc import AsyncGenerator
 
 from agentex import AsyncAgentex
-from agentex.lib.core.adapters.llm.adapter_litellm import LiteLLMGateway
-from agentex.lib.core.services.adk.streaming import StreamingService
-from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.lib.types.llm_messages import (
-    Completion,
-    LLMConfig,
-)
-from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
-    StreamTaskMessageFull,
-)
-from agentex.types.task_message_delta import TextDelta
-from agentex.types.task_message import TaskMessage
-from agentex.types.task_message_content import TextContent
 from agentex.lib.utils import logging
-from agentex.lib.utils.completions import concat_completion_chunks
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.types.task_message import TaskMessage
+from agentex.lib.utils.completions import concat_completion_chunks
+from agentex.lib.types.llm_messages import (
+    LLMConfig,
+    Completion,
+)
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.task_message_delta import TextDelta
+from agentex.types.task_message_update import (
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+)
+from agentex.types.task_message_content import TextContent
+from agentex.lib.core.services.adk.streaming import StreamingService
+from agentex.lib.core.adapters.llm.adapter_litellm import LiteLLMGateway
 
 logger = logging.make_logger(__name__)
 
@@ -193,7 +195,7 @@ class LiteLLMService:
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
-            name="chat_completion_stream",
+            name="chat_completion_stream_auto_send",
             input=llm_config.model_dump(),
         ) as span:
             # Use streaming context manager
@@ -241,6 +243,7 @@ class LiteLLMService:
                     final_content = TextContent(
                         author="agent",
                         content=complete_message.choices[0].message.content or "",
+                        format="markdown",
                     )
                     await streaming_context.stream_update(
                         update=StreamTaskMessageFull(

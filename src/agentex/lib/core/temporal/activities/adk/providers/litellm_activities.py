@@ -1,12 +1,14 @@
+from __future__ import annotations
+
 from enum import Enum
 
 from temporalio import activity
 
-from agentex.lib.core.services.adk.providers.litellm import LiteLLMService
-from agentex.lib.types.llm_messages import Completion, LLMConfig
-from agentex.types.task_message import TaskMessage
-from agentex.lib.types.tracing import BaseModelWithTraceParams
 from agentex.lib.utils import logging
+from agentex.lib.types.tracing import BaseModelWithTraceParams
+from agentex.types.task_message import TaskMessage
+from agentex.lib.types.llm_messages import LLMConfig, Completion
+from agentex.lib.core.services.adk.providers.litellm import LiteLLMService
 
 logger = logging.make_logger(__name__)
 

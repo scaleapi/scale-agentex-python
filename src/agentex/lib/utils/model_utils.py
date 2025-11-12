@@ -1,9 +1,10 @@
-from collections.abc import Iterable, Mapping
-from datetime import datetime
-from typing import Any, TypeVar
+from __future__ import annotations
 
-from pydantic import BaseModel as PydanticBaseModel
-from pydantic import ConfigDict
+from typing import Any, TypeVar
+from datetime import datetime
+from collections.abc import Mapping, Iterable
+
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict
 
 from agentex.lib.utils.io import load_yaml_file
 
@@ -28,7 +29,7 @@ class BaseModel(PydanticBaseModel):
     def to_json(self, *args, **kwargs) -> str:
         return self.model_dump_json(*args, **kwargs)
 
-    def to_dict(self, *args, **kwargs) -> dict[str, Any]:
+    def to_dict(self, *_args, **_kwargs) -> dict[str, Any]:
         return recursive_model_dump(self)
 
 
