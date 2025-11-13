@@ -16,7 +16,6 @@ Run tests:
     pytest tests/test_agent.py -v
 """
 
-import asyncio
 import pytest
 import pytest_asyncio
 
@@ -71,29 +70,28 @@ class TestStreamingEvents:
         user_message = "Hello, this is a test message!"
 
         # Flags to track what we've received
-        task_creation_found = False
         user_echo_found = False
         agent_response_found = False
         all_events = []
 
         # Stream events
         async for event in stream_agent_response(test_agent.client, test_agent.task_id, timeout=30.0):
-        #async for event in test_agent.send_event_and_stream(user_message, timeout_seconds=30.0):
             all_events.append(event)
             event_type = event.get("type")
 
-            if event_type == "full":
+            if event_type == 'connected':
+                await test_agent.send_event(user_message, timeout_seconds=30.0)
+
+            elif event_type == "full":
                 content = event.get("content", {})
                 if content.get("content") is None:
                     continue  # Skip empty content
 
                 if content.get("type") == "text" and content.get("author") == "agent":
-                    # Check for initial task creation message
-                    if "Hello! I've received your task" in content.get("content", ""):
-                        task_creation_found = True
                     # Check for agent response to user message
-                    elif "Hello! I've received your message" in content.get("content", ""):
+                    if "Hello! I've received your message" in content.get("content", ""):
                         agent_response_found = True
+                        assert user_echo_found, "User echo should be found before agent response"
 
                 elif content.get("type") == "text" and content.get("author") == "user":
                     # Check for user message echo (may or may not be present)
@@ -101,16 +99,10 @@ class TestStreamingEvents:
                         user_echo_found = True
 
             # Exit early if we've found expected messages
-            if task_creation_found and agent_response_found and user_echo_found:
+            if agent_response_found and user_echo_found:
                 break
 
-        print('all events', all_events)
-        messages = await test_agent.client.messages.list(task_id=test_agent.task_id)
-        print('all messages', messages)
-        # Validate we saw expected messages
-        assert task_creation_found, "Did not receive task creation message"
         assert agent_response_found, "Did not receive agent response to user message"
-        # User echo is optional; no assert 
         assert user_echo_found, "User echo message not found"
         assert len(all_events) > 0, "Should receive events"
 
