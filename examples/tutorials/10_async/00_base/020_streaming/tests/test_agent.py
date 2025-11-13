@@ -12,37 +12,43 @@ Prerequisites:
 Run: pytest tests/test_agent.py -v
 """
 import asyncio
-
 import pytest
+import pytest_asyncio
 
-from agentex import AsyncAgentex
+from agentex.lib.testing.sessions import AsyncAgentTest
+from agentex.lib.testing import stream_agent_response
+
 from agentex.lib.testing import (
-    assert_valid_agent_response,
     async_test_agent,
+    assert_valid_agent_response,
+    assert_agent_response_contains,
 )
 
 AGENT_NAME = "ab020-streaming"
 
+@pytest.fixture
+def agent_name():
+    """Return the agent name for testing."""
+    return AGENT_NAME
 
-@pytest.mark.asyncio
-async def test_send_event_and_poll():
-    """Test sending events and polling for responses."""
-    # Need client access to check state
-    client = AsyncAgentex(api_key="test", base_url="http://localhost:5003")
 
-    # Get agent ID
-    agents = await client.agents.list()
-    agent = next((a for a in agents if a.name == AGENT_NAME), None)
-    assert agent is not None, f"Agent {AGENT_NAME} not found"
+@pytest_asyncio.fixture
+async def test_agent(agent_name: str):
+    """Fixture to create a test async agent."""
+    async with async_test_agent(agent_name=agent_name) as test:
+        yield test
 
-    async with async_test_agent(agent_name=AGENT_NAME) as test:
-        # Wait for state initialization
-        await asyncio.sleep(1)
 
-        # Check initial state
-        states = await client.states.list(agent_id=agent.id, task_id=test.task_id)
+class TestNonStreamingEvents:
+    """Test non-streaming event sending and polling."""
+
+    @pytest.mark.asyncio
+    async def test_send_event_and_poll(self, test_agent: AsyncAgentTest):
+        """Test sending an event and polling for the response."""
+        await asyncio.sleep(1)  # Wait for state initialization
+        states = await test_agent.client.states.list(agent_id=test_agent.agent.id, task_id=test_agent.task_id)
         assert len(states) == 1
-
+        # Check initial state
         state = states[0].state
         assert state is not None
         messages = state.get("messages", [])
@@ -53,39 +59,33 @@ async def test_send_event_and_poll():
             "content": "You are a helpful assistant that can answer questions.",
         }
 
-        # Send first message
         user_message = "Hello! Here is my test message"
-        response = await test.send_event(user_message, timeout_seconds=30.0)
+        response = await test_agent.send_event(user_message, timeout_seconds=30.0)
         assert_valid_agent_response(response)
 
-        # Wait for state update (agent may or may not update state with messages)
+        # Wait for state update
         await asyncio.sleep(2)
 
-        # Check if state was updated
-        states = await client.states.list(agent_id=agent.id, task_id=test.task_id)
+        # Check if state was updated (optional - depends on agent implementation)
+        states = await test_agent.client.states.list(agent_id=test_agent.agent.id, task_id=test_agent.task_id)
+        assert len(states) == 1
         state = states[0].state
         messages = state.get("messages", [])
         assert isinstance(messages, list)
-        assert len(messages) == 3
+        assert len(messages) == 3    
 
 
-@pytest.mark.asyncio
-async def test_streaming_events():
-    """Test streaming event responses."""
-    # Need client access to check state
-    client = AsyncAgentex(api_key="test", base_url="http://localhost:5003")
+class TestStreamingEvents:
+    """Test streaming event sending."""
 
-    # Get agent ID
-    agents = await client.agents.list()
-    agent = next((a for a in agents if a.name == AGENT_NAME), None)
-    assert agent is not None, f"Agent {AGENT_NAME} not found"
-
-    async with async_test_agent(agent_name=AGENT_NAME) as test:
+    @pytest.mark.asyncio
+    async def test_streaming_events(self, test_agent: AsyncAgentTest):
+        """Test streaming events from async agent."""
         # Wait for state initialization
         await asyncio.sleep(1)
 
         # Check initial state
-        states = await client.states.list(agent_id=agent.id, task_id=test.task_id)
+        states = await test_agent.client.states.list(agent_id=test_agent.agent.id, task_id=test_agent.task_id)
         assert len(states) == 1
 
         state = states[0].state
@@ -102,32 +102,52 @@ async def test_streaming_events():
         user_message = "Hello! Stream this response"
 
         events_received = []
+        user_echo_found = False
         agent_response_found = False
         delta_messages_found = False
 
         # Stream events
-        async for event in test.send_event_and_stream(user_message, timeout_seconds=30.0):
+        async for event in stream_agent_response(test_agent.client, test_agent.task_id, timeout=30.0):
             events_received.append(event)
             event_type = event.get("type")
 
-            if event_type == "done":
+            if event_type == 'connected':
+                await test_agent.send_event(user_message, timeout_seconds=30.0)
+
+            elif event_type == "done":
                 break
+
             elif event_type == "full":
                 content = event.get("content", {})
-                if content.get("author") == "agent":
+                if content.get("content") is None:
+                    continue  # Skip empty content
+
+                if content.get("type") == "text" and content.get("author") == "agent":
+                    # Check for agent response to user message
                     agent_response_found = True
+                    assert user_echo_found, "User echo should be found before agent response"
+
+                elif content.get("type") == "text" and content.get("author") == "user":
+                    # Check for user message echo
+                    if content.get("content") == user_message:
+                        user_echo_found = True
+
             elif event_type == "delta":
                 delta_messages_found = True
+
+            if agent_response_found and user_echo_found:
+                break
 
         # Validate we received events
         assert len(events_received) > 0, "Should receive streaming events"
         assert agent_response_found, "Should receive agent response event"
-        assert delta_messages_found, "Should receive delta agent message events"
+        assert user_echo_found, "Should receive user message event"
+        assert delta_messages_found, "Should receive delta streaming events"
 
         # Verify state has been updated
         await asyncio.sleep(1) # Wait for state update
         
-        states = await client.states.list(agent_id=agent.id, task_id=test.task_id)
+        states = await test_agent.client.states.list(agent_id=test_agent.agent.id, task_id=test_agent.task_id)
         assert len(states) == 1
         state = states[0].state
         messages = state.get("messages", [])
