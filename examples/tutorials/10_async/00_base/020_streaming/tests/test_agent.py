@@ -21,7 +21,6 @@ from agentex.lib.testing import stream_agent_response
 from agentex.lib.testing import (
     async_test_agent,
     assert_valid_agent_response,
-    assert_agent_response_contains,
 )
 
 AGENT_NAME = "ab020-streaming"

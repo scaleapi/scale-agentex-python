@@ -15,38 +15,95 @@ Run tests:
     pytest tests/test_agent.py -v
 """
 
+import asyncio
 import pytest
+import pytest_asyncio
+
+from agentex.lib.testing.sessions import AsyncAgentTest
+from agentex.lib.testing import stream_agent_response
 
 from agentex.lib.testing import (
     async_test_agent,
+    assert_valid_agent_response,
 )
+
 
 AGENT_NAME = "ab030-tracing"
 
-
-@pytest.mark.asyncio
-async def test_basic_event():
-    """Test sending an event and receiving a response."""
-    async with async_test_agent(agent_name=AGENT_NAME) as test:
-        response = await test.send_event("Hello! Test message", timeout_seconds=30.0)
-        # Agent may return empty response depending on configuration
-        assert response is not None
-        assert response.author == "agent"
-        print(f"Response: {response.content[:100] if response.content else '(empty)'}")
+@pytest.fixture
+def agent_name():
+    """Return the agent name for testing."""
+    return AGENT_NAME
 
 
-@pytest.mark.asyncio
-async def test_streaming_event():
-    """Test streaming events from agent."""
-    async with async_test_agent(agent_name=AGENT_NAME) as test:
+@pytest_asyncio.fixture
+async def test_agent(agent_name: str):
+    """Fixture to create a test async agent."""
+    async with async_test_agent(agent_name=agent_name) as test:
+        yield test
+
+
+class TestNonStreamingEvents:
+    """Test non-streaming event sending and polling."""
+
+    @pytest.mark.asyncio
+    async def test_send_event_and_poll(self, test_agent: AsyncAgentTest):
+        """Test sending an event and polling for the response."""
+        # Check for initial traces
+        traces = await test_agent.client.spans.list(trace_id=test_agent.task_id)
+        assert len(traces) == 0, "Should have no traces initially"
+
+        # Send a test message and validate response
+        response = await test_agent.send_event("Hello, this is a test message!", timeout_seconds=30.0)
+        assert_valid_agent_response(response)
+
+        # Check for traces after response
+        traces = await test_agent.client.spans.list(trace_id=test_agent.task_id)
+        assert len(traces) > 0, "Should have traces after sending event"
+        traces_by_name = {trace.name: trace for trace in traces}
+        assert 'Turn 1' in traces_by_name, "Should have turn-based trace"
+        assert 'chat_completion_stream_auto_send' in traces_by_name, "Should have chat completion trace"
+        assert 'update_state' in traces_by_name, "Should have state update trace"
+
+
+class TestStreamingEvents:
+    """Test streaming event sending and response."""
+
+    @pytest.mark.asyncio
+    async def test_streaming_event(self, test_agent: AsyncAgentTest):
+        """Test streaming events from agent."""
+        # Check for initial traces
+        traces = await test_agent.client.spans.list(trace_id=test_agent.task_id)
+        assert len(traces) == 0, "Should have no traces initially"
+
+        agent_response_found = False
         events_received = []
-
-        async for event in test.send_event_and_stream("Stream this", timeout_seconds=30.0):
+        async for event in test_agent.send_event_and_stream("Stream this", timeout_seconds=30.0):
             events_received.append(event)
-            if event.get("type") == "done":
+            event_type = event.get("type")
+            if event_type == "done":
+                break
+
+            elif event_type == "full":
+                content = event.get("content", {})
+                if content.get("content") is None:
+                    continue  # Skip empty content
+
+                if content.get("type") == "text" and content.get("author") == "agent":
+                    # Check for agent response to user message
+                    agent_response_found = True
+
+            if agent_response_found:
                 break
 
         assert len(events_received) > 0, "Should receive streaming events"
+        # Check for traces after response
+        traces = await test_agent.client.spans.list(trace_id=test_agent.task_id)
+        assert len(traces) > 0, "Should have traces after sending event"
+        traces_by_name = {trace.name: trace for trace in traces}
+        assert 'Turn 1' in traces_by_name, "Should have turn-based trace"
+        assert 'chat_completion_stream_auto_send' in traces_by_name, "Should have chat completion trace"
+        assert 'update_state' in traces_by_name, "Should have state update trace"
 
 
 if __name__ == "__main__":
