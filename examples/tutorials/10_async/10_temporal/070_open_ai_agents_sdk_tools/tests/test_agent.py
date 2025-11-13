@@ -94,15 +94,12 @@ class TestNonStreamingEvents:
         final_message = None
 
         async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message,
-            timeout=60,
-            sleep_interval=1.0
-            ):
+            client=client, agent_id=agent_id, task_id=task.id, user_message=user_message, timeout=60, sleep_interval=1.0
+        ):
             assert isinstance(message, TaskMessage)
-            print(f"[DEBUG 070 POLL] Received message - Type: {message.content.type if message.content else 'None'}, Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}")
+            print(
+                f"[DEBUG 070 POLL] Received message - Type: {message.content.type if message.content else 'None'}, Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}"
+            )
 
             # Track tool_request messages (agent calling get_weather)
             if message.content and message.content.type == "tool_request":
@@ -117,7 +114,9 @@ class TestNonStreamingEvents:
             # Track agent text messages and their streaming updates
             if message.content and message.content.type == "text" and message.content.author == "agent":
                 content_length = len(message.content.content) if message.content.content else 0
-                print(f"[DEBUG 070 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}")
+                print(
+                    f"[DEBUG 070 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}"
+                )
                 final_message = message
 
                 # Stop when we get DONE status
@@ -129,7 +128,9 @@ class TestNonStreamingEvents:
         assert seen_tool_request, "Expected to see tool_request message (agent calling get_weather)"
         assert seen_tool_response, "Expected to see tool_response message (get_weather result)"
         assert final_message is not None, "Expected to see final agent text message"
-        assert final_message.content is not None and len(final_message.content.content) > 0, "Final message should have content"
+        assert final_message.content is not None and len(final_message.content.content) > 0, (
+            "Final message should have content"
+        )
 
         # Check that the response contains the temperature (22 degrees)
         # The get_weather activity returns "The weather in New York City is 22 degrees Celsius"

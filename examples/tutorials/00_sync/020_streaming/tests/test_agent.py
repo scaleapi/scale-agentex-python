@@ -16,7 +16,6 @@ Run: pytest tests/test_agent.py -v
 
 import pytest
 
-from agentex import Agentex
 from agentex.lib.testing import (
     test_sync_agent,
     collect_streaming_deltas,
@@ -31,11 +30,13 @@ def agent_name():
     """Return the agent name for testing."""
     return AGENT_NAME
 
+
 @pytest.fixture
 def test_agent(agent_name: str):
     """Fixture to create a test sync agent."""
     with test_sync_agent(agent_name=agent_name) as test:
         yield test
+
 
 class TestNonStreamingMessages:
     """Test non-streaming message sending."""
@@ -86,7 +87,7 @@ class TestStreamingMessages:
             # Collect the streaming response
             aggregated_content, chunks = collect_streaming_deltas(response_gen)
 
-             # this is using the chat_completion_stream, so we will be getting chunks of data
+            # this is using the chat_completion_stream, so we will be getting chunks of data
             assert len(chunks) > 1, "No chunks received in streaming response."
 
             # Validate we got content
@@ -102,7 +103,7 @@ class TestStreamingMessages:
             assert state.state is not None
             assert state.state.get("system_prompt") == "You are a helpful assistant that can answer questions."
             message_history = test_agent.client.messages.list(task_id=test_agent.task_id)
-            assert len(message_history) == (i + 1) * 2 # user + agent messages
+            assert len(message_history) == (i + 1) * 2  # user + agent messages
 
 
 if __name__ == "__main__":

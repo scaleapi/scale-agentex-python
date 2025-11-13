@@ -26,10 +26,12 @@ from agentex.lib.testing import (
 
 AGENT_NAME = "s010-multiturn"
 
+
 @pytest.fixture
 def agent_name():
     """Return the agent name for testing."""
     return AGENT_NAME
+
 
 @pytest.fixture
 def test_agent(agent_name: str):
@@ -99,7 +101,7 @@ class TestStreamingMessages:
             assert len(states) == 1
 
             message_history = test_agent.client.messages.list(task_id=test_agent.task_id)
-            assert len(message_history) == (i + 1) * 2 # user + agent messages
+            assert len(message_history) == (i + 1) * 2  # user + agent messages
 
 
 if __name__ == "__main__":

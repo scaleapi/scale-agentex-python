@@ -21,11 +21,11 @@ logger = make_logger(__name__)
 async def main():
     # Setup debug mode if enabled
     setup_debug_if_enabled()
-    
+
     task_queue_name = environment_variables.WORKFLOW_TASK_QUEUE
     if task_queue_name is None:
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")
-    
+
     # Add activities to the worker
     all_activities = get_all_activities() + []  # add your own activities here
 
@@ -57,7 +57,7 @@ async def main():
     worker = AgentexWorker(
         task_queue=task_queue_name,
         plugins=[OpenAIAgentsPlugin(model_provider=temporal_streaming_model_provider)],
-        interceptors=[context_interceptor]
+        interceptors=[context_interceptor],
     )
 
     await worker.run(
@@ -65,5 +65,6 @@ async def main():
         workflow=At060OpenAiAgentsSdkHelloWorldWorkflow,
     )
 
+
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

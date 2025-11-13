@@ -69,7 +69,6 @@ async def handle_message_send(
 
     task_messages = await adk.messages.list(task_id=params.task.id)
 
-
     # Initialize the provider and run config to allow for tracing
     provider = SyncStreamingProvider(
         trace_id=params.task.id,
@@ -80,7 +79,6 @@ async def handle_message_send(
         model_provider=provider,
     )
 
-
     test_agent = Agent(name="assistant", instructions=state.system_prompt, model=state.model)
 
     # Convert task messages to OpenAI Agents SDK format
@@ -88,7 +86,6 @@ async def handle_message_send(
 
     # Run the agent and stream the events
     result = Runner.run_streamed(test_agent, input_list, run_config=run_config)
-
 
     #########################################################
     # 4. Stream the events to the client.
@@ -100,4 +97,3 @@ async def handle_message_send(
     # Yield the Agentex events to the client
     async for agentex_event in convert_openai_to_agentex_events(stream):
         yield agentex_event
-

@@ -7,18 +7,32 @@ Prerequisites:
 
 Run: pytest tests/test_agent.py -v
 """
+
+import re
 import asyncio
 
 import pytest
-
-import re
+import pytest_asyncio
 
 from agentex import AsyncAgentex
-from agentex.lib.testing import async_test_agent, assert_valid_agent_response, stream_agent_response
+from agentex.lib.testing import async_test_agent, stream_agent_response, assert_valid_agent_response
 from agentex.types.text_content_param import TextContentParam
 from agentex.types.task_message_content import TextContent
 
 AGENT_NAME = "ab080-batch-events"
+
+
+@pytest.fixture
+def agent_name():
+    """Return the agent name for testing."""
+    return AGENT_NAME
+
+
+@pytest_asyncio.fixture
+async def test_agent(agent_name: str):
+    """Fixture to create a test async agent."""
+    async with async_test_agent(agent_name=agent_name) as test:
+        yield test
 
 
 @pytest.mark.asyncio
@@ -28,6 +42,7 @@ async def test_single_event_and_poll():
         response = await test.send_event("Process this single event", timeout_seconds=30.0)
         assert_valid_agent_response(response)
         assert "Processed event IDs" in response.content
+
 
 @pytest.mark.asyncio
 async def test_batch_events_and_poll():
@@ -44,7 +59,9 @@ async def test_batch_events_and_poll():
     async with async_test_agent(agent_name=AGENT_NAME) as test:
         for i in range(num_events):
             event_content = TextContentParam(type="text", author="user", content=f"Batch event {i + 1}")
-            await client.agents.send_event(agent_id=agent.id, params={"task_id": test.task_id, "content": event_content})
+            await client.agents.send_event(
+                agent_id=agent.id, params={"task_id": test.task_id, "content": event_content}
+            )
             await asyncio.sleep(0.1)  # Small delay to ensure ordering
 
         ## there should be at least 2 agent responses to ensure that not all of the events are processed
@@ -82,7 +99,7 @@ async def test_batch_events_and_poll():
 @pytest.mark.asyncio
 async def test_batched_streaming():
     """Test streaming responses."""
-   # Need client access to send events directly
+    # Need client access to send events directly
     client = AsyncAgentex(api_key="test", base_url="http://localhost:5003")
 
     # Get agent ID
@@ -94,7 +111,9 @@ async def test_batched_streaming():
     async with async_test_agent(agent_name=AGENT_NAME) as test:
         for i in range(num_events):
             event_content = TextContentParam(type="text", author="user", content=f"Batch event {i + 1}")
-            await client.agents.send_event(agent_id=agent.id, params={"task_id": test.task_id, "content": event_content})
+            await client.agents.send_event(
+                agent_id=agent.id, params={"task_id": test.task_id, "content": event_content}
+            )
             await asyncio.sleep(0.1)  # Small delay to ensure ordering
 
         # Stream events
@@ -138,7 +157,6 @@ async def test_batched_streaming():
                 break
 
         assert found_batch_with_multiple_events, "Should have found a batch with multiple events"
-
 
 
 if __name__ == "__main__":

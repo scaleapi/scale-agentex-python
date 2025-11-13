@@ -15,20 +15,17 @@ Run tests:
     pytest tests/test_agent.py -v
 """
 
-import asyncio
 import pytest
 import pytest_asyncio
-
-from agentex.lib.testing.sessions import AsyncAgentTest
-from agentex.lib.testing import stream_agent_response
 
 from agentex.lib.testing import (
     async_test_agent,
     assert_valid_agent_response,
 )
-
+from agentex.lib.testing.sessions import AsyncAgentTest
 
 AGENT_NAME = "ab030-tracing"
+
 
 @pytest.fixture
 def agent_name():
@@ -61,9 +58,9 @@ class TestNonStreamingEvents:
         traces = await test_agent.client.spans.list(trace_id=test_agent.task_id)
         assert len(traces) > 0, "Should have traces after sending event"
         traces_by_name = {trace.name: trace for trace in traces}
-        assert 'Turn 1' in traces_by_name, "Should have turn-based trace"
-        assert 'chat_completion_stream_auto_send' in traces_by_name, "Should have chat completion trace"
-        assert 'update_state' in traces_by_name, "Should have state update trace"
+        assert "Turn 1" in traces_by_name, "Should have turn-based trace"
+        assert "chat_completion_stream_auto_send" in traces_by_name, "Should have chat completion trace"
+        assert "update_state" in traces_by_name, "Should have state update trace"
 
 
 class TestStreamingEvents:
@@ -101,9 +98,9 @@ class TestStreamingEvents:
         traces = await test_agent.client.spans.list(trace_id=test_agent.task_id)
         assert len(traces) > 0, "Should have traces after sending event"
         traces_by_name = {trace.name: trace for trace in traces}
-        assert 'Turn 1' in traces_by_name, "Should have turn-based trace"
-        assert 'chat_completion_stream_auto_send' in traces_by_name, "Should have chat completion trace"
-        assert 'update_state' in traces_by_name, "Should have state update trace"
+        assert "Turn 1" in traces_by_name, "Should have turn-based trace"
+        assert "chat_completion_stream_auto_send" in traces_by_name, "Should have chat completion trace"
+        assert "update_state" in traces_by_name, "Should have state update trace"
 
 
 if __name__ == "__main__":

@@ -33,15 +33,13 @@ async def move_money(from_account: str, to_account: str, amount: float) -> str:
     withdraw_result = await workflow.execute_activity(
         withdraw_money,
         args=[from_account, amount],
-        start_to_close_timeout=timedelta(days=1)  # Long timeout for banking operations
+        start_to_close_timeout=timedelta(days=1),  # Long timeout for banking operations
     )
 
     # STEP 2: Only after successful withdrawal, start the deposit activity
     # This guarantees the sequence: withdraw THEN deposit
     deposit_result = await workflow.execute_activity(
-        deposit_money,
-        args=[to_account, amount],
-        start_to_close_timeout=timedelta(days=1)
+        deposit_money, args=[to_account, amount], start_to_close_timeout=timedelta(days=1)
     )
 
     # PATTERN 2 BENEFIT: From the agent's perspective, this was ONE tool call

@@ -16,19 +16,19 @@ Run tests:
 """
 
 import asyncio
+
 import pytest
 import pytest_asyncio
 
-from agentex.lib.testing.sessions import AsyncAgentTest
-from agentex.lib.testing import stream_agent_response
-
 from agentex.lib.testing import (
     async_test_agent,
+    stream_agent_response,
     assert_valid_agent_response,
-    assert_agent_response_contains,
 )
+from agentex.lib.testing.sessions import AsyncAgentTest
 
 AGENT_NAME = "ab010-multiturn"
+
 
 @pytest.fixture
 def agent_name():
@@ -76,7 +76,7 @@ class TestNonStreamingEvents:
         state = states[0].state
         messages = state.get("messages", [])
         assert isinstance(messages, list)
-        assert len(messages) == 3    
+        assert len(messages) == 3
 
 
 class TestStreamingEvents:
@@ -114,7 +114,7 @@ class TestStreamingEvents:
             events_received.append(event)
             event_type = event.get("type")
 
-            if event_type == 'connected':
+            if event_type == "connected":
                 await test_agent.send_event(user_message, timeout_seconds=30.0)
 
             elif event_type == "done":
@@ -144,8 +144,8 @@ class TestStreamingEvents:
         assert user_echo_found, "Should receive user message event"
 
         # Verify state has been updated
-        await asyncio.sleep(1) # Wait for state update
-        
+        await asyncio.sleep(1)  # Wait for state update
+
         states = await test_agent.client.states.list(agent_id=test_agent.agent.id, task_id=test_agent.task_id)
         assert len(states) == 1
         state = states[0].state

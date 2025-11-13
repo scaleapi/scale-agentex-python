@@ -29,7 +29,12 @@ async def main():
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")
 
     # Add activities to the worker
-    all_activities = get_all_activities() + [withdraw_money, deposit_money, get_weather, stream_lifecycle_content]  # add your own activities here
+    all_activities = get_all_activities() + [
+        withdraw_money,
+        deposit_money,
+        get_weather,
+        stream_lifecycle_content,
+    ]  # add your own activities here
 
     # ============================================================================
     # STREAMING SETUP: Interceptor + Model Provider
@@ -67,5 +72,6 @@ async def main():
         workflow=At070OpenAiAgentsSdkToolsWorkflow,
     )
 
+
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

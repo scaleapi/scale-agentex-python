@@ -79,7 +79,9 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling with human-in-the-loop."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll_with_human_approval(self, client: AsyncAgentex, agent_id: str, temporal_client: TemporalClient):
+    async def test_send_event_and_poll_with_human_approval(
+        self, client: AsyncAgentex, agent_id: str, temporal_client: TemporalClient
+    ):
         """Test sending an event that triggers human approval workflow."""
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
@@ -125,7 +127,9 @@ class TestNonStreamingEvents:
                 yield_updates=True,  # Get all streaming chunks
             ):
                 assert isinstance(message, TaskMessage)
-                print(f"[DEBUG 080 POLL] Received message - Type: {message.content.type if message.content else 'None'}, Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}")
+                print(
+                    f"[DEBUG 080 POLL] Received message - Type: {message.content.type if message.content else 'None'}, Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}"
+                )
 
                 # Track tool_request messages (agent calling wait_for_confirmation)
                 if message.content and message.content.type == "tool_request":
@@ -142,7 +146,9 @@ class TestNonStreamingEvents:
                 # Track agent text messages and their streaming updates
                 if message.content and message.content.type == "text" and message.content.author == "agent":
                     content_length = len(message.content.content) if message.content.content else 0
-                    print(f"[DEBUG 080 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}")
+                    print(
+                        f"[DEBUG 080 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}"
+                    )
 
                     # Stop when we get DONE status with actual content
                     if message.streaming_status == "DONE" and content_length > 0:

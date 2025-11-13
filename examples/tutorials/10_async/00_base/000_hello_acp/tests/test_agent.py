@@ -19,16 +19,16 @@ Run tests:
 import pytest
 import pytest_asyncio
 
-from agentex.lib.testing.sessions import AsyncAgentTest
-from agentex.lib.testing import stream_agent_response
-
 from agentex.lib.testing import (
     async_test_agent,
+    stream_agent_response,
     assert_valid_agent_response,
     assert_agent_response_contains,
 )
+from agentex.lib.testing.sessions import AsyncAgentTest
 
 AGENT_NAME = "ab000-hello-acp"
+
 
 @pytest.fixture
 def agent_name():
@@ -79,7 +79,7 @@ class TestStreamingEvents:
             all_events.append(event)
             event_type = event.get("type")
 
-            if event_type == 'connected':
+            if event_type == "connected":
                 await test_agent.send_event(user_message, timeout_seconds=30.0)
 
             elif event_type == "full":

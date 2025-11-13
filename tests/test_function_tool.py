@@ -224,9 +224,7 @@ class TestFunctionTool:
         serialized_data = valid_tool.model_dump()
 
         # Corrupt the serialized callable data with invalid base64
-        serialized_data["on_invoke_tool_serialized"] = (
-            "invalid_base64_data!"  # Add invalid character
-        )
+        serialized_data["on_invoke_tool_serialized"] = "invalid_base64_data!"  # Add invalid character
 
         # This should raise an error during model validation due to invalid base64
         with pytest.raises((ValidationError, ValueError)):

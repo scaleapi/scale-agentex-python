@@ -15,7 +15,7 @@ Run tests:
     pytest tests/test_agent.py -v
 """
 
-import pytest 
+import pytest
 
 from agentex.lib.testing import (
     test_sync_agent,
@@ -30,6 +30,7 @@ AGENT_NAME = "s000-hello-acp"
 def agent_name():
     """Return the agent name for testing."""
     return AGENT_NAME
+
 
 @pytest.fixture
 def test_agent(agent_name: str):
@@ -52,6 +53,7 @@ class TestNonStreamingMessages:
         # Check expected response format
         expected = f"Hello! I've received your message. Here's a generic response, but in future tutorials we'll see how you can get me to intelligently respond to your message. This is what I heard you say: {message_content}"
         assert response.content == expected, f"Expected: {expected}\nGot: {response.content}"
+
 
 class TestStreamingMessages:
     """Test streaming message sending."""

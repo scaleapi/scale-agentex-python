@@ -77,7 +77,7 @@ acp = FastACP.create(
         temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233"),
         plugins=[OpenAIAgentsPlugin(model_provider=temporal_streaming_model_provider)],
         interceptors=[context_interceptor],
-    )
+    ),
 )
 
 

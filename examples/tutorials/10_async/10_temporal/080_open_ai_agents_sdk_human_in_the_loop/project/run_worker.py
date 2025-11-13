@@ -31,7 +31,12 @@ async def main():
 
     # Add activities to the worker
     # stream_lifecycle_content is required for hooks to work (creates tool_request/tool_response messages)
-    all_activities = get_all_activities() + [withdraw_money, deposit_money, confirm_order, stream_lifecycle_content]  # add your own activities here
+    all_activities = get_all_activities() + [
+        withdraw_money,
+        deposit_money,
+        confirm_order,
+        stream_lifecycle_content,
+    ]  # add your own activities here
 
     # ============================================================================
     # STREAMING SETUP: Interceptor + Model Provider
@@ -64,10 +69,8 @@ async def main():
         interceptors=[context_interceptor],
     )
 
-    await worker.run(
-        activities=all_activities,
-        workflows=[At080OpenAiAgentsSdkHumanInTheLoopWorkflow, ChildWorkflow]
-    )
+    await worker.run(activities=all_activities, workflows=[At080OpenAiAgentsSdkHumanInTheLoopWorkflow, ChildWorkflow])
+
 
 if __name__ == "__main__":
     asyncio.run(main())
