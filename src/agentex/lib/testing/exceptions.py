@@ -70,7 +70,7 @@ class AgentSelectionError(AgentexTestingError):
             error_message += f"  - {agent_name}\n"
         error_message += "\nSpecify agent with:\n"
         error_message += "  test_sync_agent(agent_name='your-agent')\n"
-        error_message += "  test_agentic_agent(agent_name='your-agent')\n\n"
+        error_message += "  async_test_agent(agent_name='your-agent')\n\n"
         error_message += "To discover agent names, run: agentex agents list"
 
         super().__init__(error_message)

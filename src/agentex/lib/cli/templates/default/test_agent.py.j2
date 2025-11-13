@@ -1,7 +1,7 @@
 """
 Tests for {{ agent_name }}
 
-This test suite demonstrates testing your agentic agent with the AgentEx testing framework.
+This test suite demonstrates testing your async agent with the AgentEx testing framework.
 
 Test coverage:
 - Basic event sending and polling
@@ -19,7 +19,7 @@ Run tests:
 import pytest
 
 from agentex.lib.testing import (
-    test_agentic_agent,
+    async_test_agent,
     assert_valid_agent_response,
     assert_agent_response_contains,
     stream_agent_response,
@@ -32,7 +32,7 @@ AGENT_NAME = "{{ agent_name }}"
 @pytest.mark.asyncio
 async def test_agent_basic_response():
     """Test that agent responds to basic events."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         response = await test.send_event(
             "Hello! Please respond briefly.",
             timeout_seconds=30.0
@@ -46,7 +46,7 @@ async def test_agent_basic_response():
 @pytest.mark.asyncio
 async def test_agent_multi_turn():
     """Test multi-turn conversation."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Turn 1
         response1 = await test.send_event("Hello!", timeout_seconds=30.0)
         assert_valid_agent_response(response1)
@@ -68,7 +68,7 @@ async def test_agent_multi_turn():
 @pytest.mark.asyncio
 async def test_agent_streaming():
     """Test streaming responses from agent."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Send event first
         await test.send_event("Start streaming task", timeout_seconds=10.0)
 
@@ -93,7 +93,7 @@ async def test_agent_custom_scenario():
 
     Customize this test for your agent's specific behavior and requirements.
     """
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Example: Test specific functionality
         response = await test.send_event(
             "Your custom test message here",

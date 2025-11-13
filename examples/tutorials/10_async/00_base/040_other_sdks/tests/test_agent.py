@@ -12,7 +12,7 @@ import asyncio
 import pytest
 
 from agentex import AsyncAgentex
-from agentex.lib.testing import test_agentic_agent, assert_valid_agent_response
+from agentex.lib.testing import async_test_agent, assert_valid_agent_response
 
 AGENT_NAME = "ab040-other-sdks"
 
@@ -28,7 +28,7 @@ async def test_agent_basic():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 
@@ -65,7 +65,7 @@ async def test_poll_with_tool_use():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 
@@ -113,7 +113,7 @@ async def test_poll_multiturn():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 
@@ -153,7 +153,7 @@ async def test_basic_streaming():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 
@@ -218,7 +218,7 @@ async def test_streaming_with_tools():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 

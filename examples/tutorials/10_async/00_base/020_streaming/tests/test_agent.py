@@ -1,5 +1,5 @@
 """
-Tests for ab020-streaming (agentic agent)
+Tests for ab020-streaming (async agent)
 
 Test coverage:
 - Event sending and polling
@@ -18,7 +18,7 @@ import pytest
 from agentex import AsyncAgentex
 from agentex.lib.testing import (
     assert_valid_agent_response,
-    test_agentic_agent,
+    async_test_agent,
 )
 
 AGENT_NAME = "ab020-streaming"
@@ -35,7 +35,7 @@ async def test_send_event_and_poll():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 
@@ -80,7 +80,7 @@ async def test_streaming_events():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 

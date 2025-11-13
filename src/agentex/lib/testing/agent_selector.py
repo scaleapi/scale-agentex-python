@@ -149,14 +149,14 @@ class AgentSelector:
         return selected
 
     @classmethod
-    def select_agentic_agent(
+    def select_async_agent(
         cls,
         agents: list[Agent],
         agent_name: str | None = None,
         agent_id: str | None = None,
     ) -> Agent:
         """
-        Select an agentic agent for testing.
+        Select an async agent for testing.
 
         **Agent selection is always required** - you must specify either agent_name or agent_id.
 
@@ -166,14 +166,14 @@ class AgentSelector:
             agent_id: Agent ID to select (required if agent_name not provided)
 
         Returns:
-            Selected agentic agent
+            Selected async agent
 
         Raises:
             AgentNotFoundError: No matching agents found
             AgentSelectionError: Agent selection required or multiple agents match
         """
         # First, get all agents of the correct type
-        type_matches = [a for a in agents if cls._validate_agent(a) and a.acp_type == "agentic"]
+        type_matches = [a for a in agents if cls._validate_agent(a) and a.acp_type == "async"]
 
         # ALWAYS require explicit selection
         if agent_name is None and agent_id is None:
@@ -185,16 +185,16 @@ class AgentSelector:
             )
 
         # Now filter by name/ID
-        matching_agents = cls._filter_agents(agents, "agentic", agent_name, agent_id)
+        matching_agents = cls._filter_agents(agents, "async", agent_name, agent_id)
 
         if not matching_agents:
-            raise AgentNotFoundError("agentic", agent_name, agent_id)
+            raise AgentNotFoundError("async", agent_name, agent_id)
 
         if len(matching_agents) > 1:
             # Multiple matches - need user to be more specific
             agent_names = [cls._get_agent_name(a) for a in matching_agents]
-            raise AgentSelectionError("agentic", agent_names)
+            raise AgentSelectionError("async", agent_names)
 
         selected = matching_agents[0]
-        logger.info(f"Selected agentic agent: {cls._get_agent_name(selected)} (id: {selected.id})")
+        logger.info(f"Selected async agent: {cls._get_agent_name(selected)} (id: {selected.id})")
         return selected

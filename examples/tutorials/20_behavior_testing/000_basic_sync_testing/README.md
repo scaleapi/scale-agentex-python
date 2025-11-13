@@ -92,6 +92,6 @@ A typical sync agent test follows this pattern:
 
 ## Next Steps
 
-- Complete Tutorial 20.1 for agentic agent testing
+- Complete Tutorial 20.1 for async agent testing
 - Apply these patterns to test your own agents
 - Integrate tests into your development workflow

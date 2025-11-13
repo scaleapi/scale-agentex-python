@@ -11,7 +11,7 @@ Run: pytest tests/test_agent.py -v
 
 import pytest
 
-from agentex.lib.testing import test_agentic_agent, assert_valid_agent_response
+from agentex.lib.testing import async_test_agent, assert_valid_agent_response
 
 AGENT_NAME = "example-tutorial"
 
@@ -19,7 +19,7 @@ AGENT_NAME = "example-tutorial"
 @pytest.mark.asyncio
 async def test_agent_basic():
     """Test basic agent functionality."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         response = await test.send_event("Test message", timeout_seconds=60.0)
         assert_valid_agent_response(response)
 
@@ -27,7 +27,7 @@ async def test_agent_basic():
 @pytest.mark.asyncio
 async def test_agent_streaming():
     """Test streaming responses."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         events = []
         async for event in test.send_event_and_stream("Stream test", timeout_seconds=60.0):
             events.append(event)

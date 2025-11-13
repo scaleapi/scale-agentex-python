@@ -1,10 +1,10 @@
 # Tutorial 20.1: Agentic Agent Testing
 
-Learn how to test agentic agents that use event-driven architecture and require polling.
+Learn how to test async agents that use event-driven architecture and require polling.
 
 ## What You'll Learn
 
-- How agentic agent testing differs from sync testing
+- How async agent testing differs from sync testing
 - Using async context managers for testing
 - Configuring timeouts for polling
 - Testing event-driven behavior
@@ -12,14 +12,14 @@ Learn how to test agentic agents that use event-driven architecture and require 
 ## Prerequisites
 
 - AgentEx services running (`make dev`)
-- An agentic agent running (Tutorial 10_agentic recommended)
+- An async agent running (Tutorial 10_agentic recommended)
 - Understanding of async/await in Python
 
 ## Quick Start
 
 Run the tests:
 ```bash
-pytest test_agentic_agent.py -v
+pytest async_test_agent.py -v
 ```
 
 ## Key Differences from Sync Testing
@@ -36,11 +36,11 @@ pytest test_agentic_agent.py -v
 
 ```python
 import pytest
-from agentex.lib.testing import test_agentic_agent
+from agentex.lib.testing import async_test_agent
 
 @pytest.mark.asyncio
 async def test_my_agent():
-    async with test_agentic_agent() as test:
+    async with async_test_agent() as test:
         # Send event and wait for response
         response = await test.send_event("Hello!", timeout_seconds=15.0)
         assert response is not None
@@ -64,7 +64,7 @@ If the agent doesn't respond within the timeout, you'll get a `RuntimeError` wit
 ```python
 @pytest.mark.asyncio
 async def test_agentic_responds():
-    async with test_agentic_agent() as test:
+    async with async_test_agent() as test:
         response = await test.send_event("Hello!", timeout_seconds=15.0)
         assert_valid_agent_response(response)
 ```
@@ -73,7 +73,7 @@ async def test_agentic_responds():
 ```python
 @pytest.mark.asyncio
 async def test_conversation():
-    async with test_agentic_agent() as test:
+    async with async_test_agent() as test:
         r1 = await test.send_event("My name is Alex", timeout_seconds=15.0)
         r2 = await test.send_event("What's my name?", timeout_seconds=15.0)
 
@@ -85,7 +85,7 @@ async def test_conversation():
 ```python
 @pytest.mark.asyncio
 async def test_complex_task():
-    async with test_agentic_agent() as test:
+    async with async_test_agent() as test:
         # Some agents need more time for complex work
         response = await test.send_event(
             "Analyze this data...",
@@ -101,12 +101,12 @@ async def test_complex_task():
 - Check agent is running
 - Check AgentEx logs for errors
 
-**No agentic agents available**:
+**No async agents available**:
 - Run an agentic tutorial agent first
-- Check `await client.agents.list()` shows agentic agents
+- Check `await client.agents.list()` shows async agents
 
 ## Next Steps
 
-- Test your own agentic agents
+- Test your own async agents
 - Explore temporal agent testing for workflow-based agents
 - Integrate behavior tests into CI/CD

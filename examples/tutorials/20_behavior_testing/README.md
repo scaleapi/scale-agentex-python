@@ -5,7 +5,7 @@ Learn how to write automated tests for your AgentEx agents using the `agentex.li
 ## What You'll Learn
 
 - How to test sync agents with immediate responses
-- How to test agentic agents with event-driven polling
+- How to test async agents with event-driven polling
 - Writing assertions for agent behavior
 - Testing conversation context and multi-turn interactions
 
@@ -33,10 +33,10 @@ pytest test_sync_agent.py -v
 ```
 
 ### `010_agentic_testing/`
-Learn how to test agentic agents that use event-driven architecture.
+Learn how to test async agents that use event-driven architecture.
 
 **Key Concepts:**
-- Using `test_agentic_agent()` async context manager
+- Using `async_test_agent()` async context manager
 - Sending events with `send_event()`
 - Polling and timeout configuration
 - Testing async agent behavior
@@ -44,7 +44,7 @@ Learn how to test agentic agents that use event-driven architecture.
 **Run:**
 ```bash
 cd 010_agentic_testing
-pytest test_agentic_agent.py -v
+pytest async_test_agent.py -v
 ```
 
 ## Quick Start
@@ -60,15 +60,15 @@ def test_my_sync_agent():
         assert_valid_agent_response(response)
 ```
 
-For agentic agents:
+For async agents:
 
 ```python
 import pytest
-from agentex.lib.testing import test_agentic_agent, assert_valid_agent_response
+from agentex.lib.testing import async_test_agent, assert_valid_agent_response
 
 @pytest.mark.asyncio
 async def test_my_agentic_agent():
-    async with test_agentic_agent() as test:
+    async with async_test_agent() as test:
         response = await test.send_event("Hello!", timeout_seconds=15.0)
         assert_valid_agent_response(response)
 ```
@@ -85,7 +85,7 @@ export AGENTEX_TIMEOUT=2.0                      # Health check timeout
 ## Key Design Principles
 
 1. **Real Infrastructure Testing** - Tests run against actual AgentEx, not mocks
-2. **Type-Specific Behavior** - Sync and agentic agents tested differently to match their actual behavior
+2. **Type-Specific Behavior** - Sync and async agents tested differently to match their actual behavior
 3. **Graceful Degradation** - Tests skip if AgentEx unavailable
 4. **Automatic Cleanup** - Tasks and resources cleaned up after each test
 

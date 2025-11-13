@@ -1,7 +1,7 @@
 """
 Agentic Agent Testing
 
-Provides testing utilities for agentic agents that use event-driven architecture
+Provides testing utilities for async agents that use event-driven architecture
 and require polling for responses.
 """
 
@@ -25,9 +25,9 @@ from agentex.lib.testing.agent_selector import AgentSelector
 logger = logging.getLogger(__name__)
 
 
-class AgenticAgentTest:
+class AsyncAgentTest:
     """
-    Test helper for agentic agents using event-driven architecture.
+    Test helper for async agents using event-driven architecture.
 
     Agentic agents use send_event() and require polling for async responses.
     """
@@ -42,7 +42,7 @@ class AgenticAgentTest:
     @with_async_retry
     async def send_event(self, content: str, timeout_seconds: float = 15.0) -> TextContent:
         """
-        Send event to agentic agent and poll for response.
+        Send event to async agent and poll for response.
 
         Args:
             content: Message text to send
@@ -61,7 +61,7 @@ class AgenticAgentTest:
         """
         self._conversation_history.append(content)
 
-        logger.debug(f"Sending event to agentic agent {self.agent.id}: {content[:50]}...")
+        logger.debug(f"Sending event to async agent {self.agent.id}: {content[:50]}...")
 
         # Create user message parameter
         user_message_param = create_user_message(content)
@@ -80,6 +80,15 @@ class AgenticAgentTest:
         self._conversation_history.append(agent_response.content)
 
         return agent_response
+    
+    async def poll_for_agent_response(self, timeout_seconds: float = 15.0) -> TextContent:
+        """
+        Poll for the next agent response.
+
+        Args:
+            timeout_seconds: Max time to wait for response (default: 15.0)
+        """
+        return await self._poller.poll_for_response(timeout_seconds=timeout_seconds, expected_author="agent")
 
     async def send_event_and_stream(
         self,
@@ -131,14 +140,14 @@ class AgenticAgentTest:
 
 
 @asynccontextmanager
-async def agentic_agent_test_session(
+async def async_agent_test_session(
     agentex_client: AsyncAgentex,
     agent_name: str | None = None,
     agent_id: str | None = None,
     task_id: str | None = None,
-) -> AsyncGenerator[AgenticAgentTest, None]:
+) -> AsyncGenerator[AsyncAgentTest, None]:
     """
-    Context manager for agentic agent testing.
+    Context manager for async agent testing.
 
     Args:
         agentex_client: AsyncAgentex client instance
@@ -147,19 +156,19 @@ async def agentic_agent_test_session(
         task_id: Optional task ID to use (if None, creates a new task)
 
     Yields:
-        AgenticAgentTest instance for testing
+        AsyncAgentTest instance for testing
 
     Raises:
-        AgentNotFoundError: No matching agentic agents found
+        AgentNotFoundError: No matching async agents found
         AgentSelectionError: Multiple agents match, need to specify
 
     Usage:
         # Auto-create task (recommended)
-        async with agentic_agent_test_session(client, agent_name="my-agent") as test:
+        async with async_agent_test_session(client, agent_name="my-agent") as test:
             response = await test.send_event("Hello!", timeout_seconds=15.0)
 
         # Use existing task
-        async with agentic_agent_test_session(client, agent_name="my-agent", task_id="abc") as test:
+        async with async_agent_test_session(client, agent_name="my-agent", task_id="abc") as test:
             response = await test.send_event("Hello!", timeout_seconds=15.0)
     """
     task: Task | None = None
@@ -170,17 +179,17 @@ async def agentic_agent_test_session(
         if not agents:
             from agentex.lib.testing.exceptions import AgentNotFoundError
 
-            raise AgentNotFoundError("agentic")
+            raise AgentNotFoundError("async")
 
-        # Select agentic agent
-        agent = AgentSelector.select_agentic_agent(agents, agent_name, agent_id)
+        # Select async agent
+        agent = AgentSelector.select_async_agent(agents, agent_name, agent_id)
 
         # Create task if not provided
         if not task_id:
-            task = await TaskManager.create_task_async(agentex_client, agent, "agentic")
+            task = await TaskManager.create_task_async(agentex_client, agent, "async")
             task_id = task.id
 
-        yield AgenticAgentTest(agentex_client, agent, task_id)
+        yield AsyncAgentTest(agentex_client, agent, task_id)
 
     finally:
         # Cleanup task if we created it
@@ -189,11 +198,11 @@ async def agentic_agent_test_session(
 
 
 @asynccontextmanager
-async def test_agentic_agent(
+async def async_test_agent(
     *, agent_name: str | None = None, agent_id: str | None = None, task_id: str | None = None
-) -> AsyncGenerator[AgenticAgentTest, None]:
+) -> AsyncGenerator[AsyncAgentTest, None]:
     """
-    Simple agentic agent testing without managing client.
+    Simple async agent testing without managing client.
 
     **Agent selection is required** - you must specify either agent_name or agent_id.
 
@@ -203,19 +212,19 @@ async def test_agentic_agent(
         task_id: Optional task ID to use (if None, tasks auto-created)
 
     Yields:
-        AgenticAgentTest instance for testing
+        AsyncAgentTest instance for testing
 
     Raises:
         AgentSelectionError: Agent selection required or ambiguous
         AgentNotFoundError: No matching agent found
 
     Usage:
-        async with test_agentic_agent(agent_name="my-agent") as test:
+        async with async_test_agent(agent_name="my-agent") as test:
             response = await test.send_event("Hello!", timeout_seconds=15.0)
 
     To discover agent names:
         Run: agentex agents list
     """
     client = AsyncAgentex(api_key="test", base_url=config.base_url)
-    async with agentic_agent_test_session(client, agent_name, agent_id, task_id) as session:
+    async with async_agent_test_session(client, agent_name, agent_id, task_id) as session:
         yield session

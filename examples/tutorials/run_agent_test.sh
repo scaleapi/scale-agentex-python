@@ -53,8 +53,8 @@ ALL_TUTORIALS=(
     "00_sync/010_multiturn"
     "00_sync/020_streaming"
     # base tutorials
-    "10_agentic/00_base/000_hello_acp"
-    "10_agentic/00_base/010_multiturn"
+    "10_async/00_base/000_hello_acp"
+    "10_async/00_base/010_multiturn"
     "10_agentic/00_base/020_streaming"
     "10_agentic/00_base/030_tracing"
     "10_agentic/00_base/040_other_sdks"

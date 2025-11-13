@@ -6,7 +6,7 @@ Simplified API for testing agents with real AgentEx infrastructure.
 Quick Start:
     ```python
     import pytest
-    from agentex.lib.testing import test_sync_agent, test_agentic_agent
+    from agentex.lib.testing import test_sync_agent, async_test_agent
 
 
     # Sync agents - MUST specify which agent
@@ -19,7 +19,7 @@ Quick Start:
     # Agentic agents
     @pytest.mark.asyncio
     async def test_my_agentic_agent():
-        async with test_agentic_agent(agent_name="my-agent") as test:
+        async with async_test_agent(agent_name="my-agent") as test:
             response = await test.send_event("Hello!", timeout_seconds=15.0)
             assert response is not None
     ```
@@ -27,7 +27,7 @@ Quick Start:
 Core Principles:
 - **Explicit agent selection required** (no auto-selection)
 - Use send_message() for sync agents (immediate response)
-- Use send_event() for agentic agents (async polling)
+- Use send_event() for async agents (async polling)
 
 To discover agent names:
     Run: agentex agents list
@@ -38,7 +38,7 @@ Documentation:
 
 from agentex.lib.testing.sessions import (
     test_sync_agent,
-    test_agentic_agent,
+    async_test_agent,
 )
 from agentex.lib.testing.streaming import (
     stream_task_messages,
@@ -59,7 +59,7 @@ from agentex.lib.testing.exceptions import (
 __all__ = [
     # Core testing API
     "test_sync_agent",
-    "test_agentic_agent",
+    "async_test_agent",
     # Assertions
     "assert_valid_agent_response",
     "assert_agent_response_contains",

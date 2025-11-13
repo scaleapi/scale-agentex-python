@@ -14,7 +14,7 @@ import pytest
 import re
 
 from agentex import AsyncAgentex
-from agentex.lib.testing import test_agentic_agent, assert_valid_agent_response, stream_agent_response
+from agentex.lib.testing import async_test_agent, assert_valid_agent_response, stream_agent_response
 from agentex.types.text_content_param import TextContentParam
 from agentex.types.task_message_content import TextContent
 
@@ -24,7 +24,7 @@ AGENT_NAME = "ab080-batch-events"
 @pytest.mark.asyncio
 async def test_single_event_and_poll():
     """Test sending a single event and polling for response."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         response = await test.send_event("Process this single event", timeout_seconds=30.0)
         assert_valid_agent_response(response)
         assert "Processed event IDs" in response.content
@@ -41,7 +41,7 @@ async def test_batch_events_and_poll():
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
     num_events = 7
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         for i in range(num_events):
             event_content = TextContentParam(type="text", author="user", content=f"Batch event {i + 1}")
             await client.agents.send_event(agent_id=agent.id, params={"task_id": test.task_id, "content": event_content})
@@ -91,7 +91,7 @@ async def test_batched_streaming():
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
     num_events = 10
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         for i in range(num_events):
             event_content = TextContentParam(type="text", author="user", content=f"Batch event {i + 1}")
             await client.agents.send_event(agent_id=agent.id, params={"task_id": test.task_id, "content": event_content})

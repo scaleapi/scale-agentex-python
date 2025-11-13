@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 class MessagePoller:
     """
-    Polls for new messages from agentic agents with exponential backoff.
+    Polls for new messages from async agents with exponential backoff.
 
     Uses message IDs to track which messages have been seen, avoiding
     issues with object equality comparison.
@@ -63,6 +63,7 @@ class MessagePoller:
         self,
         timeout_seconds: float,
         expected_author: MessageAuthor,
+        match_content: str | None = None,
     ) -> TextContent:
         """
         Poll for new agent response with exponential backoff.
@@ -70,6 +71,7 @@ class MessagePoller:
         Args:
             timeout_seconds: Maximum time to wait for response
             expected_author: Expected message author (e.g., MessageAuthor("agent"))
+            match_content: Optional content substring to match in response
 
         Returns:
             New agent response as TextContent

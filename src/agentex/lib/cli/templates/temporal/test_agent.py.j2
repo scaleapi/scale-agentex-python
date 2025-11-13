@@ -23,7 +23,7 @@ Note: Temporal agents may need longer timeouts due to workflow orchestration ove
 import pytest
 
 from agentex.lib.testing import (
-    test_agentic_agent,
+    async_test_agent,
     assert_valid_agent_response,
     assert_agent_response_contains,
     stream_agent_response,
@@ -36,7 +36,7 @@ AGENT_NAME = "{{ agent_name }}"
 @pytest.mark.asyncio
 async def test_agent_basic_response():
     """Test that agent responds to basic events."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         response = await test.send_event(
             "Hello! Please respond briefly.",
             timeout_seconds=60.0  # Temporal agents may need more time
@@ -50,7 +50,7 @@ async def test_agent_basic_response():
 @pytest.mark.asyncio
 async def test_agent_multi_turn():
     """Test multi-turn conversation."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Turn 1
         response1 = await test.send_event("Hello!", timeout_seconds=60.0)
         assert_valid_agent_response(response1)
@@ -72,7 +72,7 @@ async def test_agent_multi_turn():
 @pytest.mark.asyncio
 async def test_agent_streaming():
     """Test streaming responses from temporal agent."""
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Send initial event
         await test.send_event("Start workflow", timeout_seconds=60.0)
 
@@ -98,7 +98,7 @@ async def test_agent_workflow_execution():
     Temporal agents can handle long-running tasks with retries and state management.
     Adjust timeout based on your workflow's expected duration.
     """
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         response = await test.send_event(
             "Execute your workflow task here",
             timeout_seconds=120.0  # Longer timeout for complex workflows
@@ -118,7 +118,7 @@ async def test_agent_custom_scenario():
 
     Example: Test specific functionality of your temporal agent
     """
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Customize this test for your agent's specific behavior
         response = await test.send_event(
             "Your custom test message here",

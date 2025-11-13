@@ -7,7 +7,7 @@ Simplified testing framework for AgentEx agents with real infrastructure.
 ```python
 from agentex.lib.testing import (
     test_sync_agent,
-    test_agentic_agent,
+    async_test_agent,
     assert_valid_agent_response,
 )
 
@@ -22,7 +22,7 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_my_agentic_agent():
-    async with test_agentic_agent(agent_name="my-agent") as test:
+    async with async_test_agent(agent_name="my-agent") as test:
         response = await test.send_event("Hello!", timeout_seconds=15.0)
         assert_valid_agent_response(response)
 ```
@@ -66,7 +66,7 @@ def test_sync():
 ```python
 @pytest.mark.asyncio
 async def test_agentic():
-    async with test_agentic_agent(agent_name="my-agent") as test:
+    async with async_test_agent(agent_name="my-agent") as test:
         response = await test.send_event("Hello", timeout_seconds=15.0)
 ```
 
@@ -114,19 +114,19 @@ def test_calculator_agent():
         assert "4" in response.content.lower()
 ```
 
-#### `test_agentic_agent(*, agent_name=None, agent_id=None)`
+#### `async_test_agent(*, agent_name=None, agent_id=None)`
 
-Create a test session for agentic agents.
+Create a test session for async agents.
 
 **Parameters:** Same as `test_sync_agent`
 
-**Returns:** Async context manager yielding `AgenticAgentTest` instance
+**Returns:** Async context manager yielding `AsyncAgentTest` instance
 
 **Example:**
 ```python
 @pytest.mark.asyncio
 async def test_research_agent():
-    async with test_agentic_agent(agent_name="researcher") as test:
+    async with async_test_agent(agent_name="researcher") as test:
         response = await test.send_event(
             "Research quantum computing",
             timeout_seconds=30.0
@@ -146,7 +146,7 @@ response = test.send_message("Hello!")
 
 #### `send_event(content: str, timeout_seconds: float) -> TextContent`
 
-Send event to agentic agent and poll for response.
+Send event to async agent and poll for response.
 
 ```python
 response = await test.send_event("Hello!", timeout_seconds=15.0)
@@ -228,10 +228,10 @@ with test_sync_agent(agent_name="nonexistent") as test:
 
 #### `AgentTimeoutError`
 
-Raised when agentic agent doesn't respond within timeout.
+Raised when async agent doesn't respond within timeout.
 
 ```python
-async with test_agentic_agent(agent_name="slow-agent") as test:
+async with async_test_agent(agent_name="slow-agent") as test:
     response = await test.send_event("Hello", timeout_seconds=1.0)
     # Raises AgentTimeoutError if takes >1s
 ```
@@ -261,7 +261,7 @@ def test_conversation_flow():
 ```python
 @pytest.mark.asyncio
 async def test_data_analysis():
-    async with test_agentic_agent(agent_name="analyst") as test:
+    async with async_test_agent(agent_name="analyst") as test:
         # Submit analysis request
         response = await test.send_event(
             "Analyze sales data for Q4 2024",
@@ -306,7 +306,7 @@ def test_no_agent_specified():
 
 @pytest.mark.asyncio
 async def test_timeout():
-    async with test_agentic_agent(agent_name="slow-agent") as test:
+    async with async_test_agent(agent_name="slow-agent") as test:
         with pytest.raises(AgentTimeoutError):
             await test.send_event("Complex task", timeout_seconds=1.0)
 ```
@@ -320,7 +320,7 @@ Configure via environment variables:
 export AGENTEX_BASE_URL="http://localhost:5003"
 export AGENTEX_HEALTH_TIMEOUT="5.0"
 
-# Polling (agentic agents)
+# Polling (async agents)
 export AGENTEX_POLL_INTERVAL="1.0"          # Initial interval
 export AGENTEX_MAX_POLL_INTERVAL="8.0"     # Max interval
 export AGENTEX_POLL_BACKOFF="2.0"          # Backoff multiplier

@@ -1,7 +1,7 @@
 """
-Tests for ab000-hello-acp (agentic agent)
+Tests for ab000-hello-acp (async agent)
 
-This test suite demonstrates testing an agentic agent using the AgentEx testing framework.
+This test suite demonstrates testing an async agent using the AgentEx testing framework.
 
 Test coverage:
 - Event sending and polling for responses
@@ -16,11 +16,15 @@ Run tests:
     pytest tests/test_agent.py -v
 """
 
+import asyncio
 import pytest
 import pytest_asyncio
 
+from agentex.lib.testing.sessions import AsyncAgentTest
+from agentex.lib.testing import stream_agent_response
+
 from agentex.lib.testing import (
-    test_agentic_agent,
+    async_test_agent,
     assert_valid_agent_response,
     assert_agent_response_contains,
 )
@@ -32,10 +36,11 @@ def agent_name():
     """Return the agent name for testing."""
     return AGENT_NAME
 
+
 @pytest_asyncio.fixture
 async def test_agent(agent_name: str):
-    """Fixture to create a test agentic agent."""
-    async with test_agentic_agent(agent_name=agent_name) as test:
+    """Fixture to create a test async agent."""
+    async with async_test_agent(agent_name=agent_name) as test:
         yield test
 
 
@@ -43,19 +48,16 @@ class TestNonStreamingEvents:
     """Test non-streaming event sending and polling."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll(self, agent_name):
+    async def test_send_event_and_poll(self, test_agent: AsyncAgentTest):
         """Test sending an event and polling for the response."""
-        async with test_agentic_agent(agent_name=agent_name) as test:
-            # First event - should get initial task creation message
-            initial_response = await test.send_event("Start task", timeout_seconds=30.0)
-            assert_valid_agent_response(initial_response)
-            assert_agent_response_contains(initial_response, "Hello! I've received your task")
+        # Poll for initial task creation message
+        initial_response = await test_agent.poll_for_agent_response(timeout_seconds=15.0)
+        assert_valid_agent_response(initial_response)
+        assert_agent_response_contains(initial_response, "Hello! I've received your task")
 
-        # Second event - send user message
-        user_message = "Hello, this is a test message!"
-        response = await test.send_event(user_message, timeout_seconds=30.0)
-
-        # Validate response
+        # Send a test message and validate response
+        response = await test_agent.send_event("Hello, this is a test message!", timeout_seconds=30.0)
+        # Validate latest response
         assert_valid_agent_response(response)
         assert_agent_response_contains(response, "Hello! I've received your message")
 
@@ -64,7 +66,7 @@ class TestStreamingEvents:
     """Test streaming event sending."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_stream(self, test_agent):
+    async def test_send_event_and_stream(self, test_agent: AsyncAgentTest):
         """Test sending an event and streaming the response."""
         user_message = "Hello, this is a test message!"
 
@@ -75,7 +77,8 @@ class TestStreamingEvents:
         all_events = []
 
         # Stream events
-        async for event in test_agent.send_event_and_stream(user_message, timeout_seconds=30.0):
+        async for event in stream_agent_response(test_agent.client, test_agent.task_id, timeout=30.0):
+        #async for event in test_agent.send_event_and_stream(user_message, timeout_seconds=30.0):
             all_events.append(event)
             event_type = event.get("type")
 
@@ -98,11 +101,17 @@ class TestStreamingEvents:
                         user_echo_found = True
 
             # Exit early if we've found expected messages
-            if task_creation_found and agent_response_found:
+            if task_creation_found and agent_response_found and user_echo_found:
                 break
 
+        print('all events', all_events)
+        messages = await test_agent.client.messages.list(task_id=test_agent.task_id)
+        print('all messages', messages)
         # Validate we saw expected messages
-        assert task_creation_found or agent_response_found, "Did not receive agent messages"
+        assert task_creation_found, "Did not receive task creation message"
+        assert agent_response_found, "Did not receive agent response to user message"
+        # User echo is optional; no assert 
+        assert user_echo_found, "User echo message not found"
         assert len(all_events) > 0, "Should receive events"
 
 

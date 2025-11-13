@@ -1,7 +1,7 @@
 """
-Tests for ab010-multiturn (agentic agent)
+Tests for ab010-multiturn (async agent)
 
-This test suite demonstrates testing a multi-turn agentic agent using the AgentEx testing framework.
+This test suite demonstrates testing a multi-turn async agent using the AgentEx testing framework.
 
 Test coverage:
 - Multi-turn event sending with state management
@@ -21,7 +21,7 @@ import pytest
 
 from agentex import AsyncAgentex
 from agentex.lib.testing import (
-    test_agentic_agent,
+    async_test_agent,
     assert_valid_agent_response,
 )
 
@@ -39,7 +39,7 @@ async def test_multiturn_with_state_management():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 
@@ -77,7 +77,7 @@ async def test_multiturn_with_state_management():
 
 @pytest.mark.asyncio
 async def test_streaming_events():
-    """Test streaming events from agentic agent."""
+    """Test streaming events from async agent."""
     # Need client access to check state
     client = AsyncAgentex(api_key="test", base_url="http://localhost:5003")
 
@@ -86,7 +86,7 @@ async def test_streaming_events():
     agent = next((a for a in agents if a.name == AGENT_NAME), None)
     assert agent is not None, f"Agent {AGENT_NAME} not found"
 
-    async with test_agentic_agent(agent_name=AGENT_NAME) as test:
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
         # Wait for state initialization
         await asyncio.sleep(1)
 
