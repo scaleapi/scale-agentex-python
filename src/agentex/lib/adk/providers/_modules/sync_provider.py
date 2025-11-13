@@ -26,6 +26,7 @@ from openai.types.responses import (
     ResponseReasoningSummaryTextDeltaEvent,
 )
 from agents.models.openai_provider import OpenAIProvider
+from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 
 from agentex import AsyncAgentex
 from agentex.lib.utils.logging import make_logger
@@ -42,6 +43,10 @@ from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 
 logger = make_logger(__name__)
+
+# Default guardrail messages
+DEFAULT_INPUT_GUARDRAIL_MESSAGE = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
+DEFAULT_OUTPUT_GUARDRAIL_MESSAGE = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
 
 
 def _serialize_item(item: Any) -> dict[str, Any]:
@@ -460,12 +465,20 @@ def _extract_tool_response_info(tool_map: dict[str, Any], tool_output_item: Any)
     return call_id, tool_name, content
 
 
-async def convert_openai_to_agentex_events(stream_response):
+async def convert_openai_to_agentex_events(
+    stream_response,
+    input_guardrail_message: str | None = None,
+    output_guardrail_message: str | None = None,
+):
     """Convert OpenAI streaming events to AgentEx TaskMessageUpdate events.
     This function takes an async iterator of OpenAI events and yields AgentEx
     TaskMessageUpdate events based on the OpenAI event types.
     Args:
         stream_response: An async iterator of OpenAI streaming events
+        input_guardrail_message: Optional custom message for input guardrail violations.
+            Defaults to DEFAULT_INPUT_GUARDRAIL_MESSAGE if not provided.
+        output_guardrail_message: Optional custom message for output guardrail violations.
+            Defaults to DEFAULT_OUTPUT_GUARDRAIL_MESSAGE if not provided.
     Yields:
         TaskMessageUpdate: AgentEx streaming events (StreamTaskMessageDelta or StreamTaskMessageDone)
     """
@@ -477,113 +490,196 @@ async def convert_openai_to_agentex_events(stream_response):
     item_id_to_index = {}  # Map item_id to message index
     current_reasoning_summary = ""  # Accumulate reasoning summary text
 
-    async for event in stream_response:
-        event_count += 1
+    try:
+        async for event in stream_response:
+            event_count += 1
 
-        # Check for raw response events which contain the actual OpenAI streaming events
-        if hasattr(event, 'type') and event.type == 'raw_response_event':
-            if hasattr(event, 'data'):
-                raw_event = event.data
+            # Check for raw response events which contain the actual OpenAI streaming events
+            if hasattr(event, 'type') and event.type == 'raw_response_event':
+                if hasattr(event, 'data'):
+                    raw_event = event.data
 
-                # Check for ResponseOutputItemAddedEvent which signals a new message starting
-                if isinstance(raw_event, ResponseOutputItemAddedEvent):
-                    # Don't increment here - we'll increment when we see the actual text delta
-                    # This is just a signal that a new message is starting
-                    pass
+                    # Check for ResponseOutputItemAddedEvent which signals a new message starting
+                    if isinstance(raw_event, ResponseOutputItemAddedEvent):
+                        # Don't increment here - we'll increment when we see the actual text delta
+                        # This is just a signal that a new message is starting
+                        pass
 
-                # Handle item completion - send done event to close the message
-                elif isinstance(raw_event, ResponseOutputItemDoneEvent):
-                    item_id = raw_event.item.id
-                    if item_id in item_id_to_index:
-                        # Send done event for this message
-                        yield StreamTaskMessageDone(
-                            type="done",
-                            index=item_id_to_index[item_id],
-                        )
+                    # Handle item completion - send done event to close the message
+                    elif isinstance(raw_event, ResponseOutputItemDoneEvent):
+                        item_id = raw_event.item.id
+                        if item_id in item_id_to_index:
+                            # Send done event for this message
+                            yield StreamTaskMessageDone(
+                                type="done",
+                                index=item_id_to_index[item_id],
+                            )
 
-                # Skip reasoning summary events since o1 reasoning tokens are not accessible
-                elif isinstance(raw_event, (ResponseReasoningSummaryPartAddedEvent,
-                                            ResponseReasoningSummaryTextDeltaEvent,
-                                            ResponseReasoningSummaryPartDoneEvent)):
-                    pass
+                    # Skip reasoning summary events since o1 reasoning tokens are not accessible
+                    elif isinstance(raw_event, (ResponseReasoningSummaryPartAddedEvent,
+                                                ResponseReasoningSummaryTextDeltaEvent,
+                                                ResponseReasoningSummaryPartDoneEvent)):
+                        pass
 
-                # Check if this is a text delta event from OpenAI
-                elif isinstance(raw_event, ResponseTextDeltaEvent):
-                    # Check if this event has an item_id
-                    item_id = getattr(raw_event, 'item_id', None)
+                    # Check if this is a text delta event from OpenAI
+                    elif isinstance(raw_event, ResponseTextDeltaEvent):
+                        # Check if this event has an item_id
+                        item_id = getattr(raw_event, 'item_id', None)
 
-                    # If this is a new item_id we haven't seen, it's a new message
-                    if item_id and item_id not in item_id_to_index:
-                        # Check if this is truly a NEW text message after tools
-                        # We need to differentiate between the first text and the final text after tools
-                        if seen_tool_output:
-                            # This is the final text message after tool execution
-                            message_index += 1
-                            item_id_to_index[item_id] = message_index
-                        else:
-                            item_id_to_index[item_id] = message_index
+                        # If this is a new item_id we haven't seen, it's a new message
+                        if item_id and item_id not in item_id_to_index:
+                            # Check if this is truly a NEW text message after tools
+                            # We need to differentiate between the first text and the final text after tools
+                            if seen_tool_output:
+                                # This is the final text message after tool execution
+                                message_index += 1
+                                item_id_to_index[item_id] = message_index
+                            else:
+                                item_id_to_index[item_id] = message_index
 
-                        # Send a start event with empty content for this new text message
-                        yield StreamTaskMessageStart(
-                            type="start",
-                            index=item_id_to_index[item_id],
-                            content=TextContent(
+                            # Send a start event with empty content for this new text message
+                            yield StreamTaskMessageStart(
+                                type="start",
+                                index=item_id_to_index[item_id],
+                                content=TextContent(
+                                    type="text",
+                                    author="agent",
+                                    content="",  # Start with empty content, deltas will fill it
+                                ),
+                            )
+
+                        # Use the index for this item_id
+                        current_index = item_id_to_index.get(item_id, message_index)
+
+                        delta_message = StreamTaskMessageDelta(
+                            type="delta",
+                            index=current_index,
+                            delta=TextDelta(
                                 type="text",
-                                author="agent",
-                                content="",  # Start with empty content, deltas will fill it
+                                text_delta=raw_event.delta,
                             ),
                         )
+                        yield delta_message
 
-                    # Use the index for this item_id
-                    current_index = item_id_to_index.get(item_id, message_index)
+            elif hasattr(event, 'type') and event.type == 'run_item_stream_event':
+                # Skip reasoning_item events since o1 reasoning tokens are not accessible via the API
+                if hasattr(event, 'item') and event.item.type == 'reasoning_item':
+                    continue
 
-                    delta_message = StreamTaskMessageDelta(
-                        type="delta",
-                        index=current_index,
-                        delta=TextDelta(
-                            type="text",
-                            text_delta=raw_event.delta,
-                        ),
+                # Check for tool_call_item type (this is when a tool is being called)
+                elif hasattr(event, 'item') and event.item.type == 'tool_call_item':
+                    # Extract tool call information using the helper method
+                    call_id, tool_name, tool_arguments = _extract_tool_call_info(event.item.raw_item)
+                    tool_map[call_id] = tool_name
+                    tool_request_content = ToolRequestContent(
+                        tool_call_id=call_id,
+                        name=tool_name,
+                        arguments=tool_arguments,
+                        author="agent",
                     )
-                    yield delta_message
+                    message_index += 1  # Increment for new message
+                    yield StreamTaskMessageFull(
+                        index=message_index,
+                        type="full",
+                        content=tool_request_content,
+                    )
 
-        elif hasattr(event, 'type') and event.type == 'run_item_stream_event':
-            # Skip reasoning_item events since o1 reasoning tokens are not accessible via the API
-            if hasattr(event, 'item') and event.item.type == 'reasoning_item':
-                continue
+                # Check for tool_call_output_item type (this is when a tool returns output)
+                elif hasattr(event, 'item') and event.item.type == 'tool_call_output_item':
+                    # Extract tool response information using the helper method
+                    call_id, tool_name, content = _extract_tool_response_info(tool_map, event.item.raw_item)
+                    tool_response_content = ToolResponseContent(
+                        tool_call_id=call_id,
+                        name=tool_name,
+                        content=content,
+                        author="agent",
+                    )
+                    message_index += 1  # Increment for new message
+                    seen_tool_output = True  # Mark that we've seen tool output so next text gets new index
+                    yield StreamTaskMessageFull(
+                        type="full",
+                        index=message_index,
+                        content=tool_response_content,
+                    )
 
-            # Check for tool_call_item type (this is when a tool is being called)
-            elif hasattr(event, 'item') and event.item.type == 'tool_call_item':
-                # Extract tool call information using the helper method
-                call_id, tool_name, tool_arguments = _extract_tool_call_info(event.item.raw_item)
-                tool_map[call_id] = tool_name
-                tool_request_content = ToolRequestContent(
-                    tool_call_id=call_id,
-                    name=tool_name,
-                    arguments=tool_arguments,
-                    author="agent",
-                )
-                message_index += 1  # Increment for new message
-                yield StreamTaskMessageFull(
-                    index=message_index,
-                    type="full",
-                    content=tool_request_content,
-                )
+    except InputGuardrailTripwireTriggered as e:
+        # Handle input guardrail trigger by sending a rejection message
+        # Priority: exception message > user-supplied parameter > module default
+        rejection_message = input_guardrail_message or DEFAULT_INPUT_GUARDRAIL_MESSAGE
 
-            # Check for tool_call_output_item type (this is when a tool returns output)
-            elif hasattr(event, 'item') and event.item.type == 'tool_call_output_item':
-                # Extract tool response information using the helper method
-                call_id, tool_name, content = _extract_tool_response_info(tool_map, event.item.raw_item)
-                tool_response_content = ToolResponseContent(
-                    tool_call_id=call_id,
-                    name=tool_name,
-                    content=content,
-                    author="agent",
-                )
-                message_index += 1  # Increment for new message
-                seen_tool_output = True  # Mark that we've seen tool output so next text gets new index
-                yield StreamTaskMessageFull(
-                    type="full",
-                    index=message_index,
-                    content=tool_response_content,
-                )
+        # Try to extract rejection message from the guardrail result (highest priority)
+        if hasattr(e, "guardrail_result") and hasattr(e.guardrail_result, "output"):
+            output_info = getattr(e.guardrail_result.output, "output_info", {})
+            if isinstance(output_info, dict) and "rejection_message" in output_info:
+                rejection_message = output_info["rejection_message"]
+            elif hasattr(e.guardrail_result, "guardrail"):
+                # Fall back to using guardrail name if no custom message
+                triggered_guardrail_name = getattr(e.guardrail_result.guardrail, "name", None)
+                if triggered_guardrail_name:
+                    rejection_message = f"I'm sorry, but I cannot process this request. The '{triggered_guardrail_name}' guardrail was triggered."
+
+        # Yield rejection message as AgentEx events
+        message_index += 1
+        yield StreamTaskMessageStart(
+            type="start",
+            index=message_index,
+            content=TextContent(
+                type="text",
+                author="agent",
+                content="",
+            ),
+        )
+        yield StreamTaskMessageFull(
+            type="full",
+            index=message_index,
+            content=TextContent(
+                type="text",
+                author="agent",
+                content=rejection_message,
+            ),
+        )
+        yield StreamTaskMessageDone(
+            type="done",
+            index=message_index,
+        )
+
+    except OutputGuardrailTripwireTriggered as e:
+        # Handle output guardrail trigger by sending a rejection message
+        # Priority: exception message > user-supplied parameter > module default
+        rejection_message = output_guardrail_message or DEFAULT_OUTPUT_GUARDRAIL_MESSAGE
+
+        # Try to extract rejection message from the guardrail result (highest priority)
+        if hasattr(e, "guardrail_result") and hasattr(e.guardrail_result, "output"):
+            output_info = getattr(e.guardrail_result.output, "output_info", {})
+            if isinstance(output_info, dict) and "rejection_message" in output_info:
+                rejection_message = output_info["rejection_message"]
+            elif hasattr(e.guardrail_result, "guardrail"):
+                # Fall back to using guardrail name if no custom message
+                triggered_guardrail_name = getattr(e.guardrail_result.guardrail, "name", None)
+                if triggered_guardrail_name:
+                    rejection_message = f"I'm sorry, but I cannot provide this response. The '{triggered_guardrail_name}' guardrail was triggered."
+
+        # Yield rejection message as AgentEx events
+        message_index += 1
+        yield StreamTaskMessageStart(
+            type="start",
+            index=message_index,
+            content=TextContent(
+                type="text",
+                author="agent",
+                content="",
+            ),
+        )
+        yield StreamTaskMessageFull(
+            type="full",
+            index=message_index,
+            content=TextContent(
+                type="text",
+                author="agent",
+                content=rejection_message,
+            ),
+        )
+        yield StreamTaskMessageDone(
+            type="done",
+            index=message_index,
+        )
