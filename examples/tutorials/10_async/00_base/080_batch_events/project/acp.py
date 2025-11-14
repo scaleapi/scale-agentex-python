@@ -9,6 +9,7 @@ from enum import Enum
 
 from agentex.lib import adk
 from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.sdk.fastacp.fastacp import FastACP
@@ -27,7 +28,7 @@ class Status(Enum):
 
 
 # Create an ACP server
-acp = FastACP.create(acp_type="agentic", config=AgenticACPConfig(type="base"))
+acp = FastACP.create(acp_type="async", config=AsyncACPConfig(type="base"),)
 
 
 async def process_events_batch(events, task_id: str) -> str:
