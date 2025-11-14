@@ -104,7 +104,6 @@ class TestStreamingEvents:
                 await test_agent.send_event(user_message, timeout_seconds=30.0)
 
             elif event_type == "full":
-                print('full event', event)
                 task_message_update = StreamTaskMessageFull.model_validate(event)
                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                     finished_message = await test_agent.client.messages.retrieve(task_message_update.parent_task_message.id)
@@ -121,7 +120,6 @@ class TestStreamingEvents:
                     ):
                         agent_response_found = True
             elif event_type == "done":
-                print('done event', event)
                 task_message_update = StreamTaskMessageDone.model_validate(event)
                 if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
                     finished_message = await test_agent.client.messages.retrieve(task_message_update.parent_task_message.id)
