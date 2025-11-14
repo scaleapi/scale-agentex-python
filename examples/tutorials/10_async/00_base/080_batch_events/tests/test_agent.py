@@ -14,8 +14,8 @@ import asyncio
 import pytest
 import pytest_asyncio
 
-from agentex import AsyncAgentex
 from agentex.lib.testing import async_test_agent, stream_agent_response, assert_valid_agent_response
+from agentex.lib.testing.sessions import AsyncAgentTest
 from agentex.types.text_content_param import TextContentParam
 from agentex.types.task_message_content import TextContent
 
@@ -35,53 +35,46 @@ async def test_agent(agent_name: str):
         yield test
 
 
-@pytest.mark.asyncio
-async def test_single_event_and_poll():
-    """Test sending a single event and polling for response."""
-    async with async_test_agent(agent_name=AGENT_NAME) as test:
-        response = await test.send_event("Process this single event", timeout_seconds=30.0)
+class TestNonStreamingEvents:
+    """Test non-streaming event sending and polling."""
+
+    @pytest.mark.asyncio
+    async def test_send_event_and_poll(self, test_agent: AsyncAgentTest):
+        """Test sending a single event and polling for response."""
+        response = await test_agent.send_event("Process this single event", timeout_seconds=30.0)
         assert_valid_agent_response(response)
         assert "Processed event IDs" in response.content
 
 
-@pytest.mark.asyncio
-async def test_batch_events_and_poll():
-    """Test sending events and polling for responses."""
-    # Need client access to send events directly
-    client = AsyncAgentex(api_key="test", base_url="http://localhost:5003")
-
-    # Get agent ID
-    agents = await client.agents.list()
-    agent = next((a for a in agents if a.name == AGENT_NAME), None)
-    assert agent is not None, f"Agent {AGENT_NAME} not found"
-
-    num_events = 7
-    async with async_test_agent(agent_name=AGENT_NAME) as test:
+    @pytest.mark.asyncio
+    async def test_batch_events_and_poll(self, test_agent: AsyncAgentTest):
+        """Test sending events and polling for responses."""
+        num_events = 7
         for i in range(num_events):
             event_content = TextContentParam(type="text", author="user", content=f"Batch event {i + 1}")
-            await client.agents.send_event(
-                agent_id=agent.id, params={"task_id": test.task_id, "content": event_content}
+            await test_agent.client.agents.send_event(
+                agent_id=test_agent.agent.id, params={"task_id": test_agent.task_id, "content": event_content}
             )
             await asyncio.sleep(0.1)  # Small delay to ensure ordering
 
         ## there should be at least 2 agent responses to ensure that not all of the events are processed
-        await test.send_event("Process this single event", timeout_seconds=30.0)
+        await test_agent.send_event("Process this single event", timeout_seconds=30.0)
         # Wait for processing to complete (5 events * 5 seconds each = 25s + buffer)
-        messages = []
-        for i in range(8):
-            messages = await client.messages.list(task_id=test.task_id)
-            if len(messages) >= 2:
+        agent_messages = []
+        for _ in range(8):
+            agent_messages = await test_agent.client.messages.list(task_id=test_agent.task_id)
+            if len(agent_messages) >= 2:
                 break
             await asyncio.sleep(5)
-        assert len(messages) > 0, "Should have received at least one agent response"
+        assert len(agent_messages) > 0, "Should have received at least one agent response"
         # PROOF OF BATCHING: Should have fewer responses than events sent
-        assert len(messages) < num_events, (
-            f"Expected batching to result in fewer responses than {num_events} events, got {len(messages)}"
+        assert len(agent_messages) < num_events, (
+            f"Expected batching to result in fewer responses than {num_events} events, got {len(agent_messages)}"
         )
 
         # Analyze each batch response to count how many events were in each batch
         found_batch_with_multiple_events = False
-        for msg in messages:
+        for msg in agent_messages:
             assert isinstance(msg.content, TextContent)
             response = msg.content.content
             # Count event IDs in this response (they're in a list like ['id1', 'id2', ...])
@@ -96,29 +89,23 @@ async def test_batch_events_and_poll():
         assert found_batch_with_multiple_events, "Should have found a batch with multiple events"
 
 
-@pytest.mark.asyncio
-async def test_batched_streaming():
-    """Test streaming responses."""
-    # Need client access to send events directly
-    client = AsyncAgentex(api_key="test", base_url="http://localhost:5003")
+class TestStreamingEvents:
+    """Test streaming event sending."""
 
-    # Get agent ID
-    agents = await client.agents.list()
-    agent = next((a for a in agents if a.name == AGENT_NAME), None)
-    assert agent is not None, f"Agent {AGENT_NAME} not found"
-
-    num_events = 10
-    async with async_test_agent(agent_name=AGENT_NAME) as test:
+    @pytest.mark.asyncio
+    async def test_batched_streaming(self, test_agent: AsyncAgentTest):
+        """Test streaming responses."""
+        num_events = 10
         for i in range(num_events):
             event_content = TextContentParam(type="text", author="user", content=f"Batch event {i + 1}")
-            await client.agents.send_event(
-                agent_id=agent.id, params={"task_id": test.task_id, "content": event_content}
+            await test_agent.client.agents.send_event(
+                agent_id=test_agent.agent.id, params={"task_id": test_agent.task_id, "content": event_content}
             )
             await asyncio.sleep(0.1)  # Small delay to ensure ordering
 
         # Stream events
         agent_messages = []
-        async for event in stream_agent_response(client, test.task_id, timeout=30.0):
+        async for event in stream_agent_response(test_agent.client, test_agent.task_id, timeout=30.0):
             # Collect agent text messages
             if event.get("type") == "full":
                 content = event.get("content", {})
