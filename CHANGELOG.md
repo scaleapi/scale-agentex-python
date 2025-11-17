@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.6 (2025-11-12)
+
+Full Changelog: [v0.6.5...v0.6.6](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.5...v0.6.6)
+
+### Bug Fixes
+
+* compat with Python 3.14 ([9a62f23](https://github.com/scaleapi/scale-agentex-python/commit/9a62f23376ef797bafe67f61552eb7635286caa3))
+* **compat:** update signatures of `model_dump` and `model_dump_json` for Pydantic v1 ([cf857f9](https://github.com/scaleapi/scale-agentex-python/commit/cf857f9191f10a971e9cba2a8c764229ed4a7dfe))
+
+
+### Chores
+
+* **internal:** restore stats ([5ec0383](https://github.com/scaleapi/scale-agentex-python/commit/5ec0383d9d6a85b342263ba49b8e3893924c59fc))
+* **package:** drop Python 3.8 support ([3d4dc37](https://github.com/scaleapi/scale-agentex-python/commit/3d4dc37f87b8d8f1debbe6505746342e461772ba))
+
 ## 0.6.5 (2025-11-06)
 
 Full Changelog: [v0.6.4...v0.6.5](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.4...v0.6.5)
