@@ -78,7 +78,7 @@ def with_async_retry(func):  # type: ignore[no-untyped-def]
     """
 
     @wraps(func)
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> object:
         last_exception = None
         delay = config.api_retry_delay
 

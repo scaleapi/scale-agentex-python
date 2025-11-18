@@ -33,6 +33,7 @@ CONTINUE_ON_ERROR=false
 SINGLE_TUTORIAL=""
 VIEW_LOGS=false
 FROM_REPO_ROOT=false
+BUILD_CLI=false
 
 for arg in "$@"; do
     if [[ "$arg" == "--continue-on-error" ]]; then
@@ -41,6 +42,8 @@ for arg in "$@"; do
         VIEW_LOGS=true
     elif [[ "$arg" == "--from-repo-root" ]]; then
         FROM_REPO_ROOT=true
+    elif [[ "$arg" == "--build-cli" ]]; then
+        BUILD_CLI=true
     else
         SINGLE_TUTORIAL="$arg"
     fi
@@ -55,15 +58,15 @@ ALL_TUTORIALS=(
     # base tutorials
     "10_async/00_base/000_hello_acp"
     "10_async/00_base/010_multiturn"
-    "10_agentic/00_base/020_streaming"
-    "10_agentic/00_base/030_tracing"
-    "10_agentic/00_base/040_other_sdks"
-    "10_agentic/00_base/080_batch_events"
-#    "10_agentic/00_base/090_multi_agent_non_temporal" This will require its own version of this
+    "10_async/00_base/020_streaming"
+    "10_async/00_base/030_tracing"
+    "10_async/00_base/040_other_sdks"
+    "10_async/00_base/080_batch_events"
+#    "10_async/00_base/090_multi_agent_non_temporal" This will require its own version of this
     # temporal tutorials
-    "10_agentic/10_temporal/000_hello_acp"
-    "10_agentic/10_temporal/010_agent_chat"
-    "10_agentic/10_temporal/020_state_machine"
+    "10_async/10_temporal/000_hello_acp"
+    "10_async/10_temporal/010_agent_chat"
+    "10_async/10_temporal/020_state_machine"
 )
 
 PASSED=0
@@ -92,7 +95,7 @@ check_prerequisites() {
 wait_for_agent_ready() {
     local name=$1
     local logfile="/tmp/agentex-${name}.log"
-    local timeout=30  # seconds
+    local timeout=45  # seconds
     local elapsed=0
 
     echo -e "${YELLOW}⏳ Waiting for ${name} agent to be ready...${NC}"
@@ -132,6 +135,18 @@ start_agent() {
         return 1
     fi
 
+    if [ "$BUILD_CLI" = true ]; then
+        # Use wheel from dist directory at repo root
+        local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)	
+        if [[ -z "$wheel_file" ]]; then	
+            echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"	
+            echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"	
+            echo -e "${YELLOW}💡 From the repo root directory${NC}"	
+            cd "$original_dir"	
+            return 1	
+        fi
+    fi
+
     # Determine how to run the agent
     local pid
     if [[ "$FROM_REPO_ROOT" == "true" ]]; then
@@ -141,14 +156,26 @@ start_agent() {
 
         local original_dir="$PWD"
         cd "$repo_root" || return 1
-        uv run agentex agents run --manifest "$abs_manifest" > "$logfile" 2>&1 &
+        if [ "$BUILD_CLI" = true ]; then
+            local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+            # Use the built wheel	
+            uv run --with "$wheel_file" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
+        else
+            uv run agentex agents run --manifest "$abs_manifest" > "$logfile" 2>&1 &
+        fi
         pid=$!
         cd "$original_dir"  # Return to examples/tutorials
     else
         # Traditional mode: cd into tutorial and run
         local original_dir="$PWD"
         cd "$tutorial_path" || return 1
-        uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
+        if [ "$BUILD_CLI" = true ]; then
+            local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+            # Use the built wheel	
+            uv run --with "$wheel_file" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
+        else
+            uv run agentex agents run --manifest "$abs_manifest" > "$logfile" 2>&1 &
+        fi
         pid=$!
         cd "$original_dir"
     fi
@@ -341,6 +368,38 @@ execute_tutorial_test() {
     fi
 }
 
+# Function to check if built wheel is available	
+check_built_wheel() {	
+
+    # Navigate to the repo root (two levels up from examples/tutorials)	
+    local repo_root="../../"	
+    local original_dir="$PWD"	
+
+    cd "$repo_root" || {	
+        echo -e "${RED}❌ Failed to navigate to repo root${NC}"	
+        return 1	
+    }	
+
+    # Check if wheel exists in dist directory at repo root	
+    local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)	
+    if [[ -z "$wheel_file" ]]; then	
+        echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"	
+        echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"	
+        echo -e "${YELLOW}💡 From the repo root directory${NC}"	
+        cd "$original_dir"	
+        return 1	
+    fi	
+
+    # Test the wheel by running agentex --help	
+    if ! uv run --with "$wheel_file" agentex --help >/dev/null 2>&1; then	
+        echo -e "${RED}❌ Failed to run agentex with built wheel${NC}"	
+        cd "$original_dir"	
+        return 1	
+    fi	
+    cd "$original_dir"	
+    return 0	
+}
+
 # Main execution function
 main() {
     # Handle --view-logs flag
@@ -367,6 +426,15 @@ main() {
 
     # Check prerequisites
     check_prerequisites
+    
+    # Check built wheel if requested
+    if [ "$BUILD_CLI" = true ]; then
+        if ! check_built_wheel; then
+            echo -e "${RED}❌ Failed to find or verify built wheel${NC}"
+            exit 1
+        fi
+        echo ""
+    fi
 
     echo ""
 
