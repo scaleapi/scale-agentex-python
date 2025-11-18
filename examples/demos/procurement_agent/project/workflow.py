@@ -19,9 +19,9 @@ from project.models.events import (
     ShipmentArrivedSiteEvent,
     ShipmentDepartedFactoryEvent,
 )
+from agentex.lib.utils.logging import make_logger
 from agentex.types.data_content import DataContent
 from agentex.types.text_content import TextContent
-from agentex.lib.utils.logging import make_logger
 from project.utils.summarization import (
     should_summarize,
     find_last_summary_index,
