@@ -1,8 +1,8 @@
 import asyncio
 
-from project.workflow import ExampleTutorialWorkflow
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
+from project.workflow import ExampleTutorialWorkflow
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables

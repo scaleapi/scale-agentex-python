@@ -1,10 +1,10 @@
 import asyncio
 from datetime import timedelta
 
-from project.workflow import ExampleTutorialWorkflow
-from project.activities import get_weather, deposit_money, withdraw_money
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
 
+from project.workflow import ExampleTutorialWorkflow
+from project.activities import get_weather, deposit_money, withdraw_money
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
