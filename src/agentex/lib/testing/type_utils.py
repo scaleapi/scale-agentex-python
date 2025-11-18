@@ -64,15 +64,15 @@ def extract_agent_response(response, agent_id: str):  # type: ignore[no-untyped-
 
         # SendMessageResponse: result.content
         if hasattr(result, "content"):
-            content = getattr(result, "content")
+            content = result.content # type: ignore
             if isinstance(content, TextContent):
                 return content
 
         # SendEventResponse: result.message.content
-        if hasattr(result, "message") and getattr(result, "message"):
-            message = getattr(result, "message")
+        if hasattr(result, "message") and result.message: # type: ignore
+            message = result.message # type: ignore
             if hasattr(message, "content"):
-                content = getattr(message, "content")
+                content = message.content
                 if isinstance(content, TextContent):
                     return content
 

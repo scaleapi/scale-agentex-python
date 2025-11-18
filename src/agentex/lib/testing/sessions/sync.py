@@ -147,8 +147,8 @@ class SyncAgentTest:
             first_chunk = next(response_generator, None)
             if first_chunk and hasattr(first_chunk, 'result'):
                 result = first_chunk.result
-                if hasattr(result, 'task_id') and getattr(result, 'task_id'):
-                    self.task_id = getattr(result, 'task_id')
+                if hasattr(result, 'task_id') and result.task_id: # type: ignore
+                    self.task_id = result.task_id # type: ignore
                     logger.debug(f"Task auto-created from stream: {self.task_id}")
                 # Check if result has parent_task_message with task_id
                 elif hasattr(result, 'parent_task_message') and result.parent_task_message:
