@@ -49,22 +49,29 @@ async def send_fake_events(workflow_id: str):
     steel_beams_events = [
         SubmitalApprovalEvent(
             event_type=EventType.SUBMITTAL_APPROVED,
-            item="Steel Beams"
+            item="Steel Beams",
+            document_name="Steel Beams Submittal.pdf",
+            document_url="/submittal_approval.pdf"
         ),
         ShipmentDepartedFactoryEvent(
             event_type=EventType.SHIPMENT_DEPARTED_FACTORY,
             item="Steel Beams",
-            eta=datetime(2026, 2, 10)
+            eta=datetime(2026, 2, 10, 14, 30),
+            date_departed=datetime(2026, 2, 3, 9, 15),
+            location_address="218 W 18th St, New York, NY 10011"
         ),
         ShipmentArrivedSiteEvent(
             event_type=EventType.SHIPMENT_ARRIVED_SITE,
             item="Steel Beams",
-            date_arrived=datetime(2026, 2, 10)
+            date_arrived=datetime(2026, 2, 10, 15, 45),
+            location_address="650 Townsend St, San Francisco, CA 94103"
         ),
         InspectionPassedEvent(
             event_type=EventType.INSPECTION_PASSED,
             item="Steel Beams",
-            inspection_date=datetime(2026, 2, 11)
+            inspection_date=datetime(2026, 2, 11, 10, 20),
+            document_name="Steel Beams Inspection Report.pdf",
+            document_url="/inspection_passed.pdf"
         )
     ]
 
@@ -74,22 +81,29 @@ async def send_fake_events(workflow_id: str):
     hvac_events = [
         SubmitalApprovalEvent(
             event_type=EventType.SUBMITTAL_APPROVED,
-            item="HVAC Units"
+            item="HVAC Units",
+            document_name="HVAC Units Submittal.pdf",
+            document_url="/submittal_approval.pdf"
         ),
         ShipmentDepartedFactoryEvent(
             event_type=EventType.SHIPMENT_DEPARTED_FACTORY,
             item="HVAC Units",
-            eta=datetime(2026, 2, 22)
+            eta=datetime(2026, 2, 22, 11, 0),
+            date_departed=datetime(2026, 2, 15, 13, 45),
+            location_address="218 W 18th St, New York, NY 10011"
         ),
         ShipmentArrivedSiteEvent(
             event_type=EventType.SHIPMENT_ARRIVED_SITE,
             item="HVAC Units",
-            date_arrived=datetime(2026, 2, 22)
+            date_arrived=datetime(2026, 2, 22, 10, 30),
+            location_address="650 Townsend St, San Francisco, CA 94103"
         ),
         InspectionFailedEvent(
             event_type=EventType.INSPECTION_FAILED,
             item="HVAC Units",
-            inspection_date=datetime(2026, 2, 23)
+            inspection_date=datetime(2026, 2, 23, 14, 15),
+            document_name="HVAC Units Inspection Report.pdf",
+            document_url="/inspection_failed.pdf"
         )
     ]
 
@@ -99,28 +113,36 @@ async def send_fake_events(workflow_id: str):
     windows_events = [
         SubmitalApprovalEvent(
             event_type=EventType.SUBMITTAL_APPROVED,
-            item="Windows"
+            item="Windows",
+            document_name="Windows Submittal.pdf",
+            document_url="/submittal_approval.pdf"
         ),
         ShipmentDepartedFactoryEvent(
             event_type=EventType.SHIPMENT_DEPARTED_FACTORY,
             item="Windows",
-            eta=datetime(2026, 3, 5)
+            eta=datetime(2026, 3, 5, 16, 0),
+            date_departed=datetime(2026, 2, 20, 8, 30),
+            location_address="218 W 18th St, New York, NY 10011"
         ),
         ShipmentArrivedSiteEvent(
             event_type=EventType.SHIPMENT_ARRIVED_SITE,
             item="Windows",
-            date_arrived=datetime(2026, 3, 5)
+            date_arrived=datetime(2026, 3, 5, 16, 20),
+            location_address="650 Townsend St, San Francisco, CA 94103"
         ),
         InspectionPassedEvent(
             event_type=EventType.INSPECTION_PASSED,
             item="Windows",
-            inspection_date=datetime(2026, 3, 6)
+            inspection_date=datetime(2026, 3, 6, 9, 45),
+            document_name="Windows Inspection Report.pdf",
+            document_url="/inspection_passed.pdf"
         ),
         # Duplicate arrival event to test agent doesn't double-process
         ShipmentArrivedSiteEvent(
             event_type=EventType.SHIPMENT_ARRIVED_SITE,
             item="Windows",
-            date_arrived=datetime(2026, 3, 5)
+            date_arrived=datetime(2026, 3, 5, 16, 20),
+            location_address="650 Townsend St, San Francisco, CA 94103"
         )
     ]
 
@@ -130,22 +152,29 @@ async def send_fake_events(workflow_id: str):
     flooring_events = [
         SubmitalApprovalEvent(
             event_type=EventType.SUBMITTAL_APPROVED,
-            item="Flooring Materials"
+            item="Flooring Materials",
+            document_name="Flooring Materials Submittal.pdf",
+            document_url="/submittal_approval.pdf"
         ),
         ShipmentDepartedFactoryEvent(
             event_type=EventType.SHIPMENT_DEPARTED_FACTORY,
             item="Flooring Materials",
-            eta=datetime(2026, 3, 29)
+            eta=datetime(2026, 3, 29, 13, 15),
+            date_departed=datetime(2026, 3, 22, 11, 30),
+            location_address="218 W 18th St, New York, NY 10011"
         ),
         ShipmentArrivedSiteEvent(
             event_type=EventType.SHIPMENT_ARRIVED_SITE,
             item="Flooring Materials",
-            date_arrived=datetime(2026, 3, 29)
+            date_arrived=datetime(2026, 3, 29, 12, 45),
+            location_address="650 Townsend St, San Francisco, CA 94103"
         ),
         InspectionPassedEvent(
             event_type=EventType.INSPECTION_PASSED,
             item="Flooring Materials",
-            inspection_date=datetime(2026, 3, 30)
+            inspection_date=datetime(2026, 3, 30, 15, 30),
+            document_name="Flooring Materials Inspection Report.pdf",
+            document_url="/inspection_passed.pdf"
         )
     ]
 
@@ -156,22 +185,29 @@ async def send_fake_events(workflow_id: str):
     electrical_events = [
         SubmitalApprovalEvent(
             event_type=EventType.SUBMITTAL_APPROVED,
-            item="Electrical Panels"
+            item="Electrical Panels",
+            document_name="Electrical Panels Submittal.pdf",
+            document_url="/submittal_approval.pdf"
         ),
         ShipmentDepartedFactoryEvent(
             event_type=EventType.SHIPMENT_DEPARTED_FACTORY,
             item="Electrical Panels",
-            eta=datetime(2026, 4, 10)
+            eta=datetime(2026, 4, 10, 10, 45),
+            date_departed=datetime(2026, 4, 1, 14, 0),
+            location_address="218 W 18th St, New York, NY 10011"
         ),
         ShipmentArrivedSiteEvent(
             event_type=EventType.SHIPMENT_ARRIVED_SITE,
             item="Electrical Panels",
-            date_arrived=datetime(2026, 4, 10)
+            date_arrived=datetime(2026, 4, 10, 11, 15),
+            location_address="650 Townsend St, San Francisco, CA 94103"
         ),
         InspectionFailedEvent(
             event_type=EventType.INSPECTION_FAILED,
             item="Electrical Panels",
-            inspection_date=datetime(2026, 4, 11)
+            inspection_date=datetime(2026, 4, 11, 13, 0),
+            document_name="Electrical Panels Inspection Report.pdf",
+            document_url="/inspection_failed.pdf"
         )
     ]
 

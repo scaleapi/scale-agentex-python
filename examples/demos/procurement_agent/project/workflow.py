@@ -19,8 +19,9 @@ from project.models.events import (
     ShipmentArrivedSiteEvent,
     ShipmentDepartedFactoryEvent,
 )
-from agentex.lib.utils.logging import make_logger
+from agentex.types.data_content import DataContent
 from agentex.types.text_content import TextContent
+from agentex.lib.utils.logging import make_logger
 from project.utils.summarization import (
     should_summarize,
     find_last_summary_index,
@@ -100,10 +101,6 @@ class ProcurementAgentWorkflow(BaseWorkflow):
         if self._state is None:
             raise ValueError("State is not initialized")
 
-        self._task_id = params.task.id
-        self._trace_id = params.task.id
-        self._parent_span_id = params.task.id
-
         if params.event.content is None:
             workflow.logger.warning("Received event with no content")
             return
@@ -123,6 +120,10 @@ class ProcurementAgentWorkflow(BaseWorkflow):
         logger.info(f"Received task create params: {params}")
 
         self._state = StateModel(input_list=[])
+
+        self._task_id = params.task.id
+        self._trace_id = params.task.id
+        self._parent_span_id = params.task.id
 
         workflow_id = workflow.info().workflow_id
 
@@ -181,9 +182,9 @@ class ProcurementAgentWorkflow(BaseWorkflow):
             if not self.event_queue.empty():
                 event = await self.event_queue.get()
 
-                await adk.messages.create(task_id=params.task.id, content=TextContent(
+                await adk.messages.create(task_id=params.task.id, content=DataContent(
                     author="user",
-                    content=event,
+                    data=json.loads(event),
                 ))
 
                 self._state.input_list.append({
