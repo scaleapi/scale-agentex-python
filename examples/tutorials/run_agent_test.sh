@@ -44,6 +44,7 @@ for arg in "$@"; do
         FROM_REPO_ROOT=true
     elif [[ "$arg" == "--build-cli" ]]; then
         BUILD_CLI=true
+        FROM_REPO_ROOT=true  # If building CLI, run from repo root
     else
         SINGLE_TUTORIAL="$arg"
     fi
@@ -159,7 +160,7 @@ start_agent() {
         if [ "$BUILD_CLI" = true ]; then
             local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
             # Use the built wheel	
-            uv run --with "$wheel_file" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
+            uv run --with "$wheel_file" agentex agents run --manifest "$abs_manifest" > "$logfile" 2>&1 &
         else
             uv run agentex agents run --manifest "$abs_manifest" > "$logfile" 2>&1 &
         fi
@@ -172,9 +173,9 @@ start_agent() {
         if [ "$BUILD_CLI" = true ]; then
             local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
             # Use the built wheel	
-            uv run --with "$wheel_file" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
+            uv run --with "$wheel_file" agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
         else
-            uv run agentex agents run --manifest "$abs_manifest" > "$logfile" 2>&1 &
+            uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
         fi
         pid=$!
         cd "$original_dir"
