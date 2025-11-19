@@ -6,10 +6,10 @@ from functools import reduce, singledispatch
 
 from agentex.lib.types.llm_messages import (
     Delta,
+    Usage,
     Choice,
     ToolCall,
     Completion,
-    Usage,
     ToolCallRequest,
 )
 
