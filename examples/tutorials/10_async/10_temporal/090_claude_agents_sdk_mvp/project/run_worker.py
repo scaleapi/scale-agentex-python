@@ -23,7 +23,7 @@ from agentex.lib.core.temporal.plugins.claude_agents import (
 )
 
 # Import workflow and workspace activity
-from workflow import ClaudeMvpWorkflow, create_workspace_directory
+from project.workflow import ClaudeMvpWorkflow, create_workspace_directory
 
 logger = make_logger(__name__)
 
