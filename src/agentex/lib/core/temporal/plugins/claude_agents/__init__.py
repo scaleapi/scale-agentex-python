@@ -36,7 +36,8 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 from agentex.lib.utils.logging import make_logger
 from agentex.lib import adk
 from agentex.types.text_content import TextContent
-from agentex.types.task_message_delta import TextDelta, StreamTaskMessageDelta
+from agentex.types.task_message_delta import TextDelta
+from agentex.types.task_message_update import StreamTaskMessageDelta
 
 logger = make_logger(__name__)
 
