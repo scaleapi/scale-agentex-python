@@ -18,7 +18,9 @@ What's missing (see NEXT_STEPS.md):
 """
 
 import os
+from pathlib import Path
 from temporalio import workflow
+from temporalio import activity
 from datetime import timedelta
 
 from agentex.lib import adk
@@ -41,6 +43,21 @@ if environment_variables.AGENT_NAME is None:
     raise ValueError("Environment variable AGENT_NAME is not set")
 
 logger = make_logger(__name__)
+
+
+# Activity for workspace creation (avoids determinism issues)
+@activity.defn
+async def create_workspace_directory(task_id: str, workspace_root: str | None = None) -> str:
+    """Create workspace directory for task - runs as Temporal activity"""
+    if workspace_root is None:
+        # Use project-relative workspace for local development
+        project_dir = Path(__file__).parent.parent
+        workspace_root = str(project_dir / "workspace")
+
+    workspace_path = os.path.join(workspace_root, task_id)
+    os.makedirs(workspace_path, exist_ok=True)
+    logger.info(f"Created workspace: {workspace_path}")
+    return workspace_path
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
@@ -145,15 +162,15 @@ class ClaudeMvpWorkflow(BaseWorkflow):
 
         logger.info(f"Creating Claude MVP workflow for task: {params.task.id}")
 
-        # Create workspace directory
-        workspace_root = os.environ.get("CLAUDE_WORKSPACE_ROOT", "/workspaces")
-        self._workspace_path = os.path.join(workspace_root, params.task.id)
+        # Create workspace via activity (avoids determinism issues with file I/O)
+        workspace_root = os.environ.get("CLAUDE_WORKSPACE_ROOT")
+        self._workspace_path = await workflow.execute_activity(
+            create_workspace_directory,
+            args=[params.task.id, workspace_root],
+            start_to_close_timeout=timedelta(seconds=10),
+        )
 
-        # Note: makedirs in workflow is deterministic if idempotent
-        # Temporal will replay this, but it's safe because exist_ok=True
-        os.makedirs(self._workspace_path, exist_ok=True)
-
-        logger.info(f"Created workspace: {self._workspace_path}")
+        logger.info(f"Workspace ready: {self._workspace_path}")
 
         # Send welcome message
         await adk.messages.create(

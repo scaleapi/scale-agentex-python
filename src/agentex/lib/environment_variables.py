@@ -80,7 +80,7 @@ class EnvironmentVariables(BaseModel):
     BUILD_INFO_PATH: str | None = None
     # Claude Agents SDK Configuration
     ANTHROPIC_API_KEY: str | None = None
-    CLAUDE_WORKSPACE_ROOT: str | None = "/workspaces"
+    CLAUDE_WORKSPACE_ROOT: str | None = None  # Defaults to project/workspace if not set
 
     @classmethod
     def refresh(cls) -> EnvironmentVariables:

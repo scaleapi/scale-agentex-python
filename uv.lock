@@ -12,7 +12,9 @@ version = "0.6.5"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
+    { name = "anthropic" },
     { name = "anyio" },
+    { name = "claude-agent-sdk" },
     { name = "cloudpickle" },
     { name = "datadog" },
     { name = "ddtrace" },
@@ -47,6 +49,7 @@ dependencies = [
     { name = "tzlocal" },
     { name = "uvicorn" },
     { name = "watchfiles" },
+    { name = "yaspin" },
 ]
 
 [package.optional-dependencies]
@@ -69,7 +72,9 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.10,<4" },
     { name = "aiohttp", marker = "extra == 'aiohttp'" },
+    { name = "anthropic", specifier = ">=0.40.0" },
     { name = "anyio", specifier = ">=3.5.0,<5" },
+    { name = "claude-agent-sdk", specifier = ">=0.1.0" },
     { name = "cloudpickle", specifier = ">=3.1.1" },
     { name = "datadog", specifier = ">=0.52.1" },
     { name = "ddtrace", specifier = ">=3.13.0" },
@@ -106,6 +111,7 @@ requires-dist = [
     { name = "tzlocal", specifier = ">=5.3.1" },
     { name = "uvicorn", specifier = ">=0.31.1" },
     { name = "watchfiles", specifier = ">=0.24.0,<1.0" },
+    { name = "yaspin", specifier = ">=3.1.0" },
 ]
 provides-extras = ["aiohttp", "dev"]
 
@@ -196,6 +202,25 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ee/67/531ea369ba64dcff5ec9c3402f9f51bf748cec26dde048a2f973a4eea7f5/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89", size = 16081, upload-time = "2024-05-20T21:33:25.928Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53", size = 13643, upload-time = "2024-05-20T21:33:24.1Z" },
+]
+
+[[package]]
+name = "anthropic"
+version = "0.74.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "docstring-parser" },
+    { name = "httpx" },
+    { name = "jiter" },
+    { name = "pydantic" },
+    { name = "sniffio" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/f9/baa1b885c8664b446e6a13003938046901e54ffd70b532bbebd01256e34b/anthropic-0.74.0.tar.gz", hash = "sha256:114ec10cb394b6764e199da06335da4747b019c5629e53add33572f66964ad99", size = 428958, upload-time = "2025-11-18T15:29:47.579Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/27/8c404b290ec650e634eacc674df943913722ec21097b0476d68458250c2f/anthropic-0.74.0-py3-none-any.whl", hash = "sha256:df29b8dfcdbd2751fa31177f643d8d8f66c5315fe06bdc42f9139e9f00d181d5", size = 371474, upload-time = "2025-11-18T15:29:45.748Z" },
 ]
 
 [[package]]
@@ -366,6 +391,21 @@ wheels = [
 ]
 
 [[package]]
+name = "claude-agent-sdk"
+version = "0.1.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "mcp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6e/2c/14828b10a5c99a3cdc42b12451c9ed03de6d53a712da4fe7b0b41c28e693/claude_agent_sdk-0.1.8.tar.gz", hash = "sha256:8ee495215132edc7f88e439f3f071154a016cea62d393fbf985eb806793ed3d1", size = 50899, upload-time = "2025-11-19T05:07:58.064Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/4e/fe4da2c056caaa4eb819181e77f2497f39ab2fb629ae93f0bed62a521982/claude_agent_sdk-0.1.8-py3-none-macosx_11_0_arm64.whl", hash = "sha256:bdec17988dba541bd48487d68d8e2dbcbe5fef718744f3c73b4236bb3e290875", size = 49380557, upload-time = "2025-11-19T05:07:48.607Z" },
+    { url = "https://files.pythonhosted.org/packages/95/7d/b1f6648d6631c892205c3db44f862532471aa2dead846c9d78c260ba3a73/claude_agent_sdk-0.1.8-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:6640f4c977842dc73a277a7f934a889c0161ab78ad454806cfb2b34eb0a2a7f7", size = 65237961, upload-time = "2025-11-19T05:07:52.021Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/fd/cba2bad3c79519be68c266b95a55508f856f7c3b3eaa47cfa9051672a221/claude_agent_sdk-0.1.8-py3-none-win_amd64.whl", hash = "sha256:4b2db1276d553b5cfa939701d0f6b9da38797db93445b9579f97498d0b4f3724", size = 68148406, upload-time = "2025-11-19T05:07:55.279Z" },
+]
+
+[[package]]
 name = "click"
 version = "8.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -491,6 +531,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722, upload-time = "2023-12-24T09:54:32.31Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277, upload-time = "2023-12-24T09:54:30.421Z" },
+]
+
+[[package]]
+name = "docstring-parser"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/9d/c3b43da9515bd270df0f80548d9944e389870713cc1fe2b8fb35fe2bcefd/docstring_parser-0.17.0.tar.gz", hash = "sha256:583de4a309722b3315439bb31d64ba3eebada841f2e2cee23b99df001434c912", size = 27442, upload-time = "2025-07-21T07:35:01.868Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/e2/2537ebcff11c1ee1ff17d8d0b6f4db75873e3b0fb32c2d4a2ee31ecb310a/docstring_parser-0.17.0-py3-none-any.whl", hash = "sha256:cf2569abd23dce8099b300f9b4fa8191e9582dda731fd533daf54c4551658708", size = 36896, upload-time = "2025-07-21T07:35:00.684Z" },
 ]
 
 [[package]]

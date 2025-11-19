@@ -22,8 +22,8 @@ from agentex.lib.core.temporal.plugins.claude_agents import (
     ContextInterceptor,  # Reuse from OpenAI!
 )
 
-# Import workflow
-from workflow import ClaudeMvpWorkflow
+# Import workflow and workspace activity
+from workflow import ClaudeMvpWorkflow, create_workspace_directory
 
 logger = make_logger(__name__)
 
@@ -54,8 +54,9 @@ async def main():
     # Get all standard AgentEx activities
     activities = get_all_activities()
 
-    # Add Claude-specific activity
+    # Add Claude-specific activities
     activities.append(run_claude_agent_activity)
+    activities.append(create_workspace_directory)
 
     logger.info(f"Registered {len(activities)} activities (including Claude activity)")
 
