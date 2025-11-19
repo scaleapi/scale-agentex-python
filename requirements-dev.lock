@@ -49,6 +49,8 @@ certifi==2023.7.22
     # via httpx
     # via kubernetes
     # via requests
+cfgv==3.4.0
+    # via pre-commit
 charset-normalizer==3.4.3
     # via requests
 click==8.2.1
@@ -121,6 +123,8 @@ httpx-sse==0.4.1
     # via mcp
 huggingface-hub==0.34.4
     # via tokenizers
+identify==2.6.15
+    # via pre-commit
 idna==3.4
     # via anyio
     # via httpx
@@ -186,6 +190,7 @@ nest-asyncio==1.6.0
 nexus-rpc==1.1.0
     # via temporalio
 nodeenv==1.8.0
+    # via pre-commit
     # via pyright
 nox==2023.4.22
 oauthlib==3.3.1
@@ -213,6 +218,7 @@ platformdirs==3.11.0
     # via virtualenv
 pluggy==1.5.0
     # via pytest
+pre-commit==4.3.0
 prompt-toolkit==3.0.51
     # via ipython
     # via questionary
@@ -281,6 +287,7 @@ pyyaml==6.0.2
     # via agentex-sdk
     # via huggingface-hub
     # via kubernetes
+    # via pre-commit
 pyzmq==27.0.1
     # via ipykernel
     # via jupyter-client
@@ -404,6 +411,7 @@ uvicorn==0.35.0
     # via mcp
 virtualenv==20.24.5
     # via nox
+    # via pre-commit
 watchfiles==0.24.0
     # via agentex-sdk
 wcwidth==0.2.13
