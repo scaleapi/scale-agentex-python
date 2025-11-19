@@ -1,7 +1,34 @@
 kind: Agent
+
+# Build Configuration
+build:
+  context:
+    root: ../
+    include_paths:
+      - 090_claude_agents_sdk_mvp
+    dockerfile: 090_claude_agents_sdk_mvp/Dockerfile
+    dockerignore: 090_claude_agents_sdk_mvp/.dockerignore
+
+# Local Development Configuration
+local_development:
+  agent:
+    port: 8001
+    host_address: host.docker.internal
+  paths:
+    acp: project/acp.py
+    worker: project/run_worker.py
+
+# Agent Configuration
 agent:
+  acp_type: async
   name: claude-mvp-agent
-  workflow: ClaudeMvpWorkflow
+  description: Claude Agents SDK MVP - proof of concept integration with AgentEx
+
+  temporal:
+    enabled: true
+    workflows:
+      - name: ClaudeMvpWorkflow
+        queue_name: claude-mvp-queue
 
   credentials:
     - env_var_name: ANTHROPIC_API_KEY
@@ -19,3 +46,23 @@ agent:
     CLAUDE_WORKSPACE_ROOT: "/workspaces"
     ACP_URL: "http://localhost"
     ACP_PORT: "8001"
+
+# Deployment Configuration
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+  imagePullSecrets:
+    - name: my-registry-secret
+  global:
+    agent:
+      name: "claude-mvp-agent"
+      description: "Claude Agents SDK MVP"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
