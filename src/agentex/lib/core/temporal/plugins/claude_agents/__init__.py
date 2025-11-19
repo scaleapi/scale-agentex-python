@@ -34,6 +34,9 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 )
 
 from agentex.lib.utils.logging import make_logger
+from agentex.lib import adk
+from agentex.types.text_content import TextContent
+from agentex.types.task_message_delta import TextDelta, StreamTaskMessageDelta
 
 logger = make_logger(__name__)
 
@@ -85,7 +88,21 @@ async def run_claude_agent_activity(
 
     # Run Claude and collect results
     messages = []
+    streaming_ctx = None
+
     try:
+        # Only create streaming context if we have task_id
+        if task_id:
+            logger.info(f"[run_claude_agent_activity] Creating streaming context for task: {task_id}")
+            streaming_ctx = await adk.streaming.streaming_task_message_context(
+                task_id=task_id,
+                initial_content=TextContent(
+                    author="agent",
+                    content="",
+                    format="markdown"
+                )
+            ).__aenter__()
+
         async with ClaudeSDKClient(options=options) as client:
             await client.query(prompt)
 
@@ -93,15 +110,39 @@ async def run_claude_agent_activity(
                 messages.append(message)
                 logger.debug(f"[run_claude_agent_activity] Received message: {type(message).__name__}")
 
-                # Basic text extraction for MVP
-                # TODO: Add proper streaming in Commit 4
-                if isinstance(message, AssistantMessage):
+                # Stream text blocks to UI in real-time
+                if isinstance(message, AssistantMessage) and streaming_ctx:
                     for block in message.content:
-                        if isinstance(block, TextBlock):
-                            logger.debug(f"[run_claude_agent_activity] Text block: {block.text[:100]}...")
+                        if isinstance(block, TextBlock) and block.text:
+                            logger.debug(f"[run_claude_agent_activity] Streaming text: {block.text[:50]}...")
+
+                            # Create text delta
+                            delta = TextDelta(
+                                type="text",
+                                text_delta=block.text
+                            )
+
+                            # Stream to UI
+                            await streaming_ctx.stream_update(
+                                StreamTaskMessageDelta(
+                                    parent_task_message=streaming_ctx.task_message,
+                                    delta=delta,
+                                    type="delta"
+                                )
+                            )
+
+        # Close streaming context
+        if streaming_ctx:
+            await streaming_ctx.close()
+            logger.info(f"[run_claude_agent_activity] Closed streaming context")
 
     except Exception as e:
         logger.error(f"[run_claude_agent_activity] Error: {e}", exc_info=True)
+        if streaming_ctx:
+            try:
+                await streaming_ctx.close()
+            except:
+                pass
         raise
 
     logger.info(f"[run_claude_agent_activity] Completed - collected {len(messages)} messages")
