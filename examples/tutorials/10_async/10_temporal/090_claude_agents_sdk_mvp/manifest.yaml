@@ -1,0 +1,21 @@
+kind: Agent
+agent:
+  name: claude-mvp-agent
+  workflow: ClaudeMvpWorkflow
+
+  credentials:
+    - env_var_name: ANTHROPIC_API_KEY
+      secret_name: anthropic-api-key
+      secret_key: api-key
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+
+  env:
+    ANTHROPIC_API_KEY: ""
+    AGENT_NAME: "claude-mvp-agent"
+    WORKFLOW_NAME: "ClaudeMvpWorkflow"
+    WORKFLOW_TASK_QUEUE: "claude-mvp-queue"
+    CLAUDE_WORKSPACE_ROOT: "/workspaces"
+    ACP_URL: "http://localhost"
+    ACP_PORT: "8001"
