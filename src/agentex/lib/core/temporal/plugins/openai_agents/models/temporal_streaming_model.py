@@ -826,6 +826,8 @@ class TemporalStreamingModel(Model):
                 # Serialize response output items for span tracing
                 new_items = []
                 final_output = None
+                tool_calls = []
+                tool_outputs = []
 
                 for item in response_output:
                     try:
@@ -845,12 +847,38 @@ class TemporalStreamingModel(Model):
                         logger.warning(f"Failed to serialize item in temporal_streaming_model: {e}")
                         continue
 
+                # Extract tool calls and outputs from input
+                try:
+                    if isinstance(input, list):
+                        for item in input:
+                            try:
+                                item_dict = _serialize_item(item) if not isinstance(item, dict) else item
+                                if item_dict:
+                                    # Capture function calls
+                                    if item_dict.get('type') == 'function_call':
+                                        tool_calls.append(item_dict)
+                                    # Capture function outputs
+                                    elif item_dict.get('type') == 'function_call_output':
+                                        tool_outputs.append(item_dict)
+                            except Exception:
+                                pass
+                except Exception as e:
+                    logger.warning(f"Failed to extract tool calls and outputs: {e}")
+
                 # Set span output with structured data
                 if span:
-                    span.output = {
+                    output_data = {
                         "new_items": new_items,
                         "final_output": final_output,
                     }
+                    # Include tool calls if any were in the input
+                    if tool_calls:
+                        output_data["tool_calls"] = tool_calls
+                    # Include tool outputs if any were processed
+                    if tool_outputs:
+                        output_data["tool_outputs"] = tool_outputs
+                    
+                    span.output = output_data
 
                 # Return the response
                 return ModelResponse(
