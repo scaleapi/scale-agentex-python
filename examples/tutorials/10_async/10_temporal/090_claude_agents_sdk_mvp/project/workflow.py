@@ -129,6 +129,22 @@ class ClaudeMvpWorkflow(BaseWorkflow):
             self._parent_span_id = span.id if span else None
 
             try:
+                # Define subagents for specialized tasks
+                subagents = {
+                    'code-reviewer': AgentDefinition(
+                        description='Expert code review specialist. Use when analyzing code quality, security, or best practices.',
+                        prompt='You are a code review expert. Analyze code for bugs, security issues, and best practices. Be thorough but concise.',
+                        tools=['Read', 'Grep', 'Glob'],  # Read-only
+                        model='sonnet',
+                    ),
+                    'file-organizer': AgentDefinition(
+                        description='File organization specialist. Use when creating multiple files or organizing project layout.',
+                        prompt='You are a file organization expert. Create well-structured projects with clear naming.',
+                        tools=['Write', 'Read', 'Bash', 'Glob'],
+                        model='haiku',  # Faster model
+                    ),
+                }
+
                 # Run Claude via activity (manual wrapper for MVP)
                 # ContextInterceptor reads _task_id, _trace_id, _parent_span_id and threads to activity!
                 result = await workflow.execute_activity(
@@ -136,10 +152,11 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                 args=[
                     params.event.content.content,  # prompt
                     self._workspace_path,          # workspace
-                    ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],  # allowed tools
+                    ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Task"],  # allowed tools (Task for subagents!)
                     "acceptEdits",                 # permission mode
                     "You are a helpful coding assistant. Be concise.",  # system prompt
                     self._state.claude_session_id,  # resume session for context!
+                    subagents,  # subagent definitions!
                 ],
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=RetryPolicy(

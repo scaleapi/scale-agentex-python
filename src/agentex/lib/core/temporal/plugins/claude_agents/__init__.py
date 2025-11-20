@@ -65,6 +65,7 @@ async def run_claude_agent_activity(
     permission_mode: str = "acceptEdits",
     system_prompt: str | None = None,
     resume_session_id: str | None = None,
+    agents: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute Claude SDK - wrapped in Temporal activity
 
@@ -78,10 +79,11 @@ async def run_claude_agent_activity(
     Args:
         prompt: User message to send to Claude
         workspace_path: Directory for file operations (cwd)
-        allowed_tools: List of tools Claude can use
+        allowed_tools: List of tools Claude can use (include "Task" for subagents)
         permission_mode: Permission mode (default: acceptEdits)
         system_prompt: Optional system prompt override
         resume_session_id: Optional session ID to resume conversation context
+        agents: Optional dict of subagent definitions for Task tool
 
     Returns:
         dict with "messages", "session_id", "usage", and "cost_usd" keys
@@ -95,16 +97,18 @@ async def run_claude_agent_activity(
     logger.info(
         f"[run_claude_agent_activity] Starting - "
         f"task_id={task_id}, workspace={workspace_path}, tools={allowed_tools}, "
-        f"resume={'YES' if resume_session_id else 'NO (new session)'}"
+        f"resume={'YES' if resume_session_id else 'NO (new session)'}, "
+        f"subagents={list(agents.keys()) if agents else 'NONE'}"
     )
 
-    # Configure Claude with workspace isolation and session resume
+    # Configure Claude with workspace isolation, session resume, and subagents
     options = ClaudeAgentOptions(
         cwd=workspace_path,
         allowed_tools=allowed_tools,
         permission_mode=permission_mode,  # type: ignore
         system_prompt=system_prompt,
         resume=resume_session_id,  # Resume previous session for context!
+        agents=agents,  # Subagent definitions for Task tool!
     )
 
     # Run Claude and collect results
@@ -112,6 +116,7 @@ async def run_claude_agent_activity(
     streaming_ctx = None
     tool_call_map = {}  # Map tool_call_id → tool_name
     last_tool_call_id = None  # Track most recent tool call for matching results
+    current_subagent_span = None  # Track active subagent span for setting output
 
     try:
         # Only create streaming context if we have task_id
@@ -144,6 +149,18 @@ async def run_claude_agent_activity(
                 if isinstance(message, UserMessage) and last_tool_call_id and task_id:
                     tool_name = tool_call_map.get(last_tool_call_id, "unknown")
                     logger.info(f"[run_claude_agent_activity] ✅ [{msg_num}] STREAMING Tool result (UserMessage): {tool_name}")
+
+                    # If this was a subagent (Task tool), close the subagent span
+                    if tool_name == "Task" and current_subagent_span:
+                        # Extract result for span output
+                        user_content = message.content
+                        if isinstance(user_content, list):
+                            user_content = str(user_content)
+
+                        current_subagent_span.output = {"result": user_content}
+                        await current_subagent_span.__aexit__(None, None, None)
+                        logger.info(f"[run_claude_agent_activity] 🤖 Completed subagent execution")
+                        current_subagent_span = None
 
                     # Extract content
                     user_content = message.content
@@ -190,6 +207,19 @@ async def run_claude_agent_activity(
                             # Track tool_call_id → tool_name mapping for results
                             tool_call_map[block.id] = block.name
                             last_tool_call_id = block.id  # Remember for matching result
+
+                            # Special handling for Task tool (subagents) - create nested span
+                            if block.name == "Task" and trace_id and parent_span_id:
+                                subagent_type = block.input.get("subagent_type", "unknown")
+                                logger.info(f"[run_claude_agent_activity] 🤖 Starting subagent: {subagent_type}")
+
+                                # Create nested trace span for subagent execution
+                                trace = adk.tracing.trace(trace_id)
+                                current_subagent_span = await trace.span(
+                                    parent_id=parent_span_id,
+                                    name=f"Subagent: {subagent_type}",
+                                    input=block.input,
+                                ).__aenter__()
 
                             # Stream tool request directly (can't call activity from activity)
                             try:

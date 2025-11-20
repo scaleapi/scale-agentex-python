@@ -8,19 +8,20 @@ Minimal integration proving Claude Agents SDK can run in AgentEx Temporal workfl
 
 - ✅ **Claude agent executes in Temporal workflow** - Durable, observable, retriable
 - ✅ **File operations isolated to workspace directory** - Each task gets own workspace
-- ✅ **Basic text streaming to UI** - Real-time token streaming via Redis
+- ✅ **Session resume & conversation context** - Claude remembers previous messages
+- ✅ **Text streaming to UI** - Real-time token streaming via Redis
+- ✅ **Tool call visibility** - Tool cards show Read/Write/Bash operations
+- ✅ **Subagent support** - Task tool with nested tracing spans
 - ✅ **Visible in Temporal UI as activities** - Full observability of execution
 - ✅ **Temporal retry policies work** - Automatic retries on failures
-- ✅ **Tool usage** (Read, Write, Bash, Grep, Glob) - Claude can operate on filesystem
 
 ## What's Missing (See "Next Steps")
 
 - ❌ **Automatic plugin** - Manual activity wrapping for now
-- ❌ **Tool call streaming** - Can't see individual tool executions in UI
-- ❌ **Subagents** - Task tool not supported yet
-- ❌ **Tracing wrapper** - No tracing spans around Claude calls
+- ❌ **Tracing wrapper** - No tracing around non-subagent calls
 - ❌ **Tests** - No unit or integration tests
 - ❌ **Error categorization** - All errors retry (no distinction)
+- ⚠️ **UI message ordering** - Frontend reorders text/tool cards (cosmetic issue)
 
 ## Quick Start
 
@@ -133,6 +134,37 @@ User: "Add a main function to hello.py"
 Claude: *uses Edit tool*
 "I've added a main function to hello.py..."
 ```
+
+### Subagents (Task Tool)
+
+The workflow includes two specialized subagents:
+
+**1. code-reviewer** - Read-only code analysis
+```
+User: "Review the code quality in hello.py"
+
+Claude: *delegates to code-reviewer subagent*
+[Uses Task tool → code-reviewer]
+- Specialized prompt for code review
+- Limited to Read, Grep, Glob tools
+- Returns thorough analysis
+```
+
+**2. file-organizer** - Project structuring
+```
+User: "Create a well-organized Python project structure"
+
+Claude: *delegates to file-organizer subagent*
+[Uses Task tool → file-organizer]
+- Specialized prompt for file organization
+- Can use Write, Bash tools
+- Uses faster Haiku model
+```
+
+**Subagent visibility**:
+- Tool cards show "Using tool: Task" with subagent parameters
+- Traces view shows nested spans: `Subagent: code-reviewer`
+- Timing and cost tracked separately per subagent
 
 ## Architecture Details
 
