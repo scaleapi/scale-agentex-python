@@ -1,356 +1,281 @@
 # Claude Agents SDK Integration with AgentEx
 
-## Overview
+Integration of Claude Agents SDK with AgentEx's Temporal-based orchestration platform. Claude agents run in durable workflows with real-time streaming to the AgentEx UI.
 
-Complete working integration of Claude Agents SDK with AgentEx's Temporal-based orchestration platform. This tutorial demonstrates how to run Claude-powered agents in durable, observable Temporal workflows with real-time streaming to the AgentEx UI.
+## Features
 
-## Features ✅
+- **Durable Execution** - Workflows survive restarts via Temporal's event sourcing
+- **Session Resume** - Conversation context maintained across turns via `session_id`
+- **Workspace Isolation** - Each task gets dedicated directory for file operations
+- **Real-time Streaming** - Text and tool calls stream to UI via Redis
+- **Tool Execution** - Read, Write, Edit, Bash, Grep, Glob with visibility in UI
+- **Subagents** - Specialized agents (code-reviewer, file-organizer) with nested tracing
+- **Cost Tracking** - Token usage and API costs logged per turn
+- **Automatic Retries** - Temporal policies handle transient failures
 
-### Core Functionality
-- ✅ **Temporal Workflow Integration** - Claude agents run in durable workflows (survive restarts, full replay)
-- ✅ **Workspace Isolation** - Each task gets isolated directory for file operations
-- ✅ **Session Management** - Conversation context maintained across turns via session resume
-- ✅ **Real-time Streaming** - Messages and tool calls stream to UI via Redis
+## How It Works
 
-### Tool Support
-- ✅ **File Operations** - Read, Write, Edit files with workspace isolation
-- ✅ **Command Execution** - Bash commands execute within workspace
-- ✅ **File Search** - Grep and Glob for finding files and patterns
-- ✅ **Tool Visibility** - Tool cards show in UI with parameters and results
+### Architecture
 
-### Advanced Features
-- ✅ **Subagent Support** - Specialized agents via Task tool (code-reviewer, file-organizer)
-- ✅ **Nested Tracing** - Subagent execution tracked as child spans in traces view
-- ✅ **Cost Tracking** - Token usage and API costs logged per turn
-- ✅ **Automatic Retries** - Temporal retry policies for transient failures
+```
+┌─────────────────────────────────┐
+│  Temporal Workflow              │
+│  - Stores session_id in state   │
+│  - Tracks turn number           │
+│  - Sets _task_id, _trace_id     │
+└────────────┬────────────────────┘
+             │ execute_activity
+             ↓
+┌─────────────────────────────────┐
+│  run_claude_agent_activity      │
+│  - Reads context from ContextVar│
+│  - Configures Claude SDK        │
+│  - Processes messages via hooks │
+│  - Returns session_id           │
+└────────────┬────────────────────┘
+             │ ClaudeSDKClient
+             ↓
+┌─────────────────────────────────┐
+│  Claude SDK                     │
+│  - Maintains session            │
+│  - Calls Anthropic API          │
+│  - Executes tools in workspace  │
+│  - Triggers hooks               │
+└─────────────────────────────────┘
+```
 
-## Known Limitations
+### Context Threading
 
-### Streaming Behavior
-- **Message blocks vs token streaming**: Claude SDK returns complete text blocks rather than individual tokens. Text appears instantly instead of animating character-by-character. This is a Claude SDK API limitation, not an integration issue.
-- **UI message ordering**: Frontend may reorder text and tool cards (cosmetic issue in AgentEx UI)
+The integration reuses AgentEx's `ContextInterceptor` pattern (originally built for OpenAI):
 
-### Architecture Choices
-- **Manual activity wrapping**: Activities are explicitly called (no automatic plugin yet)
-- **In-process subagents**: Subagents run within Claude SDK (not as separate Temporal workflows)
-- **Basic error handling**: All errors use Temporal's retry policy (no error categorization)
+1. **Workflow** stores `_task_id`, `_trace_id`, `_parent_span_id` as instance variables
+2. **ContextInterceptor (outbound)** reads these from workflow instance, injects into activity headers
+3. **ContextInterceptor (inbound)** extracts from headers, sets `ContextVar` values
+4. **Activity** reads `ContextVar` to get task_id for streaming
+
+This enables real-time streaming without breaking Temporal's determinism requirements.
+
+### Session Management
+
+Claude SDK sessions are preserved across turns:
+
+1. **First turn**: Claude SDK creates session, returns `session_id` in `SystemMessage`
+2. **Message handler** extracts `session_id` from messages
+3. **Activity** returns `session_id` to workflow
+4. **Workflow** stores in `StateModel.claude_session_id` (Temporal checkpoints this)
+5. **Next turn**: Pass `resume=session_id` to `ClaudeAgentOptions`
+6. **Claude SDK** resumes session with full conversation history
+
+### Tool Streaming via Hooks
+
+Tool lifecycle events are handled by Claude SDK hooks:
+
+**PreToolUse Hook**:
+- Called before tool execution
+- Streams `ToolRequestContent` to UI → shows "Using tool: Write"
+- Creates nested span for Task tool (subagents)
+
+**PostToolUse Hook**:
+- Called after tool execution
+- Streams `ToolResponseContent` to UI → shows "Used tool: Write"
+- Closes subagent spans with results
+
+### Subagent Execution
+
+Subagents are defined as `AgentDefinition` objects passed to Claude SDK:
+
+```python
+agents={
+    'code-reviewer': AgentDefinition(
+        description='Expert code review specialist...',
+        prompt='You are a code reviewer...',
+        tools=['Read', 'Grep', 'Glob'],  # Read-only
+        model='sonnet',
+    )
+}
+```
+
+When Claude uses the Task tool, the SDK routes to the appropriate subagent based on description matching. Subagent execution is tracked via nested tracing spans.
+
+## Code Structure
+
+```
+claude_agents/
+├── __init__.py                 # Public exports
+├── activities.py               # Temporal activities
+│   ├── create_workspace_directory
+│   └── run_claude_agent_activity
+├── message_handler.py          # Message processing
+│   └── ClaudeMessageHandler
+│       ├── Streams text blocks
+│       ├── Extracts session_id
+│       └── Extracts usage/cost
+└── hooks/
+    └── hooks.py                # Claude SDK hooks
+        └── TemporalStreamingHooks
+            ├── pre_tool_use
+            └── post_tool_use
+```
 
 ## Quick Start
 
 ### Prerequisites
 
-1. **Temporal server** running (localhost:7233)
-2. **Redis** running (localhost:6379)
-3. **Anthropic API key**
+- Temporal server (localhost:7233)
+- Redis (localhost:6379)
+- Anthropic API key
 
-### Setup
-
-1. **Install dependencies:**
-   ```bash
-   cd /Users/prassanna.ravishankar/git/agentex-python-claude-agents-sdk
-   rye sync --all-features
-   ```
-
-2. **Set environment variables:**
-   ```bash
-   export ANTHROPIC_API_KEY="your-anthropic-api-key"
-   export REDIS_URL="redis://localhost:6379"
-   export TEMPORAL_ADDRESS="localhost:7233"
-   ```
-
-3. **Run the worker:**
-   ```bash
-   cd examples/tutorials/10_async/10_temporal/090_claude_agents_sdk_mvp/project
-   rye run python run_worker.py
-   ```
-
-4. **In another terminal, run the ACP server:**
-   ```bash
-   cd examples/tutorials/10_async/10_temporal/090_claude_agents_sdk_mvp/project
-   rye run python acp.py
-   ```
-
-5. **Create a task via AgentEx API** (or use the AgentEx dashboard)
-
-## Architecture
-
-```
-User Message
-    ↓
-Workflow (ClaudeMvpWorkflow)
-    ├─ Creates workspace: /workspaces/{task_id}
-    ├─ Stores task_id in instance var
-    └─ Calls activity ↓
-
-Activity (run_claude_agent_activity)
-    ├─ Reads task_id from ContextVar (set by ContextInterceptor)
-    ├─ Configures Claude SDK with workspace
-    ├─ Runs Claude SDK
-    ├─ Streams text to Redis (via adk.streaming)
-    └─ Returns complete messages for Temporal
-
-Claude SDK (ClaudeSDKClient)
-    ├─ Executes with cwd=/workspaces/{task_id}
-    ├─ Tools operate on workspace filesystem
-    └─ Calls Anthropic API
-
-Anthropic API
-    ↓
-Streaming Response
-    ├─ Tokens stream to Redis → UI (real-time)
-    └─ Complete response to Temporal (determinism)
-```
-
-### Key Innovation: Context Threading
-
-The magic is **ContextInterceptor** (reused from OpenAI plugin):
-
-1. **Workflow** stores `task_id` in instance variable
-2. **ContextInterceptor** (outbound) reads `task_id` from workflow instance, injects into activity headers
-3. **ContextInterceptor** (inbound) extracts `task_id` from headers, sets ContextVar
-4. **Activity** reads `task_id` from ContextVar, uses for streaming
-
-This allows streaming WITHOUT breaking Temporal's determinism!
-
-## Example Usage
-
-### Basic Chat
-
-```
-User: "Hello! Can you create a hello.py file?"
-
-Claude: *streams response in real-time*
-"I'll create a hello.py file for you.
-
-[Uses Write tool to create file]
-
-I've created hello.py with a simple hello world program."
-```
-
-### File Operations
-
-```
-User: "List all files in the workspace"
-
-Claude: *uses Bash tool*
-"Here are the files:
-- hello.py
-- README.md"
-```
-
-### Code Modification
-
-```
-User: "Add a main function to hello.py"
-
-Claude: *uses Edit tool*
-"I've added a main function to hello.py..."
-```
-
-### Subagents (Task Tool)
-
-The workflow includes two specialized subagents:
-
-**1. code-reviewer** - Read-only code analysis
-```
-User: "Review the code quality in hello.py"
-
-Claude: *delegates to code-reviewer subagent*
-[Uses Task tool → code-reviewer]
-- Specialized prompt for code review
-- Limited to Read, Grep, Glob tools
-- Returns thorough analysis
-```
-
-**2. file-organizer** - Project structuring
-```
-User: "Create a well-organized Python project structure"
-
-Claude: *delegates to file-organizer subagent*
-[Uses Task tool → file-organizer]
-- Specialized prompt for file organization
-- Can use Write, Bash tools
-- Uses faster Haiku model
-```
-
-**Subagent visibility**:
-- Tool cards show "Using tool: Task" with subagent parameters
-- Traces view shows nested spans: `Subagent: code-reviewer`
-- Timing and cost tracked separately per subagent
-
-## Architecture Details
-
-### Workspace Isolation
-
-Each task gets an isolated workspace:
-- Location: `/workspaces/{task_id}/`
-- Created on workflow start
-- Claude's `cwd` points to this directory
-- All file operations happen within workspace
-
-### Streaming Flow
-
-1. Activity creates `streaming_task_message_context`
-2. Loops through Claude SDK messages
-3. Extracts text from `TextBlock` content
-4. Creates `TextDelta` and streams via `stream_update`
-5. Redis carries stream to UI subscribers
-6. Activity returns complete messages to Temporal
-
-### Error Handling
-
-Currently minimal:
-- All errors bubble up to Temporal
-- Temporal retry policy: 3 attempts, exponential backoff
-- No distinction between retriable/non-retriable errors
-
-## Limitations & Tradeoffs
-
-### Manual Activity Wrapping
-
-**Current**: Workflow explicitly calls `workflow.execute_activity(run_claude_agent_activity, ...)`
-**Future**: Automatic plugin wraps `ClaudeSDKClient.query()` calls
-
-This works for MVP but is less elegant than OpenAI integration.
-
-### No Tool Call Streaming
-
-**Current**: Tool calls (Read, Write, Bash) execute but aren't streamed to UI
-**Future**: Hook into tool lifecycle and stream `ToolRequestContent`/`ToolResponseContent`
-
-Users see final result but not intermediate tool usage.
-
-### Text-Only Streaming
-
-**Current**: Only text content streams
-**Future**: Stream reasoning, tool calls, errors
-
-Sufficient for MVP, richer content later.
-
-### No Subagents
-
-**Current**: Claude's Task tool is disabled
-**Future**: Intercept Task tool and spawn child Temporal workflows
-
-Can't do recursive agents yet.
-
-## Debugging
-
-### Check Worker Logs
+### Run
 
 ```bash
-# Worker logs show:
-# - Activity starts/completions
-# - Claude SDK calls
-# - Streaming context creation
-# - Errors
-```
+# Install
+rye sync --all-features
 
-### Check Temporal UI
-
-```
-http://localhost:8080
-
-Navigate to:
-- Workflows → Find ClaudeMvpWorkflow
-- Activities → See run_claude_agent_activity, create_workspace_directory
-- Event History → Full execution trace
-```
-
-### Check Traces View (AgentEx UI)
-
-Navigate to traces to see:
-- Turn-level spans showing each conversation turn
-- Nested subagent spans (e.g., "Subagent: code-reviewer")
-- Timing and cost per operation
-
-### Check Redis Streams
-
-```bash
-redis-cli
-> KEYS stream:*
-> XREAD COUNT 10 STREAMS stream:{task_id} 0
-```
-
-## Troubleshooting
-
-### "Claude Code CLI not found"
-
-Claude Agents SDK requires the Claude Code CLI. Install:
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-### "ANTHROPIC_API_KEY not set"
-
-Set the environment variable:
-```bash
+# Configure
 export ANTHROPIC_API_KEY="your-key"
+export REDIS_URL="redis://localhost:6379"
+export TEMPORAL_ADDRESS="localhost:7233"
+
+# Run from repository root
+uv run agentex agents run --manifest examples/tutorials/10_async/10_temporal/090_claude_agents_sdk_mvp/manifest.yaml
 ```
 
-Or add to `.env.local`:
+## Example Interactions
+
+### Context Preservation
+
 ```
-ANTHROPIC_API_KEY=your-key
+User: "Your name is Jose"
+Claude: "Nice to meet you! I'm Jose..."
+
+User: "What name did I assign to you?"
+Claude: "You asked me to go by Jose!"  ← Remembers context
 ```
 
-### "Text appears instantly (no character animation)"
+### Tool Usage
 
-**This is expected!** Claude SDK returns complete text blocks, not individual tokens. The streaming infrastructure works correctly - text appears as soon as Claude generates each block.
+```
+User: "Create a hello.c file with Hello World"
+Claude: *streams response*
+[Tool card appears: "Using tool: Write"]
+[Tool card updates: "Used tool: Write"]
+"Done! I've created hello.c..."
+```
 
-For character-by-character animation (like OpenAI), would need:
-1. Claude SDK to expose token-level streaming API (currently not available)
-2. Or client-side animation simulation
+### Subagents
 
-### "Workspace not found"
+```
+User: "Review the code quality in hello.c"
+Claude: *delegates to code-reviewer*
+[Tool card: "Using tool: Task" with subagent_type: "code-reviewer"]
+[Traces view shows: "Subagent: code-reviewer" nested under turn]
+```
 
-Check:
-1. Workspace defaults to `./workspace/` relative to tutorial directory
-2. Override with `CLAUDE_WORKSPACE_ROOT` env var if needed
-3. Worker has permission to create directories
+## Behind the Scenes
 
-### "Context not maintained"
+### Message Flow
 
-Verify:
-1. Session resume is working (check logs for "CONTINUED" on turn 2+)
-2. `StateModel.claude_session_id` is being stored
-3. Activity receives `resume_session_id` parameter
+When a user sends a message:
 
-## Future Enhancements
+1. **Signal received** (`on_task_event_send`) - Workflow increments turn, echoes message
+2. **Span created** - Tracing span wraps turn, stores `parent_span_id` for interceptor
+3. **Activity called** - Workflow passes prompt, workspace, session_id, subagent defs
+4. **Context threaded** - Interceptor injects task_id/trace_id into activity headers
+5. **Activity starts** - Reads context from ContextVar, creates hooks
+6. **Claude executes** - SDK uses hooks to stream tools, message_handler streams text
+7. **Results returned** - Activity returns session_id, usage, cost
+8. **State updated** - Workflow stores session_id for next turn
 
-Possible improvements for production use:
+### Streaming Pipeline
 
-- **Automatic Plugin** - Auto-intercept Claude SDK calls (like OpenAI plugin pattern)
-- **Error Categorization** - Distinguish retriable vs non-retriable errors
-- **Token-Level Streaming** - If Claude SDK adds token streaming API
-- **Tests** - Unit and integration test coverage
-- **Production Hardening** - Resource limits, security policies, monitoring
+**Text streaming**:
+```
+Claude SDK → TextBlock → ClaudeMessageHandler._handle_text_block()
+→ TextDelta → adk.streaming.stream_update()
+→ Redis XADD → AgentEx UI
+```
 
-## What We Learned
+**Tool streaming**:
+```
+Claude SDK → PreToolUse hook → ToolRequestContent
+→ adk.streaming (via hook) → Redis → UI ("Using tool...")
 
-### Key Insights from Building This Integration
+Tool executes...
 
-1. **ContextInterceptor Pattern** - Reusable across agent SDKs (worked for both OpenAI and Claude)
-2. **Session Resume is Critical** - Without it, agents can't maintain context across turns
-3. **Tool Result Format Varies** - Claude uses `UserMessage` for tool results (with `permission_mode="acceptEdits"`)
-4. **Streaming APIs Differ** - OpenAI provides token deltas, Claude provides message blocks
-5. **Subagents are Config** - Not separate processes, just routing within Claude SDK
-6. **Temporal Determinism** - File I/O must be in activities, not workflows
+Claude SDK → PostToolUse hook → ToolResponseContent
+→ adk.streaming (via hook) → Redis → UI ("Used tool...")
+```
 
-### Architecture Wins
+### Subagent Tracing
 
-- ✅ **70% code reuse** from OpenAI integration (ContextInterceptor, streaming infrastructure)
-- ✅ **Clean separation** - AgentEx orchestrates, Claude executes
-- ✅ **No SDK forks** - Used standard Claude SDK as-is
-- ✅ **Durable execution** - All conversation state preserved in Temporal
+When Task tool is detected in PreToolUse hook:
 
-## Contributing
+```python
+# Create nested span
+span_ctx = adk.tracing.span(
+    trace_id=trace_id,
+    parent_id=parent_span_id,
+    name=f"Subagent: {subagent_type}",
+    input=tool_input,
+)
+span = await span_ctx.__aenter__()
 
-Contributions welcome! Areas for improvement:
-- Add comprehensive tests
-- Implement automatic plugin (intercept Claude SDK calls)
-- Error categorization and better error messages
-- Additional subagent examples
+# Store for PostToolUse to close
+self.subagent_spans[tool_use_id] = (span_ctx, span)
+```
+
+In PostToolUse hook, the span is closed with results, creating a complete nested trace.
+
+## Key Implementation Details
+
+### Temporal Determinism
+
+- **File I/O in activities**: `create_workspace_directory` is an activity (not workflow code)
+- **Message iteration completes**: Use `receive_response()` (not `receive_messages()`)
+- **State is serializable**: `StateModel` uses Pydantic BaseModel
+
+### AgentDefinition Serialization
+
+Temporal serializes activity arguments to JSON. AgentDefinition dataclasses become dicts, so the activity reconstructs them:
+
+```python
+agent_defs = {
+    name: AgentDefinition(**agent_data)
+    for name, agent_data in agents.items()
+}
+```
+
+### Hook Callback Signatures
+
+Claude SDK expects specific signatures:
+
+```python
+async def pre_tool_use(
+    input_data: dict[str, Any],  # Contains tool_name, tool_input
+    tool_use_id: str | None,     # Unique ID for this call
+    context: Any,                # HookContext (currently unused)
+) -> dict[str, Any]:             # Return {} to allow, or modify behavior
+```
+
+## Comparison with OpenAI Integration
+
+| Aspect | OpenAI | Claude |
+|--------|--------|--------|
+| **Plugin** | `OpenAIAgentsPlugin` (official) | Manual activity wrapper |
+| **Streaming** | Token-level deltas | Message block-level |
+| **Tool Results** | `ToolResultBlock` | `UserMessage` (with acceptEdits) |
+| **Hooks** | `RunHooks` class | `HookMatcher` with callbacks |
+| **Context Threading** | ContextInterceptor | ContextInterceptor (reused!) |
+| **Subagents** | Agent handoffs | AgentDefinition config |
+
+## Notes
+
+**Message Block Streaming**: Claude SDK returns complete text blocks, not individual tokens. Text appears instantly rather than animating character-by-character. This is inherent to Claude SDK's API design.
+
+**In-Process Subagents**: Subagents run within Claude SDK via config-based routing, not as separate Temporal workflows. This is by design - subagents are specializations, not independent agents.
+
+**Manual Activity Calls**: Unlike OpenAI which has an official Temporal plugin, Claude integration requires explicit `workflow.execute_activity()` calls. A future enhancement could create an automatic plugin.
 
 ## License
 
-Same as AgentEx SDK (Apache 2.0)
+Apache 2.0 (same as AgentEx SDK)
