@@ -217,7 +217,7 @@ def sync_agent_test_session(
 
 
 @contextmanager
-def test_sync_agent(
+def sync_test_agent(
     *, agent_name: str | None = None, agent_id: str | None = None
 ) -> Generator[SyncAgentTest, None, None]:
     """
@@ -237,7 +237,7 @@ def test_sync_agent(
         AgentNotFoundError: No matching agent found
 
     Usage:
-        with test_sync_agent(agent_name="my-agent") as test:
+        with sync_test_agent(agent_name="my-agent") as test:
             response = test.send_message("Hello!")
 
     To discover agent names:

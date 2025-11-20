@@ -13,11 +13,11 @@ Setup:
     3. Update AGENT_NAME below
 
 Run:
-    pytest test_sync_agent.py -v
+    pytest sync_test_agent.py -v
 """
 
 from agentex.lib.testing import (
-    test_sync_agent,
+    sync_test_agent,
     assert_valid_agent_response,
     assert_agent_response_contains,
     assert_conversation_maintains_context,
@@ -27,9 +27,9 @@ from agentex.lib.testing import (
 AGENT_NAME = "s000-hello-acp"
 
 
-def test_sync_agent_responds():
+def sync_test_agent_responds():
     """Test that sync agent responds to a simple message."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
         # Send a message
         response = test.send_message("Hello! How are you?")
 
@@ -38,9 +38,9 @@ def test_sync_agent_responds():
         print(f"✓ Agent responded: {response.content[:50]}...")
 
 
-def test_sync_agent_multi_turn():
+def sync_test_agent_multi_turn():
     """Test that sync agent handles multi-turn conversation."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
         # First exchange
         response1 = test.send_message("Hello!")
         assert_valid_agent_response(response1)
@@ -59,9 +59,9 @@ def test_sync_agent_multi_turn():
         print(f"✓ Completed {len(history)} message conversation")
 
 
-def test_sync_agent_context():
+def sync_test_agent_context():
     """Test that sync agent maintains conversation context."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
         # Establish context
         response1 = test.send_message("My name is Sarah and I'm a teacher")
         assert_valid_agent_response(response1)
@@ -76,9 +76,9 @@ def test_sync_agent_context():
         print("✓ Agent maintained conversation context")
 
 
-def test_sync_agent_specific_content():
+def sync_test_agent_specific_content():
     """Test that agent responds with expected content."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
         # Ask a factual question
         response = test.send_message("What is 2 plus 2?")
 
@@ -91,9 +91,9 @@ def test_sync_agent_specific_content():
         print(f"✓ Agent provided correct answer: {response.content[:50]}...")
 
 
-def test_sync_agent_conversation_length():
+def sync_test_agent_conversation_length():
     """Test conversation history tracking."""
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
         # Send 3 messages
         test.send_message("First message")
         test.send_message("Second message")
@@ -108,4 +108,4 @@ def test_sync_agent_conversation_length():
 
 
 if __name__ == "__main__":
-    print("Run with: pytest test_sync_agent.py -v")
+    print("Run with: pytest sync_test_agent.py -v")

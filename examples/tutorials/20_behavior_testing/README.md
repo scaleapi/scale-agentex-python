@@ -21,7 +21,7 @@ Learn how to write automated tests for your AgentEx agents using the `agentex.li
 Learn the fundamentals of testing sync agents that respond immediately.
 
 **Key Concepts:**
-- Using `test_sync_agent()` context manager
+- Using `sync_test_agent()` context manager
 - Sending messages with `send_message()`
 - Basic response assertions
 - Testing conversation history
@@ -29,7 +29,7 @@ Learn the fundamentals of testing sync agents that respond immediately.
 **Run:**
 ```bash
 cd 000_basic_sync_testing
-pytest test_sync_agent.py -v
+pytest sync_test_agent.py -v
 ```
 
 ### `010_agentic_testing/`
@@ -52,10 +52,10 @@ pytest async_test_agent.py -v
 The simplest way to test an agent:
 
 ```python
-from agentex.lib.testing import test_sync_agent, assert_valid_agent_response
+from agentex.lib.testing import sync_test_agent, assert_valid_agent_response
 
 def test_my_sync_agent():
-    with test_sync_agent() as test:
+    with sync_test_agent() as test:
         response = test.send_message("Hello!")
         assert_valid_agent_response(response)
 ```

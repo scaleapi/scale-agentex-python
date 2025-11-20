@@ -17,7 +17,7 @@ Run: pytest tests/test_agent.py -v
 import pytest
 
 from agentex.lib.testing import (
-    test_sync_agent,
+    sync_test_agent,
     collect_streaming_deltas,
     assert_valid_agent_response,
 )
@@ -34,7 +34,7 @@ def agent_name():
 @pytest.fixture
 def test_agent(agent_name: str):
     """Fixture to create a test sync agent."""
-    with test_sync_agent(agent_name=agent_name) as test:
+    with sync_test_agent(agent_name=agent_name) as test:
         yield test
 
 

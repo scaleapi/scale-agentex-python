@@ -54,7 +54,7 @@ All bugs found and fixed:
 
 1. ✅ **`extract_agent_response()`** - Handle `result` as list of TaskMessages
 2. ✅ **`send_message_streaming()`** - Use `send_message_stream()` API, not `send_message(stream=True)`
-3. ✅ **Missing `@contextmanager`** - Added to `test_sync_agent()`
+3. ✅ **Missing `@contextmanager`** - Added to `sync_test_agent()`
 4. ✅ **Pytest collection** - Created `conftest.py` to prevent collecting framework functions
 5. ✅ **State filtering** - Filter states by `task_id` (states.list returns all tasks)
 6. ✅ **Test assertions** - Made more flexible for agents needing configuration

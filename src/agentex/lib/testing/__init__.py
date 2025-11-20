@@ -6,12 +6,12 @@ Simplified API for testing agents with real AgentEx infrastructure.
 Quick Start:
     ```python
     import pytest
-    from agentex.lib.testing import test_sync_agent, async_test_agent
+    from agentex.lib.testing import sync_test_agent, async_test_agent
 
 
     # Sync agents - MUST specify which agent
     def test_my_sync_agent():
-        with test_sync_agent(agent_name="my-agent") as test:
+        with sync_test_agent(agent_name="my-agent") as test:
             response = test.send_message("Hello!")
             assert response is not None
 
@@ -37,7 +37,7 @@ Documentation:
 """
 
 from agentex.lib.testing.sessions import (
-    test_sync_agent,
+    sync_test_agent,
     async_test_agent,
 )
 from agentex.lib.testing.streaming import (
@@ -58,7 +58,7 @@ from agentex.lib.testing.exceptions import (
 
 __all__ = [
     # Core testing API
-    "test_sync_agent",
+    "sync_test_agent",
     "async_test_agent",
     # Assertions
     "assert_valid_agent_response",

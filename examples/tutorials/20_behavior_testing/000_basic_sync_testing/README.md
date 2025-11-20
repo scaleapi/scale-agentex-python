@@ -19,7 +19,7 @@ Automated tests for sync agents that verify:
 
 Run the tests:
 ```bash
-pytest test_sync_agent.py -v
+pytest sync_test_agent.py -v
 ```
 
 ## Understanding Sync Agent Testing
@@ -27,17 +27,17 @@ pytest test_sync_agent.py -v
 Sync agents respond **immediately** via the `send_message()` API. Testing them is straightforward:
 
 ```python
-from agentex.lib.testing import test_sync_agent
+from agentex.lib.testing import sync_test_agent
 
 def test_basic_response():
-    with test_sync_agent() as test:
+    with sync_test_agent() as test:
         response = test.send_message("Hello!")
         assert response is not None
 ```
 
-## The Test Helper: `test_sync_agent()`
+## The Test Helper: `sync_test_agent()`
 
-The `test_sync_agent()` context manager:
+The `sync_test_agent()` context manager:
 1. Connects to AgentEx
 2. Finds a sync agent
 3. Creates a test task
@@ -78,7 +78,7 @@ assert_conversation_maintains_context(history, ["Alice"])
 
 A typical sync agent test follows this pattern:
 
-1. **Setup** - `with test_sync_agent() as test:`
+1. **Setup** - `with sync_test_agent() as test:`
 2. **Action** - `response = test.send_message("...")`
 3. **Assert** - Validate response
 4. **Cleanup** - Automatic when context manager exits

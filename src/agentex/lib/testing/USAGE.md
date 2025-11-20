@@ -6,14 +6,14 @@ Simplified testing framework for AgentEx agents with real infrastructure.
 
 ```python
 from agentex.lib.testing import (
-    test_sync_agent,
+    sync_test_agent,
     async_test_agent,
     assert_valid_agent_response,
 )
 
 # Sync agent test
 def test_my_sync_agent():
-    with test_sync_agent(agent_name="my-agent") as test:
+    with sync_test_agent(agent_name="my-agent") as test:
         response = test.send_message("Hello!")
         assert_valid_agent_response(response)
 
@@ -41,15 +41,15 @@ You **must** specify which agent to test:
 
 ```python
 # ✅ Good - explicit agent name
-with test_sync_agent(agent_name="my-agent") as test:
+with sync_test_agent(agent_name="my-agent") as test:
     ...
 
 # ✅ Good - explicit agent ID
-with test_sync_agent(agent_id="abc-123") as test:
+with sync_test_agent(agent_id="abc-123") as test:
     ...
 
 # ❌ Bad - will raise AgentSelectionError
-with test_sync_agent() as test:  # No agent specified!
+with sync_test_agent() as test:  # No agent specified!
     ...
 ```
 
@@ -58,7 +58,7 @@ with test_sync_agent() as test:  # No agent specified!
 **Sync agents** (immediate response):
 ```python
 def test_sync():
-    with test_sync_agent(agent_name="my-agent") as test:
+    with sync_test_agent(agent_name="my-agent") as test:
         response = test.send_message("Hello")  # Returns immediately
 ```
 
@@ -83,7 +83,7 @@ $ agentex agents list
 
 Use the name from this output in your tests:
 ```python
-with test_sync_agent(agent_name="my-sync-agent") as test:
+with sync_test_agent(agent_name="my-sync-agent") as test:
     ...
 ```
 
@@ -91,7 +91,7 @@ with test_sync_agent(agent_name="my-sync-agent") as test:
 
 ### Test Functions
 
-#### `test_sync_agent(*, agent_name=None, agent_id=None)`
+#### `sync_test_agent(*, agent_name=None, agent_id=None)`
 
 Create a test session for sync agents.
 
@@ -108,7 +108,7 @@ Create a test session for sync agents.
 **Example:**
 ```python
 def test_calculator_agent():
-    with test_sync_agent(agent_name="calculator") as test:
+    with sync_test_agent(agent_name="calculator") as test:
         response = test.send_message("What is 2 + 2?")
         assert_valid_agent_response(response)
         assert "4" in response.content.lower()
@@ -118,7 +118,7 @@ def test_calculator_agent():
 
 Create a test session for async agents.
 
-**Parameters:** Same as `test_sync_agent`
+**Parameters:** Same as `sync_test_agent`
 
 **Returns:** Async context manager yielding `AsyncAgentTest` instance
 
@@ -207,14 +207,14 @@ Raised when agent selection is missing or ambiguous.
 
 ```python
 # Multiple agents exist, none specified
-with test_sync_agent() as test:  # Raises AgentSelectionError
+with sync_test_agent() as test:  # Raises AgentSelectionError
     ...
 
 # Exception message tells you available agents:
 # Available sync agents:
 #   - agent-1
 #   - agent-2
-# Specify agent with: test_sync_agent(agent_name='your-agent')
+# Specify agent with: sync_test_agent(agent_name='your-agent')
 ```
 
 #### `AgentNotFoundError`
@@ -222,7 +222,7 @@ with test_sync_agent() as test:  # Raises AgentSelectionError
 Raised when no matching agent found.
 
 ```python
-with test_sync_agent(agent_name="nonexistent") as test:
+with sync_test_agent(agent_name="nonexistent") as test:
     ...  # Raises AgentNotFoundError
 ```
 
@@ -242,7 +242,7 @@ async with async_test_agent(agent_name="slow-agent") as test:
 
 ```python
 def test_conversation_flow():
-    with test_sync_agent(agent_name="chatbot") as test:
+    with sync_test_agent(agent_name="chatbot") as test:
         # Turn 1
         response1 = test.send_message("My favorite color is blue")
         assert_valid_agent_response(response1)
@@ -285,7 +285,7 @@ async def test_data_analysis():
 ```python
 import pytest
 from agentex.lib.testing import (
-    test_sync_agent,
+    sync_test_agent,
     AgentSelectionError,
     AgentNotFoundError,
     AgentTimeoutError,
@@ -293,12 +293,12 @@ from agentex.lib.testing import (
 
 def test_missing_agent():
     with pytest.raises(AgentNotFoundError):
-        with test_sync_agent(agent_name="nonexistent") as test:
+        with sync_test_agent(agent_name="nonexistent") as test:
             pass
 
 def test_no_agent_specified():
     with pytest.raises(AgentSelectionError) as exc_info:
-        with test_sync_agent() as test:
+        with sync_test_agent() as test:
             pass
 
     # Error message contains available agents
@@ -343,11 +343,11 @@ export AGENTEX_TEST_PREFIX="test"
 AGENT_NAME = "my-agent"
 
 def test_one():
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
         ...
 
 def test_two():
-    with test_sync_agent(agent_name=AGENT_NAME) as test:
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
         ...
 ```
 
@@ -368,7 +368,7 @@ response = await test.send_event(
 
 ```python
 def test_context_retention():
-    with test_sync_agent(agent_name="assistant") as test:
+    with sync_test_agent(agent_name="assistant") as test:
         # Establish context
         test.send_message("I work in finance")
         test.send_message("I use Python daily")
@@ -389,12 +389,12 @@ def test_context_retention():
 ```python
 # Test different agents
 def test_calculator():
-    with test_sync_agent(agent_name="calculator") as test:
+    with sync_test_agent(agent_name="calculator") as test:
         response = test.send_message("2 + 2")
         assert_agent_response_contains(response, "4")
 
 def test_translator():
-    with test_sync_agent(agent_name="translator") as test:
+    with sync_test_agent(agent_name="translator") as test:
         response = test.send_message("Translate 'hello' to Spanish")
         assert_agent_response_contains(response, "hola")
 ```
@@ -407,7 +407,7 @@ def test_translator():
 
 **Solution**: Specify agent name explicitly:
 ```python
-with test_sync_agent(agent_name="specific-agent") as test:
+with sync_test_agent(agent_name="specific-agent") as test:
     ...
 ```
 
@@ -462,7 +462,7 @@ def test_agent(real_agentex_client):
 ```python
 # New: Explicit agent selection
 def test_agent():
-    with test_sync_agent(agent_name="my-agent") as test:
+    with sync_test_agent(agent_name="my-agent") as test:
         ...
 ```
 
@@ -470,7 +470,7 @@ def test_agent():
 
 ```python
 # Old: Auto-selected first agent
-with test_sync_agent() as test:
+with sync_test_agent() as test:
     ...
 ```
 
@@ -478,7 +478,7 @@ with test_sync_agent() as test:
 
 ```python
 # New: Must specify agent
-with test_sync_agent(agent_name="my-agent") as test:
+with sync_test_agent(agent_name="my-agent") as test:
     ...
 ```
 
