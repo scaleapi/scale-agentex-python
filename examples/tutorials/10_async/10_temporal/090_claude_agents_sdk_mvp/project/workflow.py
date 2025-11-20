@@ -17,6 +17,7 @@ What's missing (see NEXT_STEPS.md):
 - Tracing
 """
 
+from claude_agent_sdk.types import AgentDefinition
 import os
 from pathlib import Path
 from temporalio import workflow

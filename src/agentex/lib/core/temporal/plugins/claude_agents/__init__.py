@@ -26,6 +26,7 @@ from temporalio import activity
 from claude_agent_sdk import (
     ClaudeSDKClient,
     ClaudeAgentOptions,
+    AgentDefinition,
     AssistantMessage,
     UserMessage,
     TextBlock,
@@ -101,6 +102,23 @@ async def run_claude_agent_activity(
         f"subagents={list(agents.keys()) if agents else 'NONE'}"
     )
 
+    # Reconstruct AgentDefinition objects from serialized dicts
+    # Temporal serializes dataclasses to dicts, need to recreate them
+    agent_defs = None
+    if agents:
+        agent_defs = {}
+        for name, agent_data in agents.items():
+            if isinstance(agent_data, AgentDefinition):
+                agent_defs[name] = agent_data
+            else:
+                # Reconstruct from dict
+                agent_defs[name] = AgentDefinition(
+                    description=agent_data.get('description', ''),
+                    prompt=agent_data.get('prompt', ''),
+                    tools=agent_data.get('tools'),
+                    model=agent_data.get('model'),
+                )
+
     # Configure Claude with workspace isolation, session resume, and subagents
     options = ClaudeAgentOptions(
         cwd=workspace_path,
@@ -108,7 +126,7 @@ async def run_claude_agent_activity(
         permission_mode=permission_mode,  # type: ignore
         system_prompt=system_prompt,
         resume=resume_session_id,  # Resume previous session for context!
-        agents=agents,  # Subagent definitions for Task tool!
+        agents=agent_defs,  # Subagent definitions for Task tool!
     )
 
     # Run Claude and collect results
