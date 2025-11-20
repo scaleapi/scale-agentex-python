@@ -135,6 +135,7 @@ async def run_claude_agent_activity(
     tool_call_map = {}  # Map tool_call_id → tool_name
     last_tool_call_id = None  # Track most recent tool call for matching results
     current_subagent_span = None  # Track active subagent span for setting output
+    current_subagent_ctx = None  # Track context manager for proper cleanup
 
     try:
         # Only create streaming context if we have task_id
@@ -169,16 +170,17 @@ async def run_claude_agent_activity(
                     logger.info(f"[run_claude_agent_activity] ✅ [{msg_num}] STREAMING Tool result (UserMessage): {tool_name}")
 
                     # If this was a subagent (Task tool), close the subagent span
-                    if tool_name == "Task" and current_subagent_span:
+                    if tool_name == "Task" and current_subagent_span and current_subagent_ctx:
                         # Extract result for span output
                         user_content = message.content
                         if isinstance(user_content, list):
                             user_content = str(user_content)
 
                         current_subagent_span.output = {"result": user_content}
-                        await current_subagent_span.__aexit__(None, None, None)
+                        await current_subagent_ctx.__aexit__(None, None, None)
                         logger.info(f"[run_claude_agent_activity] 🤖 Completed subagent execution")
                         current_subagent_span = None
+                        current_subagent_ctx = None
 
                     # Extract content
                     user_content = message.content
@@ -232,12 +234,13 @@ async def run_claude_agent_activity(
                                 logger.info(f"[run_claude_agent_activity] 🤖 Starting subagent: {subagent_type}")
 
                                 # Create nested trace span for subagent execution
-                                current_subagent_span = await adk.tracing.span(
+                                current_subagent_ctx = adk.tracing.span(
                                     trace_id=trace_id,
                                     parent_id=parent_span_id,
                                     name=f"Subagent: {subagent_type}",
                                     input=block.input,
-                                ).__aenter__()
+                                )
+                                current_subagent_span = await current_subagent_ctx.__aenter__()
 
                             # Stream tool request directly (can't call activity from activity)
                             try:
