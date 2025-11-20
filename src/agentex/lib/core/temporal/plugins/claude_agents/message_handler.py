@@ -1,4 +1,12 @@
-"""Message handling and streaming for Claude Agents SDK."""
+"""Message handling and streaming for Claude Agents SDK.
+
+Simplified message handler that focuses on:
+- Streaming text content to UI
+- Extracting session_id for conversation continuity
+- Extracting usage and cost information
+
+Tool requests/responses are handled by Claude SDK hooks (see hooks/hooks.py).
+"""
 
 from __future__ import annotations
 
@@ -6,21 +14,16 @@ from typing import Any
 
 from claude_agent_sdk import (
     AssistantMessage,
-    UserMessage,
     TextBlock,
     SystemMessage,
     ResultMessage,
-    ToolUseBlock,
-    ToolResultBlock,
 )
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib import adk
 from agentex.types.text_content import TextContent
-from agentex.types.tool_request_content import ToolRequestContent
-from agentex.types.tool_response_content import ToolResponseContent
 from agentex.types.task_message_delta import TextDelta
-from agentex.types.task_message_update import StreamTaskMessageDelta, StreamTaskMessageFull
+from agentex.types.task_message_update import StreamTaskMessageDelta
 
 logger = make_logger(__name__)
 
@@ -28,12 +31,14 @@ logger = make_logger(__name__)
 class ClaudeMessageHandler:
     """Handles Claude SDK messages and streams them to AgentEx UI.
 
-    Responsibilities:
-    - Parse Claude SDK message types (AssistantMessage, UserMessage, etc.)
-    - Stream tool requests/responses to UI
-    - Track session_id for conversation continuity
-    - Create nested spans for subagent execution
-    - Extract usage and cost information
+    Simplified handler focused on:
+    - Streaming text blocks to UI
+    - Extracting session_id from SystemMessage/ResultMessage
+    - Extracting usage and cost from ResultMessage
+    - Serializing responses for Temporal
+
+    Note: Tool lifecycle events (requests/responses) are handled by
+    TemporalStreamingHooks, not this class.
     """
 
     def __init__(
@@ -50,14 +55,8 @@ class ClaudeMessageHandler:
         self.messages: list[Any] = []
         self.serialized_messages: list[dict] = []
 
-        # Streaming contexts
+        # Streaming context for text
         self.streaming_ctx = None
-        self.tool_call_map: dict[str, str] = {}  # tool_call_id → tool_name
-        self.last_tool_call_id: str | None = None
-
-        # Subagent tracking
-        self.current_subagent_span = None
-        self.current_subagent_ctx = None
 
         # Result data
         self.session_id: str | None = None
@@ -89,76 +88,23 @@ class ClaudeMessageHandler:
             logger.debug(f"   [{msg_num}] Content blocks: {block_types}")
 
         # Route to specific handlers
-        if isinstance(message, UserMessage):
-            await self._handle_user_message(message, msg_num)
-        elif isinstance(message, AssistantMessage):
+        # Note: Tool requests/responses are handled by hooks, not here!
+        if isinstance(message, AssistantMessage):
             await self._handle_assistant_message(message, msg_num)
         elif isinstance(message, SystemMessage):
             await self._handle_system_message(message)
         elif isinstance(message, ResultMessage):
             await self._handle_result_message(message)
 
-    async def _handle_user_message(self, message: UserMessage, msg_num: int):
-        """Handle UserMessage - tool results when permission_mode=acceptEdits."""
-        if not self.last_tool_call_id or not self.task_id:
-            return
-
-        tool_name = self.tool_call_map.get(self.last_tool_call_id, "unknown")
-        logger.info(f"✅ Tool result: {tool_name}")
-
-        # If this was a subagent (Task tool), close the subagent span
-        if tool_name == "Task" and self.current_subagent_span and self.current_subagent_ctx:
-            user_content = message.content
-            if isinstance(user_content, list):
-                user_content = str(user_content)
-
-            self.current_subagent_span.output = {"result": user_content}
-            await self.current_subagent_ctx.__aexit__(None, None, None)
-            logger.info(f"🤖 Subagent completed: {tool_name}")
-            self.current_subagent_span = None
-            self.current_subagent_ctx = None
-
-        # Extract and stream tool result
-        user_content = message.content
-        if isinstance(user_content, list):
-            user_content = str(user_content)
-
-        try:
-            async with adk.streaming.streaming_task_message_context(
-                task_id=self.task_id,
-                initial_content=ToolResponseContent(
-                    author="agent",
-                    name=tool_name,
-                    content=user_content,
-                    tool_call_id=self.last_tool_call_id,
-                )
-            ) as tool_ctx:
-                await tool_ctx.stream_update(
-                    StreamTaskMessageFull(
-                        parent_task_message=tool_ctx.task_message,
-                        content=ToolResponseContent(
-                            author="agent",
-                            name=tool_name,
-                            content=user_content,
-                            tool_call_id=self.last_tool_call_id,
-                        ),
-                        type="full"
-                    )
-                )
-        except Exception as e:
-            logger.warning(f"Failed to stream tool response: {e}")
-
-        # Clear the last tool call
-        self.last_tool_call_id = None
-
     async def _handle_assistant_message(self, message: AssistantMessage, msg_num: int):
-        """Handle AssistantMessage - contains text blocks and tool calls."""
+        """Handle AssistantMessage - contains text blocks.
+
+        Note: Tool calls (ToolUseBlock/ToolResultBlock) are handled by hooks, not here.
+        We only process TextBlock for streaming text to UI.
+        """
+        # Stream text blocks to UI
         for block in message.content:
-            if isinstance(block, ToolUseBlock):
-                await self._handle_tool_use(block, msg_num)
-            elif isinstance(block, ToolResultBlock):
-                await self._handle_tool_result(block)
-            elif isinstance(block, TextBlock):
+            if isinstance(block, TextBlock):
                 await self._handle_text_block(block, msg_num)
 
         # Collect text for final response
@@ -172,92 +118,6 @@ class ClaudeMessageHandler:
                 "role": "assistant",
                 "content": "\n".join(text_content)
             })
-
-    async def _handle_tool_use(self, block: ToolUseBlock, msg_num: int):
-        """Handle tool request block."""
-        if not self.task_id:
-            return
-
-        logger.info(f"🔧 Tool request: {block.name}")
-
-        # Track tool_call_id → tool_name mapping
-        self.tool_call_map[block.id] = block.name
-        self.last_tool_call_id = block.id
-
-        # Special handling for Task tool (subagents) - create nested span
-        if block.name == "Task" and self.trace_id and self.parent_span_id:
-            subagent_type = block.input.get("subagent_type", "unknown")
-            logger.info(f"🤖 Subagent started: {subagent_type}")
-
-            # Create nested trace span
-            self.current_subagent_ctx = adk.tracing.span(
-                trace_id=self.trace_id,
-                parent_id=self.parent_span_id,
-                name=f"Subagent: {subagent_type}",
-                input=block.input,
-            )
-            self.current_subagent_span = await self.current_subagent_ctx.__aenter__()
-
-        # Stream tool request
-        try:
-            async with adk.streaming.streaming_task_message_context(
-                task_id=self.task_id,
-                initial_content=ToolRequestContent(
-                    author="agent",
-                    name=block.name,
-                    arguments=block.input,
-                    tool_call_id=block.id,
-                )
-            ) as tool_ctx:
-                await tool_ctx.stream_update(
-                    StreamTaskMessageFull(
-                        parent_task_message=tool_ctx.task_message,
-                        content=ToolRequestContent(
-                            author="agent",
-                            name=block.name,
-                            arguments=block.input,
-                            tool_call_id=block.id,
-                        ),
-                        type="full"
-                    )
-                )
-        except Exception as e:
-            logger.warning(f"Failed to stream tool request: {e}")
-
-    async def _handle_tool_result(self, block: ToolResultBlock):
-        """Handle tool result block (when not using acceptEdits)."""
-        if not self.task_id:
-            return
-
-        tool_name = self.tool_call_map.get(block.tool_use_id, "unknown")
-        logger.info(f"✅ Tool result: {tool_name}")
-
-        tool_content = block.content if block.content is not None else ""
-
-        try:
-            async with adk.streaming.streaming_task_message_context(
-                task_id=self.task_id,
-                initial_content=ToolResponseContent(
-                    author="agent",
-                    name=tool_name,
-                    content=tool_content,
-                    tool_call_id=block.tool_use_id,
-                )
-            ) as tool_ctx:
-                await tool_ctx.stream_update(
-                    StreamTaskMessageFull(
-                        parent_task_message=tool_ctx.task_message,
-                        content=ToolResponseContent(
-                            author="agent",
-                            name=tool_name,
-                            content=tool_content,
-                            tool_call_id=block.tool_use_id,
-                        ),
-                        type="full"
-                    )
-                )
-        except Exception as e:
-            logger.warning(f"Failed to stream tool response: {e}")
 
     async def _handle_text_block(self, block: TextBlock, msg_num: int):
         """Handle text content block."""

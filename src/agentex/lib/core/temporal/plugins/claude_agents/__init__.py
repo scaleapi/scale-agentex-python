@@ -44,6 +44,11 @@ from agentex.lib.core.temporal.plugins.claude_agents.message_handler import (
     ClaudeMessageHandler,
 )
 
+from agentex.lib.core.temporal.plugins.claude_agents.hooks import (
+    create_streaming_hooks,
+    TemporalStreamingHooks,
+)
+
 # Reuse OpenAI's context threading - this is the key to streaming!
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     ContextInterceptor,
@@ -58,6 +63,9 @@ __all__ = [
     "create_workspace_directory",
     # Message handling
     "ClaudeMessageHandler",
+    # Hooks
+    "create_streaming_hooks",
+    "TemporalStreamingHooks",
     # Context threading (reused from OpenAI)
     "ContextInterceptor",
     "streaming_task_id",

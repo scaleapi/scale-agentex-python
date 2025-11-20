@@ -16,6 +16,7 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
     streaming_parent_span_id,
 )
 from agentex.lib.core.temporal.plugins.claude_agents.message_handler import ClaudeMessageHandler
+from agentex.lib.core.temporal.plugins.claude_agents.hooks import create_streaming_hooks
 
 logger = make_logger(__name__)
 
@@ -103,7 +104,14 @@ async def run_claude_agent_activity(
                     model=agent_data.get('model'),
                 )
 
-    # Configure Claude with workspace isolation, session resume, and subagents
+    # Create hooks for streaming tool calls and subagent execution
+    hooks = create_streaming_hooks(
+        task_id=task_id,
+        trace_id=trace_id,
+        parent_span_id=parent_span_id,
+    )
+
+    # Configure Claude with workspace isolation, session resume, subagents, and hooks
     options = ClaudeAgentOptions(
         cwd=workspace_path,
         allowed_tools=allowed_tools,
@@ -111,6 +119,7 @@ async def run_claude_agent_activity(
         system_prompt=system_prompt,
         resume=resume_session_id,
         agents=agent_defs,
+        hooks=hooks,  # Tool lifecycle hooks for streaming!
     )
 
     # Create message handler for streaming

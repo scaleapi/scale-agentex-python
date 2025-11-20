@@ -180,43 +180,8 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                 else:
                     logger.warning(f"No session_id returned - context may not persist")
 
-                # Send Claude's response back to user
-                # Note: Activity should have streamed the response in real-time
-                # But if streaming failed (task_id=None), we need to send it here
-                messages = result.get("messages", [])
-
-                # Extract just the assistant messages (skip system/result messages)
-                assistant_messages = [
-                    msg for msg in messages
-                    if msg.get("role") == "assistant" and msg.get("content")
-                ]
-
-                if assistant_messages:
-                    # Combine assistant responses
-                    combined_content = "\n\n".join(
-                        msg.get("content", "") for msg in assistant_messages
-                    )
-
-                    # Send the response (streaming might have failed if task_id was None)
-                    await adk.messages.create(
-                        task_id=params.task.id,
-                        content=TextContent(
-                            author="agent",
-                            content=combined_content,
-                            format="markdown",
-                        )
-                    )
-                    logger.info(f"Sent Claude response to UI: {combined_content[:100]}...")
-                else:
-                    # No assistant message found - this shouldn't happen
-                    logger.warning("No assistant messages in Claude response")
-                    await adk.messages.create(
-                        task_id=params.task.id,
-                        content=TextContent(
-                            author="agent",
-                            content="⚠️ Claude completed but returned no assistant messages.",
-                        )
-                    )
+                # Response already streamed to UI by activity - no need to send again
+                logger.debug(f"Turn {self._state.turn_number} completed successfully")
 
             except Exception as e:
                 logger.error(f"Error running Claude agent: {e}", exc_info=True)
