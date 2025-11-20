@@ -148,6 +148,8 @@ class ClaudeMvpWorkflow(BaseWorkflow):
 
                 # Run Claude via activity (manual wrapper for MVP)
                 # ContextInterceptor reads _task_id, _trace_id, _parent_span_id and threads to activity!
+                logger.info(f"[WORKFLOW] About to call activity with resume_session_id={self._state.claude_session_id}")
+
                 result = await workflow.execute_activity(
                 run_claude_agent_activity,
                 args=[
@@ -168,7 +170,14 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                 ),
                 )
 
-                logger.info(f"Claude activity completed: {len(result.get('messages', []))} messages")
+                logger.info(f"[WORKFLOW] ✅ Claude activity returned successfully!")
+                logger.info(f"[WORKFLOW] Result type: {type(result)}")
+                logger.info(f"[WORKFLOW] Result: {result}")
+                logger.info(f"[WORKFLOW] Claude activity completed: {len(result.get('messages', []))} messages")
+
+                # DEBUG: Check what we got back
+                logger.info(f"DEBUG: result keys = {result.keys()}")
+                logger.info(f"DEBUG: session_id from result = {result.get('session_id')}")
 
                 # Update session_id for next turn (maintains conversation context)
                 new_session_id = result.get("session_id")
@@ -179,6 +188,8 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                         f"session_id={'STARTED' if self._state.turn_number == 1 else 'CONTINUED'} "
                         f"({new_session_id[:16]}...)"
                     )
+                else:
+                    logger.error(f"DEBUG: NO session_id in result! Current state session_id={self._state.claude_session_id}")
 
                 # Send Claude's response back to user
                 # Note: Activity should have streamed the response in real-time
@@ -219,7 +230,7 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                     )
 
             except Exception as e:
-                logger.error(f"Error running Claude agent: {e}", exc_info=True)
+                logger.error(f"[WORKFLOW] Error running Claude agent: {e}", exc_info=True)
                 # Send error message to user
                 await adk.messages.create(
                     task_id=params.task.id,
@@ -228,6 +239,7 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                         content=f"❌ Error: {str(e)}",
                     )
                 )
+                raise  # Re-raise to see in Temporal UI
 
     @workflow.run
     async def on_task_create(self, params: CreateTaskParams):
