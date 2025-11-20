@@ -27,9 +27,12 @@ from claude_agent_sdk import (
     ClaudeSDKClient,
     ClaudeAgentOptions,
     AssistantMessage,
+    UserMessage,
     TextBlock,
     SystemMessage,
     ResultMessage,
+    ToolUseBlock,
+    ToolResultBlock,
 )
 
 # Reuse OpenAI's context threading - this is the key to streaming!
@@ -43,8 +46,13 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 from agentex.lib.utils.logging import make_logger
 from agentex.lib import adk
 from agentex.types.text_content import TextContent
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_response_content import ToolResponseContent
 from agentex.types.task_message_delta import TextDelta
-from agentex.types.task_message_update import StreamTaskMessageDelta
+from agentex.types.task_message_update import StreamTaskMessageDelta, StreamTaskMessageFull
+
+# Reuse OpenAI's lifecycle streaming activity
+from agentex.lib.core.temporal.plugins.openai_agents.hooks.activities import stream_lifecycle_content
 
 logger = make_logger(__name__)
 
@@ -56,14 +64,16 @@ async def run_claude_agent_activity(
     allowed_tools: list[str],
     permission_mode: str = "acceptEdits",
     system_prompt: str | None = None,
+    resume_session_id: str | None = None,
 ) -> dict[str, Any]:
     """Execute Claude SDK - wrapped in Temporal activity
 
     This activity:
     1. Gets task_id from ContextVar (set by ContextInterceptor)
-    2. Configures Claude with workspace isolation
+    2. Configures Claude with workspace isolation and session resume
     3. Runs Claude SDK and collects responses
-    4. Returns messages for Temporal determinism
+    4. Extracts and returns session_id for next turn
+    5. Returns messages for Temporal determinism
 
     Args:
         prompt: User message to send to Claude
@@ -71,9 +81,10 @@ async def run_claude_agent_activity(
         allowed_tools: List of tools Claude can use
         permission_mode: Permission mode (default: acceptEdits)
         system_prompt: Optional system prompt override
+        resume_session_id: Optional session ID to resume conversation context
 
     Returns:
-        dict with "messages" key containing Claude's responses
+        dict with "messages", "session_id", "usage", and "cost_usd" keys
     """
 
     # Get streaming context from ContextVars (set by interceptor)
@@ -83,20 +94,24 @@ async def run_claude_agent_activity(
 
     logger.info(
         f"[run_claude_agent_activity] Starting - "
-        f"task_id={task_id}, workspace={workspace_path}, tools={allowed_tools}"
+        f"task_id={task_id}, workspace={workspace_path}, tools={allowed_tools}, "
+        f"resume={'YES' if resume_session_id else 'NO (new session)'}"
     )
 
-    # Configure Claude with workspace isolation
+    # Configure Claude with workspace isolation and session resume
     options = ClaudeAgentOptions(
         cwd=workspace_path,
         allowed_tools=allowed_tools,
         permission_mode=permission_mode,  # type: ignore
         system_prompt=system_prompt,
+        resume=resume_session_id,  # Resume previous session for context!
     )
 
     # Run Claude and collect results
     messages = []
     streaming_ctx = None
+    tool_call_map = {}  # Map tool_call_id → tool_name
+    last_tool_call_id = None  # Track most recent tool call for matching results
 
     try:
         # Only create streaming context if we have task_id
@@ -114,15 +129,134 @@ async def run_claude_agent_activity(
         async with ClaudeSDKClient(options=options) as client:
             await client.query(prompt)
 
-            async for message in client.receive_response():
+            async for message in client.receive_messages():
                 messages.append(message)
-                logger.debug(f"[run_claude_agent_activity] Received message: {type(message).__name__}")
 
-                # Stream text blocks to UI in real-time
-                if isinstance(message, AssistantMessage) and streaming_ctx:
+                # Debug: Log ALL message types and content blocks with sequence number
+                msg_num = len(messages)
+                logger.info(f"[run_claude_agent_activity] 📨 [{msg_num}] Message type: {type(message).__name__}")
+                if isinstance(message, AssistantMessage):
+                    block_types = [type(b).__name__ for b in message.content]
+                    logger.info(f"[run_claude_agent_activity]    [{msg_num}] Content blocks: {block_types}")
+
+                # Handle UserMessage as tool results (when permission_mode=acceptEdits)
+                # Claude SDK auto-executes tools and returns results as UserMessage
+                if isinstance(message, UserMessage) and last_tool_call_id and task_id:
+                    tool_name = tool_call_map.get(last_tool_call_id, "unknown")
+                    logger.info(f"[run_claude_agent_activity] ✅ [{msg_num}] STREAMING Tool result (UserMessage): {tool_name}")
+
+                    # Extract content
+                    user_content = message.content
+                    if isinstance(user_content, list):
+                        # content might be list of blocks
+                        user_content = str(user_content)
+
+                    # Stream tool response
+                    try:
+                        async with adk.streaming.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=ToolResponseContent(
+                                author="agent",
+                                name=tool_name,
+                                content=user_content,
+                                tool_call_id=last_tool_call_id,
+                            )
+                        ) as tool_ctx:
+                            await tool_ctx.stream_update(
+                                StreamTaskMessageFull(
+                                    parent_task_message=tool_ctx.task_message,
+                                    content=ToolResponseContent(
+                                        author="agent",
+                                        name=tool_name,
+                                        content=user_content,
+                                        tool_call_id=last_tool_call_id,
+                                    ),
+                                    type="full"
+                                )
+                            )
+                    except Exception as e:
+                        logger.warning(f"Failed to stream tool response: {e}")
+
+                    # Clear the last tool call
+                    last_tool_call_id = None
+
+                # Stream different content types to UI
+                if isinstance(message, AssistantMessage):
                     for block in message.content:
-                        if isinstance(block, TextBlock) and block.text:
-                            logger.debug(f"[run_claude_agent_activity] Streaming text: {block.text[:50]}...")
+                        # Stream tool requests (Read, Write, Bash, etc.)
+                        if isinstance(block, ToolUseBlock) and task_id:
+                            logger.info(f"[run_claude_agent_activity] 🔧 [{msg_num}] STREAMING Tool request: {block.name}")
+
+                            # Track tool_call_id → tool_name mapping for results
+                            tool_call_map[block.id] = block.name
+                            last_tool_call_id = block.id  # Remember for matching result
+
+                            # Stream tool request directly (can't call activity from activity)
+                            try:
+                                async with adk.streaming.streaming_task_message_context(
+                                    task_id=task_id,
+                                    initial_content=ToolRequestContent(
+                                        author="agent",
+                                        name=block.name,
+                                        arguments=block.input,
+                                        tool_call_id=block.id,
+                                    )
+                                ) as tool_ctx:
+                                    await tool_ctx.stream_update(
+                                        StreamTaskMessageFull(
+                                            parent_task_message=tool_ctx.task_message,
+                                            content=ToolRequestContent(
+                                                author="agent",
+                                                name=block.name,
+                                                arguments=block.input,
+                                                tool_call_id=block.id,
+                                            ),
+                                            type="full"
+                                        )
+                                    )
+                            except Exception as e:
+                                logger.warning(f"Failed to stream tool request: {e}")
+
+                        # Stream tool results
+                        elif isinstance(block, ToolResultBlock) and task_id:
+                            # Look up tool name from our mapping
+                            tool_name = tool_call_map.get(block.tool_use_id, "unknown")
+                            logger.info(f"[run_claude_agent_activity] ✅ Tool result: {tool_name}")
+
+                            # Extract content from tool result
+                            tool_content = block.content
+                            if tool_content is None:
+                                tool_content = ""
+
+                            # Stream tool response directly (can't call activity from activity)
+                            try:
+                                async with adk.streaming.streaming_task_message_context(
+                                    task_id=task_id,
+                                    initial_content=ToolResponseContent(
+                                        author="agent",
+                                        name=tool_name,
+                                        content=tool_content,
+                                        tool_call_id=block.tool_use_id,
+                                    )
+                                ) as tool_ctx:
+                                    await tool_ctx.stream_update(
+                                        StreamTaskMessageFull(
+                                            parent_task_message=tool_ctx.task_message,
+                                            content=ToolResponseContent(
+                                                author="agent",
+                                                name=tool_name,
+                                                content=tool_content,
+                                                tool_call_id=block.tool_use_id,
+                                            ),
+                                            type="full"
+                                        )
+                                    )
+                            except Exception as e:
+                                logger.warning(f"Failed to stream tool response: {e}")
+
+                        # Stream text blocks
+                        elif isinstance(block, TextBlock) and block.text and streaming_ctx:
+                            logger.info(f"[run_claude_agent_activity] 💬 [{msg_num}] STREAMING Text: {block.text[:50]}...")
 
                             # Create text delta
                             delta = TextDelta(
@@ -159,8 +293,21 @@ async def run_claude_agent_activity(
     serialized_messages = []
     usage_info = None
     cost_info = None
+    session_id = resume_session_id  # Start with resume_session_id, update if we get a new one
 
     for msg in messages:
+        if isinstance(msg, SystemMessage):
+            # Extract session_id from init message
+            if msg.subtype == "init":
+                session_id = msg.data.get("session_id")
+                logger.info(
+                    f"[run_claude_agent_activity] Session: "
+                    f"{'STARTED' if not resume_session_id else 'CONTINUED'} ({session_id[:16] if session_id else 'unknown'}...)"
+                )
+            # Skip system messages in output (just metadata)
+            logger.debug(f"[run_claude_agent_activity] SystemMessage: {msg.subtype}")
+            continue
+
         if isinstance(msg, AssistantMessage):
             # Extract text from assistant messages
             text_content = []
@@ -178,19 +325,18 @@ async def run_claude_agent_activity(
             # Extract usage and cost info
             usage_info = msg.usage
             cost_info = msg.total_cost_usd
+            # Update session_id from result message if available
+            if msg.session_id:
+                session_id = msg.session_id
             logger.info(
                 f"[run_claude_agent_activity] Result - "
                 f"cost=${cost_info:.4f}, duration={msg.duration_ms}ms, turns={msg.num_turns}"
             )
 
-        elif isinstance(msg, SystemMessage):
-            # Skip system messages (just metadata)
-            logger.debug(f"[run_claude_agent_activity] SystemMessage: {msg.subtype}")
-            continue
-
     return {
         "messages": serialized_messages,
         "task_id": task_id,
+        "session_id": session_id,  # Return session_id for next turn!
         "usage": usage_info,
         "cost_usd": cost_info,
     }

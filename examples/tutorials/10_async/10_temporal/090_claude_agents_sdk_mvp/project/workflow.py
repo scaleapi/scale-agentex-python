@@ -31,6 +31,7 @@ from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.types.text_content import TextContent
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.model_utils import BaseModel
 
 # Import Claude activity
 from agentex.lib.core.temporal.plugins.claude_agents import run_claude_agent_activity
@@ -44,6 +45,16 @@ if environment_variables.AGENT_NAME is None:
     raise ValueError("Environment variable AGENT_NAME is not set")
 
 logger = make_logger(__name__)
+
+
+class StateModel(BaseModel):
+    """Workflow state for Claude session tracking
+
+    Stores Claude session ID to maintain conversation context across turns.
+    This allows Claude to remember previous messages and answer follow-up questions.
+    """
+    claude_session_id: str | None = None
+    turn_number: int = 0
 
 
 # Activity for workspace creation (avoids determinism issues)
@@ -81,11 +92,11 @@ class ClaudeMvpWorkflow(BaseWorkflow):
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
+        self._state: StateModel | None = None
         self._task_id = None
         self._trace_id = None
         self._parent_span_id = None
         self._workspace_path = None
-        self._turn_number = 0
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams):
@@ -93,9 +104,12 @@ class ClaudeMvpWorkflow(BaseWorkflow):
 
         logger.info(f"Received task message: {params.event.content.content[:100]}...")
 
+        if self._state is None:
+            raise ValueError("State is not initialized")
+
         self._task_id = params.task.id
         self._trace_id = params.task.id
-        self._turn_number += 1
+        self._state.turn_number += 1
 
         # Echo user message to UI
         await adk.messages.create(
@@ -106,8 +120,11 @@ class ClaudeMvpWorkflow(BaseWorkflow):
         # Wrap in tracing span - THIS IS REQUIRED for ContextInterceptor to work!
         async with adk.tracing.span(
             trace_id=params.task.id,
-            name=f"Turn {self._turn_number}",
-            input={"prompt": params.event.content.content},
+            name=f"Turn {self._state.turn_number}",
+            input={
+                "prompt": params.event.content.content,
+                "session_id": self._state.claude_session_id,
+            },
         ) as span:
             self._parent_span_id = span.id if span else None
 
@@ -122,6 +139,7 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                     ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],  # allowed tools
                     "acceptEdits",                 # permission mode
                     "You are a helpful coding assistant. Be concise.",  # system prompt
+                    self._state.claude_session_id,  # resume session for context!
                 ],
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=RetryPolicy(
@@ -133,6 +151,16 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                 )
 
                 logger.info(f"Claude activity completed: {len(result.get('messages', []))} messages")
+
+                # Update session_id for next turn (maintains conversation context)
+                new_session_id = result.get("session_id")
+                if new_session_id:
+                    self._state.claude_session_id = new_session_id
+                    logger.info(
+                        f"Turn {self._state.turn_number}: "
+                        f"session_id={'STARTED' if self._state.turn_number == 1 else 'CONTINUED'} "
+                        f"({new_session_id[:16]}...)"
+                    )
 
                 # Send Claude's response back to user
                 # Note: Activity should have streamed the response in real-time
@@ -188,6 +216,12 @@ class ClaudeMvpWorkflow(BaseWorkflow):
         """Initialize workflow - create workspace and send welcome"""
 
         logger.info(f"Creating Claude MVP workflow for task: {params.task.id}")
+
+        # Initialize state with session tracking
+        self._state = StateModel(
+            claude_session_id=None,
+            turn_number=0,
+        )
 
         # Create workspace via activity (avoids determinism issues with file I/O)
         workspace_root = os.environ.get("CLAUDE_WORKSPACE_ROOT")
