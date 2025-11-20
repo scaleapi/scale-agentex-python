@@ -21,6 +21,7 @@ acp = FastACP.create(
     config=AsyncACPConfig(type="base"),
 )
 
+
 class StateModel(BaseModel):
     messages: List[Message]
 
@@ -37,12 +38,13 @@ async def handle_task_create(params: CreateTaskParams):
     state = StateModel(messages=[SystemMessage(content="You are a helpful assistant that can answer questions.")])
     await adk.state.create(task_id=params.task.id, agent_id=params.agent.id, state=state)
 
+
 @acp.on_task_event_send
 async def handle_event_send(params: SendEventParams):
     # !!! Warning: Because "Agentic" ACPs are designed to be fully asynchronous, race conditions can occur if parallel events are sent. It is highly recommended to use the "temporal" type in the AgenticACPConfig instead to handle complex use cases. The "base" ACP is only designed to be used for simple use cases and for learning purposes.
 
     #########################################################
-    # 2. Validate the event content. 
+    # 2. Validate the event content.
     #########################################################
     if not params.event.content:
         return
@@ -92,8 +94,8 @@ async def handle_event_send(params: SendEventParams):
 
     # Safely extract content from the event
     content_text = ""
-    if hasattr(params.event.content, 'content'):
-        content_val = getattr(params.event.content, 'content', '')
+    if hasattr(params.event.content, "content"):
+        content_val = getattr(params.event.content, "content", "")
         if isinstance(content_val, str):
             content_text = content_val
     state.messages.append(UserMessage(content=content_text))
@@ -116,11 +118,11 @@ async def handle_event_send(params: SendEventParams):
         llm_config=LLMConfig(model="gpt-4o-mini", messages=state.messages, stream=True),
         trace_id=params.task.id,
     )
-    
+
     # Safely extract content from the task message
     response_text = ""
-    if task_message.content and hasattr(task_message.content, 'content'):  # type: ignore[union-attr]
-        content_val = getattr(task_message.content, 'content', '')  # type: ignore[union-attr]
+    if task_message.content and hasattr(task_message.content, "content"):  # type: ignore[union-attr]
+        content_val = getattr(task_message.content, "content", "")  # type: ignore[union-attr]
         if isinstance(content_val, str):
             response_text = content_val
     state.messages.append(AssistantMessage(content=response_text))
@@ -137,8 +139,8 @@ async def handle_event_send(params: SendEventParams):
         trace_id=params.task.id,
     )
 
+
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):
     """Default task cancel handler"""
     logger.info(f"Task canceled: {params.task}")
-

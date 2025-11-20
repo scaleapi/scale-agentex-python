@@ -21,11 +21,13 @@ if environment_variables.AGENT_NAME is None:
 
 logger = make_logger(__name__)
 
+
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
 class At000HelloAcpWorkflow(BaseWorkflow):
     """
     Minimal async workflow template for AgentEx Temporal agents.
     """
+
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
@@ -67,5 +69,5 @@ class At000HelloAcpWorkflow(BaseWorkflow):
         # Thus, if you want this agent to field events indefinitely (or for a long time) you need to wait for a condition to be met.
         await workflow.wait_condition(
             lambda: self._complete_task,
-            timeout=None, # Set a timeout if you want to prevent the task from running indefinitely. Generally this is not needed. Temporal can run hundreds of millions of workflows in parallel and more. Only do this if you have a specific reason to do so.
+            timeout=None,  # Set a timeout if you want to prevent the task from running indefinitely. Generally this is not needed. Temporal can run hundreds of millions of workflows in parallel and more. Only do this if you have a specific reason to do so.
         )

@@ -1,48 +1,26 @@
 """
-Sample tests for AgentEx ACP agent (Temporal version).
+Tests for at000-hello-acp (temporal agent)
 
-This test suite demonstrates how to test the main AgentEx API functions:
-- Non-streaming event sending and polling
-- Streaming event sending
+Prerequisites:
+    - AgentEx services running (make dev)
+    - Temporal server running
+    - Agent running: agentex agents run --manifest manifest.yaml
 
-To run these tests:
-1. Make sure the agent is running (via docker-compose or `agentex agents run`)
-2. Set the AGENTEX_API_BASE_URL environment variable if not using default
-3. Run: pytest test_agent.py -v
-
-Configuration:
-- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
-- AGENT_NAME: Name of the agent to test (default: at000-hello-acp)
+Run: pytest tests/test_agent.py -v
 """
-
-import os
-import uuid
-import asyncio
 
 import pytest
 import pytest_asyncio
-from test_utils.async_utils import (
-    poll_messages,
+
+from agentex.lib.testing import (
+    async_test_agent,
     stream_agent_response,
-    send_event_and_poll_yielding,
+    assert_valid_agent_response,
+    assert_agent_response_contains,
 )
+from agentex.lib.testing.sessions import AsyncAgentTest
 
-from agentex import AsyncAgentex
-from agentex.types import TaskMessage
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
-from agentex.types.text_content_param import TextContentParam
-
-# Configuration from environment variables
-AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
-AGENT_NAME = os.environ.get("AGENT_NAME", "at000-hello-acp")
-
-
-@pytest_asyncio.fixture
-async def client():
-    """Create an AgentEx client instance for testing."""
-    client = AsyncAgentex(base_url=AGENTEX_API_BASE_URL)
-    yield client
-    await client.close()
+AGENT_NAME = "at000-hello-acp"
 
 
 @pytest.fixture
@@ -52,120 +30,75 @@ def agent_name():
 
 
 @pytest_asyncio.fixture
-async def agent_id(client: AsyncAgentex, agent_name):
-    """Retrieve the agent ID based on the agent name."""
-    agents = await client.agents.list()
-    for agent in agents:
-        if agent.name == agent_name:
-            return agent.id
-    raise ValueError(f"Agent with name {agent_name} not found.")
+async def test_agent(agent_name: str):
+    """Fixture to create a test async agent."""
+    async with async_test_agent(agent_name=agent_name) as test:
+        yield test
 
 
 class TestNonStreamingEvents:
     """Test non-streaming event sending and polling."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_poll(self, client: AsyncAgentex, agent_id: str):
+    async def test_send_event_and_poll(self, test_agent: AsyncAgentTest):
         """Test sending an event and polling for the response."""
-        # Create a task for this conversation
-        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        task = task_response.result
-        assert task is not None
+        # Poll for initial task creation message
+        initial_response = await test_agent.poll_for_agent_response(timeout_seconds=15.0)
+        assert_valid_agent_response(initial_response)
+        assert_agent_response_contains(initial_response, "Hello! I've received your task")
 
-        # Poll for the initial task creation message
-        async for message in poll_messages(
-            client=client,
-            task_id=task.id,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            if message.content and message.content.type == "text" and message.content.author == "agent":
-                assert "Hello! I've received your task" in message.content.content
-                break
-        
-        await asyncio.sleep(1.5)
-        # Send an event and poll for response
-        user_message = "Hello, this is a test message!"
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            if message.content and message.content.type == "text" and message.content.author == "agent":
-                assert "Hello! I've received your message" in message.content.content
-                break
+        # Send a test message and validate response
+        response = await test_agent.send_event("Hello, this is a test message!", timeout_seconds=30.0)
+        # Validate latest response
+        assert_valid_agent_response(response)
+        assert_agent_response_contains(response, "Hello! I've received your message")
 
 
 class TestStreamingEvents:
     """Test streaming event sending."""
 
     @pytest.mark.asyncio
-    async def test_send_event_and_stream(self, client: AsyncAgentex, agent_id: str):
+    async def test_send_event_and_stream(self, test_agent: AsyncAgentTest):
         """Test sending an event and streaming the response."""
-        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        task = task_response.result
-        assert task is not None
-
         user_message = "Hello, this is a test message!"
 
-        # Collect events from stream
-        all_events = []
-
         # Flags to track what we've received
-        task_creation_found = False
         user_echo_found = False
         agent_response_found = False
+        all_events = []
 
-        async def collect_stream_events(): #noqa: ANN101
-            nonlocal task_creation_found, user_echo_found, agent_response_found
+        # Stream events
+        async for event in stream_agent_response(test_agent.client, test_agent.task_id, timeout=30.0):
+            all_events.append(event)
+            event_type = event.get("type")
 
-            async for event in stream_agent_response(
-                client=client,
-                task_id=task.id,
-                timeout=30,
-            ):
-                # Check events as they arrive
-                event_type = event.get("type")
-                if event_type == "full":
-                    content = event.get("content", {})
-                    if content.get("content") is None:
-                        continue  # Skip empty content
-                    if content.get("type") == "text" and content.get("author") == "agent":
-                        # Check for initial task creation message
-                        if "Hello! I've received your task" in content.get("content", ""):
-                            task_creation_found = True
-                        # Check for agent response to user message
-                        elif "Hello! I've received your message" in content.get("content", ""):
-                            # Agent response should come after user echo
-                            assert user_echo_found, "Agent response arrived before user message echo (incorrect order)"
-                            agent_response_found = True
-                    elif content.get("type") == "text" and content.get("author") == "user":
-                        # Check for user message echo
-                        if content.get("content") == user_message:
-                            user_echo_found = True
+            if event_type == "connected":
+                await test_agent.send_event(user_message, timeout_seconds=30.0)
 
-                # Exit early if we've found all expected messages
-                if task_creation_found and user_echo_found and agent_response_found:
-                    break
+            elif event_type == "full":
+                content = event.get("content", {})
+                if content.get("content") is None:
+                    continue  # Skip empty content
 
-            assert task_creation_found, "Task creation message not found in stream"
-            assert user_echo_found, "User message echo not found in stream"
-            assert agent_response_found, "Agent response not found in stream"
+                if content.get("type") == "text" and content.get("author") == "agent":
+                    # Check for agent response to user message
+                    if "Hello! I've received your message" in content.get("content", ""):
+                        agent_response_found = True
+                        assert user_echo_found, "User echo should be found before agent response"
 
+                elif content.get("type") == "text" and content.get("author") == "user":
+                    # Check for user message echo (may or may not be present)
+                    if content.get("content") == user_message:
+                        user_echo_found = True
 
-        # Start streaming task
-        stream_task = asyncio.create_task(collect_stream_events())
+            # Exit early if we've found expected messages
+            if agent_response_found and user_echo_found:
+                break
 
-        # Send the event
-        event_content = TextContentParam(type="text", author="user", content=user_message)
-        await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
+        assert agent_response_found, "Did not receive agent response to user message"
+        assert user_echo_found, "User echo message not found"
+        assert len(all_events) > 0, "Should receive events"
 
-        # Wait for streaming to complete
-        await stream_task
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

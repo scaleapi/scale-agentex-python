@@ -1,70 +1,93 @@
 """
-Sample tests for AgentEx ACP agent.
+Tests for {{ agent_name }} (sync agent)
 
-This test suite demonstrates how to test the main AgentEx API functions:
-- Non-streaming message sending
-- Streaming message sending
-- Task creation via RPC
+This test suite demonstrates testing your sync agent with the AgentEx testing framework.
 
-To run these tests:
-1. Make sure the agent is running (via docker-compose or `agentex agents run`)
-2. Set the AGENTEX_API_BASE_URL environment variable if not using default
-3. Run: pytest test_agent.py -v
+Test coverage:
+- Basic message sending
+- Streaming responses
+- Multi-turn conversations
 
-Configuration:
-- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
-- AGENT_NAME: Name of the agent to test (default: {{ agent_name }})
+Prerequisites:
+    - AgentEx services running (make dev)
+    - Agent running: agentex agents run --manifest manifest.yaml
+
+Run tests:
+    pytest tests/test_agent.py -v
 """
 
-import os
-import pytest
-from agentex import Agentex
+from agentex.lib.testing import (
+    sync_test_agent,
+    assert_valid_agent_response,
+    assert_agent_response_contains,
+    collect_streaming_deltas,
+)
+
+AGENT_NAME = "{{ agent_name }}"
 
 
-# Configuration from environment variables
-AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
-AGENT_NAME = os.environ.get("AGENT_NAME", "{{ agent_name }}")
+def test_agent_basic_response():
+    """Test that sync agent responds to basic messages."""
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
+        response = test.send_message("Hello! Please respond briefly.")
+
+        assert_valid_agent_response(response)
+        assert len(response.content) > 0
+        print(f"✓ Agent responded: {response.content[:80]}...")
 
 
-@pytest.fixture
-def client():
-    """Create an AgentEx client instance for testing."""
-    return Agentex(base_url=AGENTEX_API_BASE_URL)
+def test_agent_multi_turn():
+    """Test multi-turn conversation."""
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
+        # Turn 1
+        response1 = test.send_message("Hello!")
+        assert_valid_agent_response(response1)
+
+        # Turn 2
+        response2 = test.send_message("How are you?")
+        assert_valid_agent_response(response2)
+
+        # Turn 3
+        response3 = test.send_message("Thank you!")
+        assert_valid_agent_response(response3)
+
+        # Verify history
+        history = test.get_conversation_history()
+        assert len(history) >= 6, f"Expected >= 6 messages, got {len(history)}"
+        print(f"✓ Conversation: {len(history)} messages")
 
 
-@pytest.fixture
-def agent_name():
-    """Return the agent name for testing."""
-    return AGENT_NAME
+def test_agent_streaming():
+    """Test streaming responses from sync agent."""
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
+        # Get streaming response
+        response_gen = test.send_message_streaming("Stream this response please")
+
+        # Collect the streaming deltas
+        content, chunks = collect_streaming_deltas(response_gen)
+
+        assert len(content) > 0, "Should receive content from stream"
+        assert len(chunks) > 0, "Should receive at least one chunk"
+        print(f"✓ Streaming works ({len(chunks)} chunks, {len(content)} chars)")
 
 
-@pytest.fixture
-def agent_id(client, agent_name):
-    """Retrieve the agent ID based on the agent name."""
-    agents = client.agents.list()
-    for agent in agents:
-        if agent.name == agent_name:
-            return agent.id
-    raise ValueError(f"Agent with name {agent_name} not found.")
+def test_agent_custom_scenario():
+    """
+    Add your custom test scenarios here.
 
+    Customize this test for your agent's specific behavior and requirements.
+    """
+    with sync_test_agent(agent_name=AGENT_NAME) as test:
+        # Example: Test specific functionality
+        response = test.send_message("Your custom test message here")
 
-class TestNonStreamingMessages:
-    """Test non-streaming message sending."""
+        assert_valid_agent_response(response)
 
-    def test_send_message(self, client: Agentex, _agent_name: str):
-        """Test sending a message and receiving a response."""
-        # TODO: Fill in the test based on what data your agent is expected to handle
-        ...
-
-
-class TestStreamingMessages:
-    """Test streaming message sending."""
-
-    def test_send_stream_message(self, client: Agentex, _agent_name: str):
-        """Test streaming a message and aggregating deltas."""
-        # TODO: Fill in the test based on what data your agent is expected to handle
-        ...
+        # Add assertions specific to your agent's expected behavior
+        # assert_agent_response_contains(response, "expected text")
+        # assert len(response.content) > 100, "Response should be detailed"
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    print(f"Run with: pytest tests/test_agent.py -v")
+    print(f"Testing agent: {AGENT_NAME}")
