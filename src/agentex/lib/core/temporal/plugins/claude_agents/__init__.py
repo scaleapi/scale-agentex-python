@@ -232,8 +232,8 @@ async def run_claude_agent_activity(
                                 logger.info(f"[run_claude_agent_activity] 🤖 Starting subagent: {subagent_type}")
 
                                 # Create nested trace span for subagent execution
-                                trace = adk.tracing.trace(trace_id)
-                                current_subagent_span = await trace.span(
+                                current_subagent_span = await adk.tracing.span(
+                                    trace_id=trace_id,
                                     parent_id=parent_span_id,
                                     name=f"Subagent: {subagent_type}",
                                     input=block.input,
