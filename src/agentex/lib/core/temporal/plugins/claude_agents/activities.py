@@ -133,11 +133,11 @@ async def run_claude_agent_activity(
             async for message in client.receive_response():
                 await handler.handle_message(message)
 
-        logger.info(f"[run_claude_agent_activity] ✅ Message loop completed, cleaning up...")
+        logger.debug(f"Message loop completed, cleaning up...")
         await handler.cleanup()
 
         results = handler.get_results()
-        logger.info(f"[run_claude_agent_activity] ✅ About to return results: {results.keys()}")
+        logger.debug(f"Returning results with keys: {results.keys()}")
         return results
 
     except Exception as e:

@@ -67,7 +67,7 @@ class ClaudeMessageHandler:
     async def initialize(self):
         """Initialize streaming context if task_id is available."""
         if self.task_id:
-            logger.info(f"[ClaudeMessageHandler] Creating streaming context for task: {self.task_id}")
+            logger.debug(f"Creating streaming context for task: {self.task_id}")
             self.streaming_ctx = await adk.streaming.streaming_task_message_context(
                 task_id=self.task_id,
                 initial_content=TextContent(
@@ -82,11 +82,11 @@ class ClaudeMessageHandler:
         self.messages.append(message)
         msg_num = len(self.messages)
 
-        # Debug logging
-        logger.info(f"[ClaudeMessageHandler] 📨 [{msg_num}] Message type: {type(message).__name__}")
+        # Debug logging (verbose - only for troubleshooting)
+        logger.debug(f"📨 [{msg_num}] Message type: {type(message).__name__}")
         if isinstance(message, AssistantMessage):
             block_types = [type(b).__name__ for b in message.content]
-            logger.info(f"[ClaudeMessageHandler]    [{msg_num}] Content blocks: {block_types}")
+            logger.debug(f"   [{msg_num}] Content blocks: {block_types}")
 
         # Route to specific handlers
         if isinstance(message, UserMessage):
@@ -104,7 +104,7 @@ class ClaudeMessageHandler:
             return
 
         tool_name = self.tool_call_map.get(self.last_tool_call_id, "unknown")
-        logger.info(f"[ClaudeMessageHandler] ✅ [{msg_num}] STREAMING Tool result: {tool_name}")
+        logger.info(f"✅ Tool result: {tool_name}")
 
         # If this was a subagent (Task tool), close the subagent span
         if tool_name == "Task" and self.current_subagent_span and self.current_subagent_ctx:
@@ -114,7 +114,7 @@ class ClaudeMessageHandler:
 
             self.current_subagent_span.output = {"result": user_content}
             await self.current_subagent_ctx.__aexit__(None, None, None)
-            logger.info(f"[ClaudeMessageHandler] 🤖 Completed subagent execution")
+            logger.info(f"🤖 Subagent completed: {tool_name}")
             self.current_subagent_span = None
             self.current_subagent_ctx = None
 
@@ -178,7 +178,7 @@ class ClaudeMessageHandler:
         if not self.task_id:
             return
 
-        logger.info(f"[ClaudeMessageHandler] 🔧 [{msg_num}] STREAMING Tool request: {block.name}")
+        logger.info(f"🔧 Tool request: {block.name}")
 
         # Track tool_call_id → tool_name mapping
         self.tool_call_map[block.id] = block.name
@@ -187,7 +187,7 @@ class ClaudeMessageHandler:
         # Special handling for Task tool (subagents) - create nested span
         if block.name == "Task" and self.trace_id and self.parent_span_id:
             subagent_type = block.input.get("subagent_type", "unknown")
-            logger.info(f"[ClaudeMessageHandler] 🤖 Starting subagent: {subagent_type}")
+            logger.info(f"🤖 Subagent started: {subagent_type}")
 
             # Create nested trace span
             self.current_subagent_ctx = adk.tracing.span(
@@ -230,7 +230,7 @@ class ClaudeMessageHandler:
             return
 
         tool_name = self.tool_call_map.get(block.tool_use_id, "unknown")
-        logger.info(f"[ClaudeMessageHandler] ✅ Tool result: {tool_name}")
+        logger.info(f"✅ Tool result: {tool_name}")
 
         tool_content = block.content if block.content is not None else ""
 
@@ -264,7 +264,7 @@ class ClaudeMessageHandler:
         if not block.text or not self.streaming_ctx:
             return
 
-        logger.info(f"[ClaudeMessageHandler] 💬 [{msg_num}] STREAMING Text: {block.text[:50]}...")
+        logger.debug(f"💬 Text block: {block.text[:50]}...")
 
         delta = TextDelta(type="text", text_delta=block.text)
 
@@ -283,11 +283,9 @@ class ClaudeMessageHandler:
         """Handle system message - extract session_id."""
         if message.subtype == "init":
             self.session_id = message.data.get("session_id")
-            logger.info(
-                f"[ClaudeMessageHandler] Session: "
-                f"{'STARTED' if self.session_id else 'unknown'} ({self.session_id[:16] if self.session_id else 'N/A'}...)"
-            )
-        logger.debug(f"[ClaudeMessageHandler] SystemMessage: {message.subtype}")
+            logger.debug(f"Session initialized: {self.session_id[:16] if self.session_id else 'unknown'}...")
+        else:
+            logger.debug(f"SystemMessage: {message.subtype}")
 
     async def _handle_result_message(self, message: ResultMessage):
         """Handle result message - extract usage and cost."""
@@ -298,17 +296,14 @@ class ClaudeMessageHandler:
         if message.session_id:
             self.session_id = message.session_id
 
-        logger.info(
-            f"[ClaudeMessageHandler] Result - "
-            f"cost=${self.cost_info:.4f}, duration={message.duration_ms}ms, turns={message.num_turns}"
-        )
+        logger.info(f"💰 Cost: ${self.cost_info:.4f}, Duration: {message.duration_ms}ms, Turns: {message.num_turns}")
 
     async def cleanup(self):
         """Clean up open streaming contexts."""
         if self.streaming_ctx:
             try:
                 await self.streaming_ctx.close()
-                logger.info(f"[ClaudeMessageHandler] Closed streaming context")
+                logger.debug(f"Closed streaming context")
             except Exception as e:
                 logger.warning(f"Failed to close streaming context: {e}")
 
