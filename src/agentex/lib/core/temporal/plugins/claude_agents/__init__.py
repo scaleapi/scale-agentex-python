@@ -23,7 +23,14 @@ from typing import Any
 from datetime import timedelta
 
 from temporalio import activity
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock
+from claude_agent_sdk import (
+    ClaudeSDKClient,
+    ClaudeAgentOptions,
+    AssistantMessage,
+    TextBlock,
+    SystemMessage,
+    ResultMessage,
+)
 
 # Reuse OpenAI's context threading - this is the key to streaming!
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
@@ -148,24 +155,44 @@ async def run_claude_agent_activity(
 
     logger.info(f"[run_claude_agent_activity] Completed - collected {len(messages)} messages")
 
-    # Serialize messages for Temporal
+    # Parse and serialize messages for Temporal
     serialized_messages = []
+    usage_info = None
+    cost_info = None
+
     for msg in messages:
         if isinstance(msg, AssistantMessage):
+            # Extract text from assistant messages
             text_content = []
             for block in msg.content:
                 if isinstance(block, TextBlock):
                     text_content.append(block.text)
-            serialized_messages.append({
-                "role": "assistant",
-                "content": "\n".join(text_content)
-            })
-        else:
-            serialized_messages.append({"type": type(msg).__name__, "content": str(msg)})
+
+            if text_content:
+                serialized_messages.append({
+                    "role": "assistant",
+                    "content": "\n".join(text_content)
+                })
+
+        elif isinstance(msg, ResultMessage):
+            # Extract usage and cost info
+            usage_info = msg.usage
+            cost_info = msg.total_cost_usd
+            logger.info(
+                f"[run_claude_agent_activity] Result - "
+                f"cost=${cost_info:.4f}, duration={msg.duration_ms}ms, turns={msg.num_turns}"
+            )
+
+        elif isinstance(msg, SystemMessage):
+            # Skip system messages (just metadata)
+            logger.debug(f"[run_claude_agent_activity] SystemMessage: {msg.subtype}")
+            continue
 
     return {
         "messages": serialized_messages,
         "task_id": task_id,
+        "usage": usage_info,
+        "cost_usd": cost_info,
     }
 
 

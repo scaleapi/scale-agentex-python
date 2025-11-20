@@ -41,15 +41,7 @@ async def main():
     logger.info(f"Temporal Address: {environment_variables.TEMPORAL_ADDRESS}")
     logger.info(f"Redis URL: {environment_variables.REDIS_URL}")
     logger.info(f"Workspace Root: {environment_variables.CLAUDE_WORKSPACE_ROOT}")
-
-    # Validate required env vars
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise ValueError(
-            "ANTHROPIC_API_KEY environment variable is not set. "
-            "Please set it in your .env file or environment."
-        )
-
-    logger.info("✓ ANTHROPIC_API_KEY is set")
+    logger.info(f"ANTHROPIC_API_KEY: {'SET' if os.environ.get('ANTHROPIC_API_KEY') else 'NOT SET (will fail when activity runs)'}")
 
     # Get all standard AgentEx activities
     activities = get_all_activities()

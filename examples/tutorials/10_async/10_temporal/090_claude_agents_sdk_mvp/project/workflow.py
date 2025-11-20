@@ -21,6 +21,7 @@ import os
 from pathlib import Path
 from temporalio import workflow
 from temporalio import activity
+from temporalio.common import RetryPolicy
 from datetime import timedelta
 
 from agentex.lib import adk
@@ -81,7 +82,10 @@ class ClaudeMvpWorkflow(BaseWorkflow):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
         self._task_id = None
+        self._trace_id = None
+        self._parent_span_id = None
         self._workspace_path = None
+        self._turn_number = 0
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams):
@@ -90,6 +94,8 @@ class ClaudeMvpWorkflow(BaseWorkflow):
         logger.info(f"Received task message: {params.event.content.content[:100]}...")
 
         self._task_id = params.task.id
+        self._trace_id = params.task.id
+        self._turn_number += 1
 
         # Echo user message to UI
         await adk.messages.create(
@@ -97,10 +103,18 @@ class ClaudeMvpWorkflow(BaseWorkflow):
             content=params.event.content
         )
 
-        try:
-            # Run Claude via activity (manual wrapper for MVP)
-            # ContextInterceptor automatically threads task_id to activity!
-            result = await workflow.execute_activity(
+        # Wrap in tracing span - THIS IS REQUIRED for ContextInterceptor to work!
+        async with adk.tracing.span(
+            trace_id=params.task.id,
+            name=f"Turn {self._turn_number}",
+            input={"prompt": params.event.content.content},
+        ) as span:
+            self._parent_span_id = span.id if span else None
+
+            try:
+                # Run Claude via activity (manual wrapper for MVP)
+                # ContextInterceptor reads _task_id, _trace_id, _parent_span_id and threads to activity!
+                result = await workflow.execute_activity(
                 run_claude_agent_activity,
                 args=[
                     params.event.content.content,  # prompt
@@ -110,51 +124,64 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                     "You are a helpful coding assistant. Be concise.",  # system prompt
                 ],
                 start_to_close_timeout=timedelta(minutes=5),
-                retry_policy=workflow.RetryPolicy(
+                retry_policy=RetryPolicy(
                     maximum_attempts=3,
                     initial_interval=timedelta(seconds=1),
                     maximum_interval=timedelta(seconds=10),
                     backoff_coefficient=2.0,
                 ),
-            )
-
-            logger.info(f"Claude activity completed: {len(result.get('messages', []))} messages")
-
-            # Send Claude's response back to user
-            messages = result.get("messages", [])
-            if messages:
-                # Combine all messages into one response
-                combined_content = "\n\n".join(
-                    msg.get("content", "") for msg in messages if msg.get("content")
                 )
 
+                logger.info(f"Claude activity completed: {len(result.get('messages', []))} messages")
+
+                # Send Claude's response back to user
+                # Note: Activity should have streamed the response in real-time
+                # But if streaming failed (task_id=None), we need to send it here
+                messages = result.get("messages", [])
+
+                # Extract just the assistant messages (skip system/result messages)
+                assistant_messages = [
+                    msg for msg in messages
+                    if msg.get("role") == "assistant" and msg.get("content")
+                ]
+
+                if assistant_messages:
+                    # Combine assistant responses
+                    combined_content = "\n\n".join(
+                        msg.get("content", "") for msg in assistant_messages
+                    )
+
+                    # Send the response (streaming might have failed if task_id was None)
+                    await adk.messages.create(
+                        task_id=params.task.id,
+                        content=TextContent(
+                            author="agent",
+                            content=combined_content,
+                            format="markdown",
+                        )
+                    )
+                    logger.info(f"Sent Claude response to UI: {combined_content[:100]}...")
+                else:
+                    # No assistant message found - this shouldn't happen
+                    logger.warning("No assistant messages in Claude response")
+                    await adk.messages.create(
+                        task_id=params.task.id,
+                        content=TextContent(
+                            author="agent",
+                            content="⚠️ Claude completed but returned no assistant messages.",
+                        )
+                    )
+
+            except Exception as e:
+                logger.error(f"Error running Claude agent: {e}", exc_info=True)
+                # Send error message to user
                 await adk.messages.create(
                     task_id=params.task.id,
                     content=TextContent(
                         author="agent",
-                        content=combined_content or "Claude completed but returned no content.",
-                        format="markdown",
+                        content=f"❌ Error: {str(e)}",
                     )
                 )
-            else:
-                await adk.messages.create(
-                    task_id=params.task.id,
-                    content=TextContent(
-                        author="agent",
-                        content="⚠️ Claude completed but returned no messages.",
-                    )
-                )
-
-        except Exception as e:
-            logger.error(f"Error running Claude agent: {e}", exc_info=True)
-            # Send error message to user
-            await adk.messages.create(
-                task_id=params.task.id,
-                content=TextContent(
-                    author="agent",
-                    content=f"❌ Error: {str(e)}",
-                )
-            )
 
     @workflow.run
     async def on_task_create(self, params: CreateTaskParams):

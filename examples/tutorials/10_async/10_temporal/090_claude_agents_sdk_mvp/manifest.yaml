@@ -12,7 +12,7 @@ build:
 # Local Development Configuration
 local_development:
   agent:
-    port: 8001
+    port: 8000
     host_address: host.docker.internal
   paths:
     acp: project/acp.py
@@ -37,15 +37,6 @@ agent:
     - env_var_name: REDIS_URL
       secret_name: redis-url-secret
       secret_key: url
-
-  env:
-    ANTHROPIC_API_KEY: ""
-    AGENT_NAME: "claude-mvp-agent"
-    WORKFLOW_NAME: "ClaudeMvpWorkflow"
-    WORKFLOW_TASK_QUEUE: "claude-mvp-queue"
-    # CLAUDE_WORKSPACE_ROOT: "/workspaces"  # Optional - defaults to ./workspace
-    ACP_URL: "http://localhost"
-    ACP_PORT: "8001"
 
 # Deployment Configuration
 deployment:
