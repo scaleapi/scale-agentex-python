@@ -16,23 +16,24 @@ What's missing (see NEXT_STEPS.md):
 - Subagents
 - Tracing
 """
+from __future__ import annotations
 
-from claude_agent_sdk.types import AgentDefinition
 import os
 from pathlib import Path
-from temporalio import workflow
-from temporalio import activity
-from temporalio.common import RetryPolicy
 from datetime import timedelta
+
+from temporalio import activity, workflow
+from temporalio.common import RetryPolicy
+from claude_agent_sdk.types import AgentDefinition
 
 from agentex.lib import adk
 from agentex.lib.types.acp import SendEventParams, CreateTaskParams
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
-from agentex.lib.environment_variables import EnvironmentVariables
-from agentex.types.text_content import TextContent
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.model_utils import BaseModel
 
 # Import Claude activity
 from agentex.lib.core.temporal.plugins.claude_agents import run_claude_agent_activity

@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
+from pathlib import Path
 
 from temporalio import activity
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AgentDefinition
+from claude_agent_sdk import AgentDefinition, ClaudeSDKClient, ClaudeAgentOptions
 
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.temporal.plugins.claude_agents.hooks import create_streaming_hooks
+from agentex.lib.core.temporal.plugins.claude_agents.message_handler import ClaudeMessageHandler
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     streaming_task_id,
     streaming_trace_id,
     streaming_parent_span_id,
 )
-from agentex.lib.core.temporal.plugins.claude_agents.message_handler import ClaudeMessageHandler
-from agentex.lib.core.temporal.plugins.claude_agents.hooks import create_streaming_hooks
 
 logger = make_logger(__name__)
 

@@ -35,18 +35,16 @@ Usage:
     await worker.run(activities=activities, workflow=YourWorkflow)
 """
 
+from agentex.lib.core.temporal.plugins.claude_agents.hooks import (
+    TemporalStreamingHooks,
+    create_streaming_hooks,
+)
 from agentex.lib.core.temporal.plugins.claude_agents.activities import (
     run_claude_agent_activity,
     create_workspace_directory,
 )
-
 from agentex.lib.core.temporal.plugins.claude_agents.message_handler import (
     ClaudeMessageHandler,
-)
-
-from agentex.lib.core.temporal.plugins.claude_agents.hooks import (
-    create_streaming_hooks,
-    TemporalStreamingHooks,
 )
 
 # Reuse OpenAI's context threading - this is the key to streaming!

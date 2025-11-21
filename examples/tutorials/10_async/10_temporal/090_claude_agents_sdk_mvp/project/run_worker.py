@@ -9,21 +9,22 @@ Key components:
 - Standard AgentEx activities (messages, streaming, tracing)
 """
 
-import asyncio
 import os
-from agentex.lib.core.temporal.workers.worker import AgentexWorker
-from agentex.lib.core.temporal.activities import get_all_activities
-from agentex.lib.environment_variables import EnvironmentVariables
-from agentex.lib.utils.logging import make_logger
-
-# Import Claude components
-from agentex.lib.core.temporal.plugins.claude_agents import (
-    run_claude_agent_activity,
-    ContextInterceptor,  # Reuse from OpenAI!
-)
+import asyncio
 
 # Import workflow and workspace activity
 from project.workflow import ClaudeMvpWorkflow, create_workspace_directory
+
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.temporal.activities import get_all_activities
+from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+# Import Claude components
+from agentex.lib.core.temporal.plugins.claude_agents import (
+    ContextInterceptor,  # Reuse from OpenAI!
+    run_claude_agent_activity,
+)
 
 logger = make_logger(__name__)
 

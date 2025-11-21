@@ -10,11 +10,11 @@ from typing import Any
 
 from claude_agent_sdk import HookMatcher
 
-from agentex.lib.utils.logging import make_logger
 from agentex.lib import adk
+from agentex.lib.utils.logging import make_logger
+from agentex.types.task_message_update import StreamTaskMessageFull
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
-from agentex.types.task_message_update import StreamTaskMessageFull
 
 logger = make_logger(__name__)
 
@@ -53,7 +53,7 @@ class TemporalStreamingHooks:
         self,
         input_data: dict[str, Any],
         tool_use_id: str | None,
-        context: Any,
+        _context: Any,
     ) -> dict[str, Any]:
         """Hook called before tool execution.
 
@@ -120,7 +120,7 @@ class TemporalStreamingHooks:
         self,
         input_data: dict[str, Any],
         tool_use_id: str | None,
-        context: Any,
+        _context: Any,
     ) -> dict[str, Any]:
         """Hook called after tool execution.
 

@@ -13,14 +13,14 @@ from __future__ import annotations
 from typing import Any
 
 from claude_agent_sdk import (
-    AssistantMessage,
     TextBlock,
-    SystemMessage,
     ResultMessage,
+    SystemMessage,
+    AssistantMessage,
 )
 
-from agentex.lib.utils.logging import make_logger
 from agentex.lib import adk
+from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import StreamTaskMessageDelta
@@ -96,7 +96,7 @@ class ClaudeMessageHandler:
         elif isinstance(message, ResultMessage):
             await self._handle_result_message(message)
 
-    async def _handle_assistant_message(self, message: AssistantMessage, msg_num: int):
+    async def _handle_assistant_message(self, message: AssistantMessage, _msg_num: int):
         """Handle AssistantMessage - contains text blocks.
 
         Note: Tool calls (ToolUseBlock/ToolResultBlock) are handled by hooks, not here.
@@ -105,7 +105,7 @@ class ClaudeMessageHandler:
         # Stream text blocks to UI
         for block in message.content:
             if isinstance(block, TextBlock):
-                await self._handle_text_block(block, msg_num)
+                await self._handle_text_block(block)
 
         # Collect text for final response
         text_content = []
@@ -119,7 +119,7 @@ class ClaudeMessageHandler:
                 "content": "\n".join(text_content)
             })
 
-    async def _handle_text_block(self, block: TextBlock, msg_num: int):
+    async def _handle_text_block(self, block: TextBlock):
         """Handle text content block."""
         if not block.text or not self.streaming_ctx:
             return
