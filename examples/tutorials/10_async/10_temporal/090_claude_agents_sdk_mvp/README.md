@@ -2,9 +2,11 @@
 
 Integration of Claude Agents SDK with AgentEx's Temporal-based orchestration platform. Claude agents run in durable workflows with real-time streaming to the AgentEx UI.
 
+> ⚠️ **Note**: This integration is designed for local agent development and single-worker deployments. For distributed multi-worker Kubernetes deployments, additional infrastructure is required (see [Deployment Considerations](#deployment-considerations) below).
+
 ## Features
 
-- **Durable Execution** - Workflows survive restarts via Temporal's event sourcing
+- **Durable Execution** - Workflows survive restarts via Temporal's event sourcing (single-worker)
 - **Session Resume** - Conversation context maintained across turns via `session_id`
 - **Workspace Isolation** - Each task gets dedicated directory for file operations
 - **Real-time Streaming** - Text and tool calls stream to UI via Redis
@@ -116,6 +118,61 @@ claude_agents/
             ├── pre_tool_use
             └── post_tool_use
 ```
+
+## Deployment Considerations
+
+This integration works well for local development and single-worker deployments. For distributed multi-worker production deployments, consider the following:
+
+### ⚠️ Session Persistence (Multi-Worker)
+
+**Current behavior**: Claude SDK sessions are tied to the worker process.
+
+- **Local dev**: ✅ Works - session persists within single worker
+- **K8s multi-pod**: ⚠️ Session ID stored in Temporal state, but session itself lives in Claude CLI process
+- **Impact**: If task moves to different pod, session becomes invalid
+- **Infrastructure needed**: Session persistence layer or sticky routing to same pod
+
+### ⚠️ Workspace Storage (Multi-Worker)
+
+**Current behavior**: Workspaces are local directories (`./workspace/{task_id}`).
+
+- **Local dev**: ✅ Works - single worker accesses all files
+- **K8s multi-pod**: ⚠️ Each pod has isolated filesystem
+- **Impact**: Files created by one pod are invisible to other pods
+- **Infrastructure needed**: Shared storage (NFS, EFS, GCS Fuse) via `CLAUDE_WORKSPACE_ROOT` env var
+
+**Solution for production**:
+```bash
+# Mount shared filesystem (NFS, EFS, etc.) to all pods
+export CLAUDE_WORKSPACE_ROOT=/mnt/shared/workspaces
+
+# All workers will now share workspace access
+```
+
+### ℹ️ Filesystem-Based Configuration
+
+**Current approach**: Agents and configuration are defined programmatically in code.
+
+- **Not used**: `.claude/agents/`, `.claude/skills/`, `CLAUDE.md` files
+- **Why**: Aligns with AgentEx's code-as-configuration philosophy
+- **Trade-off**: More explicit and version-controlled, but can't leverage existing Claude configs
+- **To enable**: Would need to add `setting_sources=["project"]` to `ClaudeAgentOptions`
+
+**Current approach** (programmatic config in workflow.py):
+```python
+subagents = {
+    'code-reviewer': AgentDefinition(
+        description='...',
+        prompt='...',
+        tools=['Read', 'Grep', 'Glob'],
+        model='sonnet',
+    ),
+}
+```
+
+---
+
+**Summary**: The integration is production-ready for **single-worker deployments**. Multi-worker deployments require additional infrastructure for session persistence and workspace sharing.
 
 ## Quick Start
 
