@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from typing import Any
-from pathlib import Path
 
 from temporalio import activity
 from claude_agent_sdk import AgentDefinition, ClaudeSDKClient, ClaudeAgentOptions
@@ -27,15 +26,15 @@ async def create_workspace_directory(task_id: str, workspace_root: str | None = 
 
     Args:
         task_id: Task ID for workspace directory name
-        workspace_root: Root directory for workspaces (defaults to project/workspace)
+        workspace_root: Root directory for workspaces (defaults to .claude-workspace/ in cwd)
 
     Returns:
         Absolute path to created workspace
     """
     if workspace_root is None:
-        # Use project-relative workspace for local development
-        project_dir = Path(__file__).parent.parent.parent.parent.parent.parent.parent
-        workspace_root = str(project_dir / "examples" / "tutorials" / "10_async" / "10_temporal" / "090_claude_agents_sdk_mvp" / "workspace")
+        # Default to .claude-workspace in current directory
+        # Follows Claude SDK's .claude/ convention
+        workspace_root = os.path.join(os.getcwd(), ".claude-workspace")
 
     workspace_path = os.path.join(workspace_root, task_id)
     os.makedirs(workspace_path, exist_ok=True)

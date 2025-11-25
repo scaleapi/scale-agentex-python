@@ -12,8 +12,8 @@ Key components:
 import os
 import asyncio
 
-# Import workflow and workspace activity
-from project.workflow import ClaudeMvpWorkflow, create_workspace_directory
+# Import workflow
+from project.workflow import ClaudeMvpWorkflow
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
@@ -24,6 +24,7 @@ from agentex.lib.core.temporal.workers.worker import AgentexWorker
 from agentex.lib.core.temporal.plugins.claude_agents import (
     ContextInterceptor,  # Reuse from OpenAI!
     run_claude_agent_activity,
+    create_workspace_directory,
 )
 
 logger = make_logger(__name__)

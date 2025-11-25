@@ -19,10 +19,9 @@ What's missing (see NEXT_STEPS.md):
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from datetime import timedelta
 
-from temporalio import activity, workflow
+from temporalio import workflow
 from temporalio.common import RetryPolicy
 from claude_agent_sdk.types import AgentDefinition
 
@@ -35,8 +34,11 @@ from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 
-# Import Claude activity
-from agentex.lib.core.temporal.plugins.claude_agents import run_claude_agent_activity
+# Import Claude activities
+from agentex.lib.core.temporal.plugins.claude_agents import (
+    run_claude_agent_activity,
+    create_workspace_directory,
+)
 
 environment_variables = EnvironmentVariables.refresh()
 
@@ -57,21 +59,6 @@ class StateModel(BaseModel):
     """
     claude_session_id: str | None = None
     turn_number: int = 0
-
-
-# Activity for workspace creation (avoids determinism issues)
-@activity.defn
-async def create_workspace_directory(task_id: str, workspace_root: str | None = None) -> str:
-    """Create workspace directory for task - runs as Temporal activity"""
-    if workspace_root is None:
-        # Use project-relative workspace for local development
-        project_dir = Path(__file__).parent.parent
-        workspace_root = str(project_dir / "workspace")
-
-    workspace_path = os.path.join(workspace_root, task_id)
-    os.makedirs(workspace_path, exist_ok=True)
-    logger.info(f"Created workspace: {workspace_path}")
-    return workspace_path
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
