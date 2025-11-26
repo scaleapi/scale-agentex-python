@@ -237,6 +237,7 @@ view_agent_logs() {
 stop_agent() {
     local tutorial_path=$1
     local name=$(basename "$tutorial_path")
+    echo -e "${YELLOW}stop_agent called with name: $name${NC}"
     local pidfile="/tmp/agentex-${name}.pid"
     local logfile="/tmp/agentex-${name}.log"
 
@@ -357,6 +358,7 @@ execute_tutorial_test() {
         FAILED_TESTS+=("$tutorial")
     fi
 
+    echo -e "${YELLOW}calling stop_agent${NC}"
     # Stop the agent
     stop_agent "$tutorial"
 
