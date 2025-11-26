@@ -1,0 +1,5 @@
+# Local environment variables (contains secrets)
+.env.local
+
+# Workspace directory (created at runtime)
+workspace/
