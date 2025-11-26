@@ -237,7 +237,6 @@ view_agent_logs() {
 stop_agent() {
     local tutorial_path=$1
     local name=$(basename "$tutorial_path")
-    echo -e "${YELLOW}stop_agent called with name: $name${NC}"
     local pidfile="/tmp/agentex-${name}.pid"
     local logfile="/tmp/agentex-${name}.log"
 
@@ -334,9 +333,9 @@ execute_tutorial_test() {
     local tutorial=$1
 
     echo ""
-    echo "--------------------------------------------------------------------------------"
+    echo "================================================================================"
     echo "Testing: $tutorial"
-    echo "--------------------------------------------------------------------------------"
+    echo "================================================================================"
 
     # Start the agent
     if ! start_agent "$tutorial"; then
@@ -358,7 +357,6 @@ execute_tutorial_test() {
         FAILED_TESTS+=("$tutorial")
     fi
 
-    echo -e "${YELLOW}calling stop_agent${NC}"
     # Stop the agent
     stop_agent "$tutorial"
 
@@ -405,7 +403,6 @@ check_built_wheel() {
 
 # Main execution function
 main() {
-    set -x
     # Handle --view-logs flag
     if [ "$VIEW_LOGS" = true ]; then
         if [[ -n "$SINGLE_TUTORIAL" ]]; then
