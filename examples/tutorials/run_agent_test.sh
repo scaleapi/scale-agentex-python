@@ -405,6 +405,7 @@ check_built_wheel() {
 
 # Main execution function
 main() {
+    set -x
     # Handle --view-logs flag
     if [ "$VIEW_LOGS" = true ]; then
         if [[ -n "$SINGLE_TUTORIAL" ]]; then
