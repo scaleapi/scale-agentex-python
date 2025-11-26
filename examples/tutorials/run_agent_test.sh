@@ -350,7 +350,7 @@ execute_tutorial_test() {
     local test_passed=false
     if run_test "$tutorial"; then
         echo -e "${GREEN}✅ PASSED: $tutorial${NC}"
-        ((PASSED++))
+        #((PASSED++))
         test_passed=true
     else
         echo -e "${RED}❌ FAILED: $tutorial${NC}"
