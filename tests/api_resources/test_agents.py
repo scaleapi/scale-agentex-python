@@ -75,6 +75,8 @@ class TestAgents:
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         agent = client.agents.list(
             limit=1,
+            order_by="order_by",
+            order_direction="order_direction",
             page_number=1,
             task_id="task_id",
         )
@@ -417,6 +419,8 @@ class TestAsyncAgents:
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         agent = await async_client.agents.list(
             limit=1,
+            order_by="order_by",
+            order_direction="order_direction",
             page_number=1,
             task_id="task_id",
         )

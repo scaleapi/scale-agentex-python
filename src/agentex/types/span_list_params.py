@@ -11,6 +11,10 @@ __all__ = ["SpanListParams"]
 class SpanListParams(TypedDict, total=False):
     limit: int
 
+    order_by: Optional[str]
+
+    order_direction: str
+
     page_number: int
 
     trace_id: Optional[str]

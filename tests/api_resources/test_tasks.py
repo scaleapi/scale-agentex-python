@@ -86,6 +86,8 @@ class TestTasks:
             agent_id="agent_id",
             agent_name="agent_name",
             limit=0,
+            order_by="order_by",
+            order_direction="order_direction",
             page_number=0,
             relationships=["agents"],
         )
@@ -400,6 +402,8 @@ class TestAsyncTasks:
             agent_id="agent_id",
             agent_name="agent_name",
             limit=0,
+            order_by="order_by",
+            order_direction="order_direction",
             page_number=0,
             relationships=["agents"],
         )
