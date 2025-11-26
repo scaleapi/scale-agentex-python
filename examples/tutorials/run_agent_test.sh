@@ -108,7 +108,7 @@ wait_for_agent_ready() {
             return 0
         fi
         sleep 1
-        ((elapsed++))
+        elapsed=$((elapsed+1))
     done
 
     echo -e "${RED}❌ Timeout waiting for ${name} agent to be ready${NC}"
@@ -341,7 +341,7 @@ execute_tutorial_test() {
     # Start the agent
     if ! start_agent "$tutorial"; then
         echo -e "${RED}❌ FAILED to start agent: $tutorial${NC}"
-        ((FAILED++))
+        FAILED=$((FAILED+1))
         FAILED_TESTS+=("$tutorial")
         return 1
     fi
@@ -350,11 +350,11 @@ execute_tutorial_test() {
     local test_passed=false
     if run_test "$tutorial"; then
         echo -e "${GREEN}✅ PASSED: $tutorial${NC}"
-        #((PASSED++))
+        PASSED=$((PASSED+1))
         test_passed=true
     else
         echo -e "${RED}❌ FAILED: $tutorial${NC}"
-        ((FAILED++))
+        FAILED=$((FAILED+1))
         FAILED_TESTS+=("$tutorial")
     fi
 

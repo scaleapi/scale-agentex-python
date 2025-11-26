@@ -18,11 +18,11 @@ def pytest_configure(config):  # noqa: ARG001
     # Import our testing module
     try:
         import agentex.lib.testing.sessions.sync
-        import agentex.lib.testing.sessions.agentic
+        import agentex.lib.testing.sessions.asynchronous
 
         # Mark our context manager functions as non-tests
         agentex.lib.testing.sessions.sync.sync_test_agent.__test__ = False
-        agentex.lib.testing.sessions.agentic.async_test_agent.__test__ = False
+        agentex.lib.testing.sessions.asynchronous.async_test_agent.__test__ = False
     except (ImportError, AttributeError):
         # If module not available, that's fine
         pass
