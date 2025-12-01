@@ -46,7 +46,7 @@ jobs:
   find-agents:
     runs-on: ubuntu-latest
     needs: [check-permissions]
-    if: ${{ !cancelled() && !failure() }}
+    if: ${{ always() && (needs.check-permissions.result == 'success' || needs.check-permissions.result == 'skipped') }}
     outputs:
       agents: ${{ steps.get-agents.outputs.agents }}
       has_agents: ${{ steps.get-agents.outputs.has_agents }}
