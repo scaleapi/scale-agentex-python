@@ -25,10 +25,18 @@ permissions:
 
 jobs:
   check-permissions:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Check event type and permissions
+        run: |
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "Skipping permission check - not a workflow_dispatch event"
+            exit 0
+          fi
+          echo "Checking maintainer permissions for workflow_dispatch"
+
       - name: Check if user is maintainer
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/github-script@v7
         with:
           script: |
@@ -46,7 +54,6 @@ jobs:
   find-agents:
     runs-on: ubuntu-latest
     needs: [check-permissions]
-    if: ${{ !cancelled() && !failure() }}
     outputs:
       agents: ${{ steps.get-agents.outputs.agents }}
       has_agents: ${{ steps.get-agents.outputs.has_agents }}
@@ -121,7 +128,7 @@ jobs:
           fi
 
   test-outputs:
-    needs: find-agents
+    needs: [find-agents]
     runs-on: ubuntu-latest
     steps:
       - name: Test outputs
@@ -130,7 +137,7 @@ jobs:
           echo "agents: '${{ needs.find-agents.outputs.agents }}'"
 
   build-agents:
-    needs: find-agents
+    needs: [find-agents]
     if: ${{ needs.find-agents.outputs.has_agents == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

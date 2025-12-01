@@ -24,6 +24,7 @@ async def handle_message_send(
 
     message_text = ""
     print(message_text, message_text)
+
     if hasattr(params.content, "content"):
         content_val = getattr(params.content, "content", "")
         if isinstance(content_val, str):
