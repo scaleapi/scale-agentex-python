@@ -122,7 +122,7 @@ jobs:
 
   build-agents:
     needs: find-agents
-    if: ${{ needs.find-agents.outputs.has_agents == 'true' && needs.find-agents.outputs.agents != '[]' }}
+    if: ${{ needs.find-agents.outputs.has_agents == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
