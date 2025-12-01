@@ -120,6 +120,15 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
 
+  test-outputs:
+    needs: find-agents
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test outputs
+        run: |
+          echo "has_agents: '${{ needs.find-agents.outputs.has_agents }}'"
+          echo "agents: '${{ needs.find-agents.outputs.agents }}'"
+
   build-agents:
     needs: find-agents
     if: ${{ needs.find-agents.outputs.has_agents == 'true' }}
