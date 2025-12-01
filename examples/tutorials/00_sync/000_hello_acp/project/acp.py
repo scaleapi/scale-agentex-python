@@ -21,7 +21,6 @@ async def handle_message_send(
 ) -> Union[TaskMessageContent, AsyncGenerator[TaskMessageUpdate, None]]:
     """Default message handler with streaming support"""
     # Extract content safely from the message
-    logger.info("msg", params)
     message_text = ""
     if hasattr(params.content, "content"):
         content_val = getattr(params.content, "content", "")
