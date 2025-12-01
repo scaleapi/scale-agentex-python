@@ -5,25 +5,27 @@ from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 # === DEBUG SETUP (AgentEx CLI Debug Support) ===
 if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
+    print("test me")
     try:
         import debugpy
+
         debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "5679"))
         debug_type = os.getenv("AGENTEX_DEBUG_TYPE", "acp")
         wait_for_attach = os.getenv("AGENTEX_DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true"
-        
+
         # Configure debugpy
         debugpy.configure(subProcess=False)
         debugpy.listen(debug_port)
-        
+
         print(f"🐛 [{debug_type.upper()}] Debug server listening on port {debug_port}")
-        
+
         if wait_for_attach:
             print(f"⏳ [{debug_type.upper()}] Waiting for debugger to attach...")
             debugpy.wait_for_client()
             print(f"✅ [{debug_type.upper()}] Debugger attached!")
         else:
             print(f"📡 [{debug_type.upper()}] Ready for debugger attachment")
-            
+
     except ImportError:
         print("❌ debugpy not available. Install with: pip install debugpy")
         sys.exit(1)
@@ -52,8 +54,8 @@ acp = FastACP.create(
         type="temporal",
         temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233"),
         plugins=[OpenAIAgentsPlugin(model_provider=temporal_streaming_model_provider)],
-        interceptors=[context_interceptor]
-    )
+        interceptors=[context_interceptor],
+    ),
 )
 
 
@@ -69,4 +71,5 @@ acp = FastACP.create(
 
 # @acp.on_task_cancel
 # This does not need to be handled by your workflow.
-# It is automatically handled by the temporal client which cancels the workflow directly 
+# It is automatically handled by the temporal client which cancels the workflow directly
+
