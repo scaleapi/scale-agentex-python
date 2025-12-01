@@ -80,7 +80,6 @@ jobs:
               BASE_BRANCH="HEAD^1"
               echo "Comparing against previous commit: $BASE_BRANCH"
             fi
-
             # Check each agent directory for changes
             for agent_dir in $all_agents; do
               echo "Checking $agent_dir for changes..."
