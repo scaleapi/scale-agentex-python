@@ -71,14 +71,9 @@ jobs:
 
             echo "### 🔄 Rebuilding All Tutorial Agents" >> $GITHUB_STEP_SUMMARY
           else
-            # Determine the base branch for comparison
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
-              BASE_BRANCH="origin/${{ github.base_ref }}"
-              echo "Comparing against PR base branch: $BASE_BRANCH"
-            else
-              BASE_BRANCH="HEAD~1"
-              echo "Comparing against previous commit: $BASE_BRANCH"
-            fi
+            # Always compare against main branch
+            BASE_BRANCH="origin/main"
+            echo "Comparing against main branch: $BASE_BRANCH"
 
             # Check each agent directory for changes
             for agent_dir in $all_agents; do
@@ -190,7 +185,7 @@ jobs:
             echo "🚀 Building and pushing agent: ${{ matrix.agent_path }}"
           else
             SHOULD_PUSH=false
-            VERSION_TAG="${{ github.commit.sha }}"
+            VERSION_TAG="${{ github.sha }}"
             echo "🔍 Validating build for agent: ${{ matrix.agent_path }}"
           fi
 
