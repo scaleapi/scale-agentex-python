@@ -81,6 +81,7 @@ pip install agentex-sdk[aiohttp]
 Then you can enable it by instantiating the client with `http_client=DefaultAioHttpClient()`:
 
 ```python
+import os
 import asyncio
 from agentex import DefaultAioHttpClient
 from agentex import AsyncAgentex
@@ -88,7 +89,7 @@ from agentex import AsyncAgentex
 
 async def main() -> None:
     async with AsyncAgentex(
-        api_key="My API Key",
+        api_key=os.environ.get("AGENTEX_SDK_API_KEY"),  # This is the default and can be omitted
         http_client=DefaultAioHttpClient(),
     ) as client:
         tasks = await client.tasks.list()
