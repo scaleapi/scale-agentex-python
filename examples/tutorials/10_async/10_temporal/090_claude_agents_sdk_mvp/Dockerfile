@@ -31,18 +31,18 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 060_open_ai_agents_sdk_hello_world/pyproject.toml /app/060_open_ai_agents_sdk_hello_world/pyproject.toml
-COPY 060_open_ai_agents_sdk_hello_world/README.md /app/060_open_ai_agents_sdk_hello_world/README.md
+COPY 090_claude_agents_sdk_mvp/pyproject.toml /app/090_claude_agents_sdk_mvp/pyproject.toml
+COPY 090_claude_agents_sdk_mvp/README.md /app/090_claude_agents_sdk_mvp/README.md
 
-WORKDIR /app/060_open_ai_agents_sdk_hello_world
+WORKDIR /app/090_claude_agents_sdk_mvp
 
 # Copy the project code
-COPY 060_open_ai_agents_sdk_hello_world/project /app/060_open_ai_agents_sdk_hello_world/project
+COPY 090_claude_agents_sdk_mvp/project /app/090_claude_agents_sdk_mvp/project
 
 # Install the required Python packages from pyproject.toml
 RUN uv pip install --system .
 
-WORKDIR /app/060_open_ai_agents_sdk_hello_world
+WORKDIR /app/090_claude_agents_sdk_mvp
 
 
 ENV PYTHONPATH=/app
