@@ -12,13 +12,13 @@
 -e file:.
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.12.8
+aiohttp==3.13.2
     # via agentex-sdk
     # via httpx-aiohttp
     # via litellm
 aiosignal==1.3.2
     # via aiohttp
-annotated-types==0.6.0
+annotated-types==0.7.0
     # via pydantic
 anyio==4.10.0
     # via agentex-sdk
@@ -74,7 +74,7 @@ decorator==5.2.1
 dirty-equals==0.6.0
 distlib==0.3.7
     # via virtualenv
-distro==1.8.0
+distro==1.9.0
     # via agentex-sdk
     # via openai
     # via scale-gp
@@ -90,7 +90,7 @@ fastapi==0.115.14
 filelock==3.12.4
     # via huggingface-hub
     # via virtualenv
-frozenlist==1.6.2
+frozenlist==1.8.0
     # via aiohttp
     # via aiosignal
 fsspec==2025.7.0
@@ -175,11 +175,11 @@ mcp==1.12.4
     # via openai-agents
 mdurl==0.1.2
     # via markdown-it-py
-multidict==6.4.4
+multidict==6.7.0
     # via aiohttp
     # via yarl
 mypy==1.17.0
-mypy-extensions==1.0.0
+mypy-extensions==1.1.0
     # via mypy
 nest-asyncio==1.6.0
     # via ipykernel
@@ -213,7 +213,7 @@ pexpect==4.9.0
 platformdirs==3.11.0
     # via jupyter-core
     # via virtualenv
-pluggy==1.5.0
+pluggy==1.6.0
     # via pytest
 prompt-toolkit==3.0.51
     # via ipython
@@ -327,7 +327,7 @@ shellingham==1.5.4
 six==1.16.0
     # via kubernetes
     # via python-dateutil
-sniffio==1.3.0
+sniffio==1.3.1
     # via agentex-sdk
     # via anyio
     # via httpx
@@ -373,6 +373,7 @@ types-urllib3==1.26.25.14
     # via types-requests
 typing-extensions==4.12.2
     # via agentex-sdk
+    # via aiosignal
     # via anyio
     # via fastapi
     # via huggingface-hub
@@ -391,7 +392,8 @@ typing-extensions==4.12.2
     # via temporalio
     # via typer
     # via typing-inspection
-typing-inspection==0.4.1
+    # via virtualenv
+typing-inspection==0.4.2
     # via pydantic
     # via pydantic-settings
 tzdata==2025.2
@@ -416,5 +418,5 @@ wrapt==1.17.3
     # via ddtrace
 yarl==1.20.0
     # via aiohttp
-zipp==3.17.0
+zipp==3.23.0
     # via importlib-metadata
