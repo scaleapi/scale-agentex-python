@@ -240,6 +240,8 @@ class TestMessages:
         message = client.messages.list(
             task_id="task_id",
             limit=0,
+            order_by="order_by",
+            order_direction="order_direction",
             page_number=0,
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
@@ -496,6 +498,8 @@ class TestAsyncMessages:
         message = await async_client.messages.list(
             task_id="task_id",
             limit=0,
+            order_by="order_by",
+            order_direction="order_direction",
             page_number=0,
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
