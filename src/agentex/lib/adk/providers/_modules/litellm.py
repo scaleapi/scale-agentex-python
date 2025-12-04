@@ -32,7 +32,7 @@ DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
 class LiteLLMModule:
     """
     Module for managing LiteLLM agent operations in Agentex.
-    Provides high-level methods for chat completion, streaming, agentic streaming.
+    Provides high-level methods for chat completion, streaming.
     """
 
     def __init__(

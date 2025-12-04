@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.6.0"
+version = "0.6.7"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -43,7 +43,10 @@ dependencies = [
     "openai>=2.2,<3", # Required by openai-agents 0.4.2; litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
     "cloudpickle>=3.1.1",
     "datadog>=0.52.1",
-    "ddtrace>=3.13.0"
+    "ddtrace>=3.13.0",
+    "yaspin>=3.1.0",
+    "claude-agent-sdk>=0.1.0",
+    "anthropic>=0.40.0",
 ]
 requires-python = ">= 3.12,<4"
 classifiers = [

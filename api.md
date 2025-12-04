@@ -152,3 +152,16 @@ Methods:
 - <code title="get /tracker/{tracker_id}">client.tracker.<a href="./src/agentex/resources/tracker.py">retrieve</a>(tracker_id) -> <a href="./src/agentex/types/agent_task_tracker.py">AgentTaskTracker</a></code>
 - <code title="put /tracker/{tracker_id}">client.tracker.<a href="./src/agentex/resources/tracker.py">update</a>(tracker_id, \*\*<a href="src/agentex/types/tracker_update_params.py">params</a>) -> <a href="./src/agentex/types/agent_task_tracker.py">AgentTaskTracker</a></code>
 - <code title="get /tracker">client.tracker.<a href="./src/agentex/resources/tracker.py">list</a>(\*\*<a href="src/agentex/types/tracker_list_params.py">params</a>) -> <a href="./src/agentex/types/tracker_list_response.py">TrackerListResponse</a></code>
+
+# DeploymentHistory
+
+Types:
+
+```python
+from agentex.types import DeploymentHistory, DeploymentHistoryListResponse
+```
+
+Methods:
+
+- <code title="get /deployment-history/{deployment_id}">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">retrieve</a>(deployment_id) -> <a href="./src/agentex/types/deployment_history.py">DeploymentHistory</a></code>
+- <code title="get /deployment-history">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">list</a>(\*\*<a href="src/agentex/types/deployment_history_list_params.py">params</a>) -> <a href="./src/agentex/types/deployment_history_list_response.py">DeploymentHistoryListResponse</a></code>

@@ -85,10 +85,12 @@ class ContextWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
     def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle:
         """Add task_id, trace_id, and parent_span_id to headers when starting model activities."""
 
-        # Only add headers for invoke_model_activity calls
+        # Only add headers for model activity calls (OpenAI and Claude)
         activity_name = str(input.activity) if hasattr(input, 'activity') else ""
 
-        if "invoke_model_activity" in activity_name or "invoke-model-activity" in activity_name:
+        if ("invoke_model_activity" in activity_name or
+            "invoke-model-activity" in activity_name or
+            "run_claude_agent_activity" in activity_name):
             # Get task_id, trace_id, and parent_span_id from workflow instance instead of inbound interceptor
             try:
                 workflow_instance = workflow.instance()

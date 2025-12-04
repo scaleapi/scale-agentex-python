@@ -39,6 +39,9 @@ class EnvVarKeys(str, Enum):
     # Build Information
     BUILD_INFO_PATH = "BUILD_INFO_PATH"
     AGENT_INPUT_TYPE = "AGENT_INPUT_TYPE"
+    # Claude Agents SDK Configuration
+    ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
+    CLAUDE_WORKSPACE_ROOT = "CLAUDE_WORKSPACE_ROOT"
 
 
 class Environment(str, Enum):
@@ -61,7 +64,7 @@ class EnvironmentVariables(BaseModel):
     AGENT_DESCRIPTION: str | None = None
     AGENT_ID: str | None = None
     AGENT_API_KEY: str | None = None
-    ACP_TYPE: str | None = "agentic"
+    ACP_TYPE: str | None = "async"
     AGENT_INPUT_TYPE: str | None = None
     # ACP Configuration
     ACP_URL: str
@@ -75,6 +78,9 @@ class EnvironmentVariables(BaseModel):
     AUTH_PRINCIPAL_B64: str | None = None
     # Build Information
     BUILD_INFO_PATH: str | None = None
+    # Claude Agents SDK Configuration
+    ANTHROPIC_API_KEY: str | None = None
+    CLAUDE_WORKSPACE_ROOT: str | None = None  # Defaults to project/workspace if not set
 
     @classmethod
     def refresh(cls) -> EnvironmentVariables:

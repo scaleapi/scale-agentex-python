@@ -17,3 +17,6 @@ Brewfile.lock.json
 .DS_Store
 
 examples/**/uv.lock
+
+# Claude workspace directories
+.claude-workspace/

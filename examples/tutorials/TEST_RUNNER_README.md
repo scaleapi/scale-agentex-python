@@ -22,13 +22,13 @@ python run_tutorial_test.py <tutorial_directory>
 # Test a sync tutorial
 python run_tutorial_test.py 00_sync/000_hello_acp
 
-# Test an agentic tutorial
-python run_tutorial_test.py 10_agentic/00_base/000_hello_acp
-python run_tutorial_test.py 10_agentic/00_base/010_multiturn
-python run_tutorial_test.py 10_agentic/00_base/020_streaming
+# Test an async tutorial
+python run_tutorial_test.py 10_async/00_base/000_hello_acp
+python run_tutorial_test.py 10_async/00_base/010_multiturn
+python run_tutorial_test.py 10_async/00_base/020_streaming
 
 # Test with custom base URL
-python run_tutorial_test.py 10_agentic/00_base/000_hello_acp --base-url http://localhost:5003
+python run_tutorial_test.py 10_async/00_base/000_hello_acp --base-url http://localhost:5003
 ```
 
 ## What the Script Does
@@ -63,10 +63,10 @@ optional arguments:
 AgentEx Tutorial Test Runner
 ================================================================================
 
-🚀 Starting agent from: 10_agentic/00_base/000_hello_acp
-📄 Manifest: 10_agentic/00_base/000_hello_acp/manifest.yaml
+🚀 Starting agent from: 10_async/00_base/000_hello_acp
+📄 Manifest: 10_async/00_base/000_hello_acp/manifest.yaml
 💻 Running command: uv run agentex agents run --manifest manifest.yaml
-📁 Working directory: 10_agentic/00_base/000_hello_acp
+📁 Working directory: 10_async/00_base/000_hello_acp
 ✅ Agent process started (PID: 12345)
 
 🔍 Checking agent health at http://localhost:5003/health...
@@ -76,9 +76,9 @@ AgentEx Tutorial Test Runner
 
 ⏳ Waiting 2 seconds for agent to fully initialize...
 
-🧪 Running tests from: 10_agentic/00_base/000_hello_acp/tests
+🧪 Running tests from: 10_async/00_base/000_hello_acp/tests
 💻 Running command: uv run pytest tests/ -v --tb=short
-📁 Working directory: 10_agentic/00_base/000_hello_acp
+📁 Working directory: 10_async/00_base/000_hello_acp
 
 ============================= test session starts ==============================
 ...
@@ -128,8 +128,8 @@ pip install httpx
 This script is designed to be CI/CD friendly:
 
 ```bash
-# Run all agentic tutorials
-for tutorial in 10_agentic/00_base/*/; do
+# Run all async tutorials
+for tutorial in 10_async/00_base/*/; do
   python run_tutorial_test.py "$tutorial" || exit 1
 done
 ```

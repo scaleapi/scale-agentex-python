@@ -62,7 +62,7 @@ agent:
 
   # Type of ACP to use
   # sync: Simple synchronous ACP implementation
-  # agentic: Advanced ACP with sub-types "base" or "temporal" (requires config)
+  # async: Asynchronous, non-blocking ACP implementation
   acp_type: sync
 
   # Description of what your agent does
