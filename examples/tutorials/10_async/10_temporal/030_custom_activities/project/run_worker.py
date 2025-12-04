@@ -16,7 +16,7 @@ logger = make_logger(__name__)
 async def main():
     # Setup debug mode if enabled
     setup_debug_if_enabled()
-    
+
     task_queue_name = environment_variables.WORKFLOW_TASK_QUEUE
     if task_queue_name is None:
         raise ValueError("WORKFLOW_TASK_QUEUE is not set")
@@ -30,9 +30,9 @@ async def main():
 
     custom_activities_use_case = CustomActivities()
     all_activites = [
-        custom_activities_use_case.report_progress, 
+        custom_activities_use_case.report_progress,
         custom_activities_use_case.process_batch_events,
-        *agentex_activities, 
+        *agentex_activities,
     ]
 
     await worker.run(
@@ -40,5 +40,6 @@ async def main():
         workflow=At030CustomActivitiesWorkflow,
     )
 
+
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

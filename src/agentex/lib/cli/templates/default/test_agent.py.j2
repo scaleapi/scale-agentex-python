@@ -1,147 +1,112 @@
 """
-Sample tests for AgentEx ACP agent.
+Tests for {{ agent_name }}
 
-This test suite demonstrates how to test the main AgentEx API functions:
-- Non-streaming event sending and polling
-- Streaming event sending
+This test suite demonstrates testing your async agent with the AgentEx testing framework.
 
-To run these tests:
-1. Make sure the agent is running (via docker-compose or `agentex agents run`)
-2. Set the AGENTEX_API_BASE_URL environment variable if not using default
-3. Run: pytest test_agent.py -v
+Test coverage:
+- Basic event sending and polling
+- Streaming responses
+- Multi-turn conversations
 
-Configuration:
-- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
-- AGENT_NAME: Name of the agent to test (default: {{ agent_name }})
+Prerequisites:
+    - AgentEx services running (make dev)
+    - Agent running: agentex agents run --manifest manifest.yaml
+
+Run tests:
+    pytest tests/test_agent.py -v
 """
 
-import os
-import uuid
-import asyncio
 import pytest
-import pytest_asyncio
-from agentex import AsyncAgentex
-from agentex.types import TaskMessage
-from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
-from agentex.types.text_content_param import TextContentParam
-from test_utils.async_utils import (
-    poll_for_agent_response,
-    send_event_and_poll_yielding,
+
+from agentex.lib.testing import (
+    async_test_agent,
+    assert_valid_agent_response,
+    assert_agent_response_contains,
     stream_agent_response,
-    validate_text_in_response,
-    poll_messages,
+    stream_task_messages,
 )
 
-
-# Configuration from environment variables
-AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
-AGENT_NAME = os.environ.get("AGENT_NAME", "{{ agent_name }}")
+AGENT_NAME = "{{ agent_name }}"
 
 
-@pytest_asyncio.fixture
-async def client():
-    """Create an AsyncAgentex client instance for testing."""
-    client = AsyncAgentex(base_url=AGENTEX_API_BASE_URL)
-    yield client
-    await client.close()
+@pytest.mark.asyncio
+async def test_agent_basic_response():
+    """Test that agent responds to basic events."""
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
+        response = await test.send_event(
+            "Hello! Please respond briefly.",
+            timeout_seconds=30.0
+        )
+
+        assert_valid_agent_response(response)
+        assert len(response.content) > 0
+        print(f"✓ Agent responded: {response.content[:80]}...")
 
 
-@pytest.fixture
-def agent_name():
-    """Return the agent name for testing."""
-    return AGENT_NAME
+@pytest.mark.asyncio
+async def test_agent_multi_turn():
+    """Test multi-turn conversation."""
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
+        # Turn 1
+        response1 = await test.send_event("Hello!", timeout_seconds=30.0)
+        assert_valid_agent_response(response1)
+
+        # Turn 2
+        response2 = await test.send_event("How are you?", timeout_seconds=30.0)
+        assert_valid_agent_response(response2)
+
+        # Turn 3
+        response3 = await test.send_event("Thank you!", timeout_seconds=30.0)
+        assert_valid_agent_response(response3)
+
+        # Verify history
+        history = await test.get_conversation_history()
+        assert len(history) >= 6, f"Expected >= 6 messages, got {len(history)}"
+        print(f"✓ Conversation: {len(history)} messages")
 
 
-@pytest_asyncio.fixture
-async def agent_id(client, agent_name):
-    """Retrieve the agent ID based on the agent name."""
-    agents = await client.agents.list()
-    for agent in agents:
-        if agent.name == agent_name:
-            return agent.id
-    raise ValueError(f"Agent with name {agent_name} not found.")
+@pytest.mark.asyncio
+async def test_agent_streaming():
+    """Test streaming responses from agent."""
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
+        # Send event first
+        await test.send_event("Start streaming task", timeout_seconds=10.0)
+
+        # Now stream subsequent events
+        events_received = []
+        async for event in test.send_event_and_stream("Stream this response", timeout_seconds=30.0):
+            events_received.append(event)
+            event_type = event.get('type')
+
+            if event_type == 'done':
+                print(f"✓ Stream complete ({len(events_received)} events)")
+                break
+
+        assert len(events_received) > 0, "Should receive at least one event"
+        print(f"✓ Streaming works ({len(events_received)} events received)")
 
 
-class TestNonStreamingEvents:
-    """Test non-streaming event sending and polling."""
+@pytest.mark.asyncio
+async def test_agent_custom_scenario():
+    """
+    Add your custom test scenarios here.
 
-    @pytest.mark.asyncio
-    async def test_send_event_and_poll(self, client: AsyncAgentex, _agent_name: str, agent_id: str):
-        """Test sending an event and polling for the response."""
-        # TODO: Create a task for this conversation
-        # task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        # task = task_response.result
-        # assert task is not None
+    Customize this test for your agent's specific behavior and requirements.
+    """
+    async with async_test_agent(agent_name=AGENT_NAME) as test:
+        # Example: Test specific functionality
+        response = await test.send_event(
+            "Your custom test message here",
+            timeout_seconds=30.0
+        )
 
-        # TODO: Poll for the initial task creation message (if your agent sends one)
-        # async for message in poll_messages(
-        #     client=client,
-        #     task_id=task.id,
-        #     timeout=30,
-        #     sleep_interval=1.0,
-        # ):
-        #     assert isinstance(message, TaskMessage)
-        #     if message.content and message.content.type == "text" and message.content.author == "agent":
-        #         # Check for your expected initial message
-        #         assert "expected initial text" in message.content.content
-        #         break
+        assert_valid_agent_response(response)
 
-        # TODO: Send an event and poll for response using the yielding helper function
-        # user_message = "Your test message here"
-        # async for message in send_event_and_poll_yielding(
-        #     client=client,
-        #     agent_id=agent_id,
-        #     task_id=task.id,
-        #     user_message=user_message,
-        #     timeout=30,
-        #     sleep_interval=1.0,
-        # ):
-        #     assert isinstance(message, TaskMessage)
-        #     if message.content and message.content.type == "text" and message.content.author == "agent":
-        #         # Check for your expected response
-        #         assert "expected response text" in message.content.content
-        #         break
-        pass
-
-
-class TestStreamingEvents:
-    """Test streaming event sending."""
-
-    @pytest.mark.asyncio
-    async def test_send_event_and_stream(self, client: AsyncAgentex, _agent_name: str, agent_id: str):
-        """Test sending an event and streaming the response."""
-        # TODO: Create a task for this conversation
-        # task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
-        # task = task_response.result
-        # assert task is not None
-
-        # user_message = "Your test message here"
-
-        # # Collect events from stream
-        # all_events = []
-
-        # async def collect_stream_events():
-        #     async for event in stream_agent_response(
-        #         client=client,
-        #         task_id=task.id,
-        #         timeout=30,
-        #     ):
-        #         all_events.append(event)
-
-        # # Start streaming task
-        # stream_task = asyncio.create_task(collect_stream_events())
-
-        # # Send the event
-        # event_content = TextContentParam(type="text", author="user", content=user_message)
-        # await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        # # Wait for streaming to complete
-        # await stream_task
-
-        # # TODO: Add your validation here
-        # assert len(all_events) > 0, "No events received in streaming response"
-        pass
+        # Add assertions specific to your agent's expected behavior
+        # assert_agent_response_contains(response, "expected text")
+        # assert len(response.content) > 100, "Response should be detailed"
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    print(f"Run with: pytest tests/test_agent.py -v")
+    print(f"Testing agent: {AGENT_NAME}")

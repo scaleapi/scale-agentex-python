@@ -211,9 +211,7 @@ class TestRecursiveModelDump:
         def sample_callback():
             return "callback executed"
 
-        model = ModelWithFunction(
-            name="test_model", value=123, callback=sample_callback
-        )
+        model = ModelWithFunction(name="test_model", value=123, callback=sample_callback)
 
         # This should not raise an exception anymore
         result = recursive_model_dump(model)

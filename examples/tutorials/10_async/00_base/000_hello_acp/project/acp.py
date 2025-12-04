@@ -19,6 +19,7 @@ acp = FastACP.create(
     ),
 )
 
+
 @acp.on_task_create
 async def handle_task_create(params: CreateTaskParams):
     # This handler is called first whenever a new task is created.
@@ -37,14 +38,15 @@ async def handle_task_create(params: CreateTaskParams):
         ),
     )
 
+
 @acp.on_task_event_send
 async def handle_event_send(params: SendEventParams):
     # This handler is called whenever a new event (like a message) is sent to the task
-    
+
     #########################################################
     # 2. (👋) Echo back the client's message to show it in the UI.
     #########################################################
-    
+
     # This is not done by default so the agent developer has full control over what is shown to the user.
     if params.event.content:
         await adk.messages.create(task_id=params.task.id, content=params.event.content)
@@ -62,6 +64,7 @@ async def handle_event_send(params: SendEventParams):
         ),
     )
 
+
 @acp.on_task_cancel
 async def handle_task_cancel(params: CancelTaskParams):
     # This handler is called when a task is cancelled.
@@ -72,4 +75,6 @@ async def handle_task_cancel(params: CancelTaskParams):
     #########################################################
 
     # This is mostly for durable workflows that are cancellable like Temporal, but we will leave it here for demonstration purposes.
-    logger.info(f"Hello! I've received task cancel for task {params.task.id}: {params.task}. This isn't necessary for this example, but it's good to know that it's available.")
+    logger.info(
+        f"Hello! I've received task cancel for task {params.task.id}: {params.task}. This isn't necessary for this example, but it's good to know that it's available."
+    )

@@ -27,11 +27,13 @@ if environment_variables.AGENT_NAME is None:
 
 logger = make_logger(__name__)
 
+
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
 class At020StateMachineWorkflow(BaseWorkflow):
     """
     Minimal async workflow template for AgentEx Temporal agents.
     """
+
     def __init__(self):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self.state_machine = DeepResearchStateMachine(
@@ -42,7 +44,7 @@ class At020StateMachineWorkflow(BaseWorkflow):
                 State(name=DeepResearchState.PERFORMING_DEEP_RESEARCH, workflow=PerformingDeepResearchWorkflow()),
             ],
             state_machine_data=DeepResearchData(),
-            trace_transitions=True
+            trace_transitions=True,
         )
 
     @override
@@ -66,7 +68,7 @@ class At020StateMachineWorkflow(BaseWorkflow):
                         input={
                             "task_id": task.id,
                             "message": message.content,
-                        }
+                        },
                     )
             else:
                 # Check if we're in the middle of follow-up questions
@@ -74,36 +76,34 @@ class At020StateMachineWorkflow(BaseWorkflow):
                     # User is responding to a follow-up question
                     # Safely extract content from message
                     content_text = ""
-                    if hasattr(message, 'content'):
-                        content_val = getattr(message, 'content', '')
+                    if hasattr(message, "content"):
+                        content_val = getattr(message, "content", "")
                         if isinstance(content_val, str):
                             content_text = content_val
                     deep_research_data.follow_up_responses.append(content_text)
-                    
+
                     # Add the Q&A to the agent input list as context
                     if deep_research_data.follow_up_questions:
                         last_question = deep_research_data.follow_up_questions[-1]
                         qa_context = f"Q: {last_question}\nA: {message.content}"
-                        deep_research_data.agent_input_list.append({
-                            "role": "user",
-                            "content": qa_context
-                        })
+                        deep_research_data.agent_input_list.append({"role": "user", "content": qa_context})
                 else:
                     # User is asking a new follow-up question about the same research topic
                     # Add the user's follow-up question to the agent input list as context
                     if deep_research_data.agent_input_list:
                         # Add user's follow-up question to the conversation
-                        deep_research_data.agent_input_list.append({
-                            "role": "user", 
-                            "content": f"Additional question: {message.content}"
-                        })
+                        deep_research_data.agent_input_list.append(
+                            {"role": "user", "content": f"Additional question: {message.content}"}
+                        )
                     else:
                         # Initialize agent input list with the follow-up question
-                        deep_research_data.agent_input_list = [{
-                            "role": "user", 
-                            "content": f"Original query: {deep_research_data.user_query}\nAdditional question: {message.content}"
-                        }]
-                
+                        deep_research_data.agent_input_list = [
+                            {
+                                "role": "user",
+                                "content": f"Original query: {deep_research_data.user_query}\nAdditional question: {message.content}",
+                            }
+                        ]
+
                 deep_research_data.current_turn += 1
 
                 if not deep_research_data.current_span:
@@ -113,18 +113,18 @@ class At020StateMachineWorkflow(BaseWorkflow):
                         input={
                             "task_id": task.id,
                             "message": message.content,
-                        }
+                        },
                     )
 
             # Always go to clarifying user query to ask follow-up questions
             # This ensures we gather more context before doing deep research
             await self.state_machine.transition(DeepResearchState.CLARIFYING_USER_QUERY)
-        
+
         # Echo back the user's message
         # Safely extract content from message for display
         message_content = ""
-        if hasattr(message, 'content'):
-            content_val = getattr(message, 'content', '')
+        if hasattr(message, "content"):
+            content_val = getattr(message, "content", "")
             if isinstance(content_val, str):
                 message_content = content_val
 
