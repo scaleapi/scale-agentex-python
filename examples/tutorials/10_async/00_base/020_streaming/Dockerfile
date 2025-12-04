@@ -23,18 +23,28 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 020_streaming/pyproject.toml /app/020_streaming/pyproject.toml
-COPY 020_streaming/README.md /app/020_streaming/README.md
+COPY 10_async/00_base/020_streaming/pyproject.toml /app/020_streaming/pyproject.toml
+COPY 10_async/00_base/020_streaming/README.md /app/020_streaming/README.md
 
 WORKDIR /app/020_streaming
 
 # Copy the project code
-COPY 020_streaming/project /app/020_streaming/project
+COPY 10_async/00_base/020_streaming/project /app/020_streaming/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 10_async/00_base/020_streaming/tests /app/020_streaming/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
+
 # Set environment variables
 ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=ab020-streaming
 
 # Run the agent using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"] 

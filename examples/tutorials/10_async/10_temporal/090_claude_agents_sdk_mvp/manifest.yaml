@@ -3,11 +3,26 @@ kind: Agent
 # Build Configuration
 build:
   context:
-    root: ../
+    # Root directory for the build context
+    root: ../../../  # Up to tutorials level to include test_utils
+
+    # Paths to include in the Docker build context
+    # Must include:
+    # - Your agent's directory (your custom agent code)
+    # These paths are collected and sent to the Docker daemon for building
     include_paths:
-      - 090_claude_agents_sdk_mvp
-    dockerfile: 090_claude_agents_sdk_mvp/Dockerfile
-    dockerignore: 090_claude_agents_sdk_mvp/.dockerignore
+      - 10_async/10_temporal/090_claude_agents_sdk_mvp
+      - test_utils
+
+    # Path to your agent's Dockerfile
+    # This defines how your agent's image is built from the context
+    # Relative to the root directory
+    dockerfile: 10_async/10_temporal/090_claude_agents_sdk_mvp/Dockerfile
+
+    # Path to your agent's .dockerignore
+    # Filters unnecessary files from the build context
+    # Helps keep build context small and builds fast
+    dockerignore: 10_async/10_temporal/090_claude_agents_sdk_mvp/.dockerignore
 
 # Local Development Configuration
 local_development:

@@ -15,24 +15,25 @@
 build:
   context:
     # Root directory for the build context
-    root: ../  # Keep this as the default root
+    root: ../../../  # Up to tutorials level to include test_utils
 
     # Paths to include in the Docker build context
     # Must include:
     # - Your agent's directory (your custom agent code)
     # These paths are collected and sent to the Docker daemon for building
     include_paths:
-      - 020_state_machine
+      - 10_async/10_temporal/020_state_machine
+      - test_utils
 
     # Path to your agent's Dockerfile
     # This defines how your agent's image is built from the context
     # Relative to the root directory
-    dockerfile: 020_state_machine/Dockerfile
+    dockerfile: 10_async/10_temporal/020_state_machine/Dockerfile
 
     # Path to your agent's .dockerignore
     # Filters unnecessary files from the build context
     # Helps keep build context small and builds fast
-    dockerignore: 020_state_machine/.dockerignore
+    dockerignore: 10_async/10_temporal/020_state_machine/.dockerignore
 
 
 # Local Development Configuration

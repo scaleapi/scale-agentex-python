@@ -15,24 +15,25 @@
 build:
   context:
     # Root directory for the build context
-    root: ../ # Keep this as the default root
+    root: ../../../  # Up to tutorials level to include test_utils
 
     # Paths to include in the Docker build context
     # Must include:
     # - Your agent's directory (your custom agent code)
     # These paths are collected and sent to the Docker daemon for building
     include_paths:
-      - 070_open_ai_agents_sdk_tools
+      - 10_async/10_temporal/070_open_ai_agents_sdk_tools
+      - test_utils
 
     # Path to your agent's Dockerfile
     # This defines how your agent's image is built from the context
     # Relative to the root directory
-    dockerfile: 070_open_ai_agents_sdk_tools/Dockerfile
+    dockerfile: 10_async/10_temporal/070_open_ai_agents_sdk_tools/Dockerfile
 
     # Path to your agent's .dockerignore
     # Filters unnecessary files from the build context
     # Helps keep build context small and builds fast
-    dockerignore: 070_open_ai_agents_sdk_tools/.dockerignore
+    dockerignore: 10_async/10_temporal/070_open_ai_agents_sdk_tools/.dockerignore
 
 # Local Development Configuration
 # -----------------------------
