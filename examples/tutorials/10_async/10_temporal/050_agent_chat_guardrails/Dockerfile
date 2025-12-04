@@ -29,16 +29,16 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 10_agentic/10_temporal/050_agent_chat_guardrails/pyproject.toml /app/050_agent_chat_guardrails/pyproject.toml
-COPY 10_agentic/10_temporal/050_agent_chat_guardrails/README.md /app/050_agent_chat_guardrails/README.md
+COPY 10_async/10_temporal/050_agent_chat_guardrails/pyproject.toml /app/050_agent_chat_guardrails/pyproject.toml
+COPY 10_async/10_temporal/050_agent_chat_guardrails/README.md /app/050_agent_chat_guardrails/README.md
 
 WORKDIR /app/050_agent_chat_guardrails
 
 # Copy the project code
-COPY 10_agentic/10_temporal/050_agent_chat_guardrails/project /app/050_agent_chat_guardrails/project
+COPY 10_async/10_temporal/050_agent_chat_guardrails/project /app/050_agent_chat_guardrails/project
 
 # Copy the test files
-COPY 10_agentic/10_temporal/050_agent_chat_guardrails/tests /app/050_agent_chat_guardrails/tests
+COPY 10_async/10_temporal/050_agent_chat_guardrails/tests /app/050_agent_chat_guardrails/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

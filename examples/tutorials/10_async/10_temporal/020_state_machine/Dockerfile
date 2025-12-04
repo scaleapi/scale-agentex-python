@@ -29,16 +29,16 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 10_agentic/10_temporal/020_state_machine/pyproject.toml /app/020_state_machine/pyproject.toml
-COPY 10_agentic/10_temporal/020_state_machine/README.md /app/020_state_machine/README.md
+COPY 10_async/10_temporal/020_state_machine/pyproject.toml /app/020_state_machine/pyproject.toml
+COPY 10_async/10_temporal/020_state_machine/README.md /app/020_state_machine/README.md
 
 WORKDIR /app/020_state_machine
 
 # Copy the project code
-COPY 10_agentic/10_temporal/020_state_machine/project /app/020_state_machine/project
+COPY 10_async/10_temporal/020_state_machine/project /app/020_state_machine/project
 
 # Copy the test files
-COPY 10_agentic/10_temporal/020_state_machine/tests /app/020_state_machine/tests
+COPY 10_async/10_temporal/020_state_machine/tests /app/020_state_machine/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

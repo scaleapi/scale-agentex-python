@@ -31,16 +31,16 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/pyproject.toml /app/080_open_ai_agents_sdk_human_in_the_loop/pyproject.toml
-COPY 10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/README.md /app/080_open_ai_agents_sdk_human_in_the_loop/README.md
+COPY 10_async/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/pyproject.toml /app/080_open_ai_agents_sdk_human_in_the_loop/pyproject.toml
+COPY 10_async/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/README.md /app/080_open_ai_agents_sdk_human_in_the_loop/README.md
 
 WORKDIR /app/080_open_ai_agents_sdk_human_in_the_loop
 
 # Copy the project code
-COPY 10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/project /app/080_open_ai_agents_sdk_human_in_the_loop/project
+COPY 10_async/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/project /app/080_open_ai_agents_sdk_human_in_the_loop/project
 
 # Copy the test files
-COPY 10_agentic/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/tests /app/080_open_ai_agents_sdk_human_in_the_loop/tests
+COPY 10_async/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/tests /app/080_open_ai_agents_sdk_human_in_the_loop/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

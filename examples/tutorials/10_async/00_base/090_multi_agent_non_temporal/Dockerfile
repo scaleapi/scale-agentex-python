@@ -24,16 +24,16 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 090_multi_agent_non_temporal/pyproject.toml /app/090_multi_agent_non_temporal/pyproject.toml
-COPY 090_multi_agent_non_temporal/README.md /app/090_multi_agent_non_temporal/README.md
+COPY 10_async/00_base/090_multi_agent_non_temporal/pyproject.toml /app/090_multi_agent_non_temporal/pyproject.toml
+COPY 10_async/00_base/090_multi_agent_non_temporal/README.md /app/090_multi_agent_non_temporal/README.md
 
 WORKDIR /app/090_multi_agent_non_temporal
 
 # Copy the project code
-COPY 090_multi_agent_non_temporal/project /app/090_multi_agent_non_temporal/project
+COPY 10_async/00_base/090_multi_agent_non_temporal/project /app/090_multi_agent_non_temporal/project
 
 # Copy the test files
-COPY 090_multi_agent_non_temporal/tests /app/090_multi_agent_non_temporal/tests
+COPY 10_async/00_base/090_multi_agent_non_temporal/tests /app/090_multi_agent_non_temporal/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

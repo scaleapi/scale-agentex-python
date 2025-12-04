@@ -31,16 +31,22 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 090_claude_agents_sdk_mvp/pyproject.toml /app/090_claude_agents_sdk_mvp/pyproject.toml
-COPY 090_claude_agents_sdk_mvp/README.md /app/090_claude_agents_sdk_mvp/README.md
+COPY 10_async/10_temporal/090_claude_agents_sdk_mvp/pyproject.toml /app/090_claude_agents_sdk_mvp/pyproject.toml
+COPY 10_async/10_temporal/090_claude_agents_sdk_mvp/README.md /app/090_claude_agents_sdk_mvp/README.md
 
 WORKDIR /app/090_claude_agents_sdk_mvp
 
 # Copy the project code
-COPY 090_claude_agents_sdk_mvp/project /app/090_claude_agents_sdk_mvp/project
+COPY 10_async/10_temporal/090_claude_agents_sdk_mvp/project /app/090_claude_agents_sdk_mvp/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 10_async/10_temporal/090_claude_agents_sdk_mvp/tests /app/090_claude_agents_sdk_mvp/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 WORKDIR /app/090_claude_agents_sdk_mvp
 

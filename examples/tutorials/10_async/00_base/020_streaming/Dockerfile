@@ -23,16 +23,16 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 10_agentic/00_base/020_streaming/pyproject.toml /app/020_streaming/pyproject.toml
-COPY 10_agentic/00_base/020_streaming/README.md /app/020_streaming/README.md
+COPY 10_async/00_base/020_streaming/pyproject.toml /app/020_streaming/pyproject.toml
+COPY 10_async/00_base/020_streaming/README.md /app/020_streaming/README.md
 
 WORKDIR /app/020_streaming
 
 # Copy the project code
-COPY 10_agentic/00_base/020_streaming/project /app/020_streaming/project
+COPY 10_async/00_base/020_streaming/project /app/020_streaming/project
 
 # Copy the test files
-COPY 10_agentic/00_base/020_streaming/tests /app/020_streaming/tests
+COPY 10_async/00_base/020_streaming/tests /app/020_streaming/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

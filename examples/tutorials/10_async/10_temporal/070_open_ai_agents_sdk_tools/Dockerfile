@@ -31,16 +31,16 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 10_agentic/10_temporal/070_open_ai_agents_sdk_tools/pyproject.toml /app/070_open_ai_agents_sdk_tools/pyproject.toml
-COPY 10_agentic/10_temporal/070_open_ai_agents_sdk_tools/README.md /app/070_open_ai_agents_sdk_tools/README.md
+COPY 10_async/10_temporal/070_open_ai_agents_sdk_tools/pyproject.toml /app/070_open_ai_agents_sdk_tools/pyproject.toml
+COPY 10_async/10_temporal/070_open_ai_agents_sdk_tools/README.md /app/070_open_ai_agents_sdk_tools/README.md
 
 WORKDIR /app/070_open_ai_agents_sdk_tools
 
 # Copy the project code
-COPY 10_agentic/10_temporal/070_open_ai_agents_sdk_tools/project /app/070_open_ai_agents_sdk_tools/project
+COPY 10_async/10_temporal/070_open_ai_agents_sdk_tools/project /app/070_open_ai_agents_sdk_tools/project
 
 # Copy the test files
-COPY 10_agentic/10_temporal/070_open_ai_agents_sdk_tools/tests /app/070_open_ai_agents_sdk_tools/tests
+COPY 10_async/10_temporal/070_open_ai_agents_sdk_tools/tests /app/070_open_ai_agents_sdk_tools/tests
 
 # Copy shared test utilities
 COPY test_utils /app/test_utils

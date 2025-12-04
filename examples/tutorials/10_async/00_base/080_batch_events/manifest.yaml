@@ -22,18 +22,18 @@ build:
     # - Your agent's directory (your custom agent code)
     # These paths are collected and sent to the Docker daemon for building
     include_paths:
-      - 10_agentic/00_base/080_batch_events
+      - 10_async/00_base/080_batch_events
       - test_utils
 
     # Path to your agent's Dockerfile
     # This defines how your agent's image is built from the context
     # Relative to the root directory
-    dockerfile: 10_agentic/00_base/080_batch_events/Dockerfile
+    dockerfile: 10_async/00_base/080_batch_events/Dockerfile
 
     # Path to your agent's .dockerignore
     # Filters unnecessary files from the build context
     # Helps keep build context small and builds fast
-    dockerignore: 10_agentic/00_base/080_batch_events/.dockerignore
+    dockerignore: 10_async/00_base/080_batch_events/.dockerignore
 
 
 # Local Development Configuration
