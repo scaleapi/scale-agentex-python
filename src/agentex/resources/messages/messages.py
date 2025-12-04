@@ -181,6 +181,8 @@ class MessagesResource(SyncAPIResource):
         *,
         task_id: str,
         limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -214,6 +216,8 @@ class MessagesResource(SyncAPIResource):
                     {
                         "task_id": task_id,
                         "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                         "page_number": page_number,
                     },
                     message_list_params.MessageListParams,
@@ -370,6 +374,8 @@ class AsyncMessagesResource(AsyncAPIResource):
         *,
         task_id: str,
         limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -403,6 +409,8 @@ class AsyncMessagesResource(AsyncAPIResource):
                     {
                         "task_id": task_id,
                         "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                         "page_number": page_number,
                     },
                     message_list_params.MessageListParams,

@@ -178,7 +178,7 @@ mdurl==0.1.2
 multidict==6.4.4
     # via aiohttp
     # via yarl
-mypy==1.14.1
+mypy==1.17.0
 mypy-extensions==1.0.0
     # via mypy
 nest-asyncio==1.6.0
@@ -204,6 +204,8 @@ packaging==23.2
     # via ipykernel
     # via nox
     # via pytest
+pathspec==0.12.1
+    # via mypy
 parso==0.8.4
     # via jedi
 pexpect==4.9.0

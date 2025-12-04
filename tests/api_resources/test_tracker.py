@@ -125,6 +125,8 @@ class TestTracker:
         tracker = client.tracker.list(
             agent_id="agent_id",
             limit=1,
+            order_by="order_by",
+            order_direction="order_direction",
             page_number=1,
             task_id="task_id",
         )
@@ -265,6 +267,8 @@ class TestAsyncTracker:
         tracker = await async_client.tracker.list(
             agent_id="agent_id",
             limit=1,
+            order_by="order_by",
+            order_direction="order_direction",
             page_number=1,
             task_id="task_id",
         )

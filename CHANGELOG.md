@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.0 (2025-12-04)
+
+Full Changelog: [v0.6.7...v0.7.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.7...v0.7.0)
+
+### Features
+
+* **api:** api update ([cdc9c63](https://github.com/scaleapi/scale-agentex-python/commit/cdc9c636be6f26e84772d1d1ef9d47cddcd9dabc))
+* **api:** api update ([413d9c8](https://github.com/scaleapi/scale-agentex-python/commit/413d9c806d918d7c5da3d0249c0f11d4b9f0894e))
+* **api:** api update ([1b4bf7d](https://github.com/scaleapi/scale-agentex-python/commit/1b4bf7d3a11306a50ec0eb9c20764c585d0e98e4))
+
+
+### Bug Fixes
+
+* ensure streams are always closed ([7bb9db8](https://github.com/scaleapi/scale-agentex-python/commit/7bb9db851a213d261e585cd2f156046f05cf85db))
+
+
+### Chores
+
+* **deps:** mypy 1.18.1 has a regression, pin to 1.17 ([e20aaa4](https://github.com/scaleapi/scale-agentex-python/commit/e20aaa495384f547dd18c8d31496f70b4a37e0dd))
+* update lockfile ([8541435](https://github.com/scaleapi/scale-agentex-python/commit/8541435780c4cd6862ac13a92b231d81481ddcff))
+
 ## 0.6.7 (2025-11-19)
 
 Full Changelog: [v0.6.6...v0.6.7](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.6...v0.6.7)

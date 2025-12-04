@@ -132,6 +132,8 @@ class TrackerResource(SyncAPIResource):
         *,
         agent_id: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -148,6 +150,10 @@ class TrackerResource(SyncAPIResource):
           agent_id: Agent ID
 
           limit: Limit
+
+          order_by: Field to order by
+
+          order_direction: Order direction (asc or desc)
 
           page_number: Page number
 
@@ -172,6 +178,8 @@ class TrackerResource(SyncAPIResource):
                     {
                         "agent_id": agent_id,
                         "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                         "page_number": page_number,
                         "task_id": task_id,
                     },
@@ -290,6 +298,8 @@ class AsyncTrackerResource(AsyncAPIResource):
         *,
         agent_id: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -306,6 +316,10 @@ class AsyncTrackerResource(AsyncAPIResource):
           agent_id: Agent ID
 
           limit: Limit
+
+          order_by: Field to order by
+
+          order_direction: Order direction (asc or desc)
 
           page_number: Page number
 
@@ -330,6 +344,8 @@ class AsyncTrackerResource(AsyncAPIResource):
                     {
                         "agent_id": agent_id,
                         "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                         "page_number": page_number,
                         "task_id": task_id,
                     },
