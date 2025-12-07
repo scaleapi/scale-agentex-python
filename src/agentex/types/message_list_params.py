@@ -12,5 +12,21 @@ class MessageListParams(TypedDict, total=False):
     """The task ID"""
 
     limit: int
+    """Maximum number of messages to return (default: 50)"""
+
+    cursor: str
+    """Opaque cursor string for pagination. Pass the `next_cursor` from
+    a previous response to get the next page."""
+
+    direction: str
+    """Pagination direction - "older" to get older messages (default),
+    "newer" to get newer messages."""
 
     page_number: int
+    """[DEPRECATED] Use cursor instead. Page number for offset-based pagination (default: 1)"""
+
+    order_by: str
+    """Field to order by (default: created_at)"""
+
+    order_direction: str
+    """Order direction - "asc" or "desc" (default: desc)"""

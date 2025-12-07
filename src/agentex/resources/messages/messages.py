@@ -181,7 +181,11 @@ class MessagesResource(SyncAPIResource):
         *,
         task_id: str,
         limit: int | Omit = omit,
+        cursor: str | Omit = omit,
+        direction: str | Omit = omit,
         page_number: int | Omit = omit,
+        order_by: str | Omit = omit,
+        order_direction: str | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -190,10 +194,27 @@ class MessagesResource(SyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> MessageListResponse:
         """
-        List Messages
+        List Messages with cursor-based pagination.
+
+        Returns messages for a task with pagination metadata.
+        Use the `next_cursor` from the response to fetch the next page.
 
         Args:
           task_id: The task ID
+
+          limit: Maximum number of messages to return (default: 50)
+
+          cursor: Opaque cursor string for pagination. Pass the `next_cursor` from
+                  a previous response to get the next page.
+
+          direction: Pagination direction - "older" to get older messages (default),
+                     "newer" to get newer messages.
+
+          page_number: [DEPRECATED] Use cursor instead. Page number for offset pagination.
+
+          order_by: Field to order by (default: created_at)
+
+          order_direction: Order direction - "asc" or "desc" (default: desc)
 
           extra_headers: Send extra headers
 
@@ -202,6 +223,18 @@ class MessagesResource(SyncAPIResource):
           extra_body: Add additional JSON properties to the request
 
           timeout: Override the client-level default timeout for this request, in seconds
+
+        Example:
+            # First request
+            response = client.messages.list(task_id="xxx", limit=50)
+
+            # Next page
+            if response.has_more:
+                next_page = client.messages.list(
+                    task_id="xxx",
+                    limit=50,
+                    cursor=response.next_cursor
+                )
         """
         return self._get(
             "/messages",
@@ -214,7 +247,11 @@ class MessagesResource(SyncAPIResource):
                     {
                         "task_id": task_id,
                         "limit": limit,
+                        "cursor": cursor,
+                        "direction": direction,
                         "page_number": page_number,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                     },
                     message_list_params.MessageListParams,
                 ),
@@ -370,7 +407,11 @@ class AsyncMessagesResource(AsyncAPIResource):
         *,
         task_id: str,
         limit: int | Omit = omit,
+        cursor: str | Omit = omit,
+        direction: str | Omit = omit,
         page_number: int | Omit = omit,
+        order_by: str | Omit = omit,
+        order_direction: str | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -379,10 +420,27 @@ class AsyncMessagesResource(AsyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> MessageListResponse:
         """
-        List Messages
+        List Messages with cursor-based pagination.
+
+        Returns messages for a task with pagination metadata.
+        Use the `next_cursor` from the response to fetch the next page.
 
         Args:
           task_id: The task ID
+
+          limit: Maximum number of messages to return (default: 50)
+
+          cursor: Opaque cursor string for pagination. Pass the `next_cursor` from
+                  a previous response to get the next page.
+
+          direction: Pagination direction - "older" to get older messages (default),
+                     "newer" to get newer messages.
+
+          page_number: [DEPRECATED] Use cursor instead. Page number for offset pagination.
+
+          order_by: Field to order by (default: created_at)
+
+          order_direction: Order direction - "asc" or "desc" (default: desc)
 
           extra_headers: Send extra headers
 
@@ -391,6 +449,18 @@ class AsyncMessagesResource(AsyncAPIResource):
           extra_body: Add additional JSON properties to the request
 
           timeout: Override the client-level default timeout for this request, in seconds
+
+        Example:
+            # First request
+            response = await client.messages.list(task_id="xxx", limit=50)
+
+            # Next page
+            if response.has_more:
+                next_page = await client.messages.list(
+                    task_id="xxx",
+                    limit=50,
+                    cursor=response.next_cursor
+                )
         """
         return await self._get(
             "/messages",
@@ -403,7 +473,11 @@ class AsyncMessagesResource(AsyncAPIResource):
                     {
                         "task_id": task_id,
                         "limit": limit,
+                        "cursor": cursor,
+                        "direction": direction,
                         "page_number": page_number,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                     },
                     message_list_params.MessageListParams,
                 ),
