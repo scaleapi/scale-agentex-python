@@ -126,7 +126,19 @@ async def poll_messages(
             if yield_updates:
                 # For streaming: track content changes
                 content_str = message.content.content if message.content and hasattr(message.content, 'content') else ""
-                content_hash = hash(content_str + str(message.streaming_status))
+                # Ensure content_str is always a string to avoid concatenation errors
+                if isinstance(content_str, list):
+                    # If it's a list, convert to string representation
+                    content_str = str(content_str)
+                elif content_str is None:
+                    content_str = ""
+                elif not isinstance(content_str, str):
+                    # Handle any other non-string types
+                    content_str = str(content_str)
+
+                # Ensure streaming_status is also properly converted to string
+                streaming_status_str = str(message.streaming_status) if message.streaming_status is not None else ""
+                content_hash = hash(content_str + streaming_status_str)
                 is_updated = message.id in message_content_hashes and message_content_hashes[message.id] != content_hash
 
                 if is_new_message or is_updated:

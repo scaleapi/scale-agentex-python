@@ -38,14 +38,14 @@ COPY 00_sync/000_hello_acp/tests /app/000_hello_acp/tests
 # Copy shared test utilities
 COPY test_utils /app/test_utils
 
-# Install the required Python packages with dev dependencies (includes pytest)
-RUN uv pip install --system .[dev] pytest-asyncio httpx
+# Install the required Python packages with dev dependencies
+RUN uv pip install --system .[dev]
 
 # Set environment variables
 ENV PYTHONPATH=/app
 
 # Set test environment variables
-ENV AGENT_NAME=s000-hello-acp
+ENV AGENT_NAME=000-hello-acp
 
 # Run the agent using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"] 

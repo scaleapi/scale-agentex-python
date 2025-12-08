@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "s010-multiturn"
+name = "010-multiturn"
 version = "0.1.0"
 description = "An AgentEx agent"
 readme = "README.md"
@@ -16,6 +16,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-asyncio",
+    "httpx",
     "black",
     "isort",
     "flake8",
