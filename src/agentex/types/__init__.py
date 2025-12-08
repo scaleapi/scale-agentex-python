@@ -50,6 +50,7 @@ from .task_retrieve_params import TaskRetrieveParams as TaskRetrieveParams
 from .tool_request_content import ToolRequestContent as ToolRequestContent
 from .message_create_params import MessageCreateParams as MessageCreateParams
 from .message_list_response import MessageListResponse as MessageListResponse
+from .message_list_response import PaginatedMessagesResponse as PaginatedMessagesResponse
 from .message_update_params import MessageUpdateParams as MessageUpdateParams
 from .tool_response_content import ToolResponseContent as ToolResponseContent
 from .tracker_list_response import TrackerListResponse as TrackerListResponse

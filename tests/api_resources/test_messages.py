@@ -240,10 +240,17 @@ class TestMessages:
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         message = client.messages.list(
             task_id="task_id",
-            limit=0,
+            limit=50,
+            cursor="eyJ2IjoxLCJpZCI6Im1zZ18xMjMiLCJjcmVhdGVkX2F0IjoiMjAyNC0wMS0xNVQxMDozMDowMCJ9",
+            direction="older",
             page_number=0,
+            order_by="created_at",
+            order_direction="desc",
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
+        # Response should have data, next_cursor, and has_more
+        assert hasattr(message, "data")
+        assert hasattr(message, "has_more")
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
@@ -496,10 +503,17 @@ class TestAsyncMessages:
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.list(
             task_id="task_id",
-            limit=0,
+            limit=50,
+            cursor="eyJ2IjoxLCJpZCI6Im1zZ18xMjMiLCJjcmVhdGVkX2F0IjoiMjAyNC0wMS0xNVQxMDozMDowMCJ9",
+            direction="older",
             page_number=0,
+            order_by="created_at",
+            order_direction="desc",
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
+        # Response should have data, next_cursor, and has_more
+        assert hasattr(message, "data")
+        assert hasattr(message, "has_more")
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
