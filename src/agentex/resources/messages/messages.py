@@ -192,7 +192,10 @@ class MessagesResource(SyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> MessageListResponse:
         """
-        List Messages
+        List messages for a task with offset-based pagination.
+
+        For cursor-based pagination with infinite scroll support, use
+        /messages/paginated.
 
         Args:
           task_id: The task ID
@@ -385,7 +388,10 @@ class AsyncMessagesResource(AsyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> MessageListResponse:
         """
-        List Messages
+        List messages for a task with offset-based pagination.
+
+        For cursor-based pagination with infinite scroll support, use
+        /messages/paginated.
 
         Args:
           task_id: The task ID
