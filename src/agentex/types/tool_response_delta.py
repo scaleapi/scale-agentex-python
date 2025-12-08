@@ -9,6 +9,8 @@ __all__ = ["ToolResponseDelta"]
 
 
 class ToolResponseDelta(BaseModel):
+    """Delta for tool response updates"""
+
     name: str
 
     tool_call_id: str

@@ -9,6 +9,16 @@ __all__ = ["State"]
 
 
 class State(BaseModel):
+    """Represents a state in the agent system.
+
+    A state is associated uniquely with a task and an agent.
+
+    This entity is used to store states in MongoDB, with each state
+    associated with a specific task and agent. The combination of task_id and agent_id is globally unique.
+
+    The state is a dictionary of arbitrary data.
+    """
+
     id: str
     """The task state's unique id"""
 

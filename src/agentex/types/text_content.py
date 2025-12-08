@@ -12,6 +12,8 @@ __all__ = ["TextContent", "Attachment"]
 
 
 class Attachment(BaseModel):
+    """Represents a file attachment in messages."""
+
     file_id: str
     """The unique ID of the attached file"""
 
