@@ -18,6 +18,7 @@ Configuration:
 import os
 import uuid
 import asyncio
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -71,7 +72,7 @@ class TestNonStreamingEvents:
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
         assert task is not None
-
+        task_creation_found = False
         # Poll for the initial task creation message
         async for message in poll_messages(
             client=client,
@@ -82,8 +83,10 @@ class TestNonStreamingEvents:
             assert isinstance(message, TaskMessage)
             if message.content and message.content.type == "text" and message.content.author == "agent":
                 assert "Hello! I've received your task" in message.content.content
+                task_creation_found = True
                 break
-        
+
+        assert task_creation_found, "Task creation message not found in poll"
         await asyncio.sleep(1.5)
         # Send an event and poll for response
         user_message = "Hello, this is a test message!"
@@ -110,23 +113,37 @@ class TestStreamingEvents:
         task = task_response.result
         assert task is not None
 
+        task_creation_found = False
+        async for message in poll_messages(
+            client=client,
+            task_id=task.id,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                assert "Hello! I've received your task" in message.content.content
+                task_creation_found = True
+                break
+
+        assert task_creation_found, "Task creation message not found in poll"
+
         user_message = "Hello, this is a test message!"
 
         # Collect events from stream
-        all_events = []
+        all_events: list[dict[str, Any]] = []
 
         # Flags to track what we've received
-        task_creation_found = False
         user_echo_found = False
         agent_response_found = False
-
+        stream_timeout = 30
         async def collect_stream_events(): #noqa: ANN101
-            nonlocal task_creation_found, user_echo_found, agent_response_found
+            nonlocal user_echo_found, agent_response_found
 
             async for event in stream_agent_response(
                 client=client,
                 task_id=task.id,
-                timeout=30,
+                timeout=stream_timeout,
             ):
                 # Check events as they arrive
                 event_type = event.get("type")
@@ -135,11 +152,8 @@ class TestStreamingEvents:
                     if content.get("content") is None:
                         continue  # Skip empty content
                     if content.get("type") == "text" and content.get("author") == "agent":
-                        # Check for initial task creation message
-                        if "Hello! I've received your task" in content.get("content", ""):
-                            task_creation_found = True
                         # Check for agent response to user message
-                        elif "Hello! I've received your message" in content.get("content", ""):
+                        if "Hello! I've received your message" in content.get("content", ""):
                             # Agent response should come after user echo
                             assert user_echo_found, "Agent response arrived before user message echo (incorrect order)"
                             agent_response_found = True
@@ -149,14 +163,8 @@ class TestStreamingEvents:
                             user_echo_found = True
 
                 # Exit early if we've found all expected messages
-                if task_creation_found and user_echo_found and agent_response_found:
+                if user_echo_found and agent_response_found:
                     break
-
-            assert task_creation_found, "Task creation message not found in stream"
-            assert user_echo_found, "User message echo not found in stream"
-            assert agent_response_found, "Agent response not found in stream"
-
-
         # Start streaming task
         stream_task = asyncio.create_task(collect_stream_events())
 
@@ -164,6 +172,16 @@ class TestStreamingEvents:
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
 
+        # Wait for the stream to complete (with timeout)
+        try:
+            await asyncio.wait_for(stream_task, timeout=stream_timeout)
+        except asyncio.TimeoutError:
+            pytest.fail(f"Stream timed out after {stream_timeout}s waiting for expected messages")
+
+        # Verify all expected messages were received (fail if stream ended without finding them)
+
+        assert user_echo_found, "User message echo not found in stream"
+        assert agent_response_found, "Agent response not found in stream"
         # Wait for streaming to complete
         await stream_task
 
