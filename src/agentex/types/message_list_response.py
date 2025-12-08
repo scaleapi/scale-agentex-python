@@ -8,6 +8,10 @@ from .task_message import TaskMessage
 __all__ = ["MessageListResponse", "PaginatedMessagesResponse"]
 
 
+# Original response type: list of messages
+MessageListResponse = List[TaskMessage]
+
+
 class PaginatedMessagesResponse(BaseModel):
     """Response with cursor pagination metadata."""
 
@@ -21,7 +25,3 @@ class PaginatedMessagesResponse(BaseModel):
 
     has_more: bool = False
     """Whether there are more messages to fetch"""
-
-
-# Alias for backwards compatibility
-MessageListResponse = PaginatedMessagesResponse
