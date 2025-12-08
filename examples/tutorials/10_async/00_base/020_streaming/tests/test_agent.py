@@ -96,7 +96,9 @@ class TestNonStreamingEvents:
             user_message=user_message,
             timeout=30,
             sleep_interval=1.0,
+            yield_updates=False,
         ):
+
             messages.append(message)
 
         assert len(messages) > 0
@@ -199,7 +201,7 @@ class TestStreamingEvents:
         await asyncio.sleep(1)  # wait for state to be updated
         states = await client.states.list(agent_id=agent_id, task_id=task.id)
         assert len(states) == 1
-        state = states[0].state
+        state: dict[str, object] = states[0].state
         messages = state.get("messages", [])
 
         assert isinstance(messages, list)
