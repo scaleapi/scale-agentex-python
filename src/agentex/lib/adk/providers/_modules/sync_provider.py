@@ -21,20 +21,17 @@ from openai.types.responses import (
     ResponseOutputItemDoneEvent,
     ResponseOutputItemAddedEvent,
     ResponseCodeInterpreterToolCall,
-    ResponseReasoningSummaryPartDoneEvent,
     ResponseReasoningSummaryPartAddedEvent,
     ResponseReasoningSummaryTextDeltaEvent,
 )
 from agents.models.openai_provider import OpenAIProvider
-from openai.types.responses.response_reasoning_summary_text_done_event import ResponseReasoningSummaryTextDoneEvent
-from openai.types.responses.response_reasoning_text_delta_event import ResponseReasoningTextDeltaEvent
 from openai.types.responses.response_reasoning_text_done_event import ResponseReasoningTextDoneEvent
+from openai.types.responses.response_reasoning_text_delta_event import ResponseReasoningTextDeltaEvent
+from openai.types.responses.response_reasoning_summary_text_done_event import ResponseReasoningSummaryTextDoneEvent
 
 from agentex import AsyncAgentex
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.types.reasoning_content_delta import ReasoningContentDelta
-from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import (
     StreamTaskMessageDone,
@@ -45,6 +42,8 @@ from agentex.types.task_message_update import (
 from agentex.types.task_message_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
+from agentex.types.reasoning_content_delta import ReasoningContentDelta
+from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 
 logger = make_logger(__name__)
 
