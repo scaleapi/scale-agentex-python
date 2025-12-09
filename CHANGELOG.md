@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.7.0 (2025-12-09)
+
+Full Changelog: [v0.6.7...v0.7.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.7...v0.7.0)
+
+### Features
+
+* **api:** add messages/paginated endpoint ([3e03aff](https://github.com/scaleapi/scale-agentex-python/commit/3e03aff8490e0556cb05052d385156eda8f28107))
+* **api:** add messages/paginated to stainless config ([2473ded](https://github.com/scaleapi/scale-agentex-python/commit/2473ded39274bcd0a16d7314667fcf7f55e829c2))
+* **api:** api update ([f6eccdf](https://github.com/scaleapi/scale-agentex-python/commit/f6eccdf975eaef9b257ef3f20f087f2f2f9b3665))
+* **api:** api update ([41067fb](https://github.com/scaleapi/scale-agentex-python/commit/41067fb79725787e0ceb20dcf16029998bcbca24))
+* **api:** api update ([cdc9c63](https://github.com/scaleapi/scale-agentex-python/commit/cdc9c636be6f26e84772d1d1ef9d47cddcd9dabc))
+* **api:** api update ([413d9c8](https://github.com/scaleapi/scale-agentex-python/commit/413d9c806d918d7c5da3d0249c0f11d4b9f0894e))
+* **api:** api update ([1b4bf7d](https://github.com/scaleapi/scale-agentex-python/commit/1b4bf7d3a11306a50ec0eb9c20764c585d0e98e4))
+* **api:** manual updates ([131e836](https://github.com/scaleapi/scale-agentex-python/commit/131e836b5bda8248f847b00308b6711a1ee84ee0))
+
+
+### Bug Fixes
+
+* ensure streams are always closed ([7bb9db8](https://github.com/scaleapi/scale-agentex-python/commit/7bb9db851a213d261e585cd2f156046f05cf85db))
+* **types:** allow pyright to infer TypedDict types within SequenceNotStr ([9cfc9d6](https://github.com/scaleapi/scale-agentex-python/commit/9cfc9d66579a11f3eaf248bafbfddb422e878a58))
+
+
+### Chores
+
+* add missing docstrings ([81f1fa9](https://github.com/scaleapi/scale-agentex-python/commit/81f1fa9b3c440d893b8ea8f773ab2592eb333d65))
+* **deps:** mypy 1.18.1 has a regression, pin to 1.17 ([e20aaa4](https://github.com/scaleapi/scale-agentex-python/commit/e20aaa495384f547dd18c8d31496f70b4a37e0dd))
+* **docs:** use environment variables for authentication in code snippets ([a30f6ae](https://github.com/scaleapi/scale-agentex-python/commit/a30f6aebca8de5be72eb7bcf7a3b3ccea28479bc))
+* update lockfile ([a3a2e4f](https://github.com/scaleapi/scale-agentex-python/commit/a3a2e4fbcf6e6e4bcbadab50c6b9236e4514dae2))
+
 ## 0.6.7 (2025-11-19)
 
 Full Changelog: [v0.6.6...v0.6.7](https://github.com/scaleapi/scale-agentex-python/compare/v0.6.6...v0.6.7)
