@@ -11,6 +11,12 @@ __all__ = ["TaskMessage"]
 
 
 class TaskMessage(BaseModel):
+    """Represents a message in the agent system.
+
+    This entity is used to store messages in MongoDB, with each message
+    associated with a specific task.
+    """
+
     content: TaskMessageContent
     """The content of the message.
 

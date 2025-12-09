@@ -13,6 +13,8 @@ __all__ = ["TextContentParam", "Attachment"]
 
 
 class Attachment(TypedDict, total=False):
+    """Represents a file attachment in messages."""
+
     file_id: Required[str]
     """The unique ID of the attached file"""
 

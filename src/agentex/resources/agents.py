@@ -93,6 +93,8 @@ class AgentsResource(SyncAPIResource):
         self,
         *,
         limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -107,6 +109,10 @@ class AgentsResource(SyncAPIResource):
 
         Args:
           limit: Limit
+
+          order_by: Field to order by
+
+          order_direction: Order direction (asc or desc)
 
           page_number: Page number
 
@@ -130,6 +136,8 @@ class AgentsResource(SyncAPIResource):
                 query=maybe_transform(
                     {
                         "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                         "page_number": page_number,
                         "task_id": task_id,
                     },
@@ -653,6 +661,8 @@ class AsyncAgentsResource(AsyncAPIResource):
         self,
         *,
         limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -667,6 +677,10 @@ class AsyncAgentsResource(AsyncAPIResource):
 
         Args:
           limit: Limit
+
+          order_by: Field to order by
+
+          order_direction: Order direction (asc or desc)
 
           page_number: Page number
 
@@ -690,6 +704,8 @@ class AsyncAgentsResource(AsyncAPIResource):
                 query=await async_maybe_transform(
                     {
                         "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                         "page_number": page_number,
                         "task_id": task_id,
                     },

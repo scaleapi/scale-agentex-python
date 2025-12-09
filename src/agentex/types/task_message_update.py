@@ -19,6 +19,8 @@ __all__ = [
 
 
 class StreamTaskMessageStart(BaseModel):
+    """Event for starting a streaming message"""
+
     content: TaskMessageContent
 
     index: Optional[int] = None
@@ -34,6 +36,8 @@ class StreamTaskMessageStart(BaseModel):
 
 
 class StreamTaskMessageDelta(BaseModel):
+    """Event for streaming chunks of content"""
+
     delta: Optional[TaskMessageDelta] = None
     """Delta for text updates"""
 
@@ -50,6 +54,8 @@ class StreamTaskMessageDelta(BaseModel):
 
 
 class StreamTaskMessageFull(BaseModel):
+    """Event for streaming the full content"""
+
     content: TaskMessageContent
 
     index: Optional[int] = None
@@ -65,6 +71,8 @@ class StreamTaskMessageFull(BaseModel):
 
 
 class StreamTaskMessageDone(BaseModel):
+    """Event for indicating the task is done"""
+
     index: Optional[int] = None
 
     parent_task_message: Optional[TaskMessage] = None

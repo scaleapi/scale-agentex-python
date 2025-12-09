@@ -11,6 +11,8 @@ __all__ = ["TaskRetrieveResponse"]
 
 
 class TaskRetrieveResponse(BaseModel):
+    """Task response model with optional related data based on relationships"""
+
     id: str
 
     agents: Optional[List[Agent]] = None

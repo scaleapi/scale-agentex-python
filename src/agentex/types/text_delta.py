@@ -9,6 +9,8 @@ __all__ = ["TextDelta"]
 
 
 class TextDelta(BaseModel):
+    """Delta for text updates"""
+
     text_delta: Optional[str] = None
 
     type: Optional[Literal["text"]] = None

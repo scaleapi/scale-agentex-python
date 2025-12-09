@@ -15,6 +15,10 @@ class TaskListParams(TypedDict, total=False):
 
     limit: int
 
+    order_by: Optional[str]
+
+    order_direction: str
+
     page_number: int
 
     relationships: List[Literal["agents"]]

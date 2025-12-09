@@ -9,6 +9,8 @@ __all__ = ["ReasoningSummaryDelta"]
 
 
 class ReasoningSummaryDelta(BaseModel):
+    """Delta for reasoning summary updates"""
+
     summary_index: int
 
     summary_delta: Optional[str] = None
