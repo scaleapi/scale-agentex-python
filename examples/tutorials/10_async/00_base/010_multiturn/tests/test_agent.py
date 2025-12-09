@@ -185,8 +185,11 @@ class TestStreamingEvents:
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
 
-        # Wait for streaming to complete
-        await stream_task
+        # Wait for streaming to complete (with timeout)
+        try:
+            await asyncio.wait_for(stream_task, timeout=15)
+        except asyncio.TimeoutError:
+            pytest.fail("Stream timed out after 15s waiting for expected messages")
 
         # Validate we received events
         assert len(all_events) > 0, "No events received in streaming response"

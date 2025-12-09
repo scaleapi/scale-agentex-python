@@ -23,19 +23,28 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 030_tracing/pyproject.toml /app/030_tracing/pyproject.toml
-COPY 030_tracing/README.md /app/030_tracing/README.md
+COPY 10_async/00_base/030_tracing/pyproject.toml /app/030_tracing/pyproject.toml
+COPY 10_async/00_base/030_tracing/README.md /app/030_tracing/README.md
 
 WORKDIR /app/030_tracing
 
 # Copy the project code
-COPY 030_tracing/project /app/030_tracing/project
+COPY 10_async/00_base/030_tracing/project /app/030_tracing/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 10_async/00_base/030_tracing/tests /app/030_tracing/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 # Set environment variables
 ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=ab030-tracing
 
 # Run the agent using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"] 

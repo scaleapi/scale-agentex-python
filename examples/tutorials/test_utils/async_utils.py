@@ -125,8 +125,14 @@ async def poll_messages(
 
             if yield_updates:
                 # For streaming: track content changes
-                content_str = message.content.content if message.content and hasattr(message.content, 'content') else ""
-                content_hash = hash(content_str + str(message.streaming_status))
+                # Use getattr to safely extract content and convert to string
+                # This handles various content structures at runtime
+                raw_content = getattr(message.content, 'content', message.content) if message.content else None
+                content_str = str(raw_content) if raw_content is not None else ""
+
+                # Ensure streaming_status is also properly converted to string
+                streaming_status_str = str(message.streaming_status) if message.streaming_status is not None else ""
+                content_hash = hash(content_str + streaming_status_str)
                 is_updated = message.id in message_content_hashes and message_content_hashes[message.id] != content_hash
 
                 if is_new_message or is_updated:
@@ -218,6 +224,7 @@ async def stream_agent_response(
     except Exception as e:
         print(f"[DEBUG] Stream error: {e}")
 
+
 async def stream_task_messages(
     client: AsyncAgentex,
     task_id: str,
@@ -245,22 +252,3 @@ async def stream_task_messages(
                 task_message = finished_message
         if task_message:
             yield task_message
-
-
-
-def validate_text_in_response(expected_text: str, message: TaskMessage) -> bool:
-    """
-    Validate that expected text appears in any of the messages.
-
-    Args:
-        expected_text: The text to search for (case-insensitive)
-        messages: List of message objects to search
-
-    Returns:
-        True if text is found, False otherwise
-    """
-    for message in messages:
-        if message.content and message.content.type == "text":
-            if expected_text.lower() in message.content.content.lower():
-                return True
-    return False

@@ -190,7 +190,7 @@ jobs:
           fi
 
           # Build command - add --push only if we should push
-          BUILD_ARGS="--manifest ${{ matrix.agent_path }}/manifest.yaml --registry ${REGISTRY} --tag ${VERSION_TAG} --platforms linux/amd64 --repository-name ${REPOSITORY_NAME}"
+          BUILD_ARGS="--manifest ${{ matrix.agent_path }}/manifest.yaml --registry ${REGISTRY} --tag ${VERSION_TAG} --platforms linux/amd64,linux/arm64 --repository-name ${REPOSITORY_NAME}"
 
           if [ "$SHOULD_PUSH" = "true" ]; then
             agentex agents build $BUILD_ARGS --push

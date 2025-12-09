@@ -234,7 +234,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
                     "to provide accurate and well-reasoned responses."
                 ),
                 parent_span_id=span.id if span else None,
-                model="gpt-4o-mini",
+                model="gpt-5",
                 model_settings=ModelSettings(
                     # Include reasoning items in the response (IDs, summaries)
                     # response_include=["reasoning.encrypted_content"],

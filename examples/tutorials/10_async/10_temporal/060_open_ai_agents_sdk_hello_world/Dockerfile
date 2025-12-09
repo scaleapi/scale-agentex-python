@@ -31,21 +31,30 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 060_open_ai_agents_sdk_hello_world/pyproject.toml /app/060_open_ai_agents_sdk_hello_world/pyproject.toml
-COPY 060_open_ai_agents_sdk_hello_world/README.md /app/060_open_ai_agents_sdk_hello_world/README.md
+COPY 10_async/10_temporal/060_open_ai_agents_sdk_hello_world/pyproject.toml /app/060_open_ai_agents_sdk_hello_world/pyproject.toml
+COPY 10_async/10_temporal/060_open_ai_agents_sdk_hello_world/README.md /app/060_open_ai_agents_sdk_hello_world/README.md
 
 WORKDIR /app/060_open_ai_agents_sdk_hello_world
 
 # Copy the project code
-COPY 060_open_ai_agents_sdk_hello_world/project /app/060_open_ai_agents_sdk_hello_world/project
+COPY 10_async/10_temporal/060_open_ai_agents_sdk_hello_world/project /app/060_open_ai_agents_sdk_hello_world/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 10_async/10_temporal/060_open_ai_agents_sdk_hello_world/tests /app/060_open_ai_agents_sdk_hello_world/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies
+RUN uv pip install --system .[dev]
 
 WORKDIR /app/060_open_ai_agents_sdk_hello_world
 
-
 ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=at060-open-ai-agents-sdk-hello-world
+
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
 

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "s000-hello-acp"
+name = "000-hello-acp"
 version = "0.1.0"
 description = "An AgentEx agent that just says hello and acknowledges the user's message"
 readme = "README.md"
@@ -11,13 +11,14 @@ requires-python = ">=3.12"
 dependencies = [
     "agentex-sdk",
     "scale-gp",
-    "pytest",
-    "pytest-xdist"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-asyncio",
+    "pytest-xdist",
+    "httpx",
     "black",
     "isort",
     "flake8",

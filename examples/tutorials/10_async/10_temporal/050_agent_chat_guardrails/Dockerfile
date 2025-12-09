@@ -29,16 +29,28 @@ RUN uv pip install --system --upgrade pip setuptools wheel
 ENV UV_HTTP_TIMEOUT=1000
 
 # Copy pyproject.toml and README.md to install dependencies
-COPY 050_agent_chat_guardrails/pyproject.toml /app/050_agent_chat_guardrails/pyproject.toml
-COPY 050_agent_chat_guardrails/README.md /app/050_agent_chat_guardrails/README.md
+COPY 10_async/10_temporal/050_agent_chat_guardrails/pyproject.toml /app/050_agent_chat_guardrails/pyproject.toml
+COPY 10_async/10_temporal/050_agent_chat_guardrails/README.md /app/050_agent_chat_guardrails/README.md
 
 WORKDIR /app/050_agent_chat_guardrails
 
 # Copy the project code
-COPY 050_agent_chat_guardrails/project /app/050_agent_chat_guardrails/project
+COPY 10_async/10_temporal/050_agent_chat_guardrails/project /app/050_agent_chat_guardrails/project
 
-# Install the required Python packages from pyproject.toml
-RUN uv pip install --system .
+# Copy the test files
+COPY 10_async/10_temporal/050_agent_chat_guardrails/tests /app/050_agent_chat_guardrails/tests
+
+# Copy shared test utilities
+COPY test_utils /app/test_utils
+
+# Install the required Python packages with dev dependencies (includes pytest)
+RUN uv pip install --system .[dev] pytest-asyncio httpx
+
+# Set environment variables
+ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=at050-agent-chat-guardrails
 
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
