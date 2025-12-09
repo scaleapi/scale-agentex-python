@@ -159,7 +159,6 @@ class TestStreamingEvents:
                             agent_response_found = True
                     elif content.get("type") == "text" and content.get("author") == "user":
                         # Check for user message echo
-                        print("here")
                         if content.get("content") == user_message:
                             user_echo_found = True
 
@@ -173,7 +172,6 @@ class TestStreamingEvents:
         # Send the event
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
 
         # Wait for the stream to complete (with timeout)
         try:

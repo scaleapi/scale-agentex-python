@@ -38,8 +38,8 @@ COPY 10_async/00_base/090_multi_agent_non_temporal/tests /app/090_multi_agent_no
 # Copy shared test utilities
 COPY test_utils /app/test_utils
 
-# Install the required Python packages with dev dependencies (includes pytest)
-RUN uv pip install --system .[dev] pytest-asyncio httpx
+# Install the required Python packages with dev dependencies
+RUN uv pip install --system .[dev]
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -47,7 +47,10 @@ ENV PYTHONPATH=/app
 ARG AGENT_FILE
 ARG PORT
 
-# Note: AGENT_NAME should be set at runtime based on which agent is running
+# Set test environment variables
+ENV AGENT_NAME=ab090-multi-agent-non-temporal
+
+# Note: AGENT_NAME can be overridden at runtime based on which agent is running
 # (ab090-creator-agent, ab090-critic-agent, ab090-formatter-agent, or ab090-orchestrator-agent)
 
 # Run the agent using uvicorn

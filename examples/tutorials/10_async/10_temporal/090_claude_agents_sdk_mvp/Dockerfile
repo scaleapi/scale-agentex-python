@@ -45,13 +45,16 @@ COPY 10_async/10_temporal/090_claude_agents_sdk_mvp/tests /app/090_claude_agents
 # Copy shared test utilities
 COPY test_utils /app/test_utils
 
-# Install the required Python packages with dev dependencies (includes pytest)
-RUN uv pip install --system .[dev] pytest-asyncio httpx
+# Install the required Python packages with dev dependencies
+RUN uv pip install --system .[dev]
 
 WORKDIR /app/090_claude_agents_sdk_mvp
 
-
+# Set environment variables
 ENV PYTHONPATH=/app
+
+# Set test environment variables
+ENV AGENT_NAME=at090-claude-agents-sdk-mvp
 # Run the ACP server using uvicorn
 CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
 
