@@ -72,7 +72,6 @@ from agentex.types import (
     ToolRequestContent,
     ToolResponseContent,
     MessageListResponse,
-    MessageListPaginatedResponse,
 )
 ```
 
@@ -82,7 +81,6 @@ Methods:
 - <code title="get /messages/{message_id}">client.messages.<a href="./src/agentex/resources/messages/messages.py">retrieve</a>(message_id) -> <a href="./src/agentex/types/task_message.py">TaskMessage</a></code>
 - <code title="put /messages/{message_id}">client.messages.<a href="./src/agentex/resources/messages/messages.py">update</a>(message_id, \*\*<a href="src/agentex/types/message_update_params.py">params</a>) -> <a href="./src/agentex/types/task_message.py">TaskMessage</a></code>
 - <code title="get /messages">client.messages.<a href="./src/agentex/resources/messages/messages.py">list</a>(\*\*<a href="src/agentex/types/message_list_params.py">params</a>) -> <a href="./src/agentex/types/message_list_response.py">MessageListResponse</a></code>
-- <code title="get /messages/paginated">client.messages.<a href="./src/agentex/resources/messages/messages.py">list_paginated</a>(\*\*<a href="src/agentex/types/message_list_paginated_params.py">params</a>) -> <a href="./src/agentex/types/message_list_paginated_response.py">MessageListPaginatedResponse</a></code>
 
 ## Batch
 

@@ -15,12 +15,7 @@ from .batch import (
     BatchResourceWithStreamingResponse,
     AsyncBatchResourceWithStreamingResponse,
 )
-from ...types import (
-    message_list_params,
-    message_create_params,
-    message_update_params,
-    message_list_paginated_params,
-)
+from ...types import message_list_params, message_create_params, message_update_params
 from ..._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
 from ..._utils import maybe_transform, async_maybe_transform
 from ..._compat import cached_property
@@ -35,7 +30,6 @@ from ..._base_client import make_request_options
 from ...types.task_message import TaskMessage
 from ...types.message_list_response import MessageListResponse
 from ...types.task_message_content_param import TaskMessageContentParam
-from ...types.message_list_paginated_response import MessageListPaginatedResponse
 
 __all__ = ["MessagesResource", "AsyncMessagesResource"]
 
@@ -198,10 +192,7 @@ class MessagesResource(SyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> MessageListResponse:
         """
-        List messages for a task with offset-based pagination.
-
-        For cursor-based pagination with infinite scroll support, use
-        /messages/paginated.
+        List Messages
 
         Args:
           task_id: The task ID
@@ -233,70 +224,6 @@ class MessagesResource(SyncAPIResource):
                 ),
             ),
             cast_to=MessageListResponse,
-        )
-
-    def list_paginated(
-        self,
-        *,
-        task_id: str,
-        cursor: Optional[str] | Omit = omit,
-        direction: Literal["older", "newer"] | Omit = omit,
-        limit: int | Omit = omit,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> MessageListPaginatedResponse:
-        """
-        List messages for a task with cursor-based pagination.
-
-        This endpoint is designed for infinite scroll UIs where new messages may arrive
-        while paginating through older ones.
-
-        Args: task_id: The task ID to filter messages by limit: Maximum number of
-        messages to return (default: 50) cursor: Opaque cursor string for pagination.
-        Pass the `next_cursor` from a previous response to get the next page. direction:
-        Pagination direction - "older" to get older messages (default), "newer" to get
-        newer messages.
-
-        Returns: PaginatedMessagesResponse with: - data: List of messages (newest first
-        when direction="older") - next_cursor: Cursor for fetching the next page (null
-        if no more pages) - has_more: Whether there are more messages to fetch
-
-        Example: First request: GET /messages/paginated?task_id=xxx&limit=50 Next page:
-        GET /messages/paginated?task_id=xxx&limit=50&cursor=<next_cursor>
-
-        Args:
-          task_id: The task ID
-
-          extra_headers: Send extra headers
-
-          extra_query: Add additional query parameters to the request
-
-          extra_body: Add additional JSON properties to the request
-
-          timeout: Override the client-level default timeout for this request, in seconds
-        """
-        return self._get(
-            "/messages/paginated",
-            options=make_request_options(
-                extra_headers=extra_headers,
-                extra_query=extra_query,
-                extra_body=extra_body,
-                timeout=timeout,
-                query=maybe_transform(
-                    {
-                        "task_id": task_id,
-                        "cursor": cursor,
-                        "direction": direction,
-                        "limit": limit,
-                    },
-                    message_list_paginated_params.MessageListPaginatedParams,
-                ),
-            ),
-            cast_to=MessageListPaginatedResponse,
         )
 
 
@@ -458,10 +385,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> MessageListResponse:
         """
-        List messages for a task with offset-based pagination.
-
-        For cursor-based pagination with infinite scroll support, use
-        /messages/paginated.
+        List Messages
 
         Args:
           task_id: The task ID
@@ -495,70 +419,6 @@ class AsyncMessagesResource(AsyncAPIResource):
             cast_to=MessageListResponse,
         )
 
-    async def list_paginated(
-        self,
-        *,
-        task_id: str,
-        cursor: Optional[str] | Omit = omit,
-        direction: Literal["older", "newer"] | Omit = omit,
-        limit: int | Omit = omit,
-        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
-        # The extra values given here take precedence over values defined on the client or passed to this method.
-        extra_headers: Headers | None = None,
-        extra_query: Query | None = None,
-        extra_body: Body | None = None,
-        timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> MessageListPaginatedResponse:
-        """
-        List messages for a task with cursor-based pagination.
-
-        This endpoint is designed for infinite scroll UIs where new messages may arrive
-        while paginating through older ones.
-
-        Args: task_id: The task ID to filter messages by limit: Maximum number of
-        messages to return (default: 50) cursor: Opaque cursor string for pagination.
-        Pass the `next_cursor` from a previous response to get the next page. direction:
-        Pagination direction - "older" to get older messages (default), "newer" to get
-        newer messages.
-
-        Returns: PaginatedMessagesResponse with: - data: List of messages (newest first
-        when direction="older") - next_cursor: Cursor for fetching the next page (null
-        if no more pages) - has_more: Whether there are more messages to fetch
-
-        Example: First request: GET /messages/paginated?task_id=xxx&limit=50 Next page:
-        GET /messages/paginated?task_id=xxx&limit=50&cursor=<next_cursor>
-
-        Args:
-          task_id: The task ID
-
-          extra_headers: Send extra headers
-
-          extra_query: Add additional query parameters to the request
-
-          extra_body: Add additional JSON properties to the request
-
-          timeout: Override the client-level default timeout for this request, in seconds
-        """
-        return await self._get(
-            "/messages/paginated",
-            options=make_request_options(
-                extra_headers=extra_headers,
-                extra_query=extra_query,
-                extra_body=extra_body,
-                timeout=timeout,
-                query=await async_maybe_transform(
-                    {
-                        "task_id": task_id,
-                        "cursor": cursor,
-                        "direction": direction,
-                        "limit": limit,
-                    },
-                    message_list_paginated_params.MessageListPaginatedParams,
-                ),
-            ),
-            cast_to=MessageListPaginatedResponse,
-        )
-
 
 class MessagesResourceWithRawResponse:
     def __init__(self, messages: MessagesResource) -> None:
@@ -575,9 +435,6 @@ class MessagesResourceWithRawResponse:
         )
         self.list = to_raw_response_wrapper(
             messages.list,
-        )
-        self.list_paginated = to_raw_response_wrapper(
-            messages.list_paginated,
         )
 
     @cached_property
@@ -601,9 +458,6 @@ class AsyncMessagesResourceWithRawResponse:
         self.list = async_to_raw_response_wrapper(
             messages.list,
         )
-        self.list_paginated = async_to_raw_response_wrapper(
-            messages.list_paginated,
-        )
 
     @cached_property
     def batch(self) -> AsyncBatchResourceWithRawResponse:
@@ -626,9 +480,6 @@ class MessagesResourceWithStreamingResponse:
         self.list = to_streamed_response_wrapper(
             messages.list,
         )
-        self.list_paginated = to_streamed_response_wrapper(
-            messages.list_paginated,
-        )
 
     @cached_property
     def batch(self) -> BatchResourceWithStreamingResponse:
@@ -650,9 +501,6 @@ class AsyncMessagesResourceWithStreamingResponse:
         )
         self.list = async_to_streamed_response_wrapper(
             messages.list,
-        )
-        self.list_paginated = async_to_streamed_response_wrapper(
-            messages.list_paginated,
         )
 
     @cached_property
