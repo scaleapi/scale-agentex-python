@@ -1,0 +1,56 @@
+import asyncio
+
+from agentex.lib.core.temporal.activities import get_all_activities
+from agentex.lib.core.temporal.workers.worker import AgentexWorker
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.debug import setup_debug_if_enabled
+from agentex.lib.environment_variables import EnvironmentVariables
+from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
+from datetime import timedelta
+from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import ContextInterceptor
+from agentex.lib.core.temporal.plugins.openai_agents.hooks.activities import stream_lifecycle_content
+from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model import (
+    TemporalStreamingModelProvider,
+)
+from project.workflow import {{ workflow_class }}
+from project.activities import get_weather
+
+environment_variables = EnvironmentVariables.refresh()
+
+logger = make_logger(__name__)
+
+
+async def main():
+    # Setup debug mode if enabled
+    setup_debug_if_enabled()
+
+    task_queue_name = environment_variables.WORKFLOW_TASK_QUEUE
+    if task_queue_name is None:
+        raise ValueError("WORKFLOW_TASK_QUEUE is not set")
+
+    # Register all activities here
+    # When you add new activities in activities.py, add them to this list
+    all_activities = get_all_activities() + [stream_lifecycle_content, get_weather]
+
+    context_interceptor = ContextInterceptor()
+    streaming_model_provider = TemporalStreamingModelProvider()
+
+    # Create a worker with automatic tracing
+    worker = AgentexWorker(
+        task_queue=task_queue_name,
+        plugins=[OpenAIAgentsPlugin(
+            model_params=ModelActivityParameters(
+                start_to_close_timeout=timedelta(days=1)
+            ),
+            model_provider=streaming_model_provider
+        )],
+        interceptors=[context_interceptor],
+    )
+
+    await worker.run(
+        activities=all_activities,
+        workflow={{ workflow_class }},
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())

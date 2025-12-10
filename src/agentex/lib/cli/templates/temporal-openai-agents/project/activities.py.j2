@@ -1,0 +1,116 @@
+"""
+Temporal Activities for OpenAI Agents SDK
+==========================================
+
+WHAT ARE ACTIVITIES?
+--------------------
+Activities are functions that perform non-deterministic operations - things that
+might have different results each time they run, such as:
+- API calls (weather services, databases, external services)
+- File I/O operations
+- Current time/date lookups
+- Random number generation
+- Any operation with side effects
+
+Temporal workflows must be deterministic (same input = same output every time).
+Activities let you safely perform non-deterministic work while Temporal handles
+retries, timeouts, and failure recovery automatically.
+
+
+HOW TO ADD NEW ACTIVITIES:
+--------------------------
+Adding a new activity requires 3 steps:
+
+1. DEFINE the activity in this file with the @activity.defn decorator:
+
+    @activity.defn
+    async def my_new_activity(param: str) -> str:
+        # Your non-deterministic logic here
+        return result
+
+2. REGISTER it in run_worker.py by adding to the activities list:
+
+    from project.activities import get_weather, my_new_activity
+
+    all_activities = get_all_activities() + [
+        stream_lifecycle_content,
+        get_weather,
+        my_new_activity,  # Add your new activity here
+    ]
+
+3. ADD it as a tool to your OpenAI agent in workflow.py:
+
+    from project.activities import get_weather, my_new_activity
+
+    agent = Agent(
+        name="...",
+        tools=[
+            openai_agents.workflow.activity_as_tool(
+                get_weather,
+                start_to_close_timeout=timedelta(minutes=5),
+            ),
+            openai_agents.workflow.activity_as_tool(
+                my_new_activity,  # Add your new activity as a tool
+                start_to_close_timeout=timedelta(minutes=5),
+            ),
+        ],
+    )
+
+
+RUNNING ACTIVITIES OUTSIDE OPENAI AGENT SDK:
+--------------------------------------------
+You can also call activities directly from your workflow without going through
+the OpenAI agent. This is useful for setup/teardown operations or when you need
+to run an activity before the agent starts:
+
+    from temporalio import workflow
+    from datetime import timedelta
+
+    # Inside your workflow method:
+    result = await workflow.execute_activity(
+        get_weather,
+        start_to_close_timeout=timedelta(minutes=5),
+    )
+
+For activities with parameters:
+
+    result = await workflow.execute_activity(
+        my_activity_with_params,
+        "param_value",  # positional args
+        start_to_close_timeout=timedelta(minutes=5),
+    )
+
+
+TEMPORAL DASHBOARD:
+-------------------
+Monitor your workflows and activities in real-time at:
+
+    http://localhost:8080
+
+The dashboard shows:
+- Running and completed workflows
+- Activity execution history
+- Retries and failures
+- Workflow state and signals
+"""
+
+from temporalio import activity
+
+from agentex.lib.utils.logging import make_logger
+
+logger = make_logger(__name__)
+
+
+@activity.defn
+async def get_weather() -> str:
+    """
+    Get the current weather.
+
+    This is a dummy activity that returns a hardcoded string for demo purposes.
+    Replace this with a real weather API call in your implementation.
+
+    Returns:
+        A string describing the current weather conditions.
+    """
+    logger.info("get_weather activity called")
+    return "Sunny, 72°F"

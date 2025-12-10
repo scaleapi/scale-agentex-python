@@ -23,6 +23,7 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 
 class TemplateType(str, Enum):
     TEMPORAL = "temporal"
+    TEMPORAL_OPENAI_AGENTS = "temporal-openai-agents"
     DEFAULT = "default"
     SYNC = "sync"
 
@@ -54,6 +55,7 @@ def create_project_structure(
     # Define project files based on template type
     project_files = {
         TemplateType.TEMPORAL: ["acp.py", "workflow.py", "run_worker.py"],
+        TemplateType.TEMPORAL_OPENAI_AGENTS: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
         TemplateType.DEFAULT: ["acp.py"],
         TemplateType.SYNC: ["acp.py"],
     }[template_type]
@@ -152,12 +154,25 @@ def init():
         "What type of template would you like to create?",
         choices=[
             {"name": "Async - ACP Only", "value": TemplateType.DEFAULT},
-            {"name": "Async - Temporal", "value": TemplateType.TEMPORAL},
+            {"name": "Async - Temporal", "value": "temporal_submenu"},
             {"name": "Sync ACP", "value": TemplateType.SYNC},
         ],
     ).ask()
     if not template_type:
         return
+
+    # If Temporal was selected, show sub-menu for Temporal variants
+    if template_type == "temporal_submenu":
+        console.print()
+        template_type = questionary.select(
+            "Which Temporal template would you like to use?",
+            choices=[
+                {"name": "Basic Temporal", "value": TemplateType.TEMPORAL},
+                {"name": "Temporal + OpenAI Agents SDK (Recommended)", "value": TemplateType.TEMPORAL_OPENAI_AGENTS},
+            ],
+        ).ask()
+        if not template_type:
+            return
 
     project_path = questionary.path(
         "Where would you like to create your project?", default="."

@@ -1,0 +1,169 @@
+import json
+import os
+
+from temporalio import workflow
+
+from agentex.lib import adk
+from agentex.lib.types.acp import CreateTaskParams, SendEventParams
+from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
+from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.environment_variables import EnvironmentVariables
+from agents import Agent, Runner
+from agentex.lib.core.temporal.plugins.openai_agents.hooks.hooks import TemporalStreamingHooks
+from pydantic import BaseModel
+from typing import List, Dict, Any
+from temporalio.contrib import openai_agents
+from project.activities import get_weather
+from agentex.lib.core.tracing.tracing_processor_manager import (
+    add_tracing_processor_config,
+)
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from datetime import timedelta
+
+
+environment_variables = EnvironmentVariables.refresh()
+
+if environment_variables.WORKFLOW_NAME is None:
+    raise ValueError("Environment variable WORKFLOW_NAME is not set")
+
+if environment_variables.AGENT_NAME is None:
+    raise ValueError("Environment variable AGENT_NAME is not set")
+
+logger = make_logger(__name__)
+
+# Setup tracing for SGP (Scale GenAI Platform)
+# This enables visibility into your agent's execution in the SGP dashboard
+add_tracing_processor_config(
+    SGPTracingProcessorConfig(
+        sgp_api_key=os.environ.get("SGP_API_KEY", ""),
+        sgp_account_id=os.environ.get("SGP_ACCOUNT_ID", ""),
+    )
+)
+
+
+class StateModel(BaseModel):
+    """
+    State model for preserving conversation history across turns.
+
+    This allows the agent to maintain context throughout the conversation,
+    making it possible to reference previous messages and build on the discussion.
+
+    Attributes:
+        input_list: The conversation history in OpenAI message format.
+        turn_number: Counter for tracking conversation turns (useful for tracing).
+    """
+
+    input_list: List[Dict[str, Any]]
+    turn_number: int
+
+
+class TurnInput(BaseModel):
+    """Input model for tracing spans."""
+    input_list: List[Dict[str, Any]]
+
+
+class TurnOutput(BaseModel):
+    """Output model for tracing spans."""
+    final_output: Any
+
+
+@workflow.defn(name=environment_variables.WORKFLOW_NAME)
+class {{ workflow_class }}(BaseWorkflow):
+    """
+    Workflow for {{ agent_name }} agent using OpenAI Agents SDK.
+
+    This workflow:
+    - Maintains conversation state across turns
+    - Creates tracing spans for each turn
+    - Runs an OpenAI agent with tools (activities)
+    - Streams responses back to the client
+    """
+
+    def __init__(self):
+        super().__init__(display_name=environment_variables.AGENT_NAME)
+        self._complete_task = False
+        self._state: StateModel = StateModel(input_list=[], turn_number=0)
+        self._task_id = None
+        self._trace_id = None
+        self._parent_span_id = None
+
+    @workflow.signal(name=SignalName.RECEIVE_EVENT)
+    async def on_task_event_send(self, params: SendEventParams) -> None:
+        logger.info(f"Received task message instruction: {params}")
+
+        # Increment turn number for tracing
+        self._state.turn_number += 1
+
+        self._task_id = params.task.id
+        self._trace_id = params.task.id
+        self._parent_span_id = params.task.id
+
+        # Add the user message to conversation history
+        self._state.input_list.append({"role": "user", "content": params.event.content.content})
+
+        # Echo back the client's message to show it in the UI
+        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+
+        temporal_streaming_hooks = TemporalStreamingHooks(task_id=params.task.id)
+
+        # Create a span to track this turn of the conversation
+        turn_input = TurnInput(
+            input_list=self._state.input_list,
+        )
+        async with adk.tracing.span(
+            trace_id=params.task.id,
+            name=f"Turn {self._state.turn_number}",
+            input=turn_input.model_dump(),
+        ) as span:
+            self._parent_span_id = span.id if span else None
+
+            # Create the OpenAI agent with tools
+            # Add your activities as tools using activity_as_tool()
+            agent = Agent(
+                name="{{ agent_name }}",
+                instructions="You are a helpful assistant. Use your tools to help the user.",
+                model="gpt-4o-mini",
+                tools=[
+                    openai_agents.workflow.activity_as_tool(
+                        get_weather,
+                        start_to_close_timeout=timedelta(minutes=5),
+                    ),
+                    # Add more tools here as you create new activities:
+                    # openai_agents.workflow.activity_as_tool(
+                    #     your_new_activity,
+                    #     start_to_close_timeout=timedelta(minutes=5),
+                    # ),
+                ],
+            )
+
+            # Run the agent with hooks to enable streaming responses
+            result = await Runner.run(agent, self._state.input_list, hooks=temporal_streaming_hooks)
+
+            # Update the state with the assistant's response for the next turn
+            self._state.input_list = result.to_input_list()  # type: ignore[assignment]
+
+            # Set span output for tracing - include full state
+            if span:
+                turn_output = TurnOutput(final_output=result.final_output)
+                span.output = turn_output.model_dump()
+
+    @workflow.run
+    async def on_task_create(self, params: CreateTaskParams) -> str:
+        logger.info(f"Received task create params: {params}")
+
+        # Acknowledge that the task has been created
+        await adk.messages.create(
+            task_id=params.task.id,
+            content=TextContent(
+                author="agent",
+                content=f"Hello! I'm {{ agent_name }}, your AI assistant. How can I help you today?\n\nParams received:\n{json.dumps(params.params, indent=2)}",
+            ),
+        )
+
+        await workflow.wait_condition(
+            lambda: self._complete_task,
+            timeout=None,
+        )
+        return "Task completed"
