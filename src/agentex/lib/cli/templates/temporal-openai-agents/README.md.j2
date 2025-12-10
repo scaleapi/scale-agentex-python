@@ -1,0 +1,224 @@
+# {{ agent_name }} - AgentEx Temporal + OpenAI Agents SDK Template
+
+This is a starter template for building AI agents with the AgentEx framework, Temporal workflows, and OpenAI Agents SDK. It provides a production-ready foundation with:
+
+- **Durable execution** via Temporal workflows
+- **AI agent capabilities** via OpenAI Agents SDK
+- **Tool use** via Temporal activities
+- **Streaming responses** for real-time feedback
+- **Conversation state management** across turns
+- **Tracing/observability** via SGP integration
+
+## What You'll Learn
+
+- **Tasks**: A task is a grouping mechanism for related messages (like a conversation thread)
+- **Messages**: Communication objects within a task (text, data, instructions)
+- **Temporal Workflows**: Long-running processes with state management and async operations
+- **Activities**: Non-deterministic operations (API calls, I/O) that Temporal can retry and recover
+- **OpenAI Agents SDK**: Building AI agents with tools, instructions, and streaming
+
+## Running the Agent
+
+1. Run the agent locally:
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+The agent will start on port 8000 and be ready to handle conversations.
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/                  # Your agent's code
+│   ├── __init__.py
+│   ├── acp.py               # ACP server with OpenAI plugin setup
+│   ├── workflow.py          # Temporal workflow with OpenAI agent
+│   ├── activities.py        # Temporal activities (tools for your agent)
+│   └── run_worker.py        # Temporal worker setup
+├── Dockerfile               # Container definition
+├── manifest.yaml            # Deployment config
+├── dev.ipynb                # Development notebook for testing
+{% if use_uv %}
+└── pyproject.toml          # Dependencies (uv)
+{% else %}
+└── requirements.txt         # Dependencies (pip)
+{% endif %}
+```
+
+## Key Concepts
+
+### Activities as Tools
+
+Activities are Temporal's way of handling non-deterministic operations. In this template, activities also serve as tools for your OpenAI agent:
+
+```python
+# In activities.py - define the activity
+@activity.defn
+async def get_weather() -> str:
+    return "Sunny, 72°F"
+
+# In workflow.py - use it as a tool for the agent
+agent = Agent(
+    name="my-agent",
+    tools=[
+        openai_agents.workflow.activity_as_tool(
+            get_weather,
+            start_to_close_timeout=timedelta(minutes=5),
+        ),
+    ],
+)
+```
+
+### Conversation State
+
+The workflow maintains conversation history across turns using `StateModel`:
+
+```python
+class StateModel(BaseModel):
+    input_list: List[Dict[str, Any]]  # Conversation history
+    turn_number: int                   # Turn counter for tracing
+```
+
+### Tracing
+
+Each conversation turn creates a tracing span for observability:
+
+```python
+async with adk.tracing.span(
+    trace_id=params.task.id,
+    name=f"Turn {self._state.turn_number}",
+    input=turn_input.model_dump(),
+) as span:
+    # Agent execution happens here
+```
+
+## Adding New Tools/Activities
+
+See the detailed instructions in `project/activities.py`. The process is:
+
+1. **Define** the activity in `activities.py`
+2. **Register** it in `run_worker.py`
+3. **Add** it as a tool in `workflow.py`
+
+## Temporal Dashboard
+
+Monitor your workflows and activities at:
+
+```
+http://localhost:8080
+```
+
+The dashboard shows:
+- Running and completed workflows
+- Activity execution history
+- Retries and failures
+- Workflow state and signals
+
+## Development
+
+### 1. Customize the Agent
+
+Edit `project/workflow.py` to change:
+- Agent instructions
+- Model (default: `gpt-4o-mini`)
+- Tools available to the agent
+
+### 2. Add New Activities
+
+See `project/activities.py` for detailed instructions on adding new tools.
+
+### 3. Test with the Development Notebook
+
+```bash
+jupyter notebook dev.ipynb
+# Or in VS Code
+code dev.ipynb
+```
+
+### 4. Manage Dependencies
+
+{% if use_uv %}
+```bash
+# Add new dependencies
+agentex uv add requests anthropic
+
+# Install/sync dependencies
+agentex uv sync
+```
+{% else %}
+```bash
+# Add to requirements.txt
+echo "requests" >> requirements.txt
+pip install -r requirements.txt
+```
+{% endif %}
+
+## Local Development
+
+### 1. Start the Agentex Backend
+```bash
+cd agentex
+make dev
+```
+
+### 2. Setup Your Agent's Environment
+```bash
+{% if use_uv %}
+agentex uv sync
+source .venv/bin/activate
+{% else %}
+pip install -r requirements.txt
+{% endif %}
+```
+
+### 3. Run Your Agent
+```bash
+export ENVIRONMENT=development
+agentex agents run --manifest manifest.yaml
+```
+
+### 4. Interact with Your Agent
+
+Via Web UI:
+```bash
+cd agentex-web
+make dev
+# Open http://localhost:3000
+```
+
+## Environment Variables
+
+For local development, create a `.env` file:
+
+```bash
+OPENAI_API_KEY=your-api-key
+SGP_API_KEY=your-sgp-key        # Optional: for tracing
+SGP_ACCOUNT_ID=your-account-id  # Optional: for tracing
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Agent not responding**
+   - Check if agent is running on port 8000
+   - Verify `ENVIRONMENT=development` is set
+   - Check logs for errors
+
+2. **Temporal workflow issues**
+   - Check Temporal Web UI at http://localhost:8080
+   - Verify Temporal server is running
+   - Check workflow logs
+
+3. **OpenAI API errors**
+   - Verify `OPENAI_API_KEY` is set
+   - Check API rate limits
+   - Verify model name is correct
+
+4. **Activity failures**
+   - Check activity logs in console
+   - Verify activity is registered in `run_worker.py`
+   - Check timeout settings
+
+Happy building with Temporal + OpenAI Agents SDK!
