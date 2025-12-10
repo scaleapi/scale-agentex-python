@@ -464,7 +464,7 @@ def _extract_tool_response_info(tool_map: dict[str, Any], tool_output_item: Any)
     return call_id, tool_name, content
 
 
-async def convert_openai_to_agentex_events_with_reasoning(stream_response):
+async def convert_openai_to_agentex_events(stream_response):
     """Convert OpenAI streaming events to AgentEx TaskMessageUpdate events with reasoning support.
     
     This is an enhanced version of the base converter that includes support for:
