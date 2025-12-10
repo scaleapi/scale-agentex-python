@@ -21,11 +21,13 @@ from openai.types.responses import (
     ResponseOutputItemDoneEvent,
     ResponseOutputItemAddedEvent,
     ResponseCodeInterpreterToolCall,
-    ResponseReasoningSummaryPartDoneEvent,
     ResponseReasoningSummaryPartAddedEvent,
     ResponseReasoningSummaryTextDeltaEvent,
 )
 from agents.models.openai_provider import OpenAIProvider
+from openai.types.responses.response_reasoning_text_done_event import ResponseReasoningTextDoneEvent
+from openai.types.responses.response_reasoning_text_delta_event import ResponseReasoningTextDeltaEvent
+from openai.types.responses.response_reasoning_summary_text_done_event import ResponseReasoningSummaryTextDoneEvent
 
 from agentex import AsyncAgentex
 from agentex.lib.utils.logging import make_logger
@@ -40,6 +42,8 @@ from agentex.types.task_message_update import (
 from agentex.types.task_message_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
+from agentex.types.reasoning_content_delta import ReasoningContentDelta
+from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 
 logger = make_logger(__name__)
 
@@ -460,14 +464,17 @@ def _extract_tool_response_info(tool_map: dict[str, Any], tool_output_item: Any)
     return call_id, tool_name, content
 
 
-async def convert_openai_to_agentex_events(stream_response):
-    """Convert OpenAI streaming events to AgentEx TaskMessageUpdate events.
-    This function takes an async iterator of OpenAI events and yields AgentEx
-    TaskMessageUpdate events based on the OpenAI event types.
+async def convert_openai_to_agentex_events_with_reasoning(stream_response):
+    """Convert OpenAI streaming events to AgentEx TaskMessageUpdate events with reasoning support.
+    
+    This is an enhanced version of the base converter that includes support for:
+    - Reasoning content deltas (for o1 models)
+    - Reasoning summary deltas (for o1 models)
+    
     Args:
         stream_response: An async iterator of OpenAI streaming events
     Yields:
-        TaskMessageUpdate: AgentEx streaming events (StreamTaskMessageDelta or StreamTaskMessageDone)
+        TaskMessageUpdate: AgentEx streaming events (StreamTaskMessageDelta, StreamTaskMessageFull, or StreamTaskMessageDone)
     """
 
     tool_map = {}
@@ -475,7 +482,7 @@ async def convert_openai_to_agentex_events(stream_response):
     message_index = 0  # Track message index for proper sequencing
     seen_tool_output = False  # Track if we've seen tool output to know when final text starts
     item_id_to_index = {}  # Map item_id to message index
-    current_reasoning_summary = ""  # Accumulate reasoning summary text
+    item_id_to_type = {}  # Map item_id to content type (text, reasoning_content, reasoning_summary)
 
     async for event in stream_response:
         event_count += 1
@@ -495,16 +502,107 @@ async def convert_openai_to_agentex_events(stream_response):
                 elif isinstance(raw_event, ResponseOutputItemDoneEvent):
                     item_id = raw_event.item.id
                     if item_id in item_id_to_index:
-                        # Send done event for this message
-                        yield StreamTaskMessageDone(
-                            type="done",
+                        # Get the message type to decide whether to send done event
+                        message_type = item_id_to_type.get(item_id, "text")
+                        
+                        # Don't send done events for reasoning content/summary
+                        # They just end with their last delta
+                        if message_type not in ("reasoning_content", "reasoning_summary"):
+                            yield StreamTaskMessageDone(
+                                type="done",
+                                index=item_id_to_index[item_id],
+                            )
+
+                # Skip reasoning summary part added events - we handle them on delta
+                elif isinstance(raw_event, ResponseReasoningSummaryPartAddedEvent):
+                    pass
+
+                # Handle reasoning summary text delta events
+                elif isinstance(raw_event, ResponseReasoningSummaryTextDeltaEvent):
+                    item_id = raw_event.item_id
+                    summary_index = raw_event.summary_index
+
+                    # If this is a new item_id we haven't seen, create a new message
+                    if item_id and item_id not in item_id_to_index:
+                        message_index += 1
+                        item_id_to_index[item_id] = message_index
+                        item_id_to_type[item_id] = "reasoning_summary"
+
+                        # Send a start event for this new reasoning summary message
+                        yield StreamTaskMessageStart(
+                            type="start",
                             index=item_id_to_index[item_id],
+                            content=TextContent(
+                                type="text",
+                                author="agent",
+                                content="",  # Start with empty content
+                            ),
                         )
 
-                # Skip reasoning summary events since o1 reasoning tokens are not accessible
-                elif isinstance(raw_event, (ResponseReasoningSummaryPartAddedEvent,
-                                            ResponseReasoningSummaryTextDeltaEvent,
-                                            ResponseReasoningSummaryPartDoneEvent)):
+                    # Use the index for this item_id
+                    current_index = item_id_to_index.get(item_id, message_index)
+
+                    # Yield reasoning summary delta
+                    yield StreamTaskMessageDelta(
+                        type="delta",
+                        index=current_index,
+                        delta=ReasoningSummaryDelta(
+                            type="reasoning_summary",
+                            summary_index=summary_index,
+                            summary_delta=raw_event.delta,
+                        ),
+                    )
+
+                # Handle reasoning summary text done events
+                elif isinstance(raw_event, ResponseReasoningSummaryTextDoneEvent):
+                    # We do NOT close the streaming context here
+                    # as there can be multiple reasoning summaries.
+                    # The context will be closed when the entire
+                    # output item is done (ResponseOutputItemDoneEvent)
+                    pass
+
+                # Handle reasoning content text delta events
+                elif isinstance(raw_event, ResponseReasoningTextDeltaEvent):
+                    item_id = raw_event.item_id
+                    content_index = raw_event.content_index
+
+                    # If this is a new item_id we haven't seen, create a new message
+                    if item_id and item_id not in item_id_to_index:
+                        message_index += 1
+                        item_id_to_index[item_id] = message_index
+                        item_id_to_type[item_id] = "reasoning_content"
+
+                        # Send a start event for this new reasoning content message
+                        yield StreamTaskMessageStart(
+                            type="start",
+                            index=item_id_to_index[item_id],
+                            content=TextContent(
+                                type="text",
+                                author="agent",
+                                content="",  # Start with empty content
+                            ),
+                        )
+
+                    # Use the index for this item_id
+                    current_index = item_id_to_index.get(item_id, message_index)
+
+                    # Yield reasoning content delta
+                    yield StreamTaskMessageDelta(
+                        type="delta",
+                        index=current_index,
+                        delta=ReasoningContentDelta(
+                            type="reasoning_content",
+                            content_index=content_index,
+                            content_delta=raw_event.delta,
+                        ),
+                    )
+
+                # Handle reasoning content text done events
+                elif isinstance(raw_event, ResponseReasoningTextDoneEvent):
+                    # We do NOT close the streaming context here
+                    # as there can be multiple reasoning content texts.
+                    # The context will be closed when the entire
+                    # output item is done (ResponseOutputItemDoneEvent)
                     pass
 
                 # Check if this is a text delta event from OpenAI
@@ -522,6 +620,8 @@ async def convert_openai_to_agentex_events(stream_response):
                             item_id_to_index[item_id] = message_index
                         else:
                             item_id_to_index[item_id] = message_index
+
+                        item_id_to_type[item_id] = "text"
 
                         # Send a start event with empty content for this new text message
                         yield StreamTaskMessageStart(
@@ -548,7 +648,7 @@ async def convert_openai_to_agentex_events(stream_response):
                     yield delta_message
 
         elif hasattr(event, 'type') and event.type == 'run_item_stream_event':
-            # Skip reasoning_item events since o1 reasoning tokens are not accessible via the API
+            # Skip reasoning_item events - they're handled via raw_response_event above
             if hasattr(event, 'item') and event.item.type == 'reasoning_item':
                 continue
 
@@ -587,3 +687,4 @@ async def convert_openai_to_agentex_events(stream_response):
                     index=message_index,
                     content=tool_response_content,
                 )
+
