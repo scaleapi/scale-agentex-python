@@ -9,7 +9,7 @@ description = "An AgentEx agent that does multiturn streaming chat"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "agentex-sdk==0.4.28",
+    "agentex-sdk",
     "scale-gp",
 ]
 
