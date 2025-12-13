@@ -12,7 +12,6 @@ from tests.utils import assert_matches_type
 from agentex.types import (
     TaskMessage,
     MessageListResponse,
-    MessageListPaginatedResponse,
 )
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
@@ -241,9 +240,6 @@ class TestMessages:
         message = client.messages.list(
             task_id="task_id",
             limit=0,
-            order_by="order_by",
-            order_direction="order_direction",
-            page_number=0,
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
 
@@ -270,51 +266,6 @@ class TestMessages:
 
             message = response.parse()
             assert_matches_type(MessageListResponse, message, path=["response"])
-
-        assert cast(Any, response.is_closed) is True
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    def test_method_list_paginated(self, client: Agentex) -> None:
-        message = client.messages.list_paginated(
-            task_id="task_id",
-        )
-        assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    def test_method_list_paginated_with_all_params(self, client: Agentex) -> None:
-        message = client.messages.list_paginated(
-            task_id="task_id",
-            cursor="cursor",
-            direction="older",
-            limit=0,
-        )
-        assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    def test_raw_response_list_paginated(self, client: Agentex) -> None:
-        response = client.messages.with_raw_response.list_paginated(
-            task_id="task_id",
-        )
-
-        assert response.is_closed is True
-        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
-        message = response.parse()
-        assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    def test_streaming_response_list_paginated(self, client: Agentex) -> None:
-        with client.messages.with_streaming_response.list_paginated(
-            task_id="task_id",
-        ) as response:
-            assert not response.is_closed
-            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
-
-            message = response.parse()
-            assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -544,9 +495,6 @@ class TestAsyncMessages:
         message = await async_client.messages.list(
             task_id="task_id",
             limit=0,
-            order_by="order_by",
-            order_direction="order_direction",
-            page_number=0,
         )
         assert_matches_type(MessageListResponse, message, path=["response"])
 
@@ -573,50 +521,5 @@ class TestAsyncMessages:
 
             message = await response.parse()
             assert_matches_type(MessageListResponse, message, path=["response"])
-
-        assert cast(Any, response.is_closed) is True
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    async def test_method_list_paginated(self, async_client: AsyncAgentex) -> None:
-        message = await async_client.messages.list_paginated(
-            task_id="task_id",
-        )
-        assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    async def test_method_list_paginated_with_all_params(self, async_client: AsyncAgentex) -> None:
-        message = await async_client.messages.list_paginated(
-            task_id="task_id",
-            cursor="cursor",
-            direction="older",
-            limit=0,
-        )
-        assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    async def test_raw_response_list_paginated(self, async_client: AsyncAgentex) -> None:
-        response = await async_client.messages.with_raw_response.list_paginated(
-            task_id="task_id",
-        )
-
-        assert response.is_closed is True
-        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
-        message = await response.parse()
-        assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    async def test_streaming_response_list_paginated(self, async_client: AsyncAgentex) -> None:
-        async with async_client.messages.with_streaming_response.list_paginated(
-            task_id="task_id",
-        ) as response:
-            assert not response.is_closed
-            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
-
-            message = await response.parse()
-            assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
 
         assert cast(Any, response.is_closed) is True

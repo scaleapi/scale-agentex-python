@@ -1,35 +1,10 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import Dict, List, Optional
-from datetime import datetime
-from typing_extensions import Literal, TypeAlias
+from typing import List
+from typing_extensions import TypeAlias
 
-from .agent import Agent
-from .._models import BaseModel
+from .task import Task
 
-__all__ = ["TaskListResponse", "TaskListResponseItem"]
+__all__ = ["TaskListResponse"]
 
-
-class TaskListResponseItem(BaseModel):
-    """Task response model with optional related data based on relationships"""
-
-    id: str
-
-    agents: Optional[List[Agent]] = None
-
-    created_at: Optional[datetime] = None
-
-    name: Optional[str] = None
-
-    params: Optional[Dict[str, object]] = None
-
-    status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]] = None
-
-    status_reason: Optional[str] = None
-
-    task_metadata: Optional[Dict[str, object]] = None
-
-    updated_at: Optional[datetime] = None
-
-
-TaskListResponse: TypeAlias = List[TaskListResponseItem]
+TaskListResponse: TypeAlias = List[Task]

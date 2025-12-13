@@ -9,11 +9,7 @@ import pytest
 
 from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
-from agentex.types import (
-    TaskListResponse,
-    TaskRetrieveResponse,
-    TaskRetrieveByNameResponse,
-)
+from agentex.types import Task, TaskListResponse
 from agentex.types.shared import DeleteResponse
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
@@ -26,42 +22,33 @@ class TestTasks:
     @parametrize
     def test_method_retrieve(self, client: Agentex) -> None:
         task = client.tasks.retrieve(
-            task_id="task_id",
+            "task_id",
         )
-        assert_matches_type(TaskRetrieveResponse, task, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    def test_method_retrieve_with_all_params(self, client: Agentex) -> None:
-        task = client.tasks.retrieve(
-            task_id="task_id",
-            relationships=["agents"],
-        )
-        assert_matches_type(TaskRetrieveResponse, task, path=["response"])
+        assert_matches_type(Task, task, path=["response"])
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
     def test_raw_response_retrieve(self, client: Agentex) -> None:
         response = client.tasks.with_raw_response.retrieve(
-            task_id="task_id",
+            "task_id",
         )
 
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         task = response.parse()
-        assert_matches_type(TaskRetrieveResponse, task, path=["response"])
+        assert_matches_type(Task, task, path=["response"])
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
     def test_streaming_response_retrieve(self, client: Agentex) -> None:
         with client.tasks.with_streaming_response.retrieve(
-            task_id="task_id",
+            "task_id",
         ) as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             task = response.parse()
-            assert_matches_type(TaskRetrieveResponse, task, path=["response"])
+            assert_matches_type(Task, task, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -70,7 +57,7 @@ class TestTasks:
     def test_path_params_retrieve(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             client.tasks.with_raw_response.retrieve(
-                task_id="",
+                "",
             )
 
     @pytest.mark.skip(reason="Prism tests are disabled")
@@ -85,11 +72,6 @@ class TestTasks:
         task = client.tasks.list(
             agent_id="agent_id",
             agent_name="agent_name",
-            limit=0,
-            order_by="order_by",
-            order_direction="order_direction",
-            page_number=0,
-            relationships=["agents"],
         )
         assert_matches_type(TaskListResponse, task, path=["response"])
 
@@ -203,42 +185,33 @@ class TestTasks:
     @parametrize
     def test_method_retrieve_by_name(self, client: Agentex) -> None:
         task = client.tasks.retrieve_by_name(
-            task_name="task_name",
+            "task_name",
         )
-        assert_matches_type(TaskRetrieveByNameResponse, task, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    def test_method_retrieve_by_name_with_all_params(self, client: Agentex) -> None:
-        task = client.tasks.retrieve_by_name(
-            task_name="task_name",
-            relationships=["agents"],
-        )
-        assert_matches_type(TaskRetrieveByNameResponse, task, path=["response"])
+        assert_matches_type(Task, task, path=["response"])
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
     def test_raw_response_retrieve_by_name(self, client: Agentex) -> None:
         response = client.tasks.with_raw_response.retrieve_by_name(
-            task_name="task_name",
+            "task_name",
         )
 
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         task = response.parse()
-        assert_matches_type(TaskRetrieveByNameResponse, task, path=["response"])
+        assert_matches_type(Task, task, path=["response"])
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
     def test_streaming_response_retrieve_by_name(self, client: Agentex) -> None:
         with client.tasks.with_streaming_response.retrieve_by_name(
-            task_name="task_name",
+            "task_name",
         ) as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             task = response.parse()
-            assert_matches_type(TaskRetrieveByNameResponse, task, path=["response"])
+            assert_matches_type(Task, task, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -247,7 +220,7 @@ class TestTasks:
     def test_path_params_retrieve_by_name(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_name` but received ''"):
             client.tasks.with_raw_response.retrieve_by_name(
-                task_name="",
+                "",
             )
 
     @pytest.mark.skip(reason="Prism tests are disabled")
@@ -342,42 +315,33 @@ class TestAsyncTasks:
     @parametrize
     async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
         task = await async_client.tasks.retrieve(
-            task_id="task_id",
+            "task_id",
         )
-        assert_matches_type(TaskRetrieveResponse, task, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    async def test_method_retrieve_with_all_params(self, async_client: AsyncAgentex) -> None:
-        task = await async_client.tasks.retrieve(
-            task_id="task_id",
-            relationships=["agents"],
-        )
-        assert_matches_type(TaskRetrieveResponse, task, path=["response"])
+        assert_matches_type(Task, task, path=["response"])
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
     async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tasks.with_raw_response.retrieve(
-            task_id="task_id",
+            "task_id",
         )
 
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         task = await response.parse()
-        assert_matches_type(TaskRetrieveResponse, task, path=["response"])
+        assert_matches_type(Task, task, path=["response"])
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
     async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
         async with async_client.tasks.with_streaming_response.retrieve(
-            task_id="task_id",
+            "task_id",
         ) as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             task = await response.parse()
-            assert_matches_type(TaskRetrieveResponse, task, path=["response"])
+            assert_matches_type(Task, task, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -386,7 +350,7 @@ class TestAsyncTasks:
     async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             await async_client.tasks.with_raw_response.retrieve(
-                task_id="",
+                "",
             )
 
     @pytest.mark.skip(reason="Prism tests are disabled")
@@ -401,11 +365,6 @@ class TestAsyncTasks:
         task = await async_client.tasks.list(
             agent_id="agent_id",
             agent_name="agent_name",
-            limit=0,
-            order_by="order_by",
-            order_direction="order_direction",
-            page_number=0,
-            relationships=["agents"],
         )
         assert_matches_type(TaskListResponse, task, path=["response"])
 
@@ -519,42 +478,33 @@ class TestAsyncTasks:
     @parametrize
     async def test_method_retrieve_by_name(self, async_client: AsyncAgentex) -> None:
         task = await async_client.tasks.retrieve_by_name(
-            task_name="task_name",
+            "task_name",
         )
-        assert_matches_type(TaskRetrieveByNameResponse, task, path=["response"])
-
-    @pytest.mark.skip(reason="Prism tests are disabled")
-    @parametrize
-    async def test_method_retrieve_by_name_with_all_params(self, async_client: AsyncAgentex) -> None:
-        task = await async_client.tasks.retrieve_by_name(
-            task_name="task_name",
-            relationships=["agents"],
-        )
-        assert_matches_type(TaskRetrieveByNameResponse, task, path=["response"])
+        assert_matches_type(Task, task, path=["response"])
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
     async def test_raw_response_retrieve_by_name(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tasks.with_raw_response.retrieve_by_name(
-            task_name="task_name",
+            "task_name",
         )
 
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         task = await response.parse()
-        assert_matches_type(TaskRetrieveByNameResponse, task, path=["response"])
+        assert_matches_type(Task, task, path=["response"])
 
     @pytest.mark.skip(reason="Prism tests are disabled")
     @parametrize
     async def test_streaming_response_retrieve_by_name(self, async_client: AsyncAgentex) -> None:
         async with async_client.tasks.with_streaming_response.retrieve_by_name(
-            task_name="task_name",
+            "task_name",
         ) as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             task = await response.parse()
-            assert_matches_type(TaskRetrieveByNameResponse, task, path=["response"])
+            assert_matches_type(Task, task, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -563,7 +513,7 @@ class TestAsyncTasks:
     async def test_path_params_retrieve_by_name(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_name` but received ''"):
             await async_client.tasks.with_raw_response.retrieve_by_name(
-                task_name="",
+                "",
             )
 
     @pytest.mark.skip(reason="Prism tests are disabled")

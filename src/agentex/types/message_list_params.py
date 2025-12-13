@@ -12,10 +12,4 @@ class MessageListParams(TypedDict, total=False):
     task_id: Required[str]
     """The task ID"""
 
-    limit: int
-
-    order_by: Optional[str]
-
-    order_direction: str
-
-    page_number: int
+    limit: Optional[int]

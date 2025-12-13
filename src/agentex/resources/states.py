@@ -166,10 +166,6 @@ class StatesResource(SyncAPIResource):
         self,
         *,
         agent_id: Optional[str] | Omit = omit,
-        limit: int | Omit = omit,
-        order_by: Optional[str] | Omit = omit,
-        order_direction: str | Omit = omit,
-        page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -183,14 +179,6 @@ class StatesResource(SyncAPIResource):
 
         Args:
           agent_id: Agent ID
-
-          limit: Limit
-
-          order_by: Field to order by
-
-          order_direction: Order direction (asc or desc)
-
-          page_number: Page number
 
           task_id: Task ID
 
@@ -212,10 +200,6 @@ class StatesResource(SyncAPIResource):
                 query=maybe_transform(
                     {
                         "agent_id": agent_id,
-                        "limit": limit,
-                        "order_by": order_by,
-                        "order_direction": order_direction,
-                        "page_number": page_number,
                         "task_id": task_id,
                     },
                     state_list_params.StateListParams,
@@ -400,10 +384,6 @@ class AsyncStatesResource(AsyncAPIResource):
         self,
         *,
         agent_id: Optional[str] | Omit = omit,
-        limit: int | Omit = omit,
-        order_by: Optional[str] | Omit = omit,
-        order_direction: str | Omit = omit,
-        page_number: int | Omit = omit,
         task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -417,14 +397,6 @@ class AsyncStatesResource(AsyncAPIResource):
 
         Args:
           agent_id: Agent ID
-
-          limit: Limit
-
-          order_by: Field to order by
-
-          order_direction: Order direction (asc or desc)
-
-          page_number: Page number
 
           task_id: Task ID
 
@@ -446,10 +418,6 @@ class AsyncStatesResource(AsyncAPIResource):
                 query=await async_maybe_transform(
                     {
                         "agent_id": agent_id,
-                        "limit": limit,
-                        "order_by": order_by,
-                        "order_direction": order_direction,
-                        "page_number": page_number,
                         "task_id": task_id,
                     },
                     state_list_params.StateListParams,
