@@ -12,17 +12,5 @@ class StateListParams(TypedDict, total=False):
     agent_id: Optional[str]
     """Agent ID"""
 
-    limit: int
-    """Limit"""
-
-    order_by: Optional[str]
-    """Field to order by"""
-
-    order_direction: str
-    """Order direction (asc or desc)"""
-
-    page_number: int
-    """Page number"""
-
     task_id: Optional[str]
     """Task ID"""
