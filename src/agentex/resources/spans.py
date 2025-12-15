@@ -222,6 +222,10 @@ class SpansResource(SyncAPIResource):
     def list(
         self,
         *,
+        limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
+        page_number: int | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -249,7 +253,16 @@ class SpansResource(SyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=maybe_transform({"trace_id": trace_id}, span_list_params.SpanListParams),
+                query=maybe_transform(
+                    {
+                        "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
+                        "page_number": page_number,
+                        "trace_id": trace_id,
+                    },
+                    span_list_params.SpanListParams,
+                ),
             ),
             cast_to=SpanListResponse,
         )
@@ -452,6 +465,10 @@ class AsyncSpansResource(AsyncAPIResource):
     async def list(
         self,
         *,
+        limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
+        page_number: int | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -479,7 +496,16 @@ class AsyncSpansResource(AsyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=await async_maybe_transform({"trace_id": trace_id}, span_list_params.SpanListParams),
+                query=await async_maybe_transform(
+                    {
+                        "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
+                        "page_number": page_number,
+                        "trace_id": trace_id,
+                    },
+                    span_list_params.SpanListParams,
+                ),
             ),
             cast_to=SpanListResponse,
         )
