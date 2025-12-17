@@ -12,6 +12,9 @@ class MessageListParams(TypedDict, total=False):
     task_id: Required[str]
     """The task ID"""
 
+    filters: Optional[str]
+    """JSON-encoded filter object"""
+
     limit: int
 
     order_by: Optional[str]

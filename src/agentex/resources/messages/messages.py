@@ -186,6 +186,7 @@ class MessagesResource(SyncAPIResource):
         self,
         *,
         task_id: str,
+        filters: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
         order_by: Optional[str] | Omit = omit,
         order_direction: str | Omit = omit,
@@ -206,6 +207,8 @@ class MessagesResource(SyncAPIResource):
         Args:
           task_id: The task ID
 
+          filters: JSON-encoded filter object
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -224,6 +227,7 @@ class MessagesResource(SyncAPIResource):
                 query=maybe_transform(
                     {
                         "task_id": task_id,
+                        "filters": filters,
                         "limit": limit,
                         "order_by": order_by,
                         "order_direction": order_direction,
@@ -241,6 +245,7 @@ class MessagesResource(SyncAPIResource):
         task_id: str,
         cursor: Optional[str] | Omit = omit,
         direction: Literal["older", "newer"] | Omit = omit,
+        filters: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -271,6 +276,8 @@ class MessagesResource(SyncAPIResource):
         Args:
           task_id: The task ID
 
+          filters: JSON-encoded filter object
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -291,6 +298,7 @@ class MessagesResource(SyncAPIResource):
                         "task_id": task_id,
                         "cursor": cursor,
                         "direction": direction,
+                        "filters": filters,
                         "limit": limit,
                     },
                     message_list_paginated_params.MessageListPaginatedParams,
@@ -446,6 +454,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         self,
         *,
         task_id: str,
+        filters: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
         order_by: Optional[str] | Omit = omit,
         order_direction: str | Omit = omit,
@@ -466,6 +475,8 @@ class AsyncMessagesResource(AsyncAPIResource):
         Args:
           task_id: The task ID
 
+          filters: JSON-encoded filter object
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -484,6 +495,7 @@ class AsyncMessagesResource(AsyncAPIResource):
                 query=await async_maybe_transform(
                     {
                         "task_id": task_id,
+                        "filters": filters,
                         "limit": limit,
                         "order_by": order_by,
                         "order_direction": order_direction,
@@ -501,6 +513,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         task_id: str,
         cursor: Optional[str] | Omit = omit,
         direction: Literal["older", "newer"] | Omit = omit,
+        filters: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -531,6 +544,8 @@ class AsyncMessagesResource(AsyncAPIResource):
         Args:
           task_id: The task ID
 
+          filters: JSON-encoded filter object
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -551,6 +566,7 @@ class AsyncMessagesResource(AsyncAPIResource):
                         "task_id": task_id,
                         "cursor": cursor,
                         "direction": direction,
+                        "filters": filters,
                         "limit": limit,
                     },
                     message_list_paginated_params.MessageListPaginatedParams,

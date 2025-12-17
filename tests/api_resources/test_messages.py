@@ -241,6 +241,7 @@ class TestMessages:
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         message = client.messages.list(
             task_id="task_id",
+            filters="filters",
             limit=0,
             order_by="order_by",
             order_direction="order_direction",
@@ -289,6 +290,7 @@ class TestMessages:
             task_id="task_id",
             cursor="cursor",
             direction="older",
+            filters="filters",
             limit=0,
         )
         assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
@@ -544,6 +546,7 @@ class TestAsyncMessages:
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         message = await async_client.messages.list(
             task_id="task_id",
+            filters="filters",
             limit=0,
             order_by="order_by",
             order_direction="order_direction",
@@ -592,6 +595,7 @@ class TestAsyncMessages:
             task_id="task_id",
             cursor="cursor",
             direction="older",
+            filters="filters",
             limit=0,
         )
         assert_matches_type(MessageListPaginatedResponse, message, path=["response"])
