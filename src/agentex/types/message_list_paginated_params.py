@@ -16,4 +16,7 @@ class MessageListPaginatedParams(TypedDict, total=False):
 
     direction: Literal["older", "newer"]
 
+    filters: Optional[str]
+    """JSON-encoded filter object"""
+
     limit: int
