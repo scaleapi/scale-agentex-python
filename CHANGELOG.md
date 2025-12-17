@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.0 (2025-12-17)
+
+Full Changelog: [v0.7.4...v0.8.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.7.4...v0.8.0)
+
+### Features
+
+* **api:** api update ([2e4ec2f](https://github.com/scaleapi/scale-agentex-python/commit/2e4ec2f28413ee58afa664b793565d6be4da5dfe))
+
+
+### Bug Fixes
+
+* use async_to_httpx_files in patch method ([8abb539](https://github.com/scaleapi/scale-agentex-python/commit/8abb539a340af3a2a42482757412c0c408817461))
+
 ## 0.7.4 (2025-12-17)
 
 Full Changelog: [v0.7.3...v0.7.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.7.3...v0.7.4)
