@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.4 (2025-12-17)
+
+Full Changelog: [v0.7.3...v0.7.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.7.3...v0.7.4)
+
+### Features
+
+* **api:** api update ([ed21ad8](https://github.com/scaleapi/scale-agentex-python/commit/ed21ad8c34cd11e80af9128181764489a0541740))
+* **api:** api update ([86a166a](https://github.com/scaleapi/scale-agentex-python/commit/86a166aba5538411ebcc0ed74291505e01a466f2))
+* **api:** api update ([4c95c94](https://github.com/scaleapi/scale-agentex-python/commit/4c95c94df570277fc49281f1343cb012e8da2334))
+
+
+### Chores
+
+* **internal:** add missing files argument to base client ([28d1738](https://github.com/scaleapi/scale-agentex-python/commit/28d1738d3af8feb00f6f641e159221fb41c42983))
+* speedup initial import ([8e50946](https://github.com/scaleapi/scale-agentex-python/commit/8e50946321c32e42a7b25cf9ae8b8e9b020a7ac9))
+
 ## 0.7.3 (2025-12-10)
 
 Full Changelog: [v0.7.2...v0.7.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.7.2...v0.7.3)
