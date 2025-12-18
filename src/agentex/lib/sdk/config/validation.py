@@ -45,16 +45,19 @@ def validate_environments_config(
     """
     # Check for required environments
     if required_environments:
+        # this must exist as a top-level key or via the environment indicator
         missing_envs: List[str] = []
+        environment_mappings = [env.environment for env in environments_config.environments.values() if env.environment]
+        top_level_envs = [env for env in environments_config.environments]
+        all_envs = set(environment_mappings + top_level_envs)
         for env_name in required_environments:
-            if env_name not in environments_config.environments:
+            if env_name not in all_envs:
                 missing_envs.append(env_name)
 
         if missing_envs:
-            available_envs = list(environments_config.environments.keys())
             raise EnvironmentsValidationError(
                 f"Missing required environments: {', '.join(missing_envs)}. "
-                f"Available environments: {', '.join(available_envs)}"
+                f"Available environments: {', '.join(all_envs)}"
             )
 
     # if environment mappings are set, you cannot have a top-level env_name that maps to an `environment: value`
