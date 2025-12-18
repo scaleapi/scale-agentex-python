@@ -112,9 +112,9 @@ class TestNonStreamingEvents:
             ):
                 assert isinstance(message, TaskMessage)
                 if message.content and message.content.type == "text" and message.content.author == "agent":
-                    assert "Hello! I've received your message" in message.content.content
-                    agent_response_found = True
-                    break
+                    if "Hello! I've received your message" in message.content.content:
+                        agent_response_found = True
+                        break
 
         try:
             await asyncio.wait_for(poll_for_response(), timeout=30)

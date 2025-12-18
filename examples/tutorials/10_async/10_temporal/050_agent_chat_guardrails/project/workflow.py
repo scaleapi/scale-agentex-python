@@ -15,12 +15,12 @@ from openai.types.shared import Reasoning
 
 from agentex.lib import adk
 from agentex.lib.types.acp import SendEventParams, CreateTaskParams
-from agentex.lib.adk.models import ModelSettings
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.utils.model_utils import BaseModel
-from agentex.lib.core.base.run_context import RunContextWrapper
+
+from agents import ModelSettings, RunContextWrapper
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
@@ -36,6 +36,7 @@ from agentex.lib.core.temporal.activities.adk.providers.openai_activities import
 
 class GuardrailFunctionOutput(BaseModel):
     """Output from a guardrail function."""
+
     output_info: Dict[str, Any]
     tripwire_triggered: bool
 
@@ -99,10 +100,7 @@ async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG
         b = parsed_args.get("b")
 
         if operation is None or a is None or b is None:
-            return (
-                "Error: Missing required parameters. "
-                "Please provide 'operation', 'a', and 'b'."
-            )
+            return "Error: Missing required parameters. Please provide 'operation', 'a', and 'b'."
 
         # Convert to numbers
         try:
@@ -124,10 +122,7 @@ async def calculator(context: RunContextWrapper, args: str) -> str:  # noqa: ARG
             result = a / b
         else:
             supported_ops = "add, subtract, multiply, divide"
-            return (
-                f"Error: Unknown operation '{operation}'. "
-                f"Supported operations: {supported_ops}."
-            )
+            return f"Error: Unknown operation '{operation}'. Supported operations: {supported_ops}."
 
         # Format the result nicely
         if result == int(result):
@@ -160,9 +155,7 @@ To test:
 
 # Define the spaghetti guardrail function
 async def check_spaghetti_guardrail(
-    ctx: RunContextWrapper[None],
-    agent: Agent,
-    input: str | list
+    ctx: RunContextWrapper[None], agent: Agent, input: str | list
 ) -> GuardrailFunctionOutput:
     """
     A simple guardrail that checks if 'spaghetti' is mentioned in the input.
@@ -185,25 +178,22 @@ async def check_spaghetti_guardrail(
     return GuardrailFunctionOutput(
         output_info={
             "contains_spaghetti": contains_spaghetti,
-            "checked_text": (
-                input_text[:200] + "..."
-                if len(input_text) > 200 else input_text
-            ),
+            "checked_text": (input_text[:200] + "..." if len(input_text) > 200 else input_text),
             "rejection_message": (
                 "I'm sorry, but I cannot process messages about spaghetti. "
                 "This guardrail was put in place for demonstration purposes. "
                 "Please ask me about something else!"
-            ) if contains_spaghetti else None
+            )
+            if contains_spaghetti
+            else None,
         },
-        tripwire_triggered=contains_spaghetti
+        tripwire_triggered=contains_spaghetti,
     )
 
 
 # Define soup input guardrail function
 async def check_soup_guardrail(
-    ctx: RunContextWrapper[None],
-    agent: Agent,
-    input: str | list
+    ctx: RunContextWrapper[None], agent: Agent, input: str | list
 ) -> GuardrailFunctionOutput:
     """
     A guardrail that checks if 'soup' is mentioned in the input.
@@ -226,44 +216,33 @@ async def check_soup_guardrail(
     return GuardrailFunctionOutput(
         output_info={
             "contains_soup": contains_soup,
-            "checked_text": (
-                input_text[:200] + "..."
-                if len(input_text) > 200 else input_text
-            ),
+            "checked_text": (input_text[:200] + "..." if len(input_text) > 200 else input_text),
             "rejection_message": (
                 "I'm sorry, but I cannot process messages about soup. "
                 "This is a demonstration guardrail for testing purposes. "
                 "Please ask about something other than soup!"
-            ) if contains_soup else None
+            )
+            if contains_soup
+            else None,
         },
-        tripwire_triggered=contains_soup
+        tripwire_triggered=contains_soup,
     )
 
 
 # Create the input guardrails
-SPAGHETTI_GUARDRAIL = TemporalInputGuardrail(
-    guardrail_function=check_spaghetti_guardrail,
-    name="spaghetti_guardrail"
-)
+SPAGHETTI_GUARDRAIL = TemporalInputGuardrail(guardrail_function=check_spaghetti_guardrail, name="spaghetti_guardrail")
 
-SOUP_GUARDRAIL = TemporalInputGuardrail(
-    guardrail_function=check_soup_guardrail,
-    name="soup_guardrail"
-)
+SOUP_GUARDRAIL = TemporalInputGuardrail(guardrail_function=check_soup_guardrail, name="soup_guardrail")
 
 
 # Define pizza output guardrail function
-async def check_pizza_guardrail(
-    ctx: RunContextWrapper[None],
-    agent: Agent,
-    output: str
-) -> GuardrailFunctionOutput:
+async def check_pizza_guardrail(ctx: RunContextWrapper[None], agent: Agent, output: str) -> GuardrailFunctionOutput:
     """
     An output guardrail that prevents mentioning pizza.
     """
     output_text = output.lower() if isinstance(output, str) else ""
     contains_pizza = "pizza" in output_text
-    
+
     return GuardrailFunctionOutput(
         output_info={
             "contains_pizza": contains_pizza,
@@ -271,24 +250,22 @@ async def check_pizza_guardrail(
                 "I cannot provide this response as it mentions pizza. "
                 "Due to content policies, I need to avoid discussing pizza. "
                 "Let me provide a different response."
-            ) if contains_pizza else None
+            )
+            if contains_pizza
+            else None,
         },
-        tripwire_triggered=contains_pizza
+        tripwire_triggered=contains_pizza,
     )
 
 
 # Define sushi output guardrail function
-async def check_sushi_guardrail(
-    ctx: RunContextWrapper[None],
-    agent: Agent,
-    output: str
-) -> GuardrailFunctionOutput:
+async def check_sushi_guardrail(ctx: RunContextWrapper[None], agent: Agent, output: str) -> GuardrailFunctionOutput:
     """
     An output guardrail that prevents mentioning sushi.
     """
     output_text = output.lower() if isinstance(output, str) else ""
     contains_sushi = "sushi" in output_text
-    
+
     return GuardrailFunctionOutput(
         output_info={
             "contains_sushi": contains_sushi,
@@ -296,29 +273,23 @@ async def check_sushi_guardrail(
                 "I cannot mention sushi in my response. "
                 "This guardrail prevents discussions about sushi for demonstration purposes. "
                 "Please let me provide information about other topics."
-            ) if contains_sushi else None
+            )
+            if contains_sushi
+            else None,
         },
-        tripwire_triggered=contains_sushi
+        tripwire_triggered=contains_sushi,
     )
 
 
 # Create the output guardrails
-PIZZA_GUARDRAIL = TemporalOutputGuardrail(
-    guardrail_function=check_pizza_guardrail,
-    name="pizza_guardrail"
-)
+PIZZA_GUARDRAIL = TemporalOutputGuardrail(guardrail_function=check_pizza_guardrail, name="pizza_guardrail")
 
-SUSHI_GUARDRAIL = TemporalOutputGuardrail(
-    guardrail_function=check_sushi_guardrail,
-    name="sushi_guardrail"
-)
+SUSHI_GUARDRAIL = TemporalOutputGuardrail(guardrail_function=check_sushi_guardrail, name="sushi_guardrail")
 
 
 # Example output guardrail function (kept for reference)
 async def check_output_length_guardrail(
-    ctx: RunContextWrapper[None],
-    agent: Agent,
-    output: str
+    ctx: RunContextWrapper[None], agent: Agent, output: str
 ) -> GuardrailFunctionOutput:
     """
     A simple output guardrail that checks if the response is too long.
@@ -326,7 +297,7 @@ async def check_output_length_guardrail(
     # Check the length of the output
     max_length = 1000  # Maximum allowed characters
     is_too_long = len(output) > max_length if isinstance(output, str) else False
-    
+
     return GuardrailFunctionOutput(
         output_info={
             "output_length": len(output) if isinstance(output, str) else 0,
@@ -336,9 +307,11 @@ async def check_output_length_guardrail(
                 f"I'm sorry, but my response is too long ({len(output)} characters). "
                 f"Please ask a more specific question so I can provide a concise answer "
                 f"(max {max_length} characters)."
-            ) if is_too_long else None
+            )
+            if is_too_long
+            else None,
         },
-        tripwire_triggered=is_too_long
+        tripwire_triggered=is_too_long,
     )
 
 
@@ -353,10 +326,7 @@ async def check_output_length_guardrail(
 # Create the calculator tool
 CALCULATOR_TOOL = FunctionTool(
     name="calculator",
-    description=(
-        "Performs basic arithmetic operations (add, subtract, multiply, "
-        "divide) on two numbers."
-    ),
+    description=("Performs basic arithmetic operations (add, subtract, multiply, divide) on two numbers."),
     params_json_schema={
         "type": "object",
         "properties": {
@@ -390,16 +360,13 @@ class At050AgentChatGuardrailsWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-
         if not params.event.content:
             return
         if params.event.content.type != "text":
             raise ValueError(f"Expected text message, got {params.event.content.type}")
 
         if params.event.content.author != "user":
-            raise ValueError(
-                f"Expected user message, got {params.event.content.author}"
-            )
+            raise ValueError(f"Expected user message, got {params.event.content.author}")
 
         if self._state is None:
             raise ValueError("State is not initialized")
@@ -407,9 +374,7 @@ class At050AgentChatGuardrailsWorkflow(BaseWorkflow):
         # Increment the turn number
         self._state.turn_number += 1
         # Add the new user message to the message history
-        self._state.input_list.append(
-            {"role": "user", "content": params.event.content.content}
-        )
+        self._state.input_list.append({"role": "user", "content": params.event.content.content})
 
         async with adk.tracing.span(
             trace_id=params.task.id,
@@ -475,7 +440,7 @@ class At050AgentChatGuardrailsWorkflow(BaseWorkflow):
                 input_guardrails=[SPAGHETTI_GUARDRAIL, SOUP_GUARDRAIL],
                 output_guardrails=[PIZZA_GUARDRAIL, SUSHI_GUARDRAIL],
             )
-            
+
             # Update state with the final input list from result
             if self._state and result:
                 final_list = getattr(result, "final_input_list", None)
