@@ -292,9 +292,8 @@ def deploy_agent(
     check_and_switch_cluster_context(cluster_name)
 
     manifest = AgentManifest.from_yaml(file_path=manifest_path)
-
-    # Load agent environment configuration
     agent_env_config = None
+    # Load agent environment configuration
     if environment_name:
         manifest_dir = Path(manifest_path).parent
         environments_config = manifest.load_environments_config(manifest_dir)
