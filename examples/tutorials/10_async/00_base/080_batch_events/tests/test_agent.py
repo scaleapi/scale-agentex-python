@@ -75,19 +75,31 @@ class TestNonStreamingEvents:
 
         # Send an event and poll for response using the helper function
         # there should only be one message returned about batching
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message="Process this single event",
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            assert isinstance(message.content, TextContent)
-            assert "Processed event IDs" in message.content.content
-            assert message.content.author == "agent"
-            break
+        agent_response_found = False
+
+        async def poll_for_response() -> None:
+            nonlocal agent_response_found
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message="Process this single event",
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                assert isinstance(message, TaskMessage)
+                if message.content and message.content.author == "agent":
+                    assert isinstance(message.content, TextContent)
+                    assert "Processed event IDs" in message.content.content
+                    agent_response_found = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_response(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for agent response")
+
+        assert agent_response_found, "Agent response not found"
 
     @pytest.mark.asyncio
     async def test_send_multiple_events_batched(self, client: AsyncAgentex, agent_id: str):
@@ -109,19 +121,26 @@ class TestNonStreamingEvents:
         ## there should be at least 2 agent responses to ensure that not all of the events are processed
         ## in the same message
         agent_messages = []
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message="Process this single event",
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            if message.content and message.content.author == "agent":
-                agent_messages.append(message)
 
-            if len(agent_messages) == 2:
-                break
+        async def poll_for_batch_responses() -> None:
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message="Process this single event",
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                if message.content and message.content.author == "agent":
+                    agent_messages.append(message)
+
+                if len(agent_messages) == 2:
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_batch_responses(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for batch responses")
 
         assert len(agent_messages) > 0, "Should have received at least one agent response"
 

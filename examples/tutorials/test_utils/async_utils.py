@@ -221,8 +221,10 @@ async def stream_agent_response(
 
     except asyncio.TimeoutError:
         print(f"[DEBUG] Stream timed out after {timeout}s")
+        raise
     except Exception as e:
         print(f"[DEBUG] Stream error: {e}")
+        raise
 
 
 async def stream_task_messages(

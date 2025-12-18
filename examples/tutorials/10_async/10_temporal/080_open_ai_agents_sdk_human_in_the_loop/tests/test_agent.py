@@ -88,18 +88,30 @@ class TestNonStreamingEvents:
 
         # Poll for the initial task creation message
         print(f"[DEBUG 080 POLL] Polling for initial task creation message...")
-        async for message in poll_messages(
-            client=client,
-            task_id=task.id,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            if message.content and message.content.type == "text" and message.content.author == "agent":
-                # Check for the initial acknowledgment message
-                print(f"[DEBUG 080 POLL] Initial message: {message.content.content[:100]}")
-                assert "task" in message.content.content.lower() or "received" in message.content.content.lower()
-                break
+        task_creation_found = False
+
+        async def poll_for_task_creation() -> None:
+            nonlocal task_creation_found
+            async for message in poll_messages(
+                client=client,
+                task_id=task.id,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                assert isinstance(message, TaskMessage)
+                if message.content and message.content.type == "text" and message.content.author == "agent":
+                    # Check for the initial acknowledgment message
+                    print(f"[DEBUG 080 POLL] Initial message: {message.content.content[:100]}")
+                    assert "task" in message.content.content.lower() or "received" in message.content.content.lower()
+                    task_creation_found = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_task_creation(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for task creation message")
+
+        assert task_creation_found, "Task creation message not found"
 
         # Send an event asking to confirm an order (triggers human-in-the-loop)
         user_message = "Please confirm my order"
@@ -172,8 +184,8 @@ class TestNonStreamingEvents:
         try:
             await asyncio.wait_for(polling_task, timeout=60)
         except asyncio.TimeoutError:
-            print(f"[DEBUG 080 POLL] ⚠️ Polling timed out - workflow may still be waiting")
             polling_task.cancel()
+            pytest.fail("Polling timed out waiting for human-in-the-loop workflow to complete")
 
         # Verify that we saw the complete flow: tool_request -> human approval -> tool_response -> final answer
         assert seen_tool_request, "Expected to see tool_request message (agent calling wait_for_confirmation)"

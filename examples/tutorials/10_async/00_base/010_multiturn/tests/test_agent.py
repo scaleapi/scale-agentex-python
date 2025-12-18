@@ -89,25 +89,48 @@ class TestNonStreamingEvents:
 
         user_message = "Hello! Here is my test message"
         messages = []
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            messages.append(message)
-            if len(messages) == 1:
-                assert message.content == TextContent(
-                    author="user",
-                    content=user_message,
-                    type="text",
-                )
-            else:
-                assert message.content is not None
-                assert message.content.author == "agent"
-                break
+
+        # Flags to track what we've received
+        user_message_found = False
+        agent_response_found = False
+
+        async def poll_for_messages() -> None:
+            nonlocal user_message_found, agent_response_found
+
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message=user_message,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                messages.append(message)
+
+                # Validate messages as they arrive
+                if message.content and hasattr(message.content, 'author'):
+                    if message.content.author == "user" and message.content.content == user_message:
+                        assert message.content == TextContent(
+                            author="user",
+                            content=user_message,
+                            type="text",
+                        )
+                        user_message_found = True
+                    elif message.content.author == "agent":
+                        assert user_message_found, "Agent response arrived before user message"
+                        agent_response_found = True
+
+                # Exit early if we've found all expected messages
+                if user_message_found and agent_response_found:
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_messages(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out after 30s waiting for expected messages")
+
+        assert user_message_found, "User message not found"
+        assert agent_response_found, "Agent response not found"
 
         await asyncio.sleep(1)  # wait for state to be updated
         states = await client.states.list(agent_id=agent_id, task_id=task.id)

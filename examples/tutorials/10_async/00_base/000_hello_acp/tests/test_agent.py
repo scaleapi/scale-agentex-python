@@ -73,31 +73,55 @@ class TestNonStreamingEvents:
         assert task is not None
 
         # Poll for the initial task creation message
-        async for message in poll_messages(
-            client=client,
-            task_id=task.id,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            if message.content and message.content.type == "text" and message.content.author == "agent":
-                assert "Hello! I've received your task" in message.content.content
-                break
+        task_creation_message_found = False
+
+        async def poll_for_task_creation() -> None:
+            nonlocal task_creation_message_found
+            async for message in poll_messages(
+                client=client,
+                task_id=task.id,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                assert isinstance(message, TaskMessage)
+                if message.content and message.content.type == "text" and message.content.author == "agent":
+                    assert "Hello! I've received your task" in message.content.content
+                    task_creation_message_found = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_task_creation(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for task creation message")
+
+        assert task_creation_message_found, "Task creation message not found"
 
         # Send an event and poll for response
         user_message = "Hello, this is a test message!"
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            if message.content and message.content.type == "text" and message.content.author == "agent":
-                assert "Hello! I've received your task" in message.content.content
-                break
+        agent_response_found = False
+
+        async def poll_for_response() -> None:
+            nonlocal agent_response_found
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message=user_message,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                assert isinstance(message, TaskMessage)
+                if message.content and message.content.type == "text" and message.content.author == "agent":
+                    assert "Hello! I've received your message" in message.content.content
+                    agent_response_found = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_response(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for agent response")
+
+        assert agent_response_found, "Agent response not found"
 
 
 class TestStreamingEvents:
@@ -111,18 +135,26 @@ class TestStreamingEvents:
 
         assert task is not None
         task_creation_found = False
+
         # Poll for the initial task creation message
-        async for message in poll_messages(
-            client=client,
-            task_id=task.id,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            if message.content and message.content.type == "text" and message.content.author == "agent":
-                assert "Hello! I've received your task" in message.content.content
-                task_creation_found = True
-                break
+        async def poll_for_task_creation() -> None:
+            nonlocal task_creation_found
+            async for message in poll_messages(
+                client=client,
+                task_id=task.id,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                assert isinstance(message, TaskMessage)
+                if message.content and message.content.type == "text" and message.content.author == "agent":
+                    assert "Hello! I've received your task" in message.content.content
+                    task_creation_found = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_task_creation(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for task creation message")
 
         assert task_creation_found, "Task creation message not found in poll"
 

@@ -94,24 +94,36 @@ class TestNonStreamingEvents:
         # Send a simple message that shouldn't require tool use
         user_message = "Hello! Please introduce yourself briefly."
         messages = []
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            messages.append(message)
+        user_message_found = False
 
-            if len(messages) == 1:
-                assert message.content == TextContent(
-                    author="user",
-                    content=user_message,
-                    type="text",
-                )
-                break
+        async def poll_for_messages() -> None:
+            nonlocal user_message_found
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message=user_message,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                assert isinstance(message, TaskMessage)
+                messages.append(message)
+
+                if message.content and message.content.author == "user":
+                    assert message.content == TextContent(
+                        author="user",
+                        content=user_message,
+                        type="text",
+                    )
+                    user_message_found = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_messages(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for user message")
+
+        assert user_message_found, "User message not found"
 
         # Verify state has been updated by polling the states for 10 seconds
         for i in range(20):
@@ -141,26 +153,33 @@ class TestNonStreamingEvents:
         tool_response_found = False
         has_final_agent_response = False
 
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message,
-            timeout=60,  # Longer timeout for tool use
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            if message.content and message.content.type == "tool_request":
-                tool_request_found = True
-                assert message.content.author == "agent"
-                assert hasattr(message.content, "name")
-                assert hasattr(message.content, "tool_call_id")
-            elif message.content and message.content.type == "tool_response":
-                tool_response_found = True
-                assert message.content.author == "agent"
-            elif message.content and message.content.type == "text" and message.content.author == "agent":
-                has_final_agent_response = True
-                break
+        async def poll_for_tool_response() -> None:
+            nonlocal tool_request_found, tool_response_found, has_final_agent_response
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message=user_message,
+                timeout=60,  # Longer timeout for tool use
+                sleep_interval=1.0,
+            ):
+                assert isinstance(message, TaskMessage)
+                if message.content and message.content.type == "tool_request":
+                    tool_request_found = True
+                    assert message.content.author == "agent"
+                    assert hasattr(message.content, "name")
+                    assert hasattr(message.content, "tool_call_id")
+                elif message.content and message.content.type == "tool_response":
+                    tool_response_found = True
+                    assert message.content.author == "agent"
+                elif message.content and message.content.type == "text" and message.content.author == "agent":
+                    has_final_agent_response = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_tool_response(), timeout=60)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for tool response")
 
         assert has_final_agent_response, "Did not receive final agent text response"
         assert tool_request_found, "Did not see tool request message"
@@ -176,24 +195,37 @@ class TestNonStreamingEvents:
 
         # ensure the task is created before we send the first event
         await asyncio.sleep(1)
+
         # First turn
         user_message_1 = "My favorite color is blue."
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message_1,
-            timeout=20,
-            sleep_interval=1.0,
-        ):
-            assert isinstance(message, TaskMessage)
-            if (
-                message.content
-                and message.content.type == "text"
-                and message.content.author == "agent"
-                and message.content.content
+        first_turn_response_found = False
+
+        async def poll_for_first_turn() -> None:
+            nonlocal first_turn_response_found
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message=user_message_1,
+                timeout=20,
+                sleep_interval=1.0,
             ):
-                break
+                assert isinstance(message, TaskMessage)
+                if (
+                    message.content
+                    and message.content.type == "text"
+                    and message.content.author == "agent"
+                    and message.content.content
+                ):
+                    first_turn_response_found = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_first_turn(), timeout=20)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for first turn response")
+
+        assert first_turn_response_found, "First turn response not found"
 
         ## keep polling the states for 10 seconds for the input_list and turn_number to be updated
         for i in range(30):
@@ -210,29 +242,38 @@ class TestNonStreamingEvents:
         assert state.get("turn_number") == 1
 
         await asyncio.sleep(1)
-        found_response = False
+
         # Second turn - reference previous context
         user_message_2 = "What did I just tell you my favorite color was?"
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message_2,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            if (
-                message.content
-                and message.content.type == "text"
-                and message.content.author == "agent"
-                and message.content.content
-            ):
-                response_text = message.content.content.lower()
-                assert "blue" in response_text
-                found_response = True
-                break
+        second_turn_response_found = False
 
-        assert found_response, "Did not receive final agent text response"
+        async def poll_for_second_turn() -> None:
+            nonlocal second_turn_response_found
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message=user_message_2,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                if (
+                    message.content
+                    and message.content.type == "text"
+                    and message.content.author == "agent"
+                    and message.content.content
+                ):
+                    response_text = message.content.content.lower()
+                    assert "blue" in response_text
+                    second_turn_response_found = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_second_turn(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for second turn response")
+
+        assert second_turn_response_found, "Did not receive final agent text response"
         for i in range(10):
             if i == 9:
                 raise Exception("Timeout waiting for state updates")
@@ -296,8 +337,11 @@ class TestStreamingEvents:
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
 
-        # Wait for streaming to complete
-        await stream_task
+        # Wait for streaming to complete (with timeout)
+        try:
+            await asyncio.wait_for(stream_task, timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Stream timed out after 30s waiting for expected messages")
         assert user_message_found, "User message found in stream"
         ## keep polling the states for 10 seconds for the input_list and turn_number to be updated
         for i in range(10):
@@ -382,8 +426,11 @@ class TestStreamingEvents:
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
 
-        # Wait for streaming to complete
-        await stream_task
+        # Wait for streaming to complete (with timeout)
+        try:
+            await asyncio.wait_for(stream_task, timeout=60)
+        except asyncio.TimeoutError:
+            pytest.fail("Stream timed out after 60s waiting for expected messages")
 
         # Verify we saw tool usage (if the agent decided to use tools)
         # Note: The agent may or may not use tools depending on its reasoning

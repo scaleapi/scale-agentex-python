@@ -86,18 +86,26 @@ class TestNonStreamingEvents:
         user_message = "Hello! Please tell me the latest news about AI and AI startups."
         messages = []
         found_agent_message = False
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=user_message,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            ## we should expect to get a question from the agent
-            if message.content.type == "text" and message.content.author == "agent":
-                found_agent_message = True
-                break
+
+        async def poll_for_agent_message() -> None:
+            nonlocal found_agent_message
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message=user_message,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                ## we should expect to get a question from the agent
+                if message.content.type == "text" and message.content.author == "agent":
+                    found_agent_message = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_agent_message(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for agent message")
 
         assert found_agent_message, "Did not find an agent message"
 
@@ -106,20 +114,28 @@ class TestNonStreamingEvents:
         next_user_message = "I want to know what viral news came up and which startups failed, got acquired, or became very successful or popular in the last 3 months"
         starting_deep_research_message = False
         uses_tool_requests = False
-        async for message in send_event_and_poll_yielding(
-            client=client,
-            agent_id=agent_id,
-            task_id=task.id,
-            user_message=next_user_message,
-            timeout=30,
-            sleep_interval=1.0,
-        ):
-            if message.content.type == "text" and message.content.author == "agent":
-                if "starting deep research" in message.content.content.lower():
-                    starting_deep_research_message = True
-            if isinstance(message.content, ToolRequestContent):
-                uses_tool_requests = True
-                break
+
+        async def poll_for_research_response() -> None:
+            nonlocal starting_deep_research_message, uses_tool_requests
+            async for message in send_event_and_poll_yielding(
+                client=client,
+                agent_id=agent_id,
+                task_id=task.id,
+                user_message=next_user_message,
+                timeout=30,
+                sleep_interval=1.0,
+            ):
+                if message.content.type == "text" and message.content.author == "agent":
+                    if "starting deep research" in message.content.content.lower():
+                        starting_deep_research_message = True
+                if isinstance(message.content, ToolRequestContent):
+                    uses_tool_requests = True
+                    break
+
+        try:
+            await asyncio.wait_for(poll_for_research_response(), timeout=30)
+        except asyncio.TimeoutError:
+            pytest.fail("Polling timed out waiting for research response")
 
         assert starting_deep_research_message, "Did not start deep research"
         assert uses_tool_requests, "Did not use tool requests"
