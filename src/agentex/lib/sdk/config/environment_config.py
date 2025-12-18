@@ -168,7 +168,7 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
                 env_name for env_name in self.environments
             ]
             raise ValueError(
-                f"Environment '{env}' not found in environments.yaml. Available environments: {available_envs}"
+                f"Environment checking dif '{env}' not found in environments.yaml. Available environments: {available_envs}"
             )
 
         return envs_to_deploy
