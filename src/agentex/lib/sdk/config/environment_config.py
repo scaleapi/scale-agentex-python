@@ -143,7 +143,8 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
                 account_id: 6887f093600ecd59bbbd3095
             helm_overrides:
 
-        if its not explicitly defined, we assumed the level key (environment name) is the environment
+        if the environment field is not explicitly set, we assume its the same as
+        the name of the environment
         Args:
             env_name: Name of the environment (e.g., 'dev', 'prod')
 
@@ -167,8 +168,9 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
             available_envs = [env.environment for env in self.environments.values() if env.environment] + [
                 env_name for env_name in self.environments
             ]
+            unique_names = set(available_envs)
             raise ValueError(
-                f"Environment checking dif '{env}' not found in environments.yaml. Available environments: {available_envs}"
+                f"Environment '{env}' not found in environments.yaml. Available environments: {unique_names}"
             )
 
         return envs_to_deploy
