@@ -93,21 +93,25 @@ class TestAgentEnvironmentsConfig:
         assert result is not None
 
     def test_get_configs_without_explicit_mapping(self, single_env_config: AgentEnvironmentsConfig):
-        """Test getting config without explicit mapping"""
-
+        """Test getting config without explicit mapping returns a dict with env name as key."""
         result = single_env_config.get_configs_for_env("dev")
+        assert isinstance(result, dict)
         assert len(result) == 1
-        assert result[0] == single_env_config.get_config_for_env("dev")
+        assert "dev" in result
+        assert result["dev"] == single_env_config.get_config_for_env("dev")
 
     def test_multiple_envs_same_keyword_returns_multiple(self, multi_cluster_same_env_config: AgentEnvironmentsConfig):
         """Test that querying 'dev' when multiple envs have environment='dev' returns multiple.
 
-        This documents current behavior - may need to change based on design decision.
+        Returns a dict mapping env names (dev-aws, dev-gcp) to their configs.
         """
         result = multi_cluster_same_env_config.get_configs_for_env("dev")
-        # Current implementation returns a list
-        assert isinstance(result, list)
-        assert len(result) >= 1
+        assert isinstance(result, dict)
+        assert len(result) == 2
+        assert "dev-aws" in result
+        assert "dev-gcp" in result
+        assert result["dev-aws"].kubernetes.namespace == "dev-ns-aws"
+        assert result["dev-gcp"].kubernetes.namespace == "dev-ns-gcp"
 
     def test_list_environments(self, multi_env_config: AgentEnvironmentsConfig):
         """Test listing all environment names."""

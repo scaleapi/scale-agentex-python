@@ -118,7 +118,7 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
             )
         return self.environments[env_name]
 
-    def get_configs_for_env(self, env: str) -> List[AgentEnvironmentConfig]:
+    def get_configs_for_env(self, env: str) -> dict[str, AgentEnvironmentConfig]:
         """Get configuration for a specific environment based on the expected mapping.
         The environment is either:
         1. explicitly specified like so using a key-map in the environments conifg:
@@ -154,15 +154,15 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
         Raises:
             ValueError: If environment is not found
         """
-        envs_to_deploy = []
+        envs_to_deploy = {}
         if env in self.environments:
             # this supports if the top-level key is just "dev, staging, etc" and matches
             # the environment name exactly without any explicit mapping
-            envs_to_deploy.append(self.environments[env])
+            envs_to_deploy[env] = self.environments[env]
 
-        for _, config in self.environments.items():
+        for env_name, config in self.environments.items():
             if config.environment == env:
-                envs_to_deploy.append(config)
+                envs_to_deploy[env_name] = config
 
         if len(envs_to_deploy) == 0:
             available_envs = [env.environment for env in self.environments.values() if env.environment] + [
