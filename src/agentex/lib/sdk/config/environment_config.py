@@ -164,11 +164,11 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
                 envs_to_deploy.append(config)
 
         if len(envs_to_deploy) == 0:
-            available_envs = [env.environment for _, env in self.environments.items()] + [
+            available_envs = [env.environment for env in self.environments.values() if env.environment] + [
                 env_name for env_name in self.environments
             ]
             raise ValueError(
-                f"Environment '{envs_to_deploy}' not found in environments.yaml. Available environments: {available_envs}"
+                f"Environment '{env}' not found in environments.yaml. Available environments: {available_envs}"
             )
 
         return envs_to_deploy
