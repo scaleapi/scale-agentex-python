@@ -1,14 +1,14 @@
 """Tests for AgentEnvironmentsConfig."""
 
-import re
 import tempfile
+
 import pytest
 
 from agentex.lib.sdk.config.environment_config import (
-    AgentEnvironmentsConfig,
-    AgentEnvironmentConfig,
     AgentAuthConfig,
     AgentKubernetesConfig,
+    AgentEnvironmentConfig,
+    AgentEnvironmentsConfig,
 )
 
 

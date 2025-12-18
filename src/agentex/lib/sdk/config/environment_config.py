@@ -7,7 +7,7 @@ configurations that are separate from the main manifest.yaml file.
 
 from __future__ import annotations
 
-from typing import Any, Dict, override, List
+from typing import Any, Dict, List, override
 from pathlib import Path
 
 import yaml
