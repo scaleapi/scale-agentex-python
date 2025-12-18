@@ -7,7 +7,7 @@ configurations that are separate from the main manifest.yaml file.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, override
+from typing import Any, Dict, override
 from pathlib import Path
 
 import yaml
@@ -118,7 +118,7 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
             )
         return self.environments[env_name]
 
-    def get_configs_for_env(self, env: str) -> dict[str, AgentEnvironmentConfig]:
+    def get_configs_for_env(self, env_target: str) -> dict[str, AgentEnvironmentConfig]:
         """Get configuration for a specific environment based on the expected mapping.
         The environment is either:
         1. explicitly specified like so using a key-map in the environments conifg:
@@ -146,7 +146,7 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
         if the environment field is not explicitly set, we assume its the same as
         the name of the environment
         Args:
-            env_name: Name of the environment (e.g., 'dev', 'prod')
+            env_target: Name of the environment target (e.g., 'dev', 'prod')
 
         Returns:
             AgentEnvironmentConfig for the specified environment
@@ -155,22 +155,26 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
             ValueError: If environment is not found
         """
         envs_to_deploy = {}
-        if env in self.environments:
+        if env_target in self.environments:
             # this supports if the top-level key is just "dev, staging, etc" and matches
             # the environment name exactly without any explicit mapping
-            envs_to_deploy[env] = self.environments[env]
+            envs_to_deploy[env_target] = self.environments[env_target]
 
         for env_name, config in self.environments.items():
-            if config.environment == env:
+            if config.environment == env_target:
                 envs_to_deploy[env_name] = config
 
         if len(envs_to_deploy) == 0:
-            available_envs = [env.environment for env in self.environments.values() if env.environment] + [
-                env_name for env_name in self.environments
-            ]
-            unique_names = set(available_envs)
+            ## this just finds environments for each target, so "available_envs" refers to each target environment
+
+            available_envs = set()
+            for env_name, config in self.environments.items():
+                if config.environment is not None:
+                    available_envs.add(config.environment)
+                else:
+                    available_envs.add(env_name)
             raise ValueError(
-                f"Environment '{env}' not found in environments.yaml. Available environments: {unique_names}"
+                f"Environment '{env_target}' not found in environments.yaml. Available environments: {available_envs}"
             )
 
         return envs_to_deploy
