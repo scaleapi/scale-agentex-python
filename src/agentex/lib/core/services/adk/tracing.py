@@ -20,8 +20,8 @@ class TracingService:
         trace_id: str,
         name: str,
         parent_id: str | None = None,
-        input: list[Any] | dict[str, Any] | BaseModel | None = None,
-        data: list[Any] | dict[str, Any] | BaseModel | None = None,
+        input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
     ) -> Span | None:
         trace = self._tracer.trace(trace_id)
         async with trace.span(

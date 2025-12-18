@@ -48,8 +48,8 @@ class Trace:
         self,
         name: str,
         parent_id: str | None = None,
-        input: dict[str, Any] | list[Any] | BaseModel | None = None,
-        data: dict[str, Any] | list[Any] | BaseModel | None = None,
+        input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
     ) -> Span:
         """
         Start a new span and register it with the API.
@@ -144,8 +144,8 @@ class Trace:
         self,
         name: str,
         parent_id: str | None = None,
-        input: dict[str, Any] | list[Any] | BaseModel | None = None,
-        data: dict[str, Any] | list[Any] | BaseModel | None = None,
+        input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
     ):
         """
         Context manager for spans.
@@ -189,8 +189,8 @@ class AsyncTrace:
         self,
         name: str,
         parent_id: str | None = None,
-        input: dict[str, Any] | list[Any] | BaseModel | None = None,
-        data: dict[str, Any] | list[Any] | BaseModel | None = None,
+        input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
     ) -> Span:
         """
         Start a new span and register it with the API.
@@ -288,8 +288,8 @@ class AsyncTrace:
         self,
         name: str,
         parent_id: str | None = None,
-        input: dict[str, Any] | list[Any] | BaseModel | None = None,
-        data: dict[str, Any] | list[Any] | BaseModel | None = None,
+        input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
     ) -> AsyncGenerator[Span | None, None]:
         """
         Context manager for spans.
