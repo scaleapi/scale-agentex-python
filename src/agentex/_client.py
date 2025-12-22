@@ -31,7 +31,7 @@ from ._base_client import (
 )
 
 if TYPE_CHECKING:
-    from .resources import spans, tasks, agents, events, states, tracker, messages
+    from .resources import spans, tasks, agents, events, states, tracker, messages, deployment_history
     from .resources.spans import SpansResource, AsyncSpansResource
     from .resources.tasks import TasksResource, AsyncTasksResource
     from .resources.agents import AgentsResource, AsyncAgentsResource
@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from .resources.states import StatesResource, AsyncStatesResource
     from .resources.tracker import TrackerResource, AsyncTrackerResource
     from .resources.messages.messages import MessagesResource, AsyncMessagesResource
+    from .resources.deployment_history import DeploymentHistoryResource, AsyncDeploymentHistoryResource
 
 __all__ = [
     "ENVIRONMENTS",
@@ -174,6 +175,12 @@ class Agentex(SyncAPIClient):
         from .resources.tracker import TrackerResource
 
         return TrackerResource(self)
+
+    @cached_property
+    def deployment_history(self) -> DeploymentHistoryResource:
+        from .resources.deployment_history import DeploymentHistoryResource
+
+        return DeploymentHistoryResource(self)
 
     @cached_property
     def with_raw_response(self) -> AgentexWithRawResponse:
@@ -410,6 +417,12 @@ class AsyncAgentex(AsyncAPIClient):
         return AsyncTrackerResource(self)
 
     @cached_property
+    def deployment_history(self) -> AsyncDeploymentHistoryResource:
+        from .resources.deployment_history import AsyncDeploymentHistoryResource
+
+        return AsyncDeploymentHistoryResource(self)
+
+    @cached_property
     def with_raw_response(self) -> AsyncAgentexWithRawResponse:
         return AsyncAgentexWithRawResponse(self)
 
@@ -574,6 +587,12 @@ class AgentexWithRawResponse:
 
         return TrackerResourceWithRawResponse(self._client.tracker)
 
+    @cached_property
+    def deployment_history(self) -> deployment_history.DeploymentHistoryResourceWithRawResponse:
+        from .resources.deployment_history import DeploymentHistoryResourceWithRawResponse
+
+        return DeploymentHistoryResourceWithRawResponse(self._client.deployment_history)
+
 
 class AsyncAgentexWithRawResponse:
     _client: AsyncAgentex
@@ -622,6 +641,12 @@ class AsyncAgentexWithRawResponse:
         from .resources.tracker import AsyncTrackerResourceWithRawResponse
 
         return AsyncTrackerResourceWithRawResponse(self._client.tracker)
+
+    @cached_property
+    def deployment_history(self) -> deployment_history.AsyncDeploymentHistoryResourceWithRawResponse:
+        from .resources.deployment_history import AsyncDeploymentHistoryResourceWithRawResponse
+
+        return AsyncDeploymentHistoryResourceWithRawResponse(self._client.deployment_history)
 
 
 class AgentexWithStreamedResponse:
@@ -672,6 +697,12 @@ class AgentexWithStreamedResponse:
 
         return TrackerResourceWithStreamingResponse(self._client.tracker)
 
+    @cached_property
+    def deployment_history(self) -> deployment_history.DeploymentHistoryResourceWithStreamingResponse:
+        from .resources.deployment_history import DeploymentHistoryResourceWithStreamingResponse
+
+        return DeploymentHistoryResourceWithStreamingResponse(self._client.deployment_history)
+
 
 class AsyncAgentexWithStreamedResponse:
     _client: AsyncAgentex
@@ -720,6 +751,12 @@ class AsyncAgentexWithStreamedResponse:
         from .resources.tracker import AsyncTrackerResourceWithStreamingResponse
 
         return AsyncTrackerResourceWithStreamingResponse(self._client.tracker)
+
+    @cached_property
+    def deployment_history(self) -> deployment_history.AsyncDeploymentHistoryResourceWithStreamingResponse:
+        from .resources.deployment_history import AsyncDeploymentHistoryResourceWithStreamingResponse
+
+        return AsyncDeploymentHistoryResourceWithStreamingResponse(self._client.deployment_history)
 
 
 Client = Agentex
