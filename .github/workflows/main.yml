@@ -1,6 +1,0 @@
-name: Test AgentEx Tutorials
-
-on:
-  workflow_dispatch:
-
-  workflow_call:
