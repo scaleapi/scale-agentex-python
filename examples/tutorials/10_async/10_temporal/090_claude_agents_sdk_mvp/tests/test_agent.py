@@ -18,7 +18,7 @@ from agentex import AsyncAgentex
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
-AGENT_NAME = os.environ.get("AGENT_NAME", "claude_")
+AGENT_NAME = os.environ.get("AGENT_NAME", "claude-mvp-agent")
 
 
 @pytest_asyncio.fixture

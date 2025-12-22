@@ -20,20 +20,17 @@ jobs:
         id: get-tutorials
         run: |
           cd examples/tutorials
-          # Find all tutorials and exclude specific temporal ones
+          # Find all tutorials with a manifest.yaml
           all_tutorials=$(find . -name "manifest.yaml" -exec dirname {} \; | sort | sed 's|^\./||')
 
-          # Filter out the specified temporal tutorials that are being updated
-          filtered_tutorials=$(echo "$all_tutorials" | grep -v -E "(temporal)")
+          # Include all tutorials (temporal tutorials are now included)
+          filtered_tutorials="$all_tutorials"
 
           # Convert to JSON array
           tutorials=$(echo "$filtered_tutorials" | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
           echo "tutorials=$tutorials" >> $GITHUB_OUTPUT
           echo "All tutorials found: $(echo "$all_tutorials" | wc -l)"
-          echo "Filtered tutorials: $(echo "$filtered_tutorials" | wc -l)"
-          echo "Excluded tutorials:"
-          echo "$all_tutorials" | grep -E "(10_temporal/050_|10_temporal/070_|10_temporal/080_)" || echo "  (none matched exclusion pattern)"
           echo "Final tutorial list: $tutorials"
 
   test-tutorial:
@@ -58,8 +55,20 @@ jobs:
       - name: Pull latest AgentEx image
         run: |
           echo "🐳 Pulling latest Scale AgentEx Docker image..."
-          docker pull ghcr.io/scaleapi/scale-agentex/agentex:latest
-          echo "✅ Successfully pulled AgentEx Docker image"
+          max_attempts=3
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts..."
+            if docker pull ghcr.io/scaleapi/scale-agentex/agentex:latest; then
+              echo "✅ Successfully pulled AgentEx Docker image"
+              exit 0
+            fi
+            echo "❌ Pull failed, waiting before retry..."
+            sleep $((attempt * 10))
+            attempt=$((attempt + 1))
+          done
+          echo "❌ Failed to pull image after $max_attempts attempts"
+          exit 1
 
       - name: Checkout scale-agentex repo
         uses: actions/checkout@v4
