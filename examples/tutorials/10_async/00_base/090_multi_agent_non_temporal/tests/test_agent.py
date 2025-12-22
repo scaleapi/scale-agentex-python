@@ -17,6 +17,7 @@ Configuration:
 
 import os
 import uuid
+import asyncio
 
 import pytest
 import pytest_asyncio
@@ -179,47 +180,54 @@ class TestStreamingEvents:
         creator_iterations = 0
         critic_feedback_count = 0
 
+        async def stream_messages() -> None:
+            nonlocal creator_iterations, critic_feedback_count
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task.id,
+                timeout=120,
+            ):
+                # Handle different event types
+                if event.get("type") == "full":
+                    content = event.get("content", {})
+                    if content.get("type") == "text" and content.get("author") == "agent":
+                        message_text = content.get("content", "")
+                        all_messages.append(message_text)
+
+                        # Track agent participation
+                        content_lower = message_text.lower()
+
+                        if "starting content workflow" in content_lower:
+                            workflow_markers["orchestrator_started"] = True
+
+                        if "creator output" in content_lower:
+                            creator_iterations += 1
+                            workflow_markers["creator_called"] = True
+
+                        if "critic feedback" in content_lower or "content approved by critic" in content_lower:
+                            if "critic feedback" in content_lower:
+                                critic_feedback_count += 1
+                            workflow_markers["critic_called"] = True
+
+                        if "calling formatter agent" in content_lower:
+                            workflow_markers["formatter_called"] = True
+
+                        if "workflow complete" in content_lower or "content creation complete" in content_lower:
+                            workflow_markers["workflow_completed"] = True
+
+                if event.get("type") == "done":
+                    break
+
+                # Check if all agents have participated
+                if all(workflow_markers.values()):
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
+
         # Send the event to trigger the agent workflow
         event_content = TextContentParam(type="text", author="user", content=json.dumps(request_json))
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        async for event in stream_agent_response(
-            client=client,
-            task_id=task.id,
-            timeout=120,
-        ):
-            # Handle different event types
-            if event.get("type") == "full":
-                content = event.get("content", {})
-                if content.get("type") == "text" and content.get("author") == "agent":
-                    message_text = content.get("content", "")
-                    all_messages.append(message_text)
-
-                    # Track agent participation
-                    content_lower = message_text.lower()
-
-                    if "starting content workflow" in content_lower:
-                        workflow_markers["orchestrator_started"] = True
-
-                    if "creator output" in content_lower:
-                        creator_iterations += 1
-                        workflow_markers["creator_called"] = True
-
-                    if "critic feedback" in content_lower or "content approved by critic" in content_lower:
-                        if "critic feedback" in content_lower:
-                            critic_feedback_count += 1
-                        workflow_markers["critic_called"] = True
-
-                    if "calling formatter agent" in content_lower:
-                        workflow_markers["formatter_called"] = True
-
-                    if "workflow complete" in content_lower or "content creation complete" in content_lower:
-                        workflow_markers["workflow_completed"] = True
-
-                        # Check if all agents have participated
-                        all_agents_done = all(workflow_markers.values())
-                        if all_agents_done:
-                            break
+        await stream_task
 
         # Validate we got streaming responses
         assert len(all_messages) > 0, "No messages received from streaming"

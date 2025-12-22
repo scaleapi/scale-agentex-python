@@ -167,31 +167,38 @@ class TestStreamingEvents:
         # Flags to track what we've received
         user_message_found = False
         agent_response_found = False
+        async def stream_messages() -> None:
+            nonlocal user_message_found, agent_response_found
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task.id,
+                timeout=15,
+            ):
+                all_events.append(event)
+
+                # Check events as they arrive
+                event_type = event.get("type")
+                if event_type == "full":
+                    content = event.get("content", {})
+                    if content.get("content") == user_message and content.get("author") == "user":
+                        # User message should come before agent response
+                        assert not agent_response_found, "User message arrived after agent response (incorrect order)"
+                        user_message_found = True
+                    elif content.get("author") == "agent":
+                        # Agent response should come after user message
+                        assert user_message_found, "Agent response arrived before user message (incorrect order)"
+                        agent_response_found = True
+                elif event_type == "done":
+                    break
+
+                # Exit early if we've found both messages
+                if user_message_found and agent_response_found:
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-        async for event in stream_agent_response(
-            client=client,
-            task_id=task.id,
-            timeout=15,
-        ):
-            all_events.append(event)
-
-            # Check events as they arrive
-            event_type = event.get("type")
-            if event_type == "full":
-                content = event.get("content", {})
-                if content.get("content") == user_message and content.get("author") == "user":
-                    # User message should come before agent response
-                    assert not agent_response_found, "User message arrived after agent response (incorrect order)"
-                    user_message_found = True
-                elif content.get("author") == "agent":
-                    # Agent response should come after user message
-                    assert user_message_found, "Agent response arrived before user message (incorrect order)"
-                    agent_response_found = True
-
-            # Exit early if we've found both messages
-            if user_message_found and agent_response_found:
-                break
+        await stream_task
 
         # Validate we received events
         assert len(all_events) > 0, "No events received in streaming response"

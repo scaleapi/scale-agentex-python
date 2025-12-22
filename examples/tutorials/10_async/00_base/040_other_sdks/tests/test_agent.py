@@ -280,24 +280,32 @@ class TestStreamingEvents:
         # Collect events from stream
         # Check for user message and delta messages
         user_message_found = False
+        async def stream_messages() -> None:
+            nonlocal user_message_found
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task.id,
+                timeout=20,
+            ):
+                msg_type = event.get("type")
+                # For full messages, content is at the top level
+                # For delta messages, we need to check parent_task_message
+                if msg_type == "full":
+                    if (
+                        event.get("content", {}).get("type") == "text"
+                        and event.get("content", {}).get("author") == "user"
+                    ):
+                        user_message_found = True
+                elif msg_type == "done":
+                    break
+
+                if user_message_found:
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-        async for event in stream_agent_response(
-            client=client,
-            task_id=task.id,
-            timeout=20,
-        ):
-            msg_type = event.get("type")
-            # For full messages, content is at the top level
-            # For delta messages, we need to check parent_task_message
-            if msg_type == "full":
-                if (
-                    event.get("content", {}).get("type") == "text"
-                    and event.get("content", {}).get("author") == "user"
-                ):
-                    user_message_found = True
-            elif msg_type == "done":
-                break
+        await stream_task
         assert user_message_found, "User message found in stream"
         ## keep polling the states for 10 seconds for the input_list and turn_number to be updated
         for i in range(10):
@@ -333,47 +341,51 @@ class TestStreamingEvents:
         tool_requests_seen = []
         tool_responses_seen = []
         text_deltas_seen = []
+        async def stream_messages() -> None:
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task.id,
+                timeout=45,
+            ):
+                msg_type = event.get("type")
+
+                # For full messages, content is at the top level
+                # For delta messages, we need to check parent_task_message
+                if msg_type == "delta":
+                    parent_msg = event.get("parent_task_message", {})
+                    content = parent_msg.get("content", {})
+                    delta = event.get("delta", {})
+                    content_type = content.get("type")
+
+                    if content_type == "text":
+                        text_deltas_seen.append(delta.get("text_delta", ""))
+                elif msg_type == "full":
+                    # For full messages
+                    content = event.get("content", {})
+                    content_type = content.get("type")
+
+                    if content_type == "tool_request":
+                        tool_requests_seen.append(
+                            {
+                                "name": content.get("name"),
+                                "tool_call_id": content.get("tool_call_id"),
+                                "streaming_type": msg_type,
+                            }
+                        )
+                    elif content_type == "tool_response":
+                        tool_responses_seen.append(
+                            {
+                                "tool_call_id": content.get("tool_call_id"),
+                                "streaming_type": msg_type,
+                            }
+                        )
+                elif msg_type == "done":
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-        async for event in stream_agent_response(
-            client=client,
-            task_id=task.id,
-            timeout=45,
-        ):
-            msg_type = event.get("type")
-
-            # For full messages, content is at the top level
-            # For delta messages, we need to check parent_task_message
-            if msg_type == "delta":
-                parent_msg = event.get("parent_task_message", {})
-                content = parent_msg.get("content", {})
-                delta = event.get("delta", {})
-                content_type = content.get("type")
-
-                if content_type == "text":
-                    text_deltas_seen.append(delta.get("text_delta", ""))
-            elif msg_type == "full":
-                # For full messages
-                content = event.get("content", {})
-                content_type = content.get("type")
-
-                if content_type == "tool_request":
-                    tool_requests_seen.append(
-                        {
-                            "name": content.get("name"),
-                            "tool_call_id": content.get("tool_call_id"),
-                            "streaming_type": msg_type,
-                        }
-                    )
-                elif content_type == "tool_response":
-                    tool_responses_seen.append(
-                        {
-                            "tool_call_id": content.get("tool_call_id"),
-                            "streaming_type": msg_type,
-                        }
-                    )
-            elif msg_type == "done":
-                break
+        await stream_task
 
         # Verify we saw tool usage (if the agent decided to use tools)
         # Note: The agent may or may not use tools depending on its reasoning

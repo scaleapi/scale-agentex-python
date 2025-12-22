@@ -143,34 +143,42 @@ class TestStreamingEvents:
         agent_response_found = False
         stream_timeout = 30
 
+        async def stream_messages() -> None:
+            nonlocal user_echo_found, agent_response_found
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task.id,
+                timeout=stream_timeout,
+            ):
+                # Check events as they arrive
+                event_type = event.get("type")
+                if event_type == "full":
+                    content = event.get("content", {})
+                    if content.get("content") is None:
+                        continue  # Skip empty content
+                    if content.get("type") == "text" and content.get("author") == "agent":
+                        # Check for agent response to user message
+                        if "Hello! I've received your message" in content.get("content", ""):
+                            # Agent response should come after user echo
+                            assert user_echo_found, "Agent response arrived before user message echo (incorrect order)"
+                            agent_response_found = True
+                    elif content.get("type") == "text" and content.get("author") == "user":
+                        # Check for user message echo
+                        if content.get("content") == user_message:
+                            user_echo_found = True
+                elif event_type == "done":
+                    break
+
+                # Exit early if we've found all expected messages
+                if user_echo_found and agent_response_found:
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
+
         # Send the event
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-        async for event in stream_agent_response(
-            client=client,
-            task_id=task.id,
-            timeout=stream_timeout,
-        ):
-            # Check events as they arrive
-            event_type = event.get("type")
-            if event_type == "full":
-                content = event.get("content", {})
-                if content.get("content") is None:
-                    continue  # Skip empty content
-                if content.get("type") == "text" and content.get("author") == "agent":
-                    # Check for agent response to user message
-                    if "Hello! I've received your message" in content.get("content", ""):
-                        # Agent response should come after user echo
-                        assert user_echo_found, "Agent response arrived before user message echo (incorrect order)"
-                        agent_response_found = True
-                elif content.get("type") == "text" and content.get("author") == "user":
-                    # Check for user message echo
-                    if content.get("content") == user_message:
-                        user_echo_found = True
-
-            # Exit early if we've found all expected messages
-            if user_echo_found and agent_response_found:
-                break
+        await stream_task
 
         # Verify all expected messages were received (fail if stream ended without finding them)
 

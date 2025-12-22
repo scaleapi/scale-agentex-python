@@ -87,7 +87,6 @@ class TestNonStreamingEvents:
         assert task is not None
 
         # Poll for the initial task creation message
-        print(f"[DEBUG 080 POLL] Polling for initial task creation message...")
         task_creation_found = False
         async for message in poll_messages(
             client=client,
@@ -98,7 +97,6 @@ class TestNonStreamingEvents:
             assert isinstance(message, TaskMessage)
             if message.content and message.content.type == "text" and message.content.author == "agent":
                 # Check for the initial acknowledgment message
-                print(f"[DEBUG 080 POLL] Initial message: {message.content.content[:100]}")
                 assert "task" in message.content.content.lower() or "received" in message.content.content.lower()
                 task_creation_found = True
                 break
@@ -107,7 +105,6 @@ class TestNonStreamingEvents:
 
         # Send an event asking to confirm an order (triggers human-in-the-loop)
         user_message = "Please confirm my order"
-        print(f"[DEBUG 080 POLL] Sending message: '{user_message}'")
 
         # Track what we've seen to ensure human-in-the-loop flow happened
         seen_tool_request = False
@@ -125,14 +122,9 @@ class TestNonStreamingEvents:
             yield_updates=True,  # Get all streaming chunks
         ):
             assert isinstance(message, TaskMessage)
-            print(
-                f"[DEBUG 080 POLL] Received message - Type: {message.content.type if message.content else 'None'}, "
-                f"Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}"
-            )
 
             # Track tool_request messages (agent calling wait_for_confirmation)
             if message.content and message.content.type == "tool_request":
-                print(f"[DEBUG 080 POLL] ✅ Saw tool_request - agent is calling wait_for_confirmation tool")
                 seen_tool_request = True
 
                 if not approval_signal_sent:
@@ -141,28 +133,23 @@ class TestNonStreamingEvents:
                     # Give Temporal a brief moment to materialize the child workflow
                     await asyncio.sleep(1)
                     try:
-                        print(f"[DEBUG 080 POLL] Sending approval signal to child workflow...")
                         handle = temporal_client.get_workflow_handle("child-workflow-id")
                         await handle.signal("fulfill_order_signal", True)
                         approval_signal_sent = True
-                        print(f"[DEBUG 080 POLL] ✅ Approval signal sent successfully!")
                     except Exception as e:
-                        print(f"[DEBUG 080 POLL] ⚠️ Warning: Could not send signal to child workflow: {e}")
-                        print(f"[DEBUG 080 POLL] This may be expected if workflow completed before signal could be sent")
+                        # It's okay if the workflow completed before we could signal it.
+                        _ = e
 
             # Track tool_response messages (child workflow completion)
             if message.content and message.content.type == "tool_response":
-                print(f"[DEBUG 080 POLL] ✅ Saw tool_response - child workflow completed after approval")
                 seen_tool_response = True
 
             # Track agent text messages and their streaming updates
             if message.content and message.content.type == "text" and message.content.author == "agent":
                 content_length = len(message.content.content) if message.content.content else 0
-                print(f"[DEBUG 080 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}")
 
                 # Stop when we get DONE status with actual content
                 if message.streaming_status == "DONE" and content_length > 0:
-                    print(f"[DEBUG 080 POLL] ✅ Streaming complete!")
                     found_final_response = True
                     break
 
@@ -170,8 +157,6 @@ class TestNonStreamingEvents:
         assert seen_tool_request, "Expected to see tool_request message (agent calling wait_for_confirmation)"
         assert seen_tool_response, "Expected to see tool_response message (child workflow completion after approval)"
         assert found_final_response, "Expected to see final text response after human approval"
-
-        print(f"[DEBUG 080 POLL] ✅ Human-in-the-loop workflow completed successfully!")
 
 
 class TestStreamingEvents:

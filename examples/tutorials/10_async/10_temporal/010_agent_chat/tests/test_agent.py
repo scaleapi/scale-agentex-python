@@ -223,53 +223,55 @@ class TestStreamingEvents:
         user_message_found = False
         agent_response_found = False
         reasoning_found = False
+        async def stream_messages() -> None:
+            nonlocal user_message_found, agent_response_found, reasoning_found
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task.id,
+                timeout=90,  # Increased timeout for CI environments
+            ):
+                msg_type = event.get("type")
+                if msg_type == "full":
+                    task_message_update = StreamTaskMessageFull.model_validate(event)
+                    if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
+                        finished_message = await client.messages.retrieve(task_message_update.parent_task_message.id)
+                        if (
+                            finished_message.content
+                            and finished_message.content.type == "text"
+                            and finished_message.content.author == "user"
+                        ):
+                            user_message_found = True
+                        elif (
+                            finished_message.content
+                            and finished_message.content.type == "text"
+                            and finished_message.content.author == "agent"
+                        ):
+                            agent_response_found = True
+                        elif finished_message.content and finished_message.content.type == "reasoning":
+                            reasoning_found = True
+
+                    # Exit early if we have what we need
+                    if user_message_found and agent_response_found:
+                        break
+
+                elif msg_type == "done":
+                    task_message_update_done = StreamTaskMessageDone.model_validate(event)
+                    if task_message_update_done.parent_task_message and task_message_update_done.parent_task_message.id:
+                        finished_message = await client.messages.retrieve(task_message_update_done.parent_task_message.id)
+                        if finished_message.content and finished_message.content.type == "reasoning":
+                            reasoning_found = True
+                        elif (
+                            finished_message.content
+                            and finished_message.content.type == "text"
+                            and finished_message.content.author == "agent"
+                        ):
+                            agent_response_found = True
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-        async for event in stream_agent_response(
-            client=client,
-            task_id=task.id,
-            timeout=90,  # Increased timeout for CI environments
-        ):
-            msg_type = event.get("type")
-            if msg_type == "full":
-                task_message_update = StreamTaskMessageFull.model_validate(event)
-                if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
-                    finished_message = await client.messages.retrieve(task_message_update.parent_task_message.id)
-                    if (
-                        finished_message.content
-                        and finished_message.content.type == "text"
-                        and finished_message.content.author == "user"
-                    ):
-                        user_message_found = True
-                    elif (
-                        finished_message.content
-                        and finished_message.content.type == "text"
-                        and finished_message.content.author == "agent"
-                    ):
-                        agent_response_found = True
-                    elif finished_message.content and finished_message.content.type == "reasoning":
-                        reasoning_found = True
-
-                # Exit early if we have what we need
-                if user_message_found and agent_response_found:
-                    break
-
-            elif msg_type == "done":
-                task_message_update_done = StreamTaskMessageDone.model_validate(event)
-                if task_message_update_done.parent_task_message and task_message_update_done.parent_task_message.id:
-                    finished_message = await client.messages.retrieve(task_message_update_done.parent_task_message.id)
-                    if finished_message.content and finished_message.content.type == "reasoning":
-                        reasoning_found = True
-                    elif (
-                        finished_message.content
-                        and finished_message.content.type == "text"
-                        and finished_message.content.author == "agent"
-                    ):
-                        agent_response_found = True
-
-                # Exit early if we have what we need
-                if user_message_found and agent_response_found:
-                    break
+        await stream_task
 
         assert user_message_found, "User message not found in stream"
         assert agent_response_found, "Agent response not found in stream"

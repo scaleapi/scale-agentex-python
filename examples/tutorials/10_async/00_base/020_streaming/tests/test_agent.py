@@ -167,29 +167,36 @@ class TestStreamingEvents:
         user_message_found = False
         full_agent_message_found = False
         delta_messages_found = False
+        async def stream_messages() -> None:
+            nonlocal user_message_found, full_agent_message_found, delta_messages_found
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task.id,
+                timeout=15,
+            ):
+                all_events.append(event)
+
+                # Check events as they arrive
+                event_type = event.get("type")
+                if event_type == "full":
+                    content = event.get("content", {})
+                    if content.get("content") == user_message and content.get("author") == "user":
+                        user_message_found = True
+                    elif content.get("author") == "agent":
+                        full_agent_message_found = True
+                elif event_type == "delta":
+                    delta_messages_found = True
+                elif event_type == "done":
+                    break
+
+                # Exit early if we've found all expected messages
+                if user_message_found and full_agent_message_found and delta_messages_found:
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-        async for event in stream_agent_response(
-            client=client,
-            task_id=task.id,
-            timeout=15,
-        ):
-            all_events.append(event)
-
-            # Check events as they arrive
-            event_type = event.get("type")
-            if event_type == "full":
-                content = event.get("content", {})
-                if content.get("content") == user_message and content.get("author") == "user":
-                    user_message_found = True
-                elif content.get("author") == "agent":
-                    full_agent_message_found = True
-            elif event_type == "delta":
-                delta_messages_found = True
-
-            # Exit early if we've found all expected messages
-            if user_message_found and full_agent_message_found and delta_messages_found:
-                break
+        await stream_task
 
         # Validate we received events
         assert len(all_events) > 0, "No events received in streaming response"

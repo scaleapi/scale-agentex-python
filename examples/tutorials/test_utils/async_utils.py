@@ -8,6 +8,7 @@ including task creation, event sending, response polling, and streaming.
 import json
 import time
 import asyncio
+import contextlib
 from typing import Optional, AsyncGenerator
 from datetime import datetime, timezone
 
@@ -94,7 +95,7 @@ async def poll_messages(
     # Keep track of messages we've already yielded
     seen_message_ids = set()
     # Track message content hashes to detect updates (for streaming)
-    message_content_hashes = {}
+    message_content_hashes: dict[str, int] = {}
     start_time = datetime.now()
 
     # Poll continuously until timeout
@@ -119,6 +120,10 @@ async def poll_messages(
                     msg_timestamp = message.created_at.timestamp()
                 if msg_timestamp < messages_created_after:
                     continue
+
+            # Some message objects may not have an ID; skip them since we use IDs for dedupe.
+            if not message.id:
+                continue
 
             # Check if this is a new message or an update to existing message
             is_new_message = message.id not in seen_message_ids
@@ -177,18 +182,45 @@ async def send_event_and_stream(
     Raises:
         Exception: If streaming fails
     """
-    # Send the event
-    event_content = TextContentParam(type="text", author="user", content=user_message)
+    queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue()
+    stream_exc: BaseException | None = None
 
-    await client.agents.send_event(agent_id=agent_id, params={"task_id": task_id, "content": event_content})
+    async def consume_stream() -> None:
+        nonlocal stream_exc
+        try:
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task_id,
+                timeout=timeout,
+            ):
+                await queue.put(event)
+                if event.get("type") == "done":
+                    break
+        except BaseException as e:  # noqa: BLE001 - propagate after draining
+            stream_exc = e
+        finally:
+            await queue.put(None)
 
-    # Stream the response using stream_agent_response and yield events up the stack
-    async for event in stream_agent_response(
-        client=client,
-        task_id=task_id,
-        timeout=timeout,
-    ):
-        yield event
+    # Start consuming the stream *before* sending the event, so we don't block waiting for the first message.
+    stream_task = asyncio.create_task(consume_stream())
+
+    try:
+        event_content = TextContentParam(type="text", author="user", content=user_message)
+        await client.agents.send_event(agent_id=agent_id, params={"task_id": task_id, "content": event_content})
+
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield item
+
+        if stream_exc is not None:
+            raise stream_exc
+    finally:
+        if not stream_task.done():
+            stream_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await stream_task
 
 
 async def stream_agent_response(
@@ -220,10 +252,8 @@ async def stream_agent_response(
                         yield event
 
     except asyncio.TimeoutError:
-        print(f"[DEBUG] Stream timed out after {timeout}s")
         raise
     except Exception as e:
-        print(f"[DEBUG] Stream error: {e}")
         raise
 
 

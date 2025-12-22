@@ -6,6 +6,7 @@ import json
 from typing import Any, Dict, List, override
 
 from mcp import StdioServerParameters
+from agents import ModelSettings, RunContextWrapper
 from dotenv import load_dotenv
 
 # Simple guardrail output model for this example
@@ -19,8 +20,6 @@ from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.utils.model_utils import BaseModel
-
-from agents import ModelSettings, RunContextWrapper
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow

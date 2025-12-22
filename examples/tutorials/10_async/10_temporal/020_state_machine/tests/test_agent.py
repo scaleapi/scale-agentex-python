@@ -137,34 +137,53 @@ class TestStreamingEvents:
 
         found_agent_message = False
         user_message = "Hello! Please tell me the latest news about AI and AI startups."
-        await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": TextContentParam(type="text", author="user", content=user_message)})
-        async for message in stream_task_messages(
-            client=client,
-            task_id=task.id,
-            timeout=30,
-        ):
-            if message.content.type == "text" and message.content.author == "agent":
-                found_agent_message = True
-                break
+        async def stream_first_turn() -> None:
+            nonlocal found_agent_message
+            async for message in stream_task_messages(
+                client=client,
+                task_id=task.id,
+                timeout=30,
+            ):
+                if message.content.type == "text" and message.content.author == "agent":
+                    found_agent_message = True
+                    break
+
+        stream_task = asyncio.create_task(stream_first_turn())
+        await client.agents.send_event(
+            agent_id=agent_id,
+            params={"task_id": task.id, "content": TextContentParam(type="text", author="user", content=user_message)},
+        )
+        await stream_task
         assert found_agent_message, "Did not find an agent message"
 
         await asyncio.sleep(2)
         starting_deep_research_message = False
         uses_tool_requests = False
         next_user_message = "I want to know what viral news came up and which startups failed, got acquired, or became very successful or popular in the last 3 months"
-        await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": TextContentParam(type="text", author="user", content=next_user_message)})
-        async for message in stream_task_messages(
-            client=client,
-            task_id=task.id,
-            timeout=30,
-        ):
-            # can you add the same checks as we did in the non-streaming events test?
-            if message.content.type == "text" and message.content.author == "agent":
-                if "starting deep research" in message.content.content.lower():
-                    starting_deep_research_message = True
-            if isinstance(message.content, ToolRequestContent):
-                uses_tool_requests = True
-                break
+        async def stream_second_turn() -> None:
+            nonlocal starting_deep_research_message, uses_tool_requests
+            async for message in stream_task_messages(
+                client=client,
+                task_id=task.id,
+                timeout=30,
+            ):
+                # can you add the same checks as we did in the non-streaming events test?
+                if message.content.type == "text" and message.content.author == "agent":
+                    if "starting deep research" in message.content.content.lower():
+                        starting_deep_research_message = True
+                if isinstance(message.content, ToolRequestContent):
+                    uses_tool_requests = True
+                    break
+
+        stream_task = asyncio.create_task(stream_second_turn())
+        await client.agents.send_event(
+            agent_id=agent_id,
+            params={
+                "task_id": task.id,
+                "content": TextContentParam(type="text", author="user", content=next_user_message),
+            },
+        )
+        await stream_task
 
         assert starting_deep_research_message, "Did not start deep research"
         assert uses_tool_requests, "Did not use tool requests"

@@ -163,6 +163,33 @@ class TestStreamingEvents:
         task = task_response.result
         assert task is not None
 
+        # Stream the responses and collect agent messages
+        print("\nStreaming batch responses...")
+
+        # We'll collect all agent messages from the stream
+        agent_messages = []
+        stream_timeout = 90  # Longer timeout for 20 events
+        async def stream_messages() -> None:
+            async for event in stream_agent_response(
+                client=client,
+                task_id=task.id,
+                timeout=stream_timeout,
+            ):
+                # Collect agent text messages
+                if event.get("type") == "full":
+                    content = event.get("content", {})
+                    if content.get("type") == "text" and content.get("author") == "agent":
+                        msg_content = content.get("content", "")
+                        if msg_content and msg_content.strip():
+                            agent_messages.append(msg_content)
+                elif event.get("type") == "done":
+                    break
+
+                if len(agent_messages) >= 2:
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
+
         # Send 10 events in quick succession (should be batched)
         num_events = 10
         print(f"\nSending {num_events} events in quick succession...")
@@ -171,28 +198,7 @@ class TestStreamingEvents:
             await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
             await asyncio.sleep(0.1)  # Small delay to ensure ordering
 
-        # Stream the responses and collect agent messages
-        print("\nStreaming batch responses...")
-
-        # We'll collect all agent messages from the stream
-        agent_messages = []
-        stream_timeout = 90  # Longer timeout for 20 events
-
-        async for event in stream_agent_response(
-            client=client,
-            task_id=task.id,
-            timeout=stream_timeout,
-        ):
-            # Collect agent text messages
-            if event.get("type") == "full":
-                content = event.get("content", {})
-                if content.get("type") == "text" and content.get("author") == "agent":
-                    msg_content = content.get("content", "")
-                    if msg_content and msg_content.strip():
-                        agent_messages.append(msg_content)
-
-            if len(agent_messages) >= 2:
-                break
+        await stream_task
 
         print(f"\nSent {num_events} events")
         print(f"Received {len(agent_messages)} agent response(s)")
