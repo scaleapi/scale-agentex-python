@@ -89,27 +89,19 @@ class TestNonStreamingEvents:
         # Poll for the initial task creation message
         print(f"[DEBUG 080 POLL] Polling for initial task creation message...")
         task_creation_found = False
-
-        async def poll_for_task_creation() -> None:
-            nonlocal task_creation_found
-            async for message in poll_messages(
-                client=client,
-                task_id=task.id,
-                timeout=30,
-                sleep_interval=1.0,
-            ):
-                assert isinstance(message, TaskMessage)
-                if message.content and message.content.type == "text" and message.content.author == "agent":
-                    # Check for the initial acknowledgment message
-                    print(f"[DEBUG 080 POLL] Initial message: {message.content.content[:100]}")
-                    assert "task" in message.content.content.lower() or "received" in message.content.content.lower()
-                    task_creation_found = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_task_creation(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for task creation message")
+        async for message in poll_messages(
+            client=client,
+            task_id=task.id,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                # Check for the initial acknowledgment message
+                print(f"[DEBUG 080 POLL] Initial message: {message.content.content[:100]}")
+                assert "task" in message.content.content.lower() or "received" in message.content.content.lower()
+                task_creation_found = True
+                break
 
         assert task_creation_found, "Task creation message not found"
 
@@ -121,71 +113,58 @@ class TestNonStreamingEvents:
         seen_tool_request = False
         seen_tool_response = False
         found_final_response = False
-        child_workflow_detected = False
+        approval_signal_sent = False
 
-        # Start polling for messages in the background
-        async def poll_and_detect():
-            nonlocal seen_tool_request, seen_tool_response, found_final_response, child_workflow_detected
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=120,  # Longer timeout for human-in-the-loop
+            sleep_interval=1.0,
+            yield_updates=True,  # Get all streaming chunks
+        ):
+            assert isinstance(message, TaskMessage)
+            print(
+                f"[DEBUG 080 POLL] Received message - Type: {message.content.type if message.content else 'None'}, "
+                f"Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}"
+            )
 
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message,
-                timeout=120,  # Longer timeout for human-in-the-loop
-                sleep_interval=1.0,
-                yield_updates=True,  # Get all streaming chunks
-            ):
-                assert isinstance(message, TaskMessage)
-                print(f"[DEBUG 080 POLL] Received message - Type: {message.content.type if message.content else 'None'}, Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}")
+            # Track tool_request messages (agent calling wait_for_confirmation)
+            if message.content and message.content.type == "tool_request":
+                print(f"[DEBUG 080 POLL] ✅ Saw tool_request - agent is calling wait_for_confirmation tool")
+                seen_tool_request = True
 
-                # Track tool_request messages (agent calling wait_for_confirmation)
-                if message.content and message.content.type == "tool_request":
-                    print(f"[DEBUG 080 POLL] ✅ Saw tool_request - agent is calling wait_for_confirmation tool")
-                    print(f"[DEBUG 080 POLL] 🔔 Child workflow should be spawned - will signal it to approve")
-                    seen_tool_request = True
-                    child_workflow_detected = True
+                if not approval_signal_sent:
+                    # Send signal to child workflow to approve the order
+                    # The child workflow ID is fixed as "child-workflow-id" (see tools.py)
+                    # Give Temporal a brief moment to materialize the child workflow
+                    await asyncio.sleep(1)
+                    try:
+                        print(f"[DEBUG 080 POLL] Sending approval signal to child workflow...")
+                        handle = temporal_client.get_workflow_handle("child-workflow-id")
+                        await handle.signal("fulfill_order_signal", True)
+                        approval_signal_sent = True
+                        print(f"[DEBUG 080 POLL] ✅ Approval signal sent successfully!")
+                    except Exception as e:
+                        print(f"[DEBUG 080 POLL] ⚠️ Warning: Could not send signal to child workflow: {e}")
+                        print(f"[DEBUG 080 POLL] This may be expected if workflow completed before signal could be sent")
 
-                # Track tool_response messages (child workflow completion)
-                if message.content and message.content.type == "tool_response":
-                    print(f"[DEBUG 080 POLL] ✅ Saw tool_response - child workflow completed after approval")
-                    seen_tool_response = True
+            # Track tool_response messages (child workflow completion)
+            if message.content and message.content.type == "tool_response":
+                print(f"[DEBUG 080 POLL] ✅ Saw tool_response - child workflow completed after approval")
+                seen_tool_response = True
 
-                # Track agent text messages and their streaming updates
-                if message.content and message.content.type == "text" and message.content.author == "agent":
-                    content_length = len(message.content.content) if message.content.content else 0
-                    print(f"[DEBUG 080 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}")
+            # Track agent text messages and their streaming updates
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                content_length = len(message.content.content) if message.content.content else 0
+                print(f"[DEBUG 080 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}")
 
-                    # Stop when we get DONE status with actual content
-                    if message.streaming_status == "DONE" and content_length > 0:
-                        print(f"[DEBUG 080 POLL] ✅ Streaming complete!")
-                        found_final_response = True
-                        break
-
-        # Start polling task
-        polling_task = asyncio.create_task(poll_and_detect())
-
-        # Wait a bit for the child workflow to be created
-        print(f"[DEBUG 080 POLL] Waiting for child workflow to spawn...")
-        await asyncio.sleep(5)
-
-        # Send signal to child workflow to approve the order
-        # The child workflow ID is fixed as "child-workflow-id" (see tools.py)
-        try:
-            print(f"[DEBUG 080 POLL] Sending approval signal to child workflow...")
-            handle = temporal_client.get_workflow_handle("child-workflow-id")
-            await handle.signal("fulfill_order_signal", True)
-            print(f"[DEBUG 080 POLL] ✅ Approval signal sent successfully!")
-        except Exception as e:
-            print(f"[DEBUG 080 POLL] ⚠️ Warning: Could not send signal to child workflow: {e}")
-            print(f"[DEBUG 080 POLL] This may be expected if workflow completed before signal could be sent")
-
-        # Wait for polling to complete
-        try:
-            await asyncio.wait_for(polling_task, timeout=60)
-        except asyncio.TimeoutError:
-            polling_task.cancel()
-            pytest.fail("Polling timed out waiting for human-in-the-loop workflow to complete")
+                # Stop when we get DONE status with actual content
+                if message.streaming_status == "DONE" and content_length > 0:
+                    print(f"[DEBUG 080 POLL] ✅ Streaming complete!")
+                    found_final_response = True
+                    break
 
         # Verify that we saw the complete flow: tool_request -> human approval -> tool_response -> final answer
         assert seen_tool_request, "Expected to see tool_request message (agent calling wait_for_confirmation)"

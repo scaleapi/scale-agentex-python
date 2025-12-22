@@ -95,33 +95,25 @@ class TestNonStreamingEvents:
         user_message = "Hello! Please introduce yourself briefly."
         messages = []
         user_message_found = False
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            messages.append(message)
 
-        async def poll_for_messages() -> None:
-            nonlocal user_message_found
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message,
-                timeout=30,
-                sleep_interval=1.0,
-            ):
-                assert isinstance(message, TaskMessage)
-                messages.append(message)
-
-                if message.content and message.content.author == "user":
-                    assert message.content == TextContent(
-                        author="user",
-                        content=user_message,
-                        type="text",
-                    )
-                    user_message_found = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_messages(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for user message")
+            if message.content and message.content.author == "user":
+                assert message.content == TextContent(
+                    author="user",
+                    content=user_message,
+                    type="text",
+                )
+                user_message_found = True
+                break
 
         assert user_message_found, "User message not found"
 
@@ -152,34 +144,26 @@ class TestNonStreamingEvents:
         tool_request_found = False
         tool_response_found = False
         has_final_agent_response = False
-
-        async def poll_for_tool_response() -> None:
-            nonlocal tool_request_found, tool_response_found, has_final_agent_response
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message,
-                timeout=60,  # Longer timeout for tool use
-                sleep_interval=1.0,
-            ):
-                assert isinstance(message, TaskMessage)
-                if message.content and message.content.type == "tool_request":
-                    tool_request_found = True
-                    assert message.content.author == "agent"
-                    assert hasattr(message.content, "name")
-                    assert hasattr(message.content, "tool_call_id")
-                elif message.content and message.content.type == "tool_response":
-                    tool_response_found = True
-                    assert message.content.author == "agent"
-                elif message.content and message.content.type == "text" and message.content.author == "agent":
-                    has_final_agent_response = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_tool_response(), timeout=60)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for tool response")
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=60,  # Longer timeout for tool use
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if message.content and message.content.type == "tool_request":
+                tool_request_found = True
+                assert message.content.author == "agent"
+                assert hasattr(message.content, "name")
+                assert hasattr(message.content, "tool_call_id")
+            elif message.content and message.content.type == "tool_response":
+                tool_response_found = True
+                assert message.content.author == "agent"
+            elif message.content and message.content.type == "text" and message.content.author == "agent":
+                has_final_agent_response = True
+                break
 
         assert has_final_agent_response, "Did not receive final agent text response"
         assert tool_request_found, "Did not see tool request message"
@@ -199,31 +183,23 @@ class TestNonStreamingEvents:
         # First turn
         user_message_1 = "My favorite color is blue."
         first_turn_response_found = False
-
-        async def poll_for_first_turn() -> None:
-            nonlocal first_turn_response_found
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message_1,
-                timeout=20,
-                sleep_interval=1.0,
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message_1,
+            timeout=20,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if (
+                message.content
+                and message.content.type == "text"
+                and message.content.author == "agent"
+                and message.content.content
             ):
-                assert isinstance(message, TaskMessage)
-                if (
-                    message.content
-                    and message.content.type == "text"
-                    and message.content.author == "agent"
-                    and message.content.content
-                ):
-                    first_turn_response_found = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_first_turn(), timeout=20)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for first turn response")
+                first_turn_response_found = True
+                break
 
         assert first_turn_response_found, "First turn response not found"
 
@@ -246,32 +222,24 @@ class TestNonStreamingEvents:
         # Second turn - reference previous context
         user_message_2 = "What did I just tell you my favorite color was?"
         second_turn_response_found = False
-
-        async def poll_for_second_turn() -> None:
-            nonlocal second_turn_response_found
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message_2,
-                timeout=30,
-                sleep_interval=1.0,
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message_2,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            if (
+                message.content
+                and message.content.type == "text"
+                and message.content.author == "agent"
+                and message.content.content
             ):
-                if (
-                    message.content
-                    and message.content.type == "text"
-                    and message.content.author == "agent"
-                    and message.content.content
-                ):
-                    response_text = message.content.content.lower()
-                    assert "blue" in response_text
-                    second_turn_response_found = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_second_turn(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for second turn response")
+                response_text = message.content.content.lower()
+                assert "blue" in response_text
+                second_turn_response_found = True
+                break
 
         assert second_turn_response_found, "Did not receive final agent text response"
         for i in range(10):
@@ -312,36 +280,24 @@ class TestStreamingEvents:
         # Collect events from stream
         # Check for user message and delta messages
         user_message_found = False
-
-        async def stream_messages() -> None:
-            nonlocal user_message_found
-            async for event in stream_agent_response(
-                client=client,
-                task_id=task.id,
-                timeout=20,
-            ):
-                msg_type = event.get("type")
-                # For full messages, content is at the top level
-                # For delta messages, we need to check parent_task_message
-                if msg_type == "full":
-                    if (
-                        event.get("content", {}).get("type") == "text"
-                        and event.get("content", {}).get("author") == "user"
-                    ):
-                        user_message_found = True
-                elif msg_type == "done":
-                    break
-
-        stream_task = asyncio.create_task(stream_messages())
-
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        # Wait for streaming to complete (with timeout)
-        try:
-            await asyncio.wait_for(stream_task, timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Stream timed out after 30s waiting for expected messages")
+        async for event in stream_agent_response(
+            client=client,
+            task_id=task.id,
+            timeout=20,
+        ):
+            msg_type = event.get("type")
+            # For full messages, content is at the top level
+            # For delta messages, we need to check parent_task_message
+            if msg_type == "full":
+                if (
+                    event.get("content", {}).get("type") == "text"
+                    and event.get("content", {}).get("author") == "user"
+                ):
+                    user_message_found = True
+            elif msg_type == "done":
+                break
         assert user_message_found, "User message found in stream"
         ## keep polling the states for 10 seconds for the input_list and turn_number to be updated
         for i in range(10):
@@ -377,60 +333,47 @@ class TestStreamingEvents:
         tool_requests_seen = []
         tool_responses_seen = []
         text_deltas_seen = []
-
-        async def stream_messages() -> None:
-            nonlocal tool_requests_seen, tool_responses_seen, text_deltas_seen
-
-            async for event in stream_agent_response(
-                client=client,
-                task_id=task.id,
-                timeout=45,
-            ):
-                msg_type = event.get("type")
-
-                # For full messages, content is at the top level
-                # For delta messages, we need to check parent_task_message
-                if msg_type == "delta":
-                    parent_msg = event.get("parent_task_message", {})
-                    content = parent_msg.get("content", {})
-                    delta = event.get("delta", {})
-                    content_type = content.get("type")
-
-                    if content_type == "text":
-                        text_deltas_seen.append(delta.get("text_delta", ""))
-                elif msg_type == "full":
-                    # For full messages
-                    content = event.get("content", {})
-                    content_type = content.get("type")
-
-                    if content_type == "tool_request":
-                        tool_requests_seen.append(
-                            {
-                                "name": content.get("name"),
-                                "tool_call_id": content.get("tool_call_id"),
-                                "streaming_type": msg_type,
-                            }
-                        )
-                    elif content_type == "tool_response":
-                        tool_responses_seen.append(
-                            {
-                                "tool_call_id": content.get("tool_call_id"),
-                                "streaming_type": msg_type,
-                            }
-                        )
-                elif msg_type == "done":
-                    break
-
-        stream_task = asyncio.create_task(stream_messages())
-
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
+        async for event in stream_agent_response(
+            client=client,
+            task_id=task.id,
+            timeout=45,
+        ):
+            msg_type = event.get("type")
 
-        # Wait for streaming to complete (with timeout)
-        try:
-            await asyncio.wait_for(stream_task, timeout=60)
-        except asyncio.TimeoutError:
-            pytest.fail("Stream timed out after 60s waiting for expected messages")
+            # For full messages, content is at the top level
+            # For delta messages, we need to check parent_task_message
+            if msg_type == "delta":
+                parent_msg = event.get("parent_task_message", {})
+                content = parent_msg.get("content", {})
+                delta = event.get("delta", {})
+                content_type = content.get("type")
+
+                if content_type == "text":
+                    text_deltas_seen.append(delta.get("text_delta", ""))
+            elif msg_type == "full":
+                # For full messages
+                content = event.get("content", {})
+                content_type = content.get("type")
+
+                if content_type == "tool_request":
+                    tool_requests_seen.append(
+                        {
+                            "name": content.get("name"),
+                            "tool_call_id": content.get("tool_call_id"),
+                            "streaming_type": msg_type,
+                        }
+                    )
+                elif content_type == "tool_response":
+                    tool_responses_seen.append(
+                        {
+                            "tool_call_id": content.get("tool_call_id"),
+                            "streaming_type": msg_type,
+                        }
+                    )
+            elif msg_type == "done":
+                break
 
         # Verify we saw tool usage (if the agent decided to use tools)
         # Note: The agent may or may not use tools depending on its reasoning

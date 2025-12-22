@@ -18,8 +18,8 @@ Configuration:
 import os
 import uuid
 
-# import pytest
-# import pytest_asyncio
+import pytest
+import pytest_asyncio
 from test_utils.async_utils import (
     stream_agent_response,
     send_event_and_poll_yielding,
@@ -92,47 +92,40 @@ class TestNonStreamingEvents:
         }
 
         all_agents_done = False
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=json.dumps(request_json),
+            timeout=120,  # Longer timeout for multi-agent workflow
+            sleep_interval=2.0,
+        ):
+            messages.append(message)
+            # Print messages as they arrive to show real-time progress
+            msg_text = getattr(message.content, "content", None) if message.content else None
+            if isinstance(msg_text, str) and msg_text:
+                # Track agent participation as messages arrive
+                content = msg_text.lower()
 
-        async def poll_for_workflow() -> None:
-            nonlocal all_agents_done
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=json.dumps(request_json),
-                timeout=120,  # Longer timeout for multi-agent workflow
-                sleep_interval=2.0,
-            ):
-                messages.append(message)
-                # Print messages as they arrive to show real-time progress
-                if message.content and message.content.content:
-                    # Track agent participation as messages arrive
-                    content = message.content.content.lower()
+                if "starting content workflow" in content:
+                    workflow_markers["orchestrator_started"] = True
 
-                    if "starting content workflow" in content:
-                        workflow_markers["orchestrator_started"] = True
+                if "creator output" in content:
+                    workflow_markers["creator_called"] = True
 
-                    if "creator output" in content:
-                        workflow_markers["creator_called"] = True
+                if "critic feedback" in content or "content approved by critic" in content:
+                    workflow_markers["critic_called"] = True
 
-                    if "critic feedback" in content or "content approved by critic" in content:
-                        workflow_markers["critic_called"] = True
+                if "calling formatter agent" in content:
+                    workflow_markers["formatter_called"] = True
 
-                    if "calling formatter agent" in content:
-                        workflow_markers["formatter_called"] = True
+                if "workflow complete" in content or "content creation complete" in content:
+                    workflow_markers["workflow_completed"] = True
 
-                    if "workflow complete" in content or "content creation complete" in content:
-                        workflow_markers["workflow_completed"] = True
-
-                        # Check if all agents have participated
-                        all_agents_done = all(workflow_markers.values())
-                        if all_agents_done:
-                            break
-
-        try:
-            await asyncio.wait_for(poll_for_workflow(), timeout=120)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for multi-agent workflow completion")
+                    # Check if all agents have participated
+                    all_agents_done = all(workflow_markers.values())
+                    if all_agents_done:
+                        break
 
         # Assert all agents participated
         assert workflow_markers["orchestrator_started"], "Orchestrator did not start workflow"

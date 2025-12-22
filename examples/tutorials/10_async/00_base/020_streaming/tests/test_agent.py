@@ -92,39 +92,29 @@ class TestNonStreamingEvents:
         # Flags to track what we've received
         user_message_found = False
         agent_response_found = False
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=30,
+            sleep_interval=1.0,
+            yield_updates=False,
+        ):
+            messages.append(message)
 
-        async def poll_for_messages() -> None:
-            nonlocal user_message_found, agent_response_found
+            # Validate messages as they come in
+            if message.content and hasattr(message.content, "author"):
+                if message.content.author == "user" and message.content.content == user_message:
+                    user_message_found = True
+                elif message.content.author == "agent":
+                    # Agent response should come after user message
+                    assert user_message_found, "Agent response arrived before user message"
+                    agent_response_found = True
 
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message,
-                timeout=30,
-                sleep_interval=1.0,
-                yield_updates=False,
-            ):
-                messages.append(message)
-
-                # Validate messages as they come in
-                if message.content and hasattr(message.content, 'author'):
-                    if message.content.author == "user" and message.content.content == user_message:
-                        user_message_found = True
-                    elif message.content.author == "agent":
-                        # Agent response should come after user message
-                        assert user_message_found, "Agent response arrived before user message"
-                        agent_response_found = True
-
-                # Exit early if we've found all expected messages
-                if user_message_found and agent_response_found:
-                    break
-
-        # Run polling with timeout
-        try:
-            await asyncio.wait_for(poll_for_messages(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out after 30s waiting for expected messages")
+            # Exit early if we've found all expected messages
+            if user_message_found and agent_response_found:
+                break
 
         # Validate we received expected messages
         assert len(messages) >= 2, "Expected at least 2 messages (user + agent)"
@@ -177,42 +167,29 @@ class TestStreamingEvents:
         user_message_found = False
         full_agent_message_found = False
         delta_messages_found = False
-
-        async def stream_messages() -> None:
-            nonlocal user_message_found, full_agent_message_found, delta_messages_found
-
-            async for event in stream_agent_response(
-                client=client,
-                task_id=task.id,
-                timeout=15,
-            ):
-                all_events.append(event)
-
-                # Check events as they arrive
-                event_type = event.get("type")
-                if event_type == "full":
-                    content = event.get("content", {})
-                    if content.get("content") == user_message and content.get("author") == "user":
-                        user_message_found = True
-                    elif content.get("author") == "agent":
-                        full_agent_message_found = True
-                elif event_type == "delta":
-                    delta_messages_found = True
-
-                # Exit early if we've found all expected messages
-                if user_message_found and full_agent_message_found and delta_messages_found:
-                    break
-
-        stream_task = asyncio.create_task(stream_messages())
-
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
+        async for event in stream_agent_response(
+            client=client,
+            task_id=task.id,
+            timeout=15,
+        ):
+            all_events.append(event)
 
-        # Wait for streaming to complete (with timeout)
-        try:
-            await asyncio.wait_for(stream_task, timeout=15)
-        except asyncio.TimeoutError:
-            pytest.fail("Stream timed out after 15s waiting for expected messages")
+            # Check events as they arrive
+            event_type = event.get("type")
+            if event_type == "full":
+                content = event.get("content", {})
+                if content.get("content") == user_message and content.get("author") == "user":
+                    user_message_found = True
+                elif content.get("author") == "agent":
+                    full_agent_message_found = True
+            elif event_type == "delta":
+                delta_messages_found = True
+
+            # Exit early if we've found all expected messages
+            if user_message_found and full_agent_message_found and delta_messages_found:
+                break
 
         # Validate we received events
         assert len(all_events) > 0, "No events received in streaming response"

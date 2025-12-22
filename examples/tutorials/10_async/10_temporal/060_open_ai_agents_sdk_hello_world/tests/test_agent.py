@@ -17,7 +17,6 @@ Configuration:
 
 import os
 import uuid
-import asyncio
 
 import pytest
 import pytest_asyncio
@@ -71,27 +70,19 @@ class TestNonStreamingEvents:
 
         # Poll for the initial task creation message
         task_creation_found = False
-
-        async def poll_for_task_creation() -> None:
-            nonlocal task_creation_found
-            async for message in poll_messages(
-                client=client,
-                task_id=task.id,
-                timeout=30,
-                sleep_interval=1.0,
-            ):
-                assert isinstance(message, TaskMessage)
-                if message.content and message.content.type == "text" and message.content.author == "agent":
-                    # Check for the Haiku Assistant welcome message
-                    assert "Haiku Assistant" in message.content.content
-                    assert "Temporal" in message.content.content
-                    task_creation_found = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_task_creation(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for task creation message")
+        async for message in poll_messages(
+            client=client,
+            task_id=task.id,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                # Check for the Haiku Assistant welcome message
+                assert "Haiku Assistant" in message.content.content
+                assert "Temporal" in message.content.content
+                task_creation_found = True
+                break
 
         assert task_creation_found, "Task creation message not found"
 
@@ -101,34 +92,26 @@ class TestNonStreamingEvents:
 
         # Use yield_updates=True to get all streaming chunks as they're written
         final_message = None
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=30,
+            sleep_interval=1.0,
+            yield_updates=True,  # Get updates as streaming writes chunks
+        ):
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                print(
+                    f"[DEBUG 060 POLL] Received update - Status: {message.streaming_status}, "
+                    f"Content length: {len(message.content.content)}"
+                )
+                final_message = message
 
-        async def poll_for_haiku() -> None:
-            nonlocal final_message
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message,
-                timeout=30,
-                sleep_interval=1.0,
-                yield_updates=True,  # Get updates as streaming writes chunks
-            ):
-                if message.content and message.content.type == "text" and message.content.author == "agent":
-                    print(
-                        f"[DEBUG 060 POLL] Received update - Status: {message.streaming_status}, "
-                        f"Content length: {len(message.content.content)}"
-                    )
-                    final_message = message
-
-                    # Stop polling once we get a DONE message
-                    if message.streaming_status == "DONE":
-                        print(f"[DEBUG 060 POLL] Streaming complete!")
-                        break
-
-        try:
-            await asyncio.wait_for(poll_for_haiku(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for haiku response")
+                # Stop polling once we get a DONE message
+                if message.streaming_status == "DONE":
+                    print(f"[DEBUG 060 POLL] Streaming complete!")
+                    break
 
         # Verify the final message has content (the haiku)
         assert final_message is not None, "Should have received an agent message"

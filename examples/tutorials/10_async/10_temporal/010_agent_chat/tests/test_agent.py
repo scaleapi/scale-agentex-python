@@ -88,33 +88,25 @@ class TestNonStreamingEvents:
         user_message = "Hello! Please introduce yourself briefly."
         messages = []
         user_message_found = False
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            messages.append(message)
 
-        async def poll_for_user_message() -> None:
-            nonlocal user_message_found
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message,
-                timeout=30,
-                sleep_interval=1.0,
-            ):
-                assert isinstance(message, TaskMessage)
-                messages.append(message)
-
-                if message.content and message.content.author == "user":
-                    assert message.content == TextContent(
-                        author="user",
-                        content=user_message,
-                        type="text",
-                    )
-                    user_message_found = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_user_message(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for user message")
+            if message.content and message.content.author == "user":
+                assert message.content == TextContent(
+                    author="user",
+                    content=user_message,
+                    type="text",
+                )
+                user_message_found = True
+                break
 
         assert user_message_found, "User message not found"
 
@@ -132,28 +124,20 @@ class TestNonStreamingEvents:
         # Send a message that could trigger the calculator tool (though with reasoning, it may not need it)
         user_message = "What is 15 multiplied by 37?"
         has_final_agent_response = False
-
-        async def poll_for_calculator_response() -> None:
-            nonlocal has_final_agent_response
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message,
-                timeout=60,  # Longer timeout for tool use
-                sleep_interval=1.0,
-            ):
-                assert isinstance(message, TaskMessage)
-                if message.content and message.content.type == "text" and message.content.author == "agent":
-                    # Check that the answer contains 555 (15 * 37)
-                    if "555" in message.content.content:
-                        has_final_agent_response = True
-                        break
-
-        try:
-            await asyncio.wait_for(poll_for_calculator_response(), timeout=60)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for calculator response")
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message,
+            timeout=60,  # Longer timeout for tool use
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if message.content and message.content.type == "text" and message.content.author == "agent":
+                # Check that the answer contains 555 (15 * 37)
+                if "555" in message.content.content:
+                    has_final_agent_response = True
+                    break
 
         assert has_final_agent_response, "Did not receive final agent text response with correct answer"
 
@@ -171,31 +155,23 @@ class TestNonStreamingEvents:
         # First turn
         user_message_1 = "My favorite color is blue."
         first_turn_found = False
-
-        async def poll_for_first_turn() -> None:
-            nonlocal first_turn_found
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message_1,
-                timeout=30,
-                sleep_interval=1.0,
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message_1,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            assert isinstance(message, TaskMessage)
+            if (
+                message.content
+                and message.content.type == "text"
+                and message.content.author == "agent"
+                and message.content.content
             ):
-                assert isinstance(message, TaskMessage)
-                if (
-                    message.content
-                    and message.content.type == "text"
-                    and message.content.author == "agent"
-                    and message.content.content
-                ):
-                    first_turn_found = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_first_turn(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for first turn response")
+                first_turn_found = True
+                break
 
         assert first_turn_found, "First turn response not found"
 
@@ -205,32 +181,24 @@ class TestNonStreamingEvents:
         # Second turn - reference previous context
         found_response = False
         user_message_2 = "What did I just tell you my favorite color was?"
-
-        async def poll_for_second_turn() -> None:
-            nonlocal found_response
-            async for message in send_event_and_poll_yielding(
-                client=client,
-                agent_id=agent_id,
-                task_id=task.id,
-                user_message=user_message_2,
-                timeout=30,
-                sleep_interval=1.0,
+        async for message in send_event_and_poll_yielding(
+            client=client,
+            agent_id=agent_id,
+            task_id=task.id,
+            user_message=user_message_2,
+            timeout=30,
+            sleep_interval=1.0,
+        ):
+            if (
+                message.content
+                and message.content.type == "text"
+                and message.content.author == "agent"
+                and message.content.content
             ):
-                if (
-                    message.content
-                    and message.content.type == "text"
-                    and message.content.author == "agent"
-                    and message.content.content
-                ):
-                    response_text = message.content.content.lower()
-                    assert "blue" in response_text, f"Expected 'blue' in response but got: {response_text}"
-                    found_response = True
-                    break
-
-        try:
-            await asyncio.wait_for(poll_for_second_turn(), timeout=30)
-        except asyncio.TimeoutError:
-            pytest.fail("Polling timed out waiting for second turn response")
+                response_text = message.content.content.lower()
+                assert "blue" in response_text, f"Expected 'blue' in response but got: {response_text}"
+                found_response = True
+                break
 
         assert found_response, "Did not receive final agent text response with context recall"
 
@@ -255,66 +223,53 @@ class TestStreamingEvents:
         user_message_found = False
         agent_response_found = False
         reasoning_found = False
-
-        async def stream_messages() -> None:  # noqa: ANN101
-            nonlocal user_message_found, agent_response_found, reasoning_found
-            async for event in stream_agent_response(
-                client=client,
-                task_id=task.id,
-                timeout=90,  # Increased timeout for CI environments
-            ):
-                msg_type = event.get("type")
-                if msg_type == "full":
-                    task_message_update = StreamTaskMessageFull.model_validate(event)
-                    if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
-                        finished_message = await client.messages.retrieve(task_message_update.parent_task_message.id)
-                        if (
-                            finished_message.content
-                            and finished_message.content.type == "text"
-                            and finished_message.content.author == "user"
-                        ):
-                            user_message_found = True
-                        elif (
-                            finished_message.content
-                            and finished_message.content.type == "text"
-                            and finished_message.content.author == "agent"
-                        ):
-                            agent_response_found = True
-                        elif finished_message.content and finished_message.content.type == "reasoning":
-                            reasoning_found = True
-
-                    # Exit early if we have what we need
-                    if user_message_found and agent_response_found:
-                        break
-
-                elif msg_type == "done":
-                    task_message_update = StreamTaskMessageDone.model_validate(event)
-                    if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
-                        finished_message = await client.messages.retrieve(task_message_update.parent_task_message.id)
-                        if finished_message.content and finished_message.content.type == "reasoning":
-                            reasoning_found = True
-                        elif (
-                            finished_message.content
-                            and finished_message.content.type == "text"
-                            and finished_message.content.author == "agent"
-                        ):
-                            agent_response_found = True
-
-                    # Exit early if we have what we need
-                    if user_message_found and agent_response_found:
-                        break
-
-        stream_task = asyncio.create_task(stream_messages())
-
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
+        async for event in stream_agent_response(
+            client=client,
+            task_id=task.id,
+            timeout=90,  # Increased timeout for CI environments
+        ):
+            msg_type = event.get("type")
+            if msg_type == "full":
+                task_message_update = StreamTaskMessageFull.model_validate(event)
+                if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
+                    finished_message = await client.messages.retrieve(task_message_update.parent_task_message.id)
+                    if (
+                        finished_message.content
+                        and finished_message.content.type == "text"
+                        and finished_message.content.author == "user"
+                    ):
+                        user_message_found = True
+                    elif (
+                        finished_message.content
+                        and finished_message.content.type == "text"
+                        and finished_message.content.author == "agent"
+                    ):
+                        agent_response_found = True
+                    elif finished_message.content and finished_message.content.type == "reasoning":
+                        reasoning_found = True
 
-        # Wait for streaming to complete with timeout
-        try:
-            await asyncio.wait_for(stream_task, timeout=120)  # Overall timeout for CI
-        except asyncio.TimeoutError:
-            stream_task.cancel()
-            pytest.fail("Test timed out waiting for streaming response")
+                # Exit early if we have what we need
+                if user_message_found and agent_response_found:
+                    break
+
+            elif msg_type == "done":
+                task_message_update_done = StreamTaskMessageDone.model_validate(event)
+                if task_message_update_done.parent_task_message and task_message_update_done.parent_task_message.id:
+                    finished_message = await client.messages.retrieve(task_message_update_done.parent_task_message.id)
+                    if finished_message.content and finished_message.content.type == "reasoning":
+                        reasoning_found = True
+                    elif (
+                        finished_message.content
+                        and finished_message.content.type == "text"
+                        and finished_message.content.author == "agent"
+                    ):
+                        agent_response_found = True
+
+                # Exit early if we have what we need
+                if user_message_found and agent_response_found:
+                    break
 
         assert user_message_found, "User message not found in stream"
         assert agent_response_found, "Agent response not found in stream"
