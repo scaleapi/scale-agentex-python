@@ -1,0 +1,137 @@
+import os
+from typing import AsyncGenerator, List
+
+from agentex.lib import adk
+from agentex.lib.adk.providers._modules.sync_provider import SyncStreamingProvider, convert_openai_to_agentex_events
+from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.lib.types.acp import SendMessageParams
+from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.utils.model_utils import BaseModel
+
+from agentex.types.task_message_update import TaskMessageUpdate
+from agentex.types.task_message_content import TaskMessageContent
+from agentex.lib.utils.logging import make_logger
+from agents import Agent, Runner, RunConfig, function_tool
+
+
+logger = make_logger(__name__)
+
+SGP_API_KEY = os.environ.get("SGP_API_KEY", "")
+SGP_ACCOUNT_ID = os.environ.get("SGP_ACCOUNT_ID", "")
+
+if SGP_API_KEY and SGP_ACCOUNT_ID:
+    add_tracing_processor_config(
+        SGPTracingProcessorConfig(
+            sgp_api_key=SGP_API_KEY,
+            sgp_account_id=SGP_ACCOUNT_ID,
+        )
+    )
+
+
+MODEL = "gpt-4o-mini"
+
+SYSTEM_PROMPT = """
+<role>
+You are a helpful assistant. Use your tools to help the user.
+</role>
+
+<communication_style>
+Communicate in a witty and friendly manner
+</communication_style>
+"""
+
+AGENT_NAME = "{{ agent_name }}"
+
+
+@function_tool
+async def get_weather() -> str:
+    """
+    Get the current weather.
+
+    This is a dummy activity that returns a hardcoded string for demo purposes.
+    Replace this with a real weather API call in your implementation.
+
+    Returns:
+        A string describing the current weather conditions.
+    """
+    logger.info("get_weather activity called")
+    return "Sunny, 72°F"
+    
+
+
+# Create an ACP server
+acp = FastACP.create(
+    acp_type="sync",
+)
+
+class StateModel(BaseModel):
+    input_list: List[dict]
+    turn_number: int
+
+
+@acp.on_message_send
+async def handle_message_send(
+    params: SendMessageParams
+) -> TaskMessageContent | list[TaskMessageContent] | AsyncGenerator[TaskMessageUpdate, None]:
+    if not os.environ.get("OPENAI_API_KEY"):
+        yield StreamTaskMessageFull(
+            index=0,
+            type="full",
+            content=TextContent(
+                author="agent",
+                content="Hey, sorry I'm unable to respond to your message because you're running this example without an OpenAI API key. Please set the OPENAI_API_KEY environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
+            ),
+        )
+
+    user_prompt = params.content.content
+
+    # Retrieve the task state. Each event is handled as a new turn, so we need to get the state for the current turn.
+    task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
+    if not task_state:
+        # If the state doesn't exist, create it.
+        state = StateModel(input_list=[], turn_number=0)
+        task_state = await adk.state.create(task_id=params.task.id, agent_id=params.agent.id, state=state)
+    else:
+        state = StateModel.model_validate(task_state.state)
+
+    state.turn_number += 1
+    state.input_list.append({"role": "user", "content": user_prompt})
+
+    # Initialize the sync provider and run config to allow for tracing
+    provider = SyncStreamingProvider(
+        trace_id=params.task.id,
+    )
+
+    run_config = RunConfig(
+        model_provider=provider,
+    )
+
+    # Initialize the agent
+    agent = Agent(
+        name=AGENT_NAME, 
+        instructions=SYSTEM_PROMPT, 
+        model=MODEL,
+        tools=[get_weather],
+    )
+
+    # Run the agent with the conversation history from state
+    result = Runner.run_streamed(
+        agent, 
+        state.input_list, 
+        run_config=run_config
+    )
+
+    # Convert the OpenAI events to Agentex events and stream them back to the client
+    async for agentex_event in convert_openai_to_agentex_events(result.stream_events()):
+        yield agentex_event
+
+    # After streaming is complete, update state with the full conversation history
+    state.input_list = result.to_input_list()
+    await adk.state.update(
+        state_id=task_state.id,
+        task_id=params.task.id,
+        agent_id=params.agent.id,
+        state=state,
+        trace_id=params.task.id,
+    )
