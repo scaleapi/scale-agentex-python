@@ -22,8 +22,8 @@ class StartSpanParams(BaseModel):
     trace_id: str
     parent_id: str | None = None
     name: str
-    input: list[Any] | dict[str, Any] | BaseModel | None = None
-    data: list[Any] | dict[str, Any] | BaseModel | None = None
+    input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None
+    data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None
 
 
 class EndSpanParams(BaseModel):
