@@ -264,7 +264,7 @@ jobs:
           docker logs "$CONTAINER_NAME" 2>&1 || true
 
           # Check for successful ACP initialization in logs
-          if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "ACP.*instance"; then
+          if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "instance created "; then
             echo "✅ Container initialized ACP successfully"
           else
             echo "⚠️ Could not verify ACP initialization from logs"
