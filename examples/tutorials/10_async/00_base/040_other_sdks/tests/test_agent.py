@@ -94,6 +94,7 @@ class TestNonStreamingEvents:
         # Send a simple message that shouldn't require tool use
         user_message = "Hello! Please introduce yourself briefly."
         messages = []
+        user_message_found = False
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -105,13 +106,16 @@ class TestNonStreamingEvents:
             assert isinstance(message, TaskMessage)
             messages.append(message)
 
-            if len(messages) == 1:
+            if message.content and message.content.author == "user":
                 assert message.content == TextContent(
                     author="user",
                     content=user_message,
                     type="text",
                 )
+                user_message_found = True
                 break
+
+        assert user_message_found, "User message not found"
 
         # Verify state has been updated by polling the states for 10 seconds
         for i in range(20):
@@ -140,7 +144,6 @@ class TestNonStreamingEvents:
         tool_request_found = False
         tool_response_found = False
         has_final_agent_response = False
-
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -176,8 +179,10 @@ class TestNonStreamingEvents:
 
         # ensure the task is created before we send the first event
         await asyncio.sleep(1)
+
         # First turn
         user_message_1 = "My favorite color is blue."
+        first_turn_response_found = False
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -193,7 +198,10 @@ class TestNonStreamingEvents:
                 and message.content.author == "agent"
                 and message.content.content
             ):
+                first_turn_response_found = True
                 break
+
+        assert first_turn_response_found, "First turn response not found"
 
         ## keep polling the states for 10 seconds for the input_list and turn_number to be updated
         for i in range(30):
@@ -210,9 +218,10 @@ class TestNonStreamingEvents:
         assert state.get("turn_number") == 1
 
         await asyncio.sleep(1)
-        found_response = False
+
         # Second turn - reference previous context
         user_message_2 = "What did I just tell you my favorite color was?"
+        second_turn_response_found = False
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -229,10 +238,10 @@ class TestNonStreamingEvents:
             ):
                 response_text = message.content.content.lower()
                 assert "blue" in response_text
-                found_response = True
+                second_turn_response_found = True
                 break
 
-        assert found_response, "Did not receive final agent text response"
+        assert second_turn_response_found, "Did not receive final agent text response"
         for i in range(10):
             if i == 9:
                 raise Exception("Timeout waiting for state updates")
@@ -271,7 +280,6 @@ class TestStreamingEvents:
         # Collect events from stream
         # Check for user message and delta messages
         user_message_found = False
-
         async def stream_messages() -> None:
             nonlocal user_message_found
             async for event in stream_agent_response(
@@ -291,12 +299,12 @@ class TestStreamingEvents:
                 elif msg_type == "done":
                     break
 
-        stream_task = asyncio.create_task(stream_messages())
+                if user_message_found:
+                    break
 
+        stream_task = asyncio.create_task(stream_messages())
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        # Wait for streaming to complete
         await stream_task
         assert user_message_found, "User message found in stream"
         ## keep polling the states for 10 seconds for the input_list and turn_number to be updated
@@ -333,10 +341,7 @@ class TestStreamingEvents:
         tool_requests_seen = []
         tool_responses_seen = []
         text_deltas_seen = []
-
         async def stream_messages() -> None:
-            nonlocal tool_requests_seen, tool_responses_seen, text_deltas_seen
-
             async for event in stream_agent_response(
                 client=client,
                 task_id=task.id,
@@ -378,11 +383,8 @@ class TestStreamingEvents:
                     break
 
         stream_task = asyncio.create_task(stream_messages())
-
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        # Wait for streaming to complete
         await stream_task
 
         # Verify we saw tool usage (if the agent decided to use tools)
