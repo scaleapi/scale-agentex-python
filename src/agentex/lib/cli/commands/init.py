@@ -26,6 +26,7 @@ class TemplateType(str, Enum):
     TEMPORAL_OPENAI_AGENTS = "temporal-openai-agents"
     DEFAULT = "default"
     SYNC = "sync"
+    SYNC_OPENAI_AGENTS = "sync-openai-agents"
 
 
 def render_template(
@@ -58,6 +59,7 @@ def create_project_structure(
         TemplateType.TEMPORAL_OPENAI_AGENTS: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
         TemplateType.DEFAULT: ["acp.py"],
         TemplateType.SYNC: ["acp.py"],
+        TemplateType.SYNC_OPENAI_AGENTS: ["acp.py"],
     }[template_type]
 
     # Create project/code files
@@ -155,7 +157,7 @@ def init():
         choices=[
             {"name": "Async - ACP Only", "value": TemplateType.DEFAULT},
             {"name": "Async - Temporal", "value": "temporal_submenu"},
-            {"name": "Sync ACP", "value": TemplateType.SYNC},
+            {"name": "Sync ACP", "value": "sync_submenu"},
         ],
     ).ask()
     if not template_type:
@@ -163,12 +165,21 @@ def init():
 
     # If Temporal was selected, show sub-menu for Temporal variants
     if template_type == "temporal_submenu":
-        console.print()
         template_type = questionary.select(
             "Which Temporal template would you like to use?",
             choices=[
                 {"name": "Basic Temporal", "value": TemplateType.TEMPORAL},
                 {"name": "Temporal + OpenAI Agents SDK (Recommended)", "value": TemplateType.TEMPORAL_OPENAI_AGENTS},
+            ],
+        ).ask()
+        if not template_type:
+            return
+    elif template_type == "sync_submenu":
+        template_type = questionary.select(
+            "Which Sync template would you like to use?",
+            choices=[
+                {"name": "Basic Sync ACP", "value": TemplateType.SYNC},
+                {"name": "Sync ACP + OpenAI Agents SDK (Recommended)", "value": TemplateType.SYNC_OPENAI_AGENTS},
             ],
         ).ask()
         if not template_type:
