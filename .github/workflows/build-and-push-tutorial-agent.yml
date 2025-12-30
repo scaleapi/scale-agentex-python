@@ -56,6 +56,7 @@ jobs:
     needs: [check-permissions]
     outputs:
       agents: ${{ steps.get-agents.outputs.agents }}
+      all_agents: ${{ steps.get-agents.outputs.all_agents }}
       has_agents: ${{ steps.get-agents.outputs.has_agents }}
     steps:
       - name: Checkout repository
@@ -71,6 +72,10 @@ jobs:
           # Find all tutorial directories with manifest.yaml
           all_agents=$(find examples/tutorials -name "manifest.yaml" -exec dirname {} \; | sort)
           agents_to_build=()
+
+          # Output all agents for deprecation check
+          all_agents_json=$(printf '%s\n' $all_agents | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "all_agents=$all_agents_json" >> $GITHUB_OUTPUT
 
           if [ "$REBUILD_ALL" = "true" ]; then
             echo "Rebuild all agents requested"
@@ -199,3 +204,73 @@ jobs:
             agentex agents build $BUILD_ARGS
             echo "✅ Build validation successful for: ${{ matrix.agent_path }}"
           fi
+
+  deprecate-agents:
+    name: "Deprecate Removed Agents"
+    runs-on: ubuntu-latest
+    needs: [find-agents]
+    steps:
+      - name: Find and delete deprecated agent packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+        run: |
+          set -e
+
+          echo "🔍 Agents in repo (from find-agents):"
+          # Convert JSON array of paths to package names
+          # e.g., "examples/tutorials/00_sync/000_hello_acp" -> "00_sync-000_hello_acp"
+          REPO_AGENTS=$(echo '${{ needs.find-agents.outputs.all_agents }}' | jq -r '.[]' | \
+            sed 's|examples/tutorials/||' | \
+            sed 's|/|-|g')
+          echo "$REPO_AGENTS"
+
+          echo ""
+          echo "🔍 Fetching packages from GitHub Container Registry..."
+          PACKAGES=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/scaleapi/packages?package_type=container&per_page=100")
+
+          # Check for API errors
+          if echo "$PACKAGES" | jq -e '.message' > /dev/null 2>&1; then
+            echo "❌ GitHub API error:"
+            echo "$PACKAGES" | jq '.'
+            exit 1
+          fi
+
+          # Verify response is an array
+          if ! echo "$PACKAGES" | jq -e 'type == "array"' > /dev/null 2>&1; then
+            echo "❌ Unexpected API response format:"
+            echo "$PACKAGES" | head -c 500
+            exit 1
+          fi
+
+          # Filter for tutorial-agents from this repo
+          TUTORIAL_PACKAGES=$(echo "$PACKAGES" | \
+            jq -r '.[] | select(.repository != null and .repository.name == "scale-agentex-python" and (.name | contains("tutorial-agents"))) | .name')
+
+          echo "Tutorial packages in registry:"
+          echo "$TUTORIAL_PACKAGES"
+
+          #
+          # echo ""
+          # echo "🔍 Checking for deprecated packages..."
+          # while IFS= read -r package_name; do
+          #   [ -z "$package_name" ] && continue
+          #
+          #   # Extract agent name: scale-agentex-python/tutorial-agents/00_sync-000_hello_acp -> 00_sync-000_hello_acp
+          #   agent_name=$(echo "$package_name" | sed 's|.*/tutorial-agents/||')
+          #
+          #   if echo "$REPO_AGENTS" | grep -q "^${agent_name}$"; then
+          #     echo "✅ $agent_name - still in repo"
+          #   else
+          #     echo "🗑️ $agent_name - NOT in repo, deleting..."
+          #     curl -s -X DELETE \
+          #       -H "Authorization: Bearer $GITHUB_TOKEN" \
+          #       -H "Accept: application/vnd.github+json" \
+          #       "https://api.github.com/orgs/scaleapi/packages/container/$(echo "$package_name" | sed 's|/|%2F|g')"
+          #     echo "   Deleted: $package_name"
+          #   fi
+          # done <<< "$TUTORIAL_PACKAGES"
+
+          echo ""
+          echo "✅ Deprecation check complete"
