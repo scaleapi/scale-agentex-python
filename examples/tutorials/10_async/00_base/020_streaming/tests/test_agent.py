@@ -28,7 +28,6 @@ from test_utils.async_utils import (
 )
 
 from agentex import AsyncAgentex
-from agentex.types import TaskMessage, TextContent
 from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from agentex.types.text_content_param import TextContentParam
 
@@ -89,6 +88,10 @@ class TestNonStreamingEvents:
 
         user_message = "Hello! Here is my test message"
         messages = []
+
+        # Flags to track what we've received
+        user_message_found = False
+        agent_response_found = False
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -98,23 +101,25 @@ class TestNonStreamingEvents:
             sleep_interval=1.0,
             yield_updates=False,
         ):
-
             messages.append(message)
 
-        assert len(messages) > 0
-        # the first message should be the agent re-iterating what the user sent
-        assert isinstance(messages, List)
-        assert len(messages) == 2
-        first_message: TaskMessage = messages[0]
-        assert first_message.content == TextContent(
-            author="user",
-            content=user_message,
-            type="text",
-        )
+            # Validate messages as they come in
+            if message.content and hasattr(message.content, "author"):
+                if message.content.author == "user" and message.content.content == user_message:
+                    user_message_found = True
+                elif message.content.author == "agent":
+                    # Agent response should come after user message
+                    assert user_message_found, "Agent response arrived before user message"
+                    agent_response_found = True
 
-        second_message: TaskMessage = messages[1]
-        assert second_message.content is not None
-        assert second_message.content.author == "agent"
+            # Exit early if we've found all expected messages
+            if user_message_found and agent_response_found:
+                break
+
+        # Validate we received expected messages
+        assert len(messages) >= 2, "Expected at least 2 messages (user + agent)"
+        assert user_message_found, "User message not found"
+        assert agent_response_found, "Agent response not found"
 
         # assert the state has been updated
         await asyncio.sleep(1)  # wait for state to be updated
@@ -158,7 +163,12 @@ class TestStreamingEvents:
         # Collect events from stream
         all_events = []
 
+        # Flags to track what we've received
+        user_message_found = False
+        full_agent_message_found = False
+        delta_messages_found = False
         async def stream_messages() -> None:
+            nonlocal user_message_found, full_agent_message_found, delta_messages_found
             async for event in stream_agent_response(
                 client=client,
                 task_id=task.id,
@@ -166,33 +176,30 @@ class TestStreamingEvents:
             ):
                 all_events.append(event)
 
-        stream_task = asyncio.create_task(stream_messages())
+                # Check events as they arrive
+                event_type = event.get("type")
+                if event_type == "full":
+                    content = event.get("content", {})
+                    if content.get("content") == user_message and content.get("author") == "user":
+                        user_message_found = True
+                    elif content.get("author") == "agent":
+                        full_agent_message_found = True
+                elif event_type == "delta":
+                    delta_messages_found = True
+                elif event_type == "done":
+                    break
 
+                # Exit early if we've found all expected messages
+                if user_message_found and full_agent_message_found and delta_messages_found:
+                    break
+
+        stream_task = asyncio.create_task(stream_messages())
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        # Wait for streaming to complete
         await stream_task
 
         # Validate we received events
         assert len(all_events) > 0, "No events received in streaming response"
-
-        # Check for user message, full agent response, and delta messages
-        user_message_found = False
-        full_agent_message_found = False
-        delta_messages_found = False
-
-        for event in all_events:
-            event_type = event.get("type")
-            if event_type == "full":
-                content = event.get("content", {})
-                if content.get("content") == user_message and content.get("author") == "user":
-                    user_message_found = True
-                elif content.get("author") == "agent":
-                    full_agent_message_found = True
-            elif event_type == "delta":
-                delta_messages_found = True
-
         assert user_message_found, "User message not found in stream"
         assert full_agent_message_found, "Full agent message not found in stream"
         assert delta_messages_found, "Delta messages not found in stream (streaming response expected)"

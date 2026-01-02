@@ -69,6 +69,7 @@ class TestNonStreamingEvents:
         assert task is not None
 
         # Poll for the initial task creation message
+        task_creation_found = False
         async for message in poll_messages(
             client=client,
             task_id=task.id,
@@ -80,11 +81,13 @@ class TestNonStreamingEvents:
                 # Check for the Haiku Assistant welcome message
                 assert "Haiku Assistant" in message.content.content
                 assert "Temporal" in message.content.content
+                task_creation_found = True
                 break
+
+        assert task_creation_found, "Task creation message not found"
 
         # Send event and poll for response with streaming updates
         user_message = "Hello how is life?"
-        print(f"[DEBUG 060 POLL] Sending message: '{user_message}'")
 
         # Use yield_updates=True to get all streaming chunks as they're written
         final_message = None
@@ -98,25 +101,16 @@ class TestNonStreamingEvents:
             yield_updates=True,  # Get updates as streaming writes chunks
         ):
             if message.content and message.content.type == "text" and message.content.author == "agent":
-                print(
-                    f"[DEBUG 060 POLL] Received update - Status: {message.streaming_status}, "
-                    f"Content length: {len(message.content.content)}"
-                )
                 final_message = message
 
                 # Stop polling once we get a DONE message
                 if message.streaming_status == "DONE":
-                    print(f"[DEBUG 060 POLL] Streaming complete!")
                     break
 
         # Verify the final message has content (the haiku)
         assert final_message is not None, "Should have received an agent message"
         assert final_message.content is not None, "Final message should have content"
         assert len(final_message.content.content) > 0, "Final message should have haiku content"
-
-        print(f"[DEBUG 060 POLL] ✅ Successfully received haiku response!")
-        print(f"[DEBUG 060 POLL] Final haiku:\n{final_message.content.content}")
-        pass
 
 
 class TestStreamingEvents:

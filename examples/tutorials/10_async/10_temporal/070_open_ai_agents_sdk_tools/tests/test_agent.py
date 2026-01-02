@@ -70,7 +70,8 @@ class TestNonStreamingEvents:
         assert task is not None
 
         # Poll for the initial task creation message
-        print(f"[DEBUG 070 POLL] Polling for initial task creation message...")
+        
+        task_creation_found = False
         async for message in poll_messages(
             client=client,
             task_id=task.id,
@@ -80,61 +81,57 @@ class TestNonStreamingEvents:
             assert isinstance(message, TaskMessage)
             if message.content and message.content.type == "text" and message.content.author == "agent":
                 # Check for the initial acknowledgment message
-                print(f"[DEBUG 070 POLL] Initial message: {message.content.content[:100]}")
                 assert "task" in message.content.content.lower() or "received" in message.content.content.lower()
+                task_creation_found = True
                 break
+
+        assert task_creation_found, "Task creation message not found"
 
         # Send an event asking about the weather in NYC and poll for response with streaming
         user_message = "What is the weather in New York City?"
-        print(f"[DEBUG 070 POLL] Sending message: '{user_message}'")
 
         # Track what we've seen to ensure tool calls happened
         seen_tool_request = False
         seen_tool_response = False
         final_message = None
-
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
             task_id=task.id,
             user_message=user_message,
             timeout=60,
-            sleep_interval=1.0
-            ):
+            sleep_interval=1.0,
+        ):
             assert isinstance(message, TaskMessage)
-            print(f"[DEBUG 070 POLL] Received message - Type: {message.content.type if message.content else 'None'}, Author: {message.content.author if message.content else 'None'}, Status: {message.streaming_status}")
 
             # Track tool_request messages (agent calling get_weather)
             if message.content and message.content.type == "tool_request":
-                print(f"[DEBUG 070 POLL] ✅ Saw tool_request - agent is calling get_weather tool")
                 seen_tool_request = True
 
             # Track tool_response messages (get_weather result)
             if message.content and message.content.type == "tool_response":
-                print(f"[DEBUG 070 POLL] ✅ Saw tool_response - get_weather returned result")
                 seen_tool_response = True
 
             # Track agent text messages and their streaming updates
             if message.content and message.content.type == "text" and message.content.author == "agent":
-                content_length = len(message.content.content) if message.content.content else 0
-                print(f"[DEBUG 070 POLL] Agent text update - Status: {message.streaming_status}, Length: {content_length}")
+                agent_text = getattr(message.content, "content", "") or ""
+                content_length = len(str(agent_text))
                 final_message = message
 
                 # Stop when we get DONE status
                 if message.streaming_status == "DONE" and content_length > 0:
-                    print(f"[DEBUG 070 POLL] ✅ Streaming complete!")
                     break
 
         # Verify we got all the expected pieces
         assert seen_tool_request, "Expected to see tool_request message (agent calling get_weather)"
         assert seen_tool_response, "Expected to see tool_response message (get_weather result)"
         assert final_message is not None, "Expected to see final agent text message"
-        assert final_message.content is not None and len(final_message.content.content) > 0, "Final message should have content"
+        final_text = getattr(final_message.content, "content", None) if final_message.content else None
+        assert isinstance(final_text, str) and len(final_text) > 0, "Final message should have content"
 
         # Check that the response contains the temperature (22 degrees)
         # The get_weather activity returns "The weather in New York City is 22 degrees Celsius"
-        print(f"[DEBUG 070 POLL] Final response: {final_message.content.content}")
-        assert "22" in final_message.content.content, "Expected weather response to contain temperature (22 degrees)"
+        assert "22" in final_text, "Expected weather response to contain temperature (22 degrees)"
 
 
 class TestStreamingEvents:
