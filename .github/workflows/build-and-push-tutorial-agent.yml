@@ -237,13 +237,6 @@ jobs:
             exit 1
           fi
 
-          # Verify response is an array
-          if ! echo "$PACKAGES" | jq -e 'type == "array"' > /dev/null 2>&1; then
-            echo "❌ Unexpected API response format:"
-            echo "$PACKAGES" | head -c 500
-            exit 1
-          fi
-
           # Filter for tutorial-agents from this repo
           TUTORIAL_PACKAGES=$(echo "$PACKAGES" | \
             jq -r '.[] | select(.repository != null and .repository.name == "scale-agentex-python" and (.name | contains("tutorial-agents"))) | .name')
@@ -251,26 +244,33 @@ jobs:
           echo "Tutorial packages in registry:"
           echo "$TUTORIAL_PACKAGES"
 
-          #
-          # echo ""
-          # echo "🔍 Checking for deprecated packages..."
-          # while IFS= read -r package_name; do
-          #   [ -z "$package_name" ] && continue
-          #
-          #   # Extract agent name: scale-agentex-python/tutorial-agents/00_sync-000_hello_acp -> 00_sync-000_hello_acp
-          #   agent_name=$(echo "$package_name" | sed 's|.*/tutorial-agents/||')
-          #
-          #   if echo "$REPO_AGENTS" | grep -q "^${agent_name}$"; then
-          #     echo "✅ $agent_name - still in repo"
-          #   else
-          #     echo "🗑️ $agent_name - NOT in repo, deleting..."
-          #     curl -s -X DELETE \
-          #       -H "Authorization: Bearer $GITHUB_TOKEN" \
-          #       -H "Accept: application/vnd.github+json" \
-          #       "https://api.github.com/orgs/scaleapi/packages/container/$(echo "$package_name" | sed 's|/|%2F|g')"
-          #     echo "   Deleted: $package_name"
-          #   fi
-          # done <<< "$TUTORIAL_PACKAGES"
+          echo ""
+          echo "🔍 Checking for deprecated packages..."
+          while IFS= read -r package_name; do
+            [ -z "$package_name" ] && continue
+
+            # Extract agent name: scale-agentex-python/tutorial-agents/00_sync-000_hello_acp -> 00_sync-000_hello_acp
+            agent_name=$(echo "$package_name" | sed 's|.*/tutorial-agents/||')
+
+            if ! echo "$REPO_AGENTS" | grep -q "^${agent_name}$"; then
+              echo "🗑️ $agent_name - NOT in repo, deleting..."
+              # URL encode the package name (replace / with %2F)
+              encoded_package=$(echo "$package_name" | sed 's|/|%2F|g')
+              response=$(curl -s -w "\n%{http_code}" -X DELETE \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/orgs/scaleapi/packages/container/${encoded_package}")
+
+              http_code=$(echo "$response" | tail -n1)
+              body=$(echo "$response" | sed '$d')
+
+              if [ "$http_code" = "204" ] || [ "$http_code" = "200" ]; then
+                echo "   ✅ Deleted: $package_name"
+              else
+                echo "   ⚠️ Failed to delete $package_name (HTTP $http_code): $body"
+              fi
+            fi
+          done <<< "$TUTORIAL_PACKAGES"
 
           echo ""
           echo "✅ Deprecation check complete"
