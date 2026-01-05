@@ -319,3 +319,9 @@ jobs:
               echo "ℹ️ **Tests were cancelled or skipped.**" >> $GITHUB_STEP_SUMMARY
             fi
           fi
+
+      - name: Fail if tests failed
+        if: ${{ needs.test-tutorial.result != 'success' }}
+        run: |
+          echo "❌ Test jobs did not succeed. Result: ${{ needs.test-tutorial.result }}"
+          exit 1

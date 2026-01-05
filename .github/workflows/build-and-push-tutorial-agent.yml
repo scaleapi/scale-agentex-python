@@ -200,10 +200,86 @@ jobs:
           if [ "$SHOULD_PUSH" = "true" ]; then
             agentex agents build $BUILD_ARGS --push
             echo "✅ Successfully built and pushed: ${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"
+            # Set full image name for validation step
+            echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
           else
             agentex agents build $BUILD_ARGS
             echo "✅ Build validation successful for: ${{ matrix.agent_path }}"
+            # Set full image name for validation step (local build)
+            echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
           fi
+
+      - name: Validate agent image
+        run: |
+          set -e
+
+          FULL_IMAGE="${{ env.FULL_IMAGE }}"
+          AGENT_PATH="${{ matrix.agent_path }}"
+          AGENT_NAME="${{ env.AGENT_NAME }}"
+
+          echo "🔍 Validating agent image: $FULL_IMAGE"
+
+          # Determine ACP type from path
+          if [[ "$AGENT_PATH" == *"10_async"* ]]; then
+            ACP_TYPE="async"
+          else
+            ACP_TYPE="sync"
+          fi
+
+          # Common environment variables for validation
+          ENV_VARS="-e ENVIRONMENT=development \
+            -e AGENT_NAME=${AGENT_NAME} \
+            -e ACP_URL=http://localhost:8000 \
+            -e ACP_PORT=8000 \
+            -e ACP_TYPE=${ACP_TYPE}"
+
+          # 1. Validate ACP entry point exists and is importable
+          echo "📦 Checking ACP entry point..."
+          docker run --rm $ENV_VARS "$FULL_IMAGE" python -c "from project.acp import acp; print('✅ ACP entry point validated')"
+
+          # 2. Check if tests/test_agent.py exists (required for integration tests)
+          # Tests are located at /app/<agent_dir>/tests/test_agent.py
+          echo "🧪 Checking for tests/test_agent.py..."
+          TEST_FILE=$(docker run --rm "$FULL_IMAGE" find /app -name "test_agent.py" -path "*/tests/*" 2>/dev/null | head -1)
+
+          if [ -n "$TEST_FILE" ]; then
+            echo "✅ Found test file at: $TEST_FILE"
+          else
+            echo "❌ No tests/test_agent.py found in image - this is required for all tutorial agents"
+            echo "   Please add a tests/test_agent.py file to your agent"
+            exit 1
+          fi
+
+          # 3. Validate container can start (may fail due to missing services, but should initialize)
+          echo "🏥 Validating container starts..."
+          CONTAINER_NAME="validate-agent-$$"
+
+          # Start container in background with required env vars
+          docker run -d --name "$CONTAINER_NAME" \
+            $ENV_VARS \
+            -p 8000:8000 \
+            "$FULL_IMAGE"
+
+          # Give it a few seconds to attempt startup
+          sleep 5
+
+          # Check if container is still running (it may exit due to missing services, that's ok)
+          # We just want to see that it attempted to start properly
+          echo "📋 Container logs:"
+          docker logs "$CONTAINER_NAME" 2>&1 || true
+
+          # Check for successful ACP initialization in logs
+          if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "instance created "; then
+            echo "✅ Container initialized ACP successfully"
+          else
+            echo "⚠️ Could not verify ACP initialization from logs"
+          fi
+
+          # Cleanup container
+          docker stop "$CONTAINER_NAME" > /dev/null 2>&1 || true
+          docker rm "$CONTAINER_NAME" > /dev/null 2>&1 || true
+
+          echo "✅ All validations passed for: $FULL_IMAGE"
 
   deprecate-agents:
     name: "Deprecate Removed Agents"
