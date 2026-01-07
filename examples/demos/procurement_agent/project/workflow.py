@@ -1,3 +1,4 @@
+import os
 import json
 import asyncio
 from typing import Any, Dict, List, override
@@ -19,6 +20,7 @@ from project.models.events import (
     ShipmentArrivedSiteEvent,
     ShipmentDepartedFactoryEvent,
 )
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.data_content import DataContent
 from agentex.types.text_content import TextContent
@@ -36,6 +38,9 @@ from project.agents.summarization_agent import new_summarization_agent
 from project.agents.extract_learnings_agent import new_extract_learnings_agent
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
+from agentex.lib.core.tracing.tracing_processor_manager import (
+    add_tracing_processor_config,
+)
 from agentex.lib.core.temporal.plugins.openai_agents.hooks.hooks import TemporalStreamingHooks
 
 environment_variables = EnvironmentVariables.refresh()
@@ -48,14 +53,40 @@ if environment_variables.AGENT_NAME is None:
 
 logger = make_logger(__name__)
 
+# Setup tracing for SGP (Scale GenAI Platform)
+# This enables visibility into your agent's execution in the SGP dashboard
+add_tracing_processor_config(
+    SGPTracingProcessorConfig(
+        sgp_api_key=os.environ.get("SGP_API_KEY", ""),
+        sgp_account_id=os.environ.get("SGP_ACCOUNT_ID", ""),
+        sgp_base_url=os.environ.get("SGP_BASE_URL"),
+    )
+)
+
+
+class TurnInput(BaseModel):
+    """Input model for tracing spans."""
+    input_list: List[Dict[str, Any]]
+
+
+class TurnOutput(BaseModel):
+    """Output model for tracing spans."""
+    final_output: Any
+
+
 class StateModel(BaseModel):
     """
     State model for preserving conversation history.
 
     This allows the agent to maintain context throughout the conversation,
     making it possible to reference previous messages and build on the discussion.
+
+    Attributes:
+        input_list: The conversation history in OpenAI message format.
+        turn_number: Counter for tracking conversation turns (useful for tracing).
     """
     input_list: List[Dict[str, Any]]
+    turn_number: int
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
@@ -119,7 +150,7 @@ class ProcurementAgentWorkflow(BaseWorkflow):
     async def on_task_create(self, params: CreateTaskParams) -> str:
         logger.info(f"Received task create params: {params}")
 
-        self._state = StateModel(input_list=[])
+        self._state = StateModel(input_list=[], turn_number=0)
 
         self._task_id = params.task.id
         self._trace_id = params.task.id
@@ -225,21 +256,41 @@ class ProcurementAgentWorkflow(BaseWorkflow):
                     )
                     continue  # Skip this event, wait for next one
 
+                # Increment turn number for tracing
+                self._state.turn_number += 1
+
+                # Create a span to track this turn of the conversation
+                turn_input = TurnInput(
+                    input_list=self._state.input_list,
+                )
+
                 # Create agent and execute with error handling
                 try:
-                    procurement_agent = new_procurement_agent(
-                        master_construction_schedule=master_construction_schedule,
-                        human_input_learnings=self.human_input_learnings
-                    )
+                    async with adk.tracing.span(
+                        trace_id=params.task.id,
+                        name=f"Turn {self._state.turn_number}",
+                        input=turn_input.model_dump(),
+                    ) as span:
+                        self._parent_span_id = span.id if span else None
 
-                    hooks = TemporalStreamingHooks(task_id=params.task.id)
+                        procurement_agent = new_procurement_agent(
+                            master_construction_schedule=master_construction_schedule,
+                            human_input_learnings=self.human_input_learnings
+                        )
 
-                    # Execute agent with graceful degradation pattern (from temporal-community demos)
-                    result = await Runner.run(procurement_agent, self._state.input_list, hooks=hooks)  # type: ignore[arg-type]
+                        hooks = TemporalStreamingHooks(task_id=params.task.id)
 
-                    # Update state with result
-                    self._state.input_list = result.to_input_list()  # type: ignore[assignment]
-                    logger.info("Successfully processed event")
+                        # Execute agent with graceful degradation pattern (from temporal-community demos)
+                        result = await Runner.run(procurement_agent, self._state.input_list, hooks=hooks)  # type: ignore[arg-type]
+
+                        # Update state with result
+                        self._state.input_list = result.to_input_list()  # type: ignore[assignment]
+                        logger.info("Successfully processed event")
+
+                        # Set span output for tracing
+                        if span:
+                            turn_output = TurnOutput(final_output=result.final_output)
+                            span.output = turn_output.model_dump()
                     # Extract learnings from NEW wait_for_human calls only (using going backwards approach)
                     try:
                         result_context = get_new_wait_for_human_context(
