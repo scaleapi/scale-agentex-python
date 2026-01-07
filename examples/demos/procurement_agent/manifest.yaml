@@ -100,18 +100,19 @@ agent:
     - env_var_name: REDIS_URL
       secret_name: redis-url-secret
       secret_key: url
+    - env_var_name: SGP_API_KEY
+      secret_name: sgp-api-key
+      secret_key: api-key
   #   - env_var_name: OPENAI_API_KEY
   #     secret_name: openai-api-key
   #     secret_key: api-key
-  
-  # Optional: Set Environment variables for running your agent locally as well 
+
+  # Optional: Set Environment variables for running your agent locally as well
   # as for deployment later on
   env:
     OPENAI_API_KEY: ""
     # OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
     OPENAI_ORG_ID: ""
-
-
 # Deployment Configuration
 # -----------------------
 # Configuration for deploying your agent to Kubernetes clusters
