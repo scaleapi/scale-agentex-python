@@ -40,6 +40,81 @@ The package provides the `agentex` CLI with these main commands:
 - Debug agents: `agentex agents run --manifest manifest.yaml --debug-worker`
 - Debug with custom port: `agentex agents run --manifest manifest.yaml --debug-worker --debug-port 5679`
 
+### Custom OpenAI Client for Agents SDK
+
+Configure custom OpenAI clients **specifically for the OpenAI Agents SDK** integration (Agent and Runner classes).
+
+⚠️ **Scope**: This configuration ONLY affects OpenAI Agents SDK operations. It does NOT affect:
+- LiteLLM integration (configure LiteLLM separately via environment variables or LiteLLM config)
+- SGP integration
+- Direct OpenAI API calls
+
+#### Requirements
+- Must use **async** client: `AsyncOpenAI` or `AsyncAzureOpenAI`
+- Sync clients (`OpenAI`) are not supported by the Agents SDK
+
+#### Basic Usage (Custom Endpoint)
+
+Use this for custom OpenAI-compatible endpoints such as LiteLLM proxy for cost tracking:
+
+```python
+from openai import AsyncOpenAI
+from agentex.lib.adk.providers._modules.openai_agents_config import (
+    initialize_openai_agents_client
+)
+
+# Configure custom endpoint
+client = AsyncOpenAI(
+    base_url="https://your-proxy.com/v1",
+    api_key=os.getenv("CUSTOM_API_KEY")
+)
+initialize_openai_agents_client(client)
+```
+
+#### Azure OpenAI
+
+```python
+from openai import AsyncAzureOpenAI
+from agentex.lib.adk.providers._modules.openai_agents_config import (
+    initialize_openai_agents_client
+)
+
+client = AsyncAzureOpenAI(
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_KEY"),
+    api_version="2024-02-01"
+)
+initialize_openai_agents_client(client)
+```
+
+#### Temporal Workers
+
+Call `initialize_openai_agents_client()` in your worker startup script **BEFORE** starting the worker:
+
+```python
+# run_worker.py
+import os
+from openai import AsyncOpenAI
+from agentex.lib.adk.providers._modules.openai_agents_config import (
+    initialize_openai_agents_client
+)
+
+# Step 1: Configure client before starting worker
+if os.getenv("CUSTOM_OPENAI_BASE_URL"):
+    client = AsyncOpenAI(
+        base_url=os.getenv("CUSTOM_OPENAI_BASE_URL"),
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+    initialize_openai_agents_client(client)
+
+# Step 2: Start worker (all agent operations will use configured client)
+# ... worker startup code ...
+```
+
+#### Backward Compatibility
+
+If `initialize_openai_agents_client()` is not called, the OpenAI Agents SDK uses default OpenAI configuration via the `OPENAI_API_KEY` environment variable. All existing code continues to work without changes.
+
 ## Architecture Overview
 
 ### Code Structure
