@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.7.3"
+version = "0.8.2"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"

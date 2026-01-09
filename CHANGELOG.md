@@ -1,5 +1,80 @@
 # Changelog
 
+## 0.8.2 (2026-01-02)
+
+Full Changelog: [v0.8.1...v0.8.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.8.1...v0.8.2)
+
+### Features
+
+* **api:** api update ([f2115eb](https://github.com/scaleapi/scale-agentex-python/commit/f2115ebf273043a87ea50b39837138bfc30a63d6))
+
+## 0.8.1 (2025-12-22)
+
+Full Changelog: [v0.8.0...v0.8.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.8.0...v0.8.1)
+
+### Features
+
+* **api:** add messages/paginated endpoint ([3e03aff](https://github.com/scaleapi/scale-agentex-python/commit/3e03aff8490e0556cb05052d385156eda8f28107))
+* **api:** add messages/paginated to stainless config ([2473ded](https://github.com/scaleapi/scale-agentex-python/commit/2473ded39274bcd0a16d7314667fcf7f55e829c2))
+* **api:** api update ([2e4ec2f](https://github.com/scaleapi/scale-agentex-python/commit/2e4ec2f28413ee58afa664b793565d6be4da5dfe))
+* **api:** api update ([ed21ad8](https://github.com/scaleapi/scale-agentex-python/commit/ed21ad8c34cd11e80af9128181764489a0541740))
+* **api:** api update ([86a166a](https://github.com/scaleapi/scale-agentex-python/commit/86a166aba5538411ebcc0ed74291505e01a466f2))
+* **api:** api update ([4c95c94](https://github.com/scaleapi/scale-agentex-python/commit/4c95c94df570277fc49281f1343cb012e8da2334))
+* **api:** api update ([f6eccdf](https://github.com/scaleapi/scale-agentex-python/commit/f6eccdf975eaef9b257ef3f20f087f2f2f9b3665))
+* **api:** api update ([41067fb](https://github.com/scaleapi/scale-agentex-python/commit/41067fb79725787e0ceb20dcf16029998bcbca24))
+* **api:** api update ([cdc9c63](https://github.com/scaleapi/scale-agentex-python/commit/cdc9c636be6f26e84772d1d1ef9d47cddcd9dabc))
+* **api:** api update ([413d9c8](https://github.com/scaleapi/scale-agentex-python/commit/413d9c806d918d7c5da3d0249c0f11d4b9f0894e))
+* **api:** api update ([1b4bf7d](https://github.com/scaleapi/scale-agentex-python/commit/1b4bf7d3a11306a50ec0eb9c20764c585d0e98e4))
+* **api:** manual updates ([131e836](https://github.com/scaleapi/scale-agentex-python/commit/131e836b5bda8248f847b00308b6711a1ee84ee0))
+* **api:** update via SDK Studio ([2a6c7fa](https://github.com/scaleapi/scale-agentex-python/commit/2a6c7fa919ad255f9e53e7f97f195065599a05e9))
+
+
+### Bug Fixes
+
+* ensure streams are always closed ([7bb9db8](https://github.com/scaleapi/scale-agentex-python/commit/7bb9db851a213d261e585cd2f156046f05cf85db))
+* **types:** allow pyright to infer TypedDict types within SequenceNotStr ([9cfc9d6](https://github.com/scaleapi/scale-agentex-python/commit/9cfc9d66579a11f3eaf248bafbfddb422e878a58))
+* use async_to_httpx_files in patch method ([8abb539](https://github.com/scaleapi/scale-agentex-python/commit/8abb539a340af3a2a42482757412c0c408817461))
+
+
+### Chores
+
+* add missing docstrings ([81f1fa9](https://github.com/scaleapi/scale-agentex-python/commit/81f1fa9b3c440d893b8ea8f773ab2592eb333d65))
+* **deps:** mypy 1.18.1 has a regression, pin to 1.17 ([e20aaa4](https://github.com/scaleapi/scale-agentex-python/commit/e20aaa495384f547dd18c8d31496f70b4a37e0dd))
+* **docs:** use environment variables for authentication in code snippets ([a30f6ae](https://github.com/scaleapi/scale-agentex-python/commit/a30f6aebca8de5be72eb7bcf7a3b3ccea28479bc))
+* **internal:** add `--fix` argument to lint script ([0ef4242](https://github.com/scaleapi/scale-agentex-python/commit/0ef4242888cc6ed341536e1ab1fbf6b03c723de9))
+* **internal:** add missing files argument to base client ([28d1738](https://github.com/scaleapi/scale-agentex-python/commit/28d1738d3af8feb00f6f641e159221fb41c42983))
+* speedup initial import ([8e50946](https://github.com/scaleapi/scale-agentex-python/commit/8e50946321c32e42a7b25cf9ae8b8e9b020a7ac9))
+* update lockfile ([a3a2e4f](https://github.com/scaleapi/scale-agentex-python/commit/a3a2e4fbcf6e6e4bcbadab50c6b9236e4514dae2))
+
+## 0.8.0 (2025-12-17)
+
+Full Changelog: [v0.7.4...v0.8.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.7.4...v0.8.0)
+
+### Features
+
+* **api:** api update ([2e4ec2f](https://github.com/scaleapi/scale-agentex-python/commit/2e4ec2f28413ee58afa664b793565d6be4da5dfe))
+
+
+### Bug Fixes
+
+* use async_to_httpx_files in patch method ([8abb539](https://github.com/scaleapi/scale-agentex-python/commit/8abb539a340af3a2a42482757412c0c408817461))
+
+## 0.7.4 (2025-12-17)
+
+Full Changelog: [v0.7.3...v0.7.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.7.3...v0.7.4)
+
+### Features
+
+* **api:** api update ([ed21ad8](https://github.com/scaleapi/scale-agentex-python/commit/ed21ad8c34cd11e80af9128181764489a0541740))
+* **api:** api update ([86a166a](https://github.com/scaleapi/scale-agentex-python/commit/86a166aba5538411ebcc0ed74291505e01a466f2))
+* **api:** api update ([4c95c94](https://github.com/scaleapi/scale-agentex-python/commit/4c95c94df570277fc49281f1343cb012e8da2334))
+
+
+### Chores
+
+* **internal:** add missing files argument to base client ([28d1738](https://github.com/scaleapi/scale-agentex-python/commit/28d1738d3af8feb00f6f641e159221fb41c42983))
+* speedup initial import ([8e50946](https://github.com/scaleapi/scale-agentex-python/commit/8e50946321c32e42a7b25cf9ae8b8e9b020a7ac9))
+
 ## 0.7.3 (2025-12-10)
 
 Full Changelog: [v0.7.2...v0.7.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.7.2...v0.7.3)

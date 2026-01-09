@@ -94,6 +94,7 @@ class TestNonStreamingEvents:
             timeout=30,
             sleep_interval=1.0,
         ):
+            messages.append(message)
             ## we should expect to get a question from the agent
             if message.content.type == "text" and message.content.author == "agent":
                 found_agent_message = True
@@ -135,7 +136,8 @@ class TestStreamingEvents:
         assert task is not None
 
         found_agent_message = False
-        async def poll_message_in_background() -> None:
+        user_message = "Hello! Please tell me the latest news about AI and AI startups."
+        async def stream_first_turn() -> None:
             nonlocal found_agent_message
             async for message in stream_task_messages(
                 client=client,
@@ -146,19 +148,19 @@ class TestStreamingEvents:
                     found_agent_message = True
                     break
 
-            assert found_agent_message, "Did not find an agent message"
-
-        poll_task = asyncio.create_task(poll_message_in_background())
-        # create the first
-        user_message = "Hello! Please tell me the latest news about AI and AI startups."
-        await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": TextContentParam(type="text", author="user", content=user_message)})
-
-        await poll_task
+        stream_task = asyncio.create_task(stream_first_turn())
+        await client.agents.send_event(
+            agent_id=agent_id,
+            params={"task_id": task.id, "content": TextContentParam(type="text", author="user", content=user_message)},
+        )
+        await stream_task
+        assert found_agent_message, "Did not find an agent message"
 
         await asyncio.sleep(2)
         starting_deep_research_message = False
         uses_tool_requests = False
-        async def poll_message_in_background_2() -> None:
+        next_user_message = "I want to know what viral news came up and which startups failed, got acquired, or became very successful or popular in the last 3 months"
+        async def stream_second_turn() -> None:
             nonlocal starting_deep_research_message, uses_tool_requests
             async for message in stream_task_messages(
                 client=client,
@@ -173,14 +175,18 @@ class TestStreamingEvents:
                     uses_tool_requests = True
                     break
 
-            assert starting_deep_research_message, "Did not start deep research"
-            assert uses_tool_requests, "Did not use tool requests"
+        stream_task = asyncio.create_task(stream_second_turn())
+        await client.agents.send_event(
+            agent_id=agent_id,
+            params={
+                "task_id": task.id,
+                "content": TextContentParam(type="text", author="user", content=next_user_message),
+            },
+        )
+        await stream_task
 
-        poll_task_2 = asyncio.create_task(poll_message_in_background_2())
-
-        next_user_message = "I want to know what viral news came up and which startups failed, got acquired, or became very successful or popular in the last 3 months"
-        await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": TextContentParam(type="text", author="user", content=next_user_message)})
-        await poll_task_2
+        assert starting_deep_research_message, "Did not start deep research"
+        assert uses_tool_requests, "Did not use tool requests"
 
 
 if __name__ == "__main__":

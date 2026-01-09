@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Mapping, cast
+from typing import TYPE_CHECKING, Any, Dict, Mapping, cast
 from typing_extensions import Self, Literal, override
 
 import httpx
@@ -20,8 +20,8 @@ from ._types import (
     not_given,
 )
 from ._utils import is_given, get_async_library
+from ._compat import cached_property
 from ._version import __version__
-from .resources import spans, tasks, agents, events, states, tracker, deployment_history
 from ._streaming import Stream as Stream, AsyncStream as AsyncStream
 from ._exceptions import APIStatusError
 from ._base_client import (
@@ -29,7 +29,17 @@ from ._base_client import (
     SyncAPIClient,
     AsyncAPIClient,
 )
-from .resources.messages import messages
+
+if TYPE_CHECKING:
+    from .resources import spans, tasks, agents, events, states, tracker, messages, deployment_history
+    from .resources.spans import SpansResource, AsyncSpansResource
+    from .resources.tasks import TasksResource, AsyncTasksResource
+    from .resources.agents import AgentsResource, AsyncAgentsResource
+    from .resources.events import EventsResource, AsyncEventsResource
+    from .resources.states import StatesResource, AsyncStatesResource
+    from .resources.tracker import TrackerResource, AsyncTrackerResource
+    from .resources.messages.messages import MessagesResource, AsyncMessagesResource
+    from .resources.deployment_history import DeploymentHistoryResource, AsyncDeploymentHistoryResource
 
 __all__ = [
     "ENVIRONMENTS",
@@ -50,17 +60,6 @@ ENVIRONMENTS: Dict[str, str] = {
 
 
 class Agentex(SyncAPIClient):
-    agents: agents.AgentsResource
-    tasks: tasks.TasksResource
-    messages: messages.MessagesResource
-    spans: spans.SpansResource
-    states: states.StatesResource
-    events: events.EventsResource
-    tracker: tracker.TrackerResource
-    deployment_history: deployment_history.DeploymentHistoryResource
-    with_raw_response: AgentexWithRawResponse
-    with_streaming_response: AgentexWithStreamedResponse
-
     # client options
     api_key: str | None
 
@@ -135,16 +134,61 @@ class Agentex(SyncAPIClient):
             _strict_response_validation=_strict_response_validation,
         )
 
-        self.agents = agents.AgentsResource(self)
-        self.tasks = tasks.TasksResource(self)
-        self.messages = messages.MessagesResource(self)
-        self.spans = spans.SpansResource(self)
-        self.states = states.StatesResource(self)
-        self.events = events.EventsResource(self)
-        self.tracker = tracker.TrackerResource(self)
-        self.deployment_history = deployment_history.DeploymentHistoryResource(self)
-        self.with_raw_response = AgentexWithRawResponse(self)
-        self.with_streaming_response = AgentexWithStreamedResponse(self)
+    @cached_property
+    def agents(self) -> AgentsResource:
+        from .resources.agents import AgentsResource
+
+        return AgentsResource(self)
+
+    @cached_property
+    def tasks(self) -> TasksResource:
+        from .resources.tasks import TasksResource
+
+        return TasksResource(self)
+
+    @cached_property
+    def messages(self) -> MessagesResource:
+        from .resources.messages import MessagesResource
+
+        return MessagesResource(self)
+
+    @cached_property
+    def spans(self) -> SpansResource:
+        from .resources.spans import SpansResource
+
+        return SpansResource(self)
+
+    @cached_property
+    def states(self) -> StatesResource:
+        from .resources.states import StatesResource
+
+        return StatesResource(self)
+
+    @cached_property
+    def events(self) -> EventsResource:
+        from .resources.events import EventsResource
+
+        return EventsResource(self)
+
+    @cached_property
+    def tracker(self) -> TrackerResource:
+        from .resources.tracker import TrackerResource
+
+        return TrackerResource(self)
+
+    @cached_property
+    def deployment_history(self) -> DeploymentHistoryResource:
+        from .resources.deployment_history import DeploymentHistoryResource
+
+        return DeploymentHistoryResource(self)
+
+    @cached_property
+    def with_raw_response(self) -> AgentexWithRawResponse:
+        return AgentexWithRawResponse(self)
+
+    @cached_property
+    def with_streaming_response(self) -> AgentexWithStreamedResponse:
+        return AgentexWithStreamedResponse(self)
 
     @property
     @override
@@ -256,17 +300,6 @@ class Agentex(SyncAPIClient):
 
 
 class AsyncAgentex(AsyncAPIClient):
-    agents: agents.AsyncAgentsResource
-    tasks: tasks.AsyncTasksResource
-    messages: messages.AsyncMessagesResource
-    spans: spans.AsyncSpansResource
-    states: states.AsyncStatesResource
-    events: events.AsyncEventsResource
-    tracker: tracker.AsyncTrackerResource
-    deployment_history: deployment_history.AsyncDeploymentHistoryResource
-    with_raw_response: AsyncAgentexWithRawResponse
-    with_streaming_response: AsyncAgentexWithStreamedResponse
-
     # client options
     api_key: str | None
 
@@ -341,16 +374,61 @@ class AsyncAgentex(AsyncAPIClient):
             _strict_response_validation=_strict_response_validation,
         )
 
-        self.agents = agents.AsyncAgentsResource(self)
-        self.tasks = tasks.AsyncTasksResource(self)
-        self.messages = messages.AsyncMessagesResource(self)
-        self.spans = spans.AsyncSpansResource(self)
-        self.states = states.AsyncStatesResource(self)
-        self.events = events.AsyncEventsResource(self)
-        self.tracker = tracker.AsyncTrackerResource(self)
-        self.deployment_history = deployment_history.AsyncDeploymentHistoryResource(self)
-        self.with_raw_response = AsyncAgentexWithRawResponse(self)
-        self.with_streaming_response = AsyncAgentexWithStreamedResponse(self)
+    @cached_property
+    def agents(self) -> AsyncAgentsResource:
+        from .resources.agents import AsyncAgentsResource
+
+        return AsyncAgentsResource(self)
+
+    @cached_property
+    def tasks(self) -> AsyncTasksResource:
+        from .resources.tasks import AsyncTasksResource
+
+        return AsyncTasksResource(self)
+
+    @cached_property
+    def messages(self) -> AsyncMessagesResource:
+        from .resources.messages import AsyncMessagesResource
+
+        return AsyncMessagesResource(self)
+
+    @cached_property
+    def spans(self) -> AsyncSpansResource:
+        from .resources.spans import AsyncSpansResource
+
+        return AsyncSpansResource(self)
+
+    @cached_property
+    def states(self) -> AsyncStatesResource:
+        from .resources.states import AsyncStatesResource
+
+        return AsyncStatesResource(self)
+
+    @cached_property
+    def events(self) -> AsyncEventsResource:
+        from .resources.events import AsyncEventsResource
+
+        return AsyncEventsResource(self)
+
+    @cached_property
+    def tracker(self) -> AsyncTrackerResource:
+        from .resources.tracker import AsyncTrackerResource
+
+        return AsyncTrackerResource(self)
+
+    @cached_property
+    def deployment_history(self) -> AsyncDeploymentHistoryResource:
+        from .resources.deployment_history import AsyncDeploymentHistoryResource
+
+        return AsyncDeploymentHistoryResource(self)
+
+    @cached_property
+    def with_raw_response(self) -> AsyncAgentexWithRawResponse:
+        return AsyncAgentexWithRawResponse(self)
+
+    @cached_property
+    def with_streaming_response(self) -> AsyncAgentexWithStreamedResponse:
+        return AsyncAgentexWithStreamedResponse(self)
 
     @property
     @override
@@ -462,57 +540,223 @@ class AsyncAgentex(AsyncAPIClient):
 
 
 class AgentexWithRawResponse:
+    _client: Agentex
+
     def __init__(self, client: Agentex) -> None:
-        self.agents = agents.AgentsResourceWithRawResponse(client.agents)
-        self.tasks = tasks.TasksResourceWithRawResponse(client.tasks)
-        self.messages = messages.MessagesResourceWithRawResponse(client.messages)
-        self.spans = spans.SpansResourceWithRawResponse(client.spans)
-        self.states = states.StatesResourceWithRawResponse(client.states)
-        self.events = events.EventsResourceWithRawResponse(client.events)
-        self.tracker = tracker.TrackerResourceWithRawResponse(client.tracker)
-        self.deployment_history = deployment_history.DeploymentHistoryResourceWithRawResponse(client.deployment_history)
+        self._client = client
+
+    @cached_property
+    def agents(self) -> agents.AgentsResourceWithRawResponse:
+        from .resources.agents import AgentsResourceWithRawResponse
+
+        return AgentsResourceWithRawResponse(self._client.agents)
+
+    @cached_property
+    def tasks(self) -> tasks.TasksResourceWithRawResponse:
+        from .resources.tasks import TasksResourceWithRawResponse
+
+        return TasksResourceWithRawResponse(self._client.tasks)
+
+    @cached_property
+    def messages(self) -> messages.MessagesResourceWithRawResponse:
+        from .resources.messages import MessagesResourceWithRawResponse
+
+        return MessagesResourceWithRawResponse(self._client.messages)
+
+    @cached_property
+    def spans(self) -> spans.SpansResourceWithRawResponse:
+        from .resources.spans import SpansResourceWithRawResponse
+
+        return SpansResourceWithRawResponse(self._client.spans)
+
+    @cached_property
+    def states(self) -> states.StatesResourceWithRawResponse:
+        from .resources.states import StatesResourceWithRawResponse
+
+        return StatesResourceWithRawResponse(self._client.states)
+
+    @cached_property
+    def events(self) -> events.EventsResourceWithRawResponse:
+        from .resources.events import EventsResourceWithRawResponse
+
+        return EventsResourceWithRawResponse(self._client.events)
+
+    @cached_property
+    def tracker(self) -> tracker.TrackerResourceWithRawResponse:
+        from .resources.tracker import TrackerResourceWithRawResponse
+
+        return TrackerResourceWithRawResponse(self._client.tracker)
+
+    @cached_property
+    def deployment_history(self) -> deployment_history.DeploymentHistoryResourceWithRawResponse:
+        from .resources.deployment_history import DeploymentHistoryResourceWithRawResponse
+
+        return DeploymentHistoryResourceWithRawResponse(self._client.deployment_history)
 
 
 class AsyncAgentexWithRawResponse:
+    _client: AsyncAgentex
+
     def __init__(self, client: AsyncAgentex) -> None:
-        self.agents = agents.AsyncAgentsResourceWithRawResponse(client.agents)
-        self.tasks = tasks.AsyncTasksResourceWithRawResponse(client.tasks)
-        self.messages = messages.AsyncMessagesResourceWithRawResponse(client.messages)
-        self.spans = spans.AsyncSpansResourceWithRawResponse(client.spans)
-        self.states = states.AsyncStatesResourceWithRawResponse(client.states)
-        self.events = events.AsyncEventsResourceWithRawResponse(client.events)
-        self.tracker = tracker.AsyncTrackerResourceWithRawResponse(client.tracker)
-        self.deployment_history = deployment_history.AsyncDeploymentHistoryResourceWithRawResponse(
-            client.deployment_history
-        )
+        self._client = client
+
+    @cached_property
+    def agents(self) -> agents.AsyncAgentsResourceWithRawResponse:
+        from .resources.agents import AsyncAgentsResourceWithRawResponse
+
+        return AsyncAgentsResourceWithRawResponse(self._client.agents)
+
+    @cached_property
+    def tasks(self) -> tasks.AsyncTasksResourceWithRawResponse:
+        from .resources.tasks import AsyncTasksResourceWithRawResponse
+
+        return AsyncTasksResourceWithRawResponse(self._client.tasks)
+
+    @cached_property
+    def messages(self) -> messages.AsyncMessagesResourceWithRawResponse:
+        from .resources.messages import AsyncMessagesResourceWithRawResponse
+
+        return AsyncMessagesResourceWithRawResponse(self._client.messages)
+
+    @cached_property
+    def spans(self) -> spans.AsyncSpansResourceWithRawResponse:
+        from .resources.spans import AsyncSpansResourceWithRawResponse
+
+        return AsyncSpansResourceWithRawResponse(self._client.spans)
+
+    @cached_property
+    def states(self) -> states.AsyncStatesResourceWithRawResponse:
+        from .resources.states import AsyncStatesResourceWithRawResponse
+
+        return AsyncStatesResourceWithRawResponse(self._client.states)
+
+    @cached_property
+    def events(self) -> events.AsyncEventsResourceWithRawResponse:
+        from .resources.events import AsyncEventsResourceWithRawResponse
+
+        return AsyncEventsResourceWithRawResponse(self._client.events)
+
+    @cached_property
+    def tracker(self) -> tracker.AsyncTrackerResourceWithRawResponse:
+        from .resources.tracker import AsyncTrackerResourceWithRawResponse
+
+        return AsyncTrackerResourceWithRawResponse(self._client.tracker)
+
+    @cached_property
+    def deployment_history(self) -> deployment_history.AsyncDeploymentHistoryResourceWithRawResponse:
+        from .resources.deployment_history import AsyncDeploymentHistoryResourceWithRawResponse
+
+        return AsyncDeploymentHistoryResourceWithRawResponse(self._client.deployment_history)
 
 
 class AgentexWithStreamedResponse:
+    _client: Agentex
+
     def __init__(self, client: Agentex) -> None:
-        self.agents = agents.AgentsResourceWithStreamingResponse(client.agents)
-        self.tasks = tasks.TasksResourceWithStreamingResponse(client.tasks)
-        self.messages = messages.MessagesResourceWithStreamingResponse(client.messages)
-        self.spans = spans.SpansResourceWithStreamingResponse(client.spans)
-        self.states = states.StatesResourceWithStreamingResponse(client.states)
-        self.events = events.EventsResourceWithStreamingResponse(client.events)
-        self.tracker = tracker.TrackerResourceWithStreamingResponse(client.tracker)
-        self.deployment_history = deployment_history.DeploymentHistoryResourceWithStreamingResponse(
-            client.deployment_history
-        )
+        self._client = client
+
+    @cached_property
+    def agents(self) -> agents.AgentsResourceWithStreamingResponse:
+        from .resources.agents import AgentsResourceWithStreamingResponse
+
+        return AgentsResourceWithStreamingResponse(self._client.agents)
+
+    @cached_property
+    def tasks(self) -> tasks.TasksResourceWithStreamingResponse:
+        from .resources.tasks import TasksResourceWithStreamingResponse
+
+        return TasksResourceWithStreamingResponse(self._client.tasks)
+
+    @cached_property
+    def messages(self) -> messages.MessagesResourceWithStreamingResponse:
+        from .resources.messages import MessagesResourceWithStreamingResponse
+
+        return MessagesResourceWithStreamingResponse(self._client.messages)
+
+    @cached_property
+    def spans(self) -> spans.SpansResourceWithStreamingResponse:
+        from .resources.spans import SpansResourceWithStreamingResponse
+
+        return SpansResourceWithStreamingResponse(self._client.spans)
+
+    @cached_property
+    def states(self) -> states.StatesResourceWithStreamingResponse:
+        from .resources.states import StatesResourceWithStreamingResponse
+
+        return StatesResourceWithStreamingResponse(self._client.states)
+
+    @cached_property
+    def events(self) -> events.EventsResourceWithStreamingResponse:
+        from .resources.events import EventsResourceWithStreamingResponse
+
+        return EventsResourceWithStreamingResponse(self._client.events)
+
+    @cached_property
+    def tracker(self) -> tracker.TrackerResourceWithStreamingResponse:
+        from .resources.tracker import TrackerResourceWithStreamingResponse
+
+        return TrackerResourceWithStreamingResponse(self._client.tracker)
+
+    @cached_property
+    def deployment_history(self) -> deployment_history.DeploymentHistoryResourceWithStreamingResponse:
+        from .resources.deployment_history import DeploymentHistoryResourceWithStreamingResponse
+
+        return DeploymentHistoryResourceWithStreamingResponse(self._client.deployment_history)
 
 
 class AsyncAgentexWithStreamedResponse:
+    _client: AsyncAgentex
+
     def __init__(self, client: AsyncAgentex) -> None:
-        self.agents = agents.AsyncAgentsResourceWithStreamingResponse(client.agents)
-        self.tasks = tasks.AsyncTasksResourceWithStreamingResponse(client.tasks)
-        self.messages = messages.AsyncMessagesResourceWithStreamingResponse(client.messages)
-        self.spans = spans.AsyncSpansResourceWithStreamingResponse(client.spans)
-        self.states = states.AsyncStatesResourceWithStreamingResponse(client.states)
-        self.events = events.AsyncEventsResourceWithStreamingResponse(client.events)
-        self.tracker = tracker.AsyncTrackerResourceWithStreamingResponse(client.tracker)
-        self.deployment_history = deployment_history.AsyncDeploymentHistoryResourceWithStreamingResponse(
-            client.deployment_history
-        )
+        self._client = client
+
+    @cached_property
+    def agents(self) -> agents.AsyncAgentsResourceWithStreamingResponse:
+        from .resources.agents import AsyncAgentsResourceWithStreamingResponse
+
+        return AsyncAgentsResourceWithStreamingResponse(self._client.agents)
+
+    @cached_property
+    def tasks(self) -> tasks.AsyncTasksResourceWithStreamingResponse:
+        from .resources.tasks import AsyncTasksResourceWithStreamingResponse
+
+        return AsyncTasksResourceWithStreamingResponse(self._client.tasks)
+
+    @cached_property
+    def messages(self) -> messages.AsyncMessagesResourceWithStreamingResponse:
+        from .resources.messages import AsyncMessagesResourceWithStreamingResponse
+
+        return AsyncMessagesResourceWithStreamingResponse(self._client.messages)
+
+    @cached_property
+    def spans(self) -> spans.AsyncSpansResourceWithStreamingResponse:
+        from .resources.spans import AsyncSpansResourceWithStreamingResponse
+
+        return AsyncSpansResourceWithStreamingResponse(self._client.spans)
+
+    @cached_property
+    def states(self) -> states.AsyncStatesResourceWithStreamingResponse:
+        from .resources.states import AsyncStatesResourceWithStreamingResponse
+
+        return AsyncStatesResourceWithStreamingResponse(self._client.states)
+
+    @cached_property
+    def events(self) -> events.AsyncEventsResourceWithStreamingResponse:
+        from .resources.events import AsyncEventsResourceWithStreamingResponse
+
+        return AsyncEventsResourceWithStreamingResponse(self._client.events)
+
+    @cached_property
+    def tracker(self) -> tracker.AsyncTrackerResourceWithStreamingResponse:
+        from .resources.tracker import AsyncTrackerResourceWithStreamingResponse
+
+        return AsyncTrackerResourceWithStreamingResponse(self._client.tracker)
+
+    @cached_property
+    def deployment_history(self) -> deployment_history.AsyncDeploymentHistoryResourceWithStreamingResponse:
+        from .resources.deployment_history import AsyncDeploymentHistoryResourceWithStreamingResponse
+
+        return AsyncDeploymentHistoryResourceWithStreamingResponse(self._client.deployment_history)
 
 
 Client = Agentex
