@@ -68,7 +68,7 @@ async def handle_message_send(
         state = StateModel.model_validate(task_state.state)
 
     task_messages = await adk.messages.list(task_id=params.task.id)
-
+    task_messages = list(reversed(task_messages))  # API returns newest first, reverse to chronological order
 
     # Initialize the provider and run config to allow for tracing
     provider = SyncStreamingProvider(

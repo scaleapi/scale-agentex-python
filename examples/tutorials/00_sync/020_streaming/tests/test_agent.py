@@ -19,7 +19,7 @@ Configuration:
 import os
 
 import pytest
-from test_utils.sync import collect_streaming_response
+from test_utils.sync import validate_text_in_string, collect_streaming_response
 
 from agentex import Agentex
 from agentex.types import TextContent, TextContentParam
@@ -57,19 +57,27 @@ class TestNonStreamingMessages:
     """Test non-streaming message sending."""
 
     def test_send_message(self, client: Agentex, agent_name: str, agent_id: str):
-        """Test sending a message and receiving a response."""
+        """
+        Test message ordering by sending messages about distinct topics.
+
+        This validates that the agent receives messages in chronological order.
+        If messages are reversed (newest first), the agent would respond about
+        the wrong topic.
+        """
         task_response = client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
 
         assert task is not None
 
-        messages = [
-            "Hello, can you tell me a little bit about tennis? I want you to make sure you use the word 'tennis' in each response.",
-            "Pick one of the things you just mentioned, and dive deeper into it.",
-            "Can you now output a summary of this conversation",
+        # Each message asks about a distinct topic with a required keyword in response
+        # This validates message ordering: if order is wrong, agent responds about wrong topic
+        messages_and_expected_keywords = [
+            ("Tell me about tennis. You must include the word 'tennis' in your response.", "tennis"),
+            ("Now tell me about basketball. You must include the word 'basketball' in your response. Do not mention tennis.", "basketball"),
+            ("Now tell me about soccer. You must include the word 'soccer' in your response. Do not mention tennis or basketball.", "soccer"),
         ]
 
-        for i, msg in enumerate(messages):
+        for i, (msg, expected_keyword) in enumerate(messages_and_expected_keywords):
             response = client.agents.send_message(
                 agent_name=agent_name,
                 params=ParamsSendMessageRequest(
@@ -88,6 +96,8 @@ class TestNonStreamingMessages:
                 content = message.content
                 assert content is not None
                 assert isinstance(content, TextContent) and isinstance(content.content, str)
+                # Validate response contains the expected keyword for THIS message's topic
+                validate_text_in_string(expected_keyword, content.content.lower())
 
             states = client.states.list(agent_id=agent_id, task_id=task.id)
             assert len(states) == 1
@@ -105,19 +115,28 @@ class TestStreamingMessages:
     """Test streaming message sending."""
 
     def test_send_stream_message(self, client: Agentex, agent_name: str, agent_id: str):
-        """Test streaming messages in a multi-turn conversation."""
+        """
+        Test message ordering with streaming by sending messages about distinct topics.
+
+        This validates that the agent receives messages in chronological order.
+        If messages are reversed (newest first), the agent would respond about
+        the wrong topic.
+        """
         # create a task for this specific conversation
         task_response = client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
 
         assert task is not None
-        messages = [
-            "Hello, can you tell me a little bit about tennis? I want you to make sure you use the word 'tennis' in each response.",
-            "Pick one of the things you just mentioned, and dive deeper into it.",
-            "Can you now output a summary of this conversation",
+
+        # Each message asks about a distinct topic with a required keyword in response
+        # This validates message ordering: if order is wrong, agent responds about wrong topic
+        messages_and_expected_keywords = [
+            ("Tell me about tennis. You must include the word 'tennis' in your response.", "tennis"),
+            ("Now tell me about basketball. You must include the word 'basketball' in your response. Do not mention tennis.", "basketball"),
+            ("Now tell me about soccer. You must include the word 'soccer' in your response. Do not mention tennis or basketball.", "soccer"),
         ]
 
-        for i, msg in enumerate(messages):
+        for i, (msg, expected_keyword) in enumerate(messages_and_expected_keywords):
             stream = client.agents.send_message_stream(
                 agent_name=agent_name,
                 params=ParamsSendMessageRequest(
@@ -136,6 +155,9 @@ class TestStreamingMessages:
             assert aggregated_content is not None
             # this is using the chat_completion_stream, so we will be getting chunks of data
             assert len(chunks) > 1, "No chunks received in streaming response."
+
+            # Validate response contains the expected keyword for THIS message's topic
+            validate_text_in_string(expected_keyword, aggregated_content.lower())
 
             states = client.states.list(agent_id=agent_id, task_id=task.id)
             assert len(states) == 1
