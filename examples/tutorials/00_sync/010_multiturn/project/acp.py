@@ -67,6 +67,7 @@ async def handle_message_send(
     #########################################################
 
     task_messages = await adk.messages.list(task_id=params.task.id)
+    task_messages = list(reversed(task_messages))  # API returns newest first, reverse to chronological order
 
     #########################################################
     # 3. Run the agent with OpenAI Agents SDK
