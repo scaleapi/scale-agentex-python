@@ -26,6 +26,9 @@ from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.cli.handlers.agent_handlers import (
     run_agent,
     build_agent,
+    prepare_cloud_build_context,
+    parse_build_args,
+    CloudBuildContext,
 )
 from agentex.lib.cli.handlers.deploy_handlers import (
     HelmError,
@@ -161,6 +164,101 @@ def build(
     except Exception as e:
         typer.echo(f"Error building agent image: {str(e)}", err=True)
         logger.exception("Error building agent image")
+        raise typer.Exit(1) from e
+
+
+@agents.command(name="package")
+def package(
+    manifest: str = typer.Option(..., help="Path to the manifest you want to use"),
+    tag: str | None = typer.Option(
+        None,
+        "--tag",
+        "-t",
+        help="Image tag (defaults to deployment.image.tag from manifest, or 'latest')",
+    ),
+    output: str | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output filename for the tarball (defaults to <agent-name>-<tag>.tar.gz)",
+    ),
+    build_arg: builtins.list[str] | None = typer.Option(  # noqa: B008
+        None,
+        "--build-arg",
+        "-b",
+        help="Build argument in KEY=VALUE format (can be repeated)",
+    ),
+):
+    """
+    Package an agent's build context into a tarball for cloud builds.
+
+    Reads manifest.yaml, prepares build context according to include_paths and
+    dockerignore, then saves a compressed tarball to the current directory.
+
+    The tag defaults to the value in deployment.image.tag from the manifest.
+
+    Example:
+        agentex agents package --manifest manifest.yaml
+        agentex agents package --manifest manifest.yaml --tag v1.0
+    """
+    typer.echo(f"Packaging build context from manifest: {manifest}")
+
+    # Validate manifest exists
+    manifest_path = Path(manifest)
+    if not manifest_path.exists():
+        typer.echo(f"Error: manifest not found at {manifest_path}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        # Prepare the build context (tag defaults from manifest if not provided)
+        build_context = prepare_cloud_build_context(
+            manifest_path=str(manifest_path),
+            tag=tag,
+            build_args=build_arg,
+        )
+
+        # Determine output filename using the resolved tag
+        if output:
+            output_filename = output
+        else:
+            output_filename = f"{build_context.agent_name}-{build_context.tag}.tar.gz"
+
+        # Save tarball to current working directory
+        output_path = Path.cwd() / output_filename
+        output_path.write_bytes(build_context.archive_bytes)
+
+        typer.echo(f"\nTarball saved to: {output_path}")
+        typer.echo(f"Size: {build_context.build_context_size_kb:.1f} KB")
+
+        # Output the build parameters needed for cloud build
+        typer.echo("\n" + "=" * 60)
+        typer.echo("Build Parameters for Cloud Build API:")
+        typer.echo("=" * 60)
+        typer.echo(f"  agent_name:      {build_context.agent_name}")
+        typer.echo(f"  image_name:      {build_context.image_name}")
+        typer.echo(f"  tag:             {build_context.tag}")
+        typer.echo(f"  context_file:    {output_path}")
+
+        if build_arg:
+            parsed_args = parse_build_args(build_arg)
+            typer.echo(f"  build_args:      {parsed_args}")
+
+        typer.echo("")
+        typer.echo("Command:")
+        build_args_str = ""
+        if build_arg:
+            build_args_str = " ".join(f'--build-arg "{arg}"' for arg in build_arg)
+            build_args_str = f" {build_args_str}"
+        typer.echo(
+            f'  sgp agentex build --context "{output_path}" '
+            f'--image-name "{build_context.image_name}" '
+            f'--tag "{build_context.tag}"{build_args_str}'
+        )
+        typer.echo("=" * 60)
+
+    except Exception as e:
+        typer.echo(f"Error packaging build context: {str(e)}", err=True)
+        logger.exception("Error packaging build context")
         raise typer.Exit(1) from e
 
 
