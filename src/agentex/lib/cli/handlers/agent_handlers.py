@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import NamedTuple
+from pathlib import Path
 
 from rich.console import Console
 from python_on_whales import DockerException, docker

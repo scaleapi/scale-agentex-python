@@ -6,17 +6,17 @@ import os
 import tarfile
 import tempfile
 from pathlib import Path
+from collections.abc import Iterator
 
 import pytest
 from typer.testing import CliRunner
 
+from agentex.lib.cli.commands.agents import agents
 from agentex.lib.cli.handlers.agent_handlers import (
     CloudBuildContext,
     parse_build_args,
     prepare_cloud_build_context,
 )
-from agentex.lib.cli.commands.agents import agents
-
 
 runner = CliRunner()
 
@@ -54,7 +54,7 @@ class TestPrepareCloudBuildContext:
     """Tests for prepare_cloud_build_context function."""
 
     @pytest.fixture
-    def temp_agent_dir(self) -> Path:
+    def temp_agent_dir(self) -> Iterator[Path]:
         """Create a temporary agent directory with minimal required files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             agent_dir = Path(tmpdir)
@@ -96,7 +96,7 @@ deployment:
             yield agent_dir
 
     @pytest.fixture
-    def temp_agent_dir_no_deployment(self) -> Path:
+    def temp_agent_dir_no_deployment(self) -> Iterator[Path]:
         """Create a temporary agent directory without deployment config."""
         with tempfile.TemporaryDirectory() as tmpdir:
             agent_dir = Path(tmpdir)
@@ -260,7 +260,7 @@ class TestPackageCommand:
     """Tests for the 'agentex agents package' CLI command."""
 
     @pytest.fixture
-    def temp_agent_dir(self) -> Path:
+    def temp_agent_dir(self) -> Iterator[Path]:
         """Create a temporary agent directory with minimal required files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             agent_dir = Path(tmpdir)

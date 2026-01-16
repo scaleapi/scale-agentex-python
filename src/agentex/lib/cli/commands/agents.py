@@ -26,9 +26,8 @@ from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.cli.handlers.agent_handlers import (
     run_agent,
     build_agent,
-    prepare_cloud_build_context,
     parse_build_args,
-    CloudBuildContext,
+    prepare_cloud_build_context,
 )
 from agentex.lib.cli.handlers.deploy_handlers import (
     HelmError,
