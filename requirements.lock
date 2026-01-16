@@ -16,16 +16,12 @@ aiohttp==3.13.2
     # via agentex-sdk
     # via httpx-aiohttp
     # via litellm
-aiosignal==1.4.0
+aiosignal==1.3.2
     # via aiohttp
 annotated-types==0.7.0
     # via pydantic
-anthropic==0.75.0
-    # via agentex-sdk
 anyio==4.10.0
     # via agentex-sdk
-    # via anthropic
-    # via claude-agent-sdk
     # via httpx
     # via mcp
     # via openai
@@ -53,8 +49,6 @@ certifi==2023.7.22
     # via requests
 charset-normalizer==3.4.3
     # via requests
-claude-agent-sdk==0.1.19
-    # via agentex-sdk
 click==8.2.1
     # via litellm
     # via typer
@@ -75,12 +69,9 @@ decorator==5.2.1
     # via ipython
 distro==1.8.0
     # via agentex-sdk
-    # via anthropic
     # via openai
     # via scale-gp
     # via scale-gp-beta
-docstring-parser==0.17.0
-    # via anthropic
 envier==0.6.1
     # via ddtrace
 executing==2.2.0
@@ -107,7 +98,6 @@ httpcore==1.0.9
     # via httpx
 httpx==0.27.2
     # via agentex-sdk
-    # via anthropic
     # via httpx-aiohttp
     # via litellm
     # via mcp
@@ -142,7 +132,6 @@ jinja2==3.1.6
     # via agentex-sdk
     # via litellm
 jiter==0.10.0
-    # via anthropic
     # via openai
 json-log-formatter==1.1.1
     # via agentex-sdk
@@ -172,7 +161,6 @@ matplotlib-inline==0.1.7
     # via ipython
 mcp==1.12.4
     # via agentex-sdk
-    # via claude-agent-sdk
     # via openai-agents
 mdurl==0.1.2
     # via markdown-it-py
@@ -212,6 +200,9 @@ prompt-toolkit==3.0.51
 propcache==0.3.1
     # via aiohttp
     # via yarl
+pydantic==2.12.5
+    # via agentex-sdk
+pydantic-core==2.41.5
 protobuf==5.29.5
     # via ddtrace
     # via temporalio
@@ -226,19 +217,6 @@ pyasn1==0.6.1
     # via rsa
 pyasn1-modules==0.4.2
     # via google-auth
-pydantic==2.12.5
-    # via agentex-sdk
-    # via anthropic
-    # via fastapi
-    # via litellm
-    # via mcp
-    # via openai
-    # via openai-agents
-    # via pydantic-settings
-    # via python-on-whales
-    # via scale-gp
-    # via scale-gp-beta
-pydantic-core==2.41.5
     # via pydantic
 pydantic-settings==2.10.1
     # via mcp
@@ -312,8 +290,7 @@ six==1.17.0
     # via python-dateutil
 sniffio==1.3.0
     # via agentex-sdk
-    # via anthropic
-    # via anyio
+typing-extensions==4.15.0
     # via httpx
     # via openai
     # via scale-gp
@@ -327,8 +304,6 @@ starlette==0.46.2
     # via mcp
 temporalio==1.18.2
     # via agentex-sdk
-termcolor==3.3.0
-    # via yaspin
 tiktoken==0.11.0
     # via litellm
 tokenizers==0.21.4
@@ -356,10 +331,8 @@ types-requests==2.31.0.6
     # via openai-agents
 types-urllib3==1.26.25.14
     # via types-requests
-typing-extensions==4.15.0
     # via agentex-sdk
     # via aiosignal
-    # via anthropic
     # via anyio
     # via fastapi
     # via huggingface-hub
@@ -399,7 +372,5 @@ wrapt==1.17.3
     # via ddtrace
 yarl==1.20.0
     # via aiohttp
-yaspin==3.4.0
-    # via agentex-sdk
 zipp==3.23.0
     # via importlib-metadata

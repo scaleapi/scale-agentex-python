@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from agentex.lib.utils.model_utils import BaseModel
 
