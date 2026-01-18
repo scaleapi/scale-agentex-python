@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.0 (2026-01-18)
+
+Full Changelog: [v0.8.2...v0.9.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.8.2...v0.9.0)
+
+### Features
+
+* **api:** api update ([288bcf3](https://github.com/scaleapi/scale-agentex-python/commit/288bcf3fcad0c50043ffa19b25f9f13128341362))
+* **client:** add support for binary request streaming ([07039a1](https://github.com/scaleapi/scale-agentex-python/commit/07039a13dabeb375ca833bc98705d49aac1b69ed))
+
+
+### Chores
+
+* **internal:** update `actions/checkout` version ([85af380](https://github.com/scaleapi/scale-agentex-python/commit/85af38015fa7739569ea64ce1bf1f24384533773))
+
 ## 0.8.2 (2026-01-02)
 
 Full Changelog: [v0.8.1...v0.8.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.8.1...v0.8.2)
