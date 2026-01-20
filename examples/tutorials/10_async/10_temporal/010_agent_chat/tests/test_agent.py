@@ -143,7 +143,13 @@ class TestNonStreamingEvents:
 
     @pytest.mark.asyncio
     async def test_multi_turn_conversation(self, client: AsyncAgentex, agent_id: str):
-        """Test multiple turns of conversation with state preservation."""
+        """
+        Test message ordering by sending messages about distinct topics.
+
+        This validates that the agent receives messages in chronological order.
+        If messages are reversed (newest first), the agent would respond about
+        the wrong topic.
+        """
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
@@ -152,8 +158,8 @@ class TestNonStreamingEvents:
         # Wait for workflow to initialize
         await asyncio.sleep(1)
 
-        # First turn
-        user_message_1 = "My favorite color is blue."
+        # First turn - ask about tennis
+        user_message_1 = "Tell me about tennis. You must include the word 'tennis' in your response."
         first_turn_found = False
         async for message in send_event_and_poll_yielding(
             client=client,
@@ -170,6 +176,8 @@ class TestNonStreamingEvents:
                 and message.content.author == "agent"
                 and message.content.content
             ):
+                # Validate response is about tennis
+                assert "tennis" in message.content.content.lower(), "First response should be about tennis"
                 first_turn_found = True
                 break
 
@@ -178,9 +186,10 @@ class TestNonStreamingEvents:
         # Wait a bit for state to update
         await asyncio.sleep(2)
 
-        # Second turn - reference previous context
+        # Second turn - ask about basketball (different topic)
+        # If message ordering is wrong, agent might respond about tennis instead
         found_response = False
-        user_message_2 = "What did I just tell you my favorite color was?"
+        user_message_2 = "Now tell me about basketball. You must include the word 'basketball' in your response. Do not mention tennis."
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -196,11 +205,12 @@ class TestNonStreamingEvents:
                 and message.content.content
             ):
                 response_text = message.content.content.lower()
-                assert "blue" in response_text, f"Expected 'blue' in response but got: {response_text}"
+                # Validate response is about basketball, not tennis
+                assert "basketball" in response_text, f"Second response should be about basketball, got: {response_text}"
                 found_response = True
                 break
 
-        assert found_response, "Did not receive final agent text response with context recall"
+        assert found_response, "Did not receive final agent text response with correct topic"
 
 
 class TestStreamingEvents:

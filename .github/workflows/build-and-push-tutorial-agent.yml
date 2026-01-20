@@ -190,6 +190,10 @@ jobs:
             SHOULD_PUSH=false
             VERSION_TAG="${{ github.sha }}"
             echo "🔍 Building agent for validation: ${{ matrix.agent_path }}"
+            # Set full image name for validation step (local build)
+            echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
+            # Skip image validation for PRs since Buildx doesn't load multi-platform images locally
+            echo "SKIP_VALIDATION=true" >> $GITHUB_ENV
           fi
 
           # Always build locally first (without push)
@@ -203,6 +207,7 @@ jobs:
           echo "SHOULD_PUSH=${SHOULD_PUSH}" >> $GITHUB_ENV
 
       - name: Validate agent image
+        if: env.SKIP_VALIDATION != 'true'
         run: |
           set -e
 
