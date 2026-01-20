@@ -168,15 +168,13 @@ jobs:
           echo "Agent name set to $AGENT_NAME"
 
       - name: Login to GitHub Container Registry
-        # Only login if we're going to push (main branch or rebuild_all)
-        if: ${{ github.event_name == 'push' || inputs.rebuild_all }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Conditionally Push Agent Image
+      - name: Build Agent Image
         env:
           REGISTRY: ghcr.io
         run: |
@@ -187,27 +185,22 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.rebuild_all }}" = "true" ]; then
             SHOULD_PUSH=true
             VERSION_TAG="latest"
-            echo "🚀 Building and pushing agent: ${{ matrix.agent_path }}"
+            echo "🚀 Building agent (will push after validation): ${{ matrix.agent_path }}"
           else
             SHOULD_PUSH=false
             VERSION_TAG="${{ github.sha }}"
-            echo "🔍 Validating build for agent: ${{ matrix.agent_path }}"
+            echo "🔍 Building agent for validation: ${{ matrix.agent_path }}"
           fi
 
-          # Build command - add --push only if we should push
+          # Always build locally first (without push)
           BUILD_ARGS="--manifest ${{ matrix.agent_path }}/manifest.yaml --registry ${REGISTRY} --tag ${VERSION_TAG} --platforms linux/amd64,linux/arm64 --repository-name ${REPOSITORY_NAME}"
 
-          if [ "$SHOULD_PUSH" = "true" ]; then
-            agentex agents build $BUILD_ARGS --push
-            echo "✅ Successfully built and pushed: ${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"
-            # Set full image name for validation step
-            echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
-          else
-            agentex agents build $BUILD_ARGS
-            echo "✅ Build validation successful for: ${{ matrix.agent_path }}"
-            # Set full image name for validation step (local build)
-            echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
-          fi
+          agentex agents build $BUILD_ARGS
+          echo "✅ Successfully built: ${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"
+
+          # Set environment variables for subsequent steps
+          echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
+          echo "SHOULD_PUSH=${SHOULD_PUSH}" >> $GITHUB_ENV
 
       - name: Validate agent image
         run: |
@@ -280,6 +273,14 @@ jobs:
           docker rm "$CONTAINER_NAME" > /dev/null 2>&1 || true
 
           echo "✅ All validations passed for: $FULL_IMAGE"
+
+      - name: Push Agent Image
+        if: env.SHOULD_PUSH == 'true'
+        run: |
+          FULL_IMAGE="${{ env.FULL_IMAGE }}"
+          echo "🚀 Pushing validated image: $FULL_IMAGE"
+          docker push "$FULL_IMAGE"
+          echo "✅ Successfully pushed: $FULL_IMAGE"
 
   deprecate-agents:
     name: "Deprecate Removed Agents"
