@@ -66,7 +66,18 @@ class AgentexSyncTracingProcessor(SyncTracingProcessor):
 
 class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
     def __init__(self, config: AgentexTracingProcessorConfig):  # noqa: ARG002
-        self.client = create_async_agentex_client()
+        import httpx
+
+        # Disable keepalive so each span HTTP call gets a fresh TCP connection.
+        # Reused connections carry asyncio primitives bound to the event loop
+        # that created them; in sync-ACP / streaming contexts the loop context
+        # can shift between calls, causing "bound to a different event loop"
+        # RuntimeErrors.
+        self.client = create_async_agentex_client(
+            http_client=httpx.AsyncClient(
+                limits=httpx.Limits(max_keepalive_connections=0),
+            ),
+        )
 
     @override
     async def on_span_start(self, span: Span) -> None:

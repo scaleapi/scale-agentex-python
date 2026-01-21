@@ -24,14 +24,14 @@ class TracingService:
         data: list[Any] | dict[str, Any] | BaseModel | None = None,
     ) -> Span | None:
         trace = self._tracer.trace(trace_id)
-        async with trace.span(
-            parent_id=parent_id,
+        span = await trace.start_span(
             name=name,
+            parent_id=parent_id,
             input=input or {},
             data=data,
-        ) as span:
-            heartbeat_if_in_workflow("start span")
-            return span if span else None
+        )
+        heartbeat_if_in_workflow("start span")
+        return span
 
     async def end_span(self, trace_id: str, span: Span) -> Span:
         trace = self._tracer.trace(trace_id)
