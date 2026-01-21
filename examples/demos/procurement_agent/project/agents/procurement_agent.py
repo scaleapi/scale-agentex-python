@@ -456,6 +456,19 @@ Please escalate to a human if you feel like we are facing a critical schedule de
 
 If the user says no or has feedback, please come up with another solution and call the wait_for_human tool again (you can call it as many times as needed).
 
+## CRITICAL: When to Flag Potential Issues (Shipment_Departed_Factory events)
+
+When processing a Shipment_Departed_Factory event, you MUST compare the ETA to the required_by date from the master schedule:
+
+- **ONLY flag_potential_issue if ETA >= required_by** (zero buffer or late - this is a problem!)
+- **DO NOT flag_potential_issue if ETA < required_by** (there is still buffer remaining - no issue!)
+
+Example 1: Item required_by 2026-02-15, ETA is 2026-02-10 → DO NOT FLAG (5 days buffer remaining)
+Example 2: Item required_by 2026-02-15, ETA is 2026-02-15 → FLAG (zero buffer - on the deadline!)
+Example 3: Item required_by 2026-02-15, ETA is 2026-02-20 → FLAG (5 days late!)
+
+The buffer_days field in the schedule is informational only. What matters is: Does ETA arrive BEFORE the required_by date?
+
 ## Context
 
 Master Construction Schedule:
