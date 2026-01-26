@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.1 (2026-01-26)
+
+Full Changelog: [v0.9.0...v0.9.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.0...v0.9.1)
+
+### Chores
+
+* **ci:** upgrade `actions/github-script` ([71d5c6c](https://github.com/scaleapi/scale-agentex-python/commit/71d5c6c67362f18e0cbdc27cca37672778ff6b1f))
+
 ## 0.9.0 (2026-01-21)
 
 Full Changelog: [v0.8.2...v0.9.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.8.2...v0.9.0)
