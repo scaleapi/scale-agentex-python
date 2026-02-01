@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0 (2026-02-01)
+
+Full Changelog: [v0.9.1...v0.10.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.1...v0.10.0)
+
+### Features
+
+* **client:** add custom JSON encoder for extended type support ([74dc487](https://github.com/scaleapi/scale-agentex-python/commit/74dc487de33bf6569f2e94546a0743ec55ee7703))
+
 ## 0.9.1 (2026-01-26)
 
 Full Changelog: [v0.9.0...v0.9.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.0...v0.9.1)
