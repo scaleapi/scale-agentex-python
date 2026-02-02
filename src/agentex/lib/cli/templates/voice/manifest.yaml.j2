@@ -1,6 +1,6 @@
-# Agent Manifest Configuration for Voice Agent
-# ------------------------------------------
-# This file defines how your voice agent should be built and deployed.
+# Agent Manifest Configuration for Conversational Agent
+# -----------------------------------------------------
+# This file defines how your conversational agent should be built and deployed.
 
 # Build Configuration
 # ------------------
@@ -34,7 +34,7 @@ local_development:
 # Agent Configuration
 # -----------------
 agent:
-  acp_type: sync  # Voice agents use sync ACP
+  acp_type: sync  # Conversational agents use sync ACP
   
   # Unique name for your agent
   name: {{ agent_name }}
@@ -43,22 +43,16 @@ agent:
   description: {{ description }}
 
   # Temporal workflow configuration
-  # Voice agents typically don't need Temporal
+  # Conversational agents typically don't need Temporal
   temporal:
     enabled: false
 
-  # Voice-specific credentials
-  # Uncomment and configure if using LiveKit
+  # Credentials for external services
+  # Configure based on your voice provider or other integrations
   credentials: []
-  #   - env_var_name: LIVEKIT_URL
-  #     secret_name: livekit-credentials
-  #     secret_key: url
-  #   - env_var_name: LIVEKIT_API_KEY
-  #     secret_name: livekit-credentials
+  #   - env_var_name: YOUR_API_KEY
+  #     secret_name: your-secret-name
   #     secret_key: api-key
-  #   - env_var_name: LIVEKIT_API_SECRET
-  #     secret_name: livekit-credentials
-  #     secret_key: api-secret
 
   # Environment variables for local development
   # For deployed environments, use Kubernetes secrets (see credentials below)

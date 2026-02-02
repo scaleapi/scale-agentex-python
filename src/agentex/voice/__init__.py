@@ -1,7 +1,7 @@
-"""Voice Agent SDK module for building LiveKit-powered voice agents.
+"""Conversational Agent SDK module for building real-time conversational agents.
 
 This module provides base classes and utilities for creating production-ready
-voice agents with state management, guardrails, and streaming support.
+conversational agents with state management, guardrails, and streaming support.
 
 Example usage:
     from agentex.voice import VoiceAgentBase, AgentState, AgentResponse

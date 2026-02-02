@@ -1,4 +1,4 @@
-"""Voice Agent base class for LiveKit-powered voice agents.
+"""Conversational Agent base class for real-time conversational agents.
 
 This module provides the VoiceAgentBase class which handles:
 - State management and persistence
@@ -46,7 +46,7 @@ TResponse = TypeVar("TResponse", bound=AgentResponse)
 
 
 class VoiceAgentBase(ABC, Generic[TState, TResponse]):
-    """Base class for voice agents with LiveKit integration.
+    """Base class for conversational agents with streaming support.
     
     This class provides:
     - Automatic state management and persistence

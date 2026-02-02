@@ -1,6 +1,6 @@
 # {{ agent_name }} - Voice Agent Template
 
-This is a starter template for building **voice agents** with the AgentEx framework. It provides a pre-configured implementation using the `VoiceAgentBase` class with LiveKit voice integration, conversation state management, guardrails, and streaming support.
+This is a starter template for building **conversational agents** with the AgentEx framework. It provides a pre-configured implementation using the `VoiceAgentBase` class with conversation state management, guardrails, and streaming support.
 
 ## What's Included
 
@@ -10,8 +10,7 @@ This template provides:
 - ✅ **Interruption Handling** - Voice-specific logic for handling user interruptions
 - ✅ **Streaming Support** - Real-time streaming with concurrent guardrail checks
 - ✅ **Guardrail System** - Extensible policy enforcement framework
-- ✅ **LiveKit Ready** - Pre-configured for voice infrastructure
-- ✅ **Gemini Integration** - Uses Gemini 2.5 Flash by default
+- ✅ **Multi-LLM Support** - OpenAI, Azure, Vertex AI, and more
 
 ## What You'll Learn
 
@@ -83,12 +82,6 @@ LLM_MODEL=google/gemini-2.0-flash  # optional
 # Returns canned responses for integration testing
 MOCK_MODE=true
 
-# ============================================================================
-# OPTIONAL: LiveKit (for voice infrastructure)
-# ============================================================================
-# LIVEKIT_URL=wss://your-livekit-instance.com
-# LIVEKIT_API_KEY=your_livekit_api_key
-# LIVEKIT_API_SECRET=your_livekit_api_secret
 ```
 
 **Note**: The manifest is pre-configured with `AGENTEX_BASE_URL: ""` for local testing.
