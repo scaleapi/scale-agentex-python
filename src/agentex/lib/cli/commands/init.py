@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from pathlib import Path
 
+import typer
 import questionary
 from jinja2 import Environment, FileSystemLoader
 from rich.rule import Rule
@@ -27,6 +28,7 @@ class TemplateType(str, Enum):
     DEFAULT = "default"
     SYNC = "sync"
     SYNC_OPENAI_AGENTS = "sync-openai-agents"
+    VOICE = "voice"
 
 
 def render_template(
@@ -60,6 +62,7 @@ def create_project_structure(
         TemplateType.DEFAULT: ["acp.py"],
         TemplateType.SYNC: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS: ["acp.py"],
+        TemplateType.VOICE: ["acp.py"],
     }[template_type]
 
     # Create project/code files
@@ -102,9 +105,15 @@ def get_project_context(answers: Dict[str, Any], project_path: Path, manifest_ro
     # Now, this is actually the exact same as the project_name because we changed the build root to be ../
     project_path_from_build_root = project_name
 
+    # Create PascalCase class name from agent name
+    agent_class_name = "".join(
+        word.capitalize() for word in answers["agent_name"].split("-")
+    )
+
     return {
         **answers,
         "project_name": project_name,
+        "agent_class_name": agent_class_name,
         "workflow_class": "".join(
             word.capitalize() for word in answers["agent_name"].split("-")
         )
@@ -115,7 +124,14 @@ def get_project_context(answers: Dict[str, Any], project_path: Path, manifest_ro
     }
 
 
-def init():
+def init(
+    conversation: bool = typer.Option(
+        False,
+        "--conversation",
+        hidden=True,
+        help="Create a conversational agent template with interruption handling and state management",
+    ),
+):
     """Initialize a new agent project"""
     console.print(
         Panel.fit(
@@ -124,25 +140,40 @@ def init():
         )
     )
 
-    # Use a Rich table for template descriptions
-    table = Table(show_header=True, header_style="bold blue")
-    table.add_column("Template", style="cyan", no_wrap=True)
-    table.add_column("Description", style="white")
-    table.add_row(
-        "[bold cyan]Async - ACP Only[/bold cyan]",
-        "Asynchronous, non-blocking agent that can process multiple concurrent requests. Best for straightforward asynchronous agents that don't need durable execution. Good for asynchronous workflows, stateful applications, and multi-step analysis.",
-    )
-    table.add_row(
-        "[bold cyan]Async - Temporal[/bold cyan]",
-        "Asynchronous, non-blocking agent with durable execution for all steps. Best for production-grade agents that require complex multi-step tool calls, human-in-the-loop approvals, and long-running processes that require transactional reliability.",
-    )
-    table.add_row(
-        "[bold cyan]Sync ACP[/bold cyan]",
-        "Synchronous agent that processes one request per task with a simple request-response pattern. Best for low-latency use cases, FAQ bots, translation services, and data lookups.",
-    )
-    console.print()
-    console.print(table)
-    console.print()
+    # If --conversation flag is passed, skip the menu and use voice template
+    if conversation:
+        console.print("[bold cyan]Creating Conversational Agent template...[/bold cyan]\n")
+        template_type = TemplateType.VOICE
+    else:
+        # Use a Rich table for template descriptions
+        table = Table(show_header=True, header_style="bold blue")
+        table.add_column("Template", style="cyan", no_wrap=True)
+        table.add_column("Description", style="white")
+        table.add_row(
+            "[bold cyan]Async - ACP Only[/bold cyan]",
+            "Asynchronous, non-blocking agent that can process multiple concurrent requests. Best for straightforward asynchronous agents that don't need durable execution. Good for asynchronous workflows, stateful applications, and multi-step analysis.",
+        )
+        table.add_row(
+            "[bold cyan]Async - Temporal[/bold cyan]",
+            "Asynchronous, non-blocking agent with durable execution for all steps. Best for production-grade agents that require complex multi-step tool calls, human-in-the-loop approvals, and long-running processes that require transactional reliability.",
+        )
+        table.add_row(
+            "[bold cyan]Sync ACP[/bold cyan]",
+            "Synchronous agent that processes one request per task with a simple request-response pattern. Best for low-latency use cases, FAQ bots, translation services, and data lookups.",
+        )
+        console.print()
+        console.print(table)
+        console.print()
+
+        # Gather project information
+        template_type = questionary.select(
+            "What type of template would you like to create?",
+            choices=[
+                {"name": "Async - ACP Only", "value": TemplateType.DEFAULT},
+                {"name": "Async - Temporal", "value": "temporal_submenu"},
+                {"name": "Sync ACP", "value": "sync_submenu"},
+            ],
+        ).ask()
 
     def validate_agent_name(text: str) -> bool | str:
         """Validate agent name follows required format"""
@@ -150,17 +181,7 @@ def init():
         if not is_valid:
             return "Invalid name. Use only lowercase letters, numbers, and hyphens. Examples: 'my-agent', 'newsbot'"
         return True
-
-    # Gather project information
-    template_type = questionary.select(
-        "What type of template would you like to create?",
-        choices=[
-            {"name": "Async - ACP Only", "value": TemplateType.DEFAULT},
-            {"name": "Async - Temporal", "value": "temporal_submenu"},
-            {"name": "Sync ACP", "value": "sync_submenu"},
-        ],
-    ).ask()
-    if not template_type:
+    if template_type is None:
         return
 
     # If Temporal was selected, show sub-menu for Temporal variants

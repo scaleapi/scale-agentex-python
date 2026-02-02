@@ -1,0 +1,392 @@
+# {{ agent_name }} - Voice Agent Template
+
+This is a starter template for building **conversational agents** with the AgentEx framework. It provides a pre-configured implementation using the `VoiceAgentBase` class with conversation state management, guardrails, and streaming support.
+
+## What's Included
+
+This template provides:
+- ✅ **VoiceAgentBase** - Production-ready base class with 90% of boilerplate handled
+- ✅ **State Management** - Automatic conversation history and state persistence
+- ✅ **Interruption Handling** - Voice-specific logic for handling user interruptions
+- ✅ **Streaming Support** - Real-time streaming with concurrent guardrail checks
+- ✅ **Guardrail System** - Extensible policy enforcement framework
+- ✅ **Multi-LLM Support** - OpenAI, Azure, Vertex AI, and more
+
+## What You'll Learn
+
+- **Voice Agents**: Building conversational AI for voice interactions
+- **Tasks**: Grouping mechanism for conversation threads/sessions
+- **Messages**: Communication objects within a task (text, data, tool requests/responses)
+- **Sync ACP**: Synchronous Agent Communication Protocol with immediate responses
+- **State Management**: Persisting conversation state across messages
+- **Guardrails**: Enforcing policies and safety boundaries
+
+## Quick Start
+
+### 1. Install Dependencies
+
+{% if use_uv %}
+```bash
+# Using uv (recommended)
+uv sync
+```
+{% else %}
+```bash
+# Using pip
+pip install -r requirements.txt
+```
+{% endif %}
+
+### 2. Configure Environment
+
+Create a `.env` file in the project directory. Choose ONE LLM provider:
+
+```bash
+# ============================================================================
+# LLM CONFIGURATION (choose one)
+# ============================================================================
+
+# OPTION 1: OpenAI (direct)
+# Works anywhere with internet access to api.openai.com
+OPENAI_API_KEY=sk-your-openai-key
+LLM_MODEL=gpt-4o-mini  # optional, this is the default
+
+# OPTION 2: OpenAI via Proxy (for VPC/firewall environments)
+# Use when cluster can't reach api.openai.com directly
+OPENAI_API_KEY=your-key
+OPENAI_BASE_URL=https://your-internal-proxy.company.com/v1
+LLM_MODEL=gpt-4o-mini
+
+# OPTION 3: Azure OpenAI
+# For Azure-hosted OpenAI deployments
+AZURE_OPENAI_API_KEY=your-azure-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+LLM_MODEL=gpt-4o  # optional
+
+# OPTION 4: Scale Generative Platform (SGP) for Gemini
+# For Scale internal use
+SGP_API_KEY=your_sgp_api_key
+SGP_ACCOUNT_ID=your_sgp_account_id
+LLM_MODEL=gemini-2.0-flash  # optional
+
+# OPTION 5: Google Cloud Vertex AI
+# For GCP deployments with Gemini
+GOOGLE_GENAI_USE_VERTEXAI=true
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+GOOGLE_CLOUD_LOCATION=us-central1  # optional, this is default
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+LLM_MODEL=google/gemini-2.0-flash  # optional
+
+# OPTION 6: Mock Mode (for testing without LLM)
+# Returns canned responses for integration testing
+MOCK_MODE=true
+
+```
+
+**Note**: The manifest is pre-configured with `AGENTEX_BASE_URL: ""` for local testing.
+
+### Deployment Environments
+
+| Environment | Recommended Config | Notes |
+|-------------|-------------------|-------|
+| Local dev | OpenAI direct or `MOCK_MODE=true` | Fastest setup |
+| Cloud (direct internet) | OpenAI or Azure | Works out of box |
+| VPC/Firewall | `OPENAI_BASE_URL` with proxy | Set proxy URL |
+| GCP/Vertex AI | `GOOGLE_GENAI_USE_VERTEXAI=true` | For GCP/Gemini |
+| Scale internal | SGP credentials | For Gemini models |
+
+### 3. Run the Agent
+
+```bash
+# Run the agent locally
+uv run agentex agents run --manifest manifest.yaml
+
+# Or with pip-installed agentex:
+agentex agents run --manifest manifest.yaml
+```
+
+### 4. Test Your Agent
+
+**Option A: Web UI (Recommended)**
+```bash
+# In the agentex-web directory
+make dev
+
+# Open http://localhost:3000 and select your agent
+```
+
+**Option B: Development Notebook**
+```bash
+# Open the included Jupyter notebook
+jupyter notebook dev.ipynb
+```
+
+## Customizing Your Agent
+
+### 1. Edit the System Prompt
+
+Modify `get_system_prompt()` in `project/acp.py`:
+
+```python
+def get_system_prompt(self, conversation_state, guardrail_override=None):
+    return """
+<role>
+You are a [describe your agent's role]
+</role>
+
+<communication_style>
+- Keep responses under 3 sentences for voice
+- Use natural, conversational language
+- Speak at a moderate pace
+- Be empathetic and warm
+</communication_style>
+
+<capabilities>
+- [What can your agent do?]
+</capabilities>
+"""
+```
+
+### 2. Add Custom State Fields
+
+Extend the state model to track agent-specific data:
+
+```python
+class MyAgentState(AgentState):
+    conversation_phase: str = "introduction"
+    user_name: Optional[str] = None
+    key_information_gathered: dict = Field(default_factory=dict)
+```
+
+### 3. Add Custom Response Fields
+
+Extend the response model for structured outputs:
+
+```python
+class MyAgentResponse(AgentResponse):
+    phase_transition: bool = False
+    new_phase: Optional[str] = None
+    sentiment: Optional[str] = None
+```
+
+### 4. Add Tools
+
+Use the `@function_tool` decorator:
+
+```python
+from agents import function_tool
+
+@function_tool
+async def get_user_info(user_id: str) -> dict:
+    """Fetch user information from database."""
+    # Your implementation
+    return {"name": "John", "account_id": "12345"}
+
+# Add to TOOLS list
+TOOLS = [get_user_info]
+```
+
+### 5. Add Guardrails
+
+Create custom guardrails for policy enforcement:
+
+```python
+from agentex.voice.guardrails import Guardrail
+
+class MedicalAdviceGuardrail(Guardrail):
+    def __init__(self):
+        super().__init__(
+            name="medical_advice",
+            outcome_prompt="I cannot provide medical advice. Please consult your healthcare provider."
+        )
+    
+    async def check(self, user_message, conversation_state):
+        # Your logic here
+        medical_keywords = ["diagnose", "treatment", "prescription"]
+        return not any(kw in user_message.lower() for kw in medical_keywords)
+
+# Add to GUARDRAILS list
+GUARDRAILS = [MedicalAdviceGuardrail()]
+```
+
+## Voice-Specific Best Practices
+
+### 1. Keep Responses Concise
+Voice responses should be shorter than text:
+- ❌ Bad: "I'd be delighted to help you with that question! Let me provide you with a comprehensive answer..."
+- ✅ Good: "Sure! Here's what you need to know..."
+
+### 2. Use Natural Language
+Speak like a human, not a robot:
+- ❌ Bad: "Please provide the requested information in order to proceed with processing."
+- ✅ Good: "What would you like me to help with?"
+
+### 3. Handle Interruptions Gracefully
+The `VoiceAgentBase` automatically handles interruptions, but you can customize behavior in `handle_message_interruption()`.
+
+### 4. Consider TTS Pacing
+- Use punctuation to control pacing (commas, periods, em-dashes)
+- Break long responses into shorter chunks
+- Avoid complex sentences with nested clauses
+
+### 5. Add Empathy Guidelines
+Voice needs more empathy cues than text:
+```python
+<empathy_guidelines>
+- Acknowledge emotions: "That sounds frustrating" or "I understand"
+- Use warm, supportive tone
+- Pause appropriately (use punctuation)
+- Mirror user's energy level
+</empathy_guidelines>
+```
+
+## Architecture
+
+### How VoiceAgentBase Works
+
+```
+User Message
+    ↓
+VoiceAgentBase.send_message()
+    ↓
+[State Management]
+    ↓
+[Interruption Handling] ← Checks for concurrent messages
+    ↓
+[Guardrail Checks] ← Concurrent with streaming
+    ↓
+[LLM Streaming] ← Your custom prompt
+    ↓
+[State Update] ← Your custom logic
+    ↓
+[Save State]
+    ↓
+Response to User
+```
+
+### What You Implement vs What's Handled
+
+**You Implement (2 methods):**
+- `get_system_prompt()` - Your agent's behavior
+- `update_state_and_tracing_from_response()` - State updates
+
+**VoiceAgentBase Handles:**
+- ✅ State persistence and retrieval
+- ✅ Conversation history management
+- ✅ Message interruption detection
+- ✅ Guardrail concurrent execution
+- ✅ Streaming with buffering
+- ✅ Error handling and tracing
+
+## Managing Dependencies
+
+{% if use_uv %}
+### Using uv (Recommended)
+
+```bash
+# Add new dependencies
+uv add requests openai anthropic
+
+# Sync dependencies
+uv sync
+
+# Run commands with uv
+uv run agentex agents run --manifest manifest.yaml
+```
+{% else %}
+### Using pip
+
+```bash
+# Add to requirements.txt
+echo "requests" >> requirements.txt
+echo "openai" >> requirements.txt
+
+# Install dependencies
+pip install -r requirements.txt
+```
+{% endif %}
+
+## Testing
+
+### Unit Tests
+
+```bash
+pytest test_agent.py -v
+```
+
+### Manual Testing with Notebook
+
+The included `dev.ipynb` notebook provides:
+- Non-streaming message tests
+- Streaming message tests
+- State inspection
+- Task management examples
+
+## Deployment
+
+### Build the Docker Image
+
+```bash
+agentex agents build --manifest manifest.yaml
+```
+
+### Deploy to Kubernetes
+
+```bash
+# Deploy to dev environment
+agentex agents deploy --manifest manifest.yaml --environment dev
+
+# Check deployment status
+kubectl get pods -n team-{{ agent_name }}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**1. Agent not appearing in web UI**
+- Check if agent is running on port 8000
+- Verify `ENVIRONMENT=development` is set
+- Check agent logs for errors
+
+**2. Slow response times**
+- Optimize your system prompt (shorter is faster)
+- Consider caching expensive operations
+- Use faster LLM model (e.g., gemini-flash vs gemini-pro)
+
+**3. Guardrails timing out**
+- Check guardrail LLM calls are completing
+- Use faster models for guardrails
+- Reduce guardrail complexity
+
+**4. State not persisting**
+- Verify state_id is not None
+- Check agentex backend is running
+- Look for errors in state.update() calls
+
+## Next Steps
+
+1. **Customize the prompt** - Make it specific to your use case
+2. **Add tools** - Give your agent capabilities
+3. **Add guardrails** - Enforce safety and policy boundaries
+4. **Test thoroughly** - Use dev notebook and write tests
+5. **Deploy** - Build and deploy to dev environment
+6. **Iterate** - Monitor and improve based on user interactions
+
+## Resources
+
+- [Agentex Documentation](https://docs.agentex.ai)
+- [Voice Agent Best Practices](https://docs.agentex.ai/voice-agents)
+- [Guardrails Guide](https://docs.agentex.ai/guardrails)
+- [Gemini Model Documentation](https://ai.google.dev/gemini-api/docs)
+
+## Support
+
+For questions or issues:
+- Open an issue in the agentex repository
+- Contact the Agentex team on Slack (#agentex-support)
+
+---
+
+Happy building with Voice Agents! 🎙️🤖

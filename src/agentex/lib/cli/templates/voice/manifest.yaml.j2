@@ -1,0 +1,117 @@
+# Agent Manifest Configuration for Conversational Agent
+# -----------------------------------------------------
+# This file defines how your conversational agent should be built and deployed.
+
+# Build Configuration
+# ------------------
+build:
+  context:
+    root: ../  # Keep this as the default root
+
+    # Paths to include in the Docker build context
+    include_paths:
+      - {{ project_path_from_build_root }}
+
+    # Path to your agent's Dockerfile
+    dockerfile: {{ project_path_from_build_root }}/Dockerfile
+
+    # Path to your agent's .dockerignore
+    dockerignore: {{ project_path_from_build_root }}/.dockerignore
+
+
+# Local Development Configuration
+# -----------------------------
+local_development:
+  agent:
+    port: 8000  # Port where your local ACP server runs
+    host_address: host.docker.internal
+
+  paths:
+    # Path to ACP server file (relative to this manifest.yaml)
+    acp: project/acp.py
+
+
+# Agent Configuration
+# -----------------
+agent:
+  acp_type: sync  # Conversational agents use sync ACP
+  
+  # Unique name for your agent
+  name: {{ agent_name }}
+
+  # Description of what your agent does
+  description: {{ description }}
+
+  # Temporal workflow configuration
+  # Conversational agents typically don't need Temporal
+  temporal:
+    enabled: false
+
+  # Credentials for external services
+  # Configure based on your voice provider or other integrations
+  credentials: []
+  #   - env_var_name: YOUR_API_KEY
+  #     secret_name: your-secret-name
+  #     secret_key: api-key
+
+  # Environment variables for local development
+  # For deployed environments, use Kubernetes secrets (see credentials below)
+  env:
+    AGENTEX_BASE_URL: ""  # Empty = disable platform registration for local testing
+    # LLM_MODEL: "gpt-4o-mini"  # Override default model
+    
+  # LLM Credentials (choose one approach based on deployment)
+  # --------------------------------------------------------
+  # OPTION 1: OpenAI (direct or via proxy)
+  #   - env_var_name: OPENAI_API_KEY
+  #     secret_name: openai-api-key-secret
+  #     secret_key: api-key
+  #   - env_var_name: OPENAI_BASE_URL  # For proxy/internal endpoints
+  #     secret_name: openai-config
+  #     secret_key: base-url
+  #
+  # OPTION 2: Azure OpenAI
+  #   - env_var_name: AZURE_OPENAI_API_KEY
+  #     secret_name: azure-openai-secret
+  #     secret_key: api-key
+  #   - env_var_name: AZURE_OPENAI_ENDPOINT
+  #     secret_name: azure-openai-secret
+  #     secret_key: endpoint
+  #   - env_var_name: AZURE_OPENAI_DEPLOYMENT
+  #     secret_name: azure-openai-secret
+  #     secret_key: deployment
+  #
+  # OPTION 3: Scale Generative Platform (SGP)
+  #   - env_var_name: SGP_API_KEY
+  #     secret_name: sgp-credentials
+  #     secret_key: api-key
+  #   - env_var_name: SGP_ACCOUNT_ID
+  #     secret_name: sgp-credentials
+  #     secret_key: account-id
+
+
+# Deployment Configuration
+# -----------------------
+deployment:
+  # Container image configuration
+  image:
+    repository: ""  # Update with your container registry
+    tag: "latest"
+
+  imagePullSecrets: []
+    # - name: my-registry-secret
+
+  # Global deployment settings
+  global:
+    # Default replica count
+    replicaCount: 1
+    
+    # Default resource requirements
+    # Adjust based on your agent's needs
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

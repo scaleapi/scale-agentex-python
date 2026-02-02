@@ -1,0 +1,359 @@
+"""{{ agent_name }} - Conversational Agent
+
+This agent uses the VoiceAgentBase class which provides:
+- Automatic state management and conversation history
+- Streaming support with interruption handling
+- Guardrail system integration
+"""
+
+import os
+from typing import AsyncGenerator, Optional
+
+# Disable default Agentex tracing for local development
+# Remove this block when deploying to Agentex platform
+import agentex.lib.core.tracing.tracing_processor_manager as _tpm
+_tpm._default_initialized = True
+
+from agentex.voice import VoiceAgentBase, AgentState, AgentResponse
+from agentex.voice.guardrails import Guardrail
+from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.lib.types.acp import SendMessageParams
+from agentex.lib.utils.logging import make_logger
+from agentex.types import Span
+from agentex.types.task_message_update import TaskMessageUpdate
+from pydantic import Field
+from openai import AsyncOpenAI
+
+logger = make_logger(__name__)
+
+# ============================================================================
+# LLM Configuration
+# ============================================================================
+# This template supports multiple LLM providers via environment variables.
+# Configure ONE of the following options:
+#
+# OPTION 1: OpenAI (direct or via proxy)
+#   OPENAI_API_KEY=sk-...
+#   OPENAI_BASE_URL=https://api.openai.com/v1  (optional, for proxies)
+#   LLM_MODEL=gpt-4o-mini  (optional)
+#
+# OPTION 2: Azure OpenAI
+#   AZURE_OPENAI_API_KEY=...
+#   AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+#   AZURE_OPENAI_DEPLOYMENT=your-deployment-name
+#   LLM_MODEL=gpt-4o  (optional)
+#
+# OPTION 3: Scale Generative Platform (SGP) for Gemini
+#   SGP_API_KEY=...
+#   SGP_ACCOUNT_ID=...
+#   LLM_MODEL=gemini-2.0-flash  (optional)
+#
+# OPTION 4: Any OpenAI-compatible endpoint
+#   OPENAI_API_KEY=your-key
+#   OPENAI_BASE_URL=https://your-internal-proxy.company.com/v1
+#   LLM_MODEL=your-model-name
+#
+# For testing without credentials, set: MOCK_MODE=true
+# ============================================================================
+
+# Environment variables
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "")  # Empty = use default
+AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY", "")
+AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT", "")
+AZURE_OPENAI_DEPLOYMENT = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "")
+SGP_API_KEY = os.environ.get("SGP_API_KEY", "")
+SGP_ACCOUNT_ID = os.environ.get("SGP_ACCOUNT_ID", "")
+# Vertex AI (Google Cloud)
+GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+GOOGLE_CLOUD_LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+GOOGLE_GENAI_USE_VERTEXAI = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in ("true", "1", "yes")
+LLM_MODEL_ENV = os.environ.get("LLM_MODEL", "")
+MOCK_MODE = os.environ.get("MOCK_MODE", "").lower() in ("true", "1", "yes")
+
+openai_client = None
+LLM_MODEL = LLM_MODEL_ENV or "gpt-4o-mini"  # Default model
+
+def configure_llm_client():
+    """Configure LLM client based on available environment variables."""
+    global openai_client, LLM_MODEL, MOCK_MODE
+    
+    # Priority: Vertex AI > Azure > SGP > OpenAI > Mock
+    
+    if GOOGLE_GENAI_USE_VERTEXAI and GOOGLE_CLOUD_PROJECT:
+        # Vertex AI using OpenAI-compatible endpoint
+        try:
+            import google.auth
+            from google.auth.transport.requests import Request
+            
+            # Get credentials from environment (GOOGLE_APPLICATION_CREDENTIALS)
+            credentials, project = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+            credentials.refresh(Request())
+            
+            # Vertex AI OpenAI-compatible endpoint
+            vertex_base_url = f"https://{GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/{GOOGLE_CLOUD_PROJECT}/locations/{GOOGLE_CLOUD_LOCATION}/endpoints/openapi"
+            
+            logger.info(f"Configuring Vertex AI client: project={GOOGLE_CLOUD_PROJECT}, location={GOOGLE_CLOUD_LOCATION}")
+            openai_client = AsyncOpenAI(
+                api_key=credentials.token,  # Use OAuth token as API key
+                base_url=vertex_base_url,
+            )
+            LLM_MODEL = LLM_MODEL_ENV or "google/gemini-2.0-flash"
+            logger.info(f"Vertex AI configured for model: {LLM_MODEL}")
+            return
+        except Exception as e:
+            logger.warning(f"Failed to configure Vertex AI: {e}. Falling back to other providers.")
+    
+    if AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT:
+        # Azure OpenAI
+        from openai import AsyncAzureOpenAI
+        logger.info(f"Configuring Azure OpenAI client: {AZURE_OPENAI_ENDPOINT}")
+        openai_client = AsyncAzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_version="2024-02-01",
+        )
+        LLM_MODEL = LLM_MODEL_ENV or AZURE_OPENAI_DEPLOYMENT or "gpt-4o"
+        logger.info(f"Azure OpenAI configured with model: {LLM_MODEL}")
+        return
+    
+    if SGP_API_KEY and SGP_ACCOUNT_ID:
+        # Scale Generative Platform with Gemini
+        logger.info(f"Configuring SGP client with account ID: {SGP_ACCOUNT_ID[:8]}...")
+        openai_client = AsyncOpenAI(
+            api_key=SGP_API_KEY,
+            base_url="https://api.egp.scale.com/beta",
+            default_headers={"x-selected-account-id": SGP_ACCOUNT_ID},
+        )
+        LLM_MODEL = LLM_MODEL_ENV or "gemini-2.0-flash"
+        logger.info(f"SGP client configured for model: {LLM_MODEL}")
+        return
+    
+    if OPENAI_API_KEY:
+        # OpenAI (direct or via proxy/custom endpoint)
+        client_kwargs = {"api_key": OPENAI_API_KEY}
+        if OPENAI_BASE_URL:
+            client_kwargs["base_url"] = OPENAI_BASE_URL
+            logger.info(f"Configuring OpenAI client with custom base URL: {OPENAI_BASE_URL}")
+        else:
+            logger.info("Configuring OpenAI client (direct)")
+        
+        openai_client = AsyncOpenAI(**client_kwargs)
+        LLM_MODEL = LLM_MODEL_ENV or "gpt-4o-mini"
+        logger.info(f"OpenAI client configured for model: {LLM_MODEL}")
+        return
+    
+    # No credentials - enable mock mode
+    MOCK_MODE = True
+    logger.warning("No LLM credentials set - running in MOCK MODE (returns test responses)")
+
+# Initialize LLM client
+configure_llm_client()
+
+# Create ACP server
+acp = FastACP.create(acp_type="sync")
+
+
+# ============================================================================
+# Custom State and Response Models (optional)
+# ============================================================================
+
+class {{ agent_class_name }}State(AgentState):
+    """Custom state for {{ agent_name }}.
+    
+    Extend AgentState to add agent-specific fields.
+    
+    Example:
+        conversation_phase: str = "introduction"
+        user_preferences: dict = Field(default_factory=dict)
+    """
+    pass
+
+
+class {{ agent_class_name }}Response(AgentResponse):
+    """Custom response for {{ agent_name }}.
+    
+    Extend AgentResponse to add structured output fields.
+    
+    Example:
+        phase_transition: bool = False
+        new_phase: Optional[str] = None
+    """
+    pass
+
+
+# ============================================================================
+# Agent Implementation
+# ============================================================================
+
+class {{ agent_class_name }}(VoiceAgentBase):
+    """Voice agent for {{ agent_name }}."""
+    
+    # Specify custom models
+    state_class = {{ agent_class_name }}State
+    response_class = {{ agent_class_name }}Response
+    
+    def get_system_prompt(
+        self, 
+        conversation_state: {{ agent_class_name }}State,
+        guardrail_override: Optional[str] = None
+    ) -> str:
+        """Return the system prompt for this agent.
+        
+        Args:
+            conversation_state: Current conversation state
+            guardrail_override: If provided, use this prompt (for guardrail failures)
+        
+        Returns:
+            System prompt string
+        """
+        if guardrail_override:
+            return guardrail_override
+        
+        # TODO: Customize this prompt for your agent
+        return """
+<role>
+You are a helpful voice assistant for {{ description }}.
+</role>
+
+<communication_style>
+- Speak naturally and conversationally
+- Be empathetic and warm
+- Keep responses concise for voice interaction
+- Use appropriate pacing and tone
+- Avoid technical jargon unless necessary
+</communication_style>
+
+<capabilities>
+# TODO: Describe what this agent can do
+- Answer questions about [topic]
+- Help with [task]
+- Provide information about [subject]
+</capabilities>
+
+<guidelines>
+- Always be respectful and professional
+- If you don't know something, admit it
+- Stay within your defined capabilities
+- Redirect inappropriate or off-topic requests politely
+</guidelines>
+"""
+    
+    def update_state_and_tracing_from_response(
+        self,
+        conversation_state: {{ agent_class_name }}State,
+        response_data: {{ agent_class_name }}Response,
+        span: Span,
+    ) -> {{ agent_class_name }}State:
+        """Update state after LLM response.
+        
+        Args:
+            conversation_state: Current conversation state
+            response_data: Structured response from LLM
+            span: Tracing span for logging
+        
+        Returns:
+            Updated conversation state
+        """
+        # TODO: Update state based on response_data fields
+        # Example:
+        # if response_data.phase_transition:
+        #     conversation_state.conversation_phase = response_data.new_phase
+        
+        # Set span output for tracing
+        span.output = response_data
+        
+        return conversation_state
+
+
+# ============================================================================
+# Guardrails (optional)
+# ============================================================================
+
+# TODO: Add guardrails for your agent
+# Example:
+# class MyCustomGuardrail(Guardrail):
+#     def __init__(self):
+#         super().__init__(
+#             name="my_guardrail",
+#             outcome_prompt="I can't help with that."
+#         )
+#     
+#     async def check(self, user_message, conversation_state):
+#         return "bad_word" not in user_message.lower()
+
+GUARDRAILS = [
+    # Add your guardrails here
+    # MyCustomGuardrail(),
+]
+
+
+# ============================================================================
+# Tools (optional)
+# ============================================================================
+
+# TODO: Add tools for your agent using the @function_tool decorator
+# Example:
+# from agents import function_tool
+# 
+# @function_tool
+# async def get_weather(location: str) -> str:
+#     """Get the weather for a location."""
+#     return f"The weather in {location} is sunny."
+
+TOOLS = [
+    # Add your tools here
+]
+
+
+# ============================================================================
+# Agent Initialization
+# ============================================================================
+
+AGENT = {{ agent_class_name }}(
+    agent_name="{{ agent_name }}",
+    llm_model=LLM_MODEL,  # Set by LLM configuration above
+    tools=TOOLS,
+    guardrails=GUARDRAILS,
+    openai_client=openai_client,
+)
+
+
+# ============================================================================
+# ACP Handler
+# ============================================================================
+
+@acp.on_message_send
+async def handle_message_send(
+    params: SendMessageParams,
+) -> AsyncGenerator[TaskMessageUpdate, None]:
+    """Handle incoming voice messages with streaming support.
+    
+    This is the main entry point for the agent. It delegates to
+    VoiceAgentBase.send_message() which handles all the complex logic.
+    """
+    logger.info(f"Received message for {{ agent_name }}")
+    
+    # Mock mode for testing without LLM credentials
+    if MOCK_MODE:
+        from agentex.types import TextContent
+        from agentex.types.task_message_update import StreamTaskMessageFull
+        
+        user_message = params.content.content if hasattr(params.content, 'content') else str(params.content)
+        logger.info(f"MOCK MODE: Returning test response for: {user_message[:50]}...")
+        
+        yield StreamTaskMessageFull(
+            type="full",
+            index=0,
+            content=TextContent(
+                type="text",
+                author="agent",
+                content=f"[MOCK MODE] Hello! I received your message: '{user_message[:100]}'. This is a test response. Configure OPENAI_API_KEY or SGP credentials for real LLM responses.",
+            ),
+        )
+        return
+    
+    async for chunk in AGENT.send_message(params):
+        yield chunk
