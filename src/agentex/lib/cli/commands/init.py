@@ -125,11 +125,11 @@ def get_project_context(answers: Dict[str, Any], project_path: Path, manifest_ro
 
 
 def init(
-    voice: bool = typer.Option(
+    conversation: bool = typer.Option(
         False,
-        "--voice",
+        "--conversation",
         hidden=True,
-        help="Create a voice agent template with interruption handling and conversation state management",
+        help="Create a conversational agent template with interruption handling and state management",
     ),
 ):
     """Initialize a new agent project"""
@@ -140,9 +140,9 @@ def init(
         )
     )
 
-    # If --voice flag is passed, skip the menu and use voice template
-    if voice:
-        console.print("[bold cyan]Creating Voice Agent template...[/bold cyan]\n")
+    # If --conversation flag is passed, skip the menu and use voice template
+    if conversation:
+        console.print("[bold cyan]Creating Conversational Agent template...[/bold cyan]\n")
         template_type = TemplateType.VOICE
     else:
         # Use a Rich table for template descriptions
