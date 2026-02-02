@@ -120,7 +120,7 @@ def configure_llm_client():
         return
     
     if SGP_API_KEY and SGP_ACCOUNT_ID:
-        # Scale Groundplane with Gemini
+        # Scale Generative Platform with Gemini
         logger.info(f"Configuring SGP client with account ID: {SGP_ACCOUNT_ID[:8]}...")
         openai_client = AsyncOpenAI(
             api_key=SGP_API_KEY,
