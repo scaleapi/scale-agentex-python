@@ -124,7 +124,14 @@ def get_project_context(answers: Dict[str, Any], project_path: Path, manifest_ro
     }
 
 
-def init():
+def init(
+    voice: bool = typer.Option(
+        False,
+        "--voice",
+        hidden=True,
+        help="Create a voice agent template with interruption handling and conversation state management",
+    ),
+):
     """Initialize a new agent project"""
     console.print(
         Panel.fit(
@@ -133,40 +140,40 @@ def init():
         )
     )
 
-    # Use a Rich table for template descriptions
-    table = Table(show_header=True, header_style="bold blue")
-    table.add_column("Template", style="cyan", no_wrap=True)
-    table.add_column("Description", style="white")
-    table.add_row(
-        "[bold cyan]Async - ACP Only[/bold cyan]",
-        "Asynchronous, non-blocking agent that can process multiple concurrent requests. Best for straightforward asynchronous agents that don't need durable execution. Good for asynchronous workflows, stateful applications, and multi-step analysis.",
-    )
-    table.add_row(
-        "[bold cyan]Async - Temporal[/bold cyan]",
-        "Asynchronous, non-blocking agent with durable execution for all steps. Best for production-grade agents that require complex multi-step tool calls, human-in-the-loop approvals, and long-running processes that require transactional reliability.",
-    )
-    table.add_row(
-        "[bold cyan]Sync ACP[/bold cyan]",
-        "Synchronous agent that processes one request per task with a simple request-response pattern. Best for low-latency use cases, FAQ bots, translation services, and data lookups.",
-    )
-    table.add_row(
-        "[bold cyan]Conversational Agent[/bold cyan]",
-        "Real-time conversational agent with built-in interruption handling, state management, and guardrail support. Best for voice assistants, interactive chatbots, and applications requiring natural turn-taking and streaming responses.",
-    )
-    console.print()
-    console.print(table)
-    console.print()
+    # If --voice flag is passed, skip the menu and use voice template
+    if voice:
+        console.print("[bold cyan]Creating Voice Agent template...[/bold cyan]\n")
+        template_type = TemplateType.VOICE
+    else:
+        # Use a Rich table for template descriptions
+        table = Table(show_header=True, header_style="bold blue")
+        table.add_column("Template", style="cyan", no_wrap=True)
+        table.add_column("Description", style="white")
+        table.add_row(
+            "[bold cyan]Async - ACP Only[/bold cyan]",
+            "Asynchronous, non-blocking agent that can process multiple concurrent requests. Best for straightforward asynchronous agents that don't need durable execution. Good for asynchronous workflows, stateful applications, and multi-step analysis.",
+        )
+        table.add_row(
+            "[bold cyan]Async - Temporal[/bold cyan]",
+            "Asynchronous, non-blocking agent with durable execution for all steps. Best for production-grade agents that require complex multi-step tool calls, human-in-the-loop approvals, and long-running processes that require transactional reliability.",
+        )
+        table.add_row(
+            "[bold cyan]Sync ACP[/bold cyan]",
+            "Synchronous agent that processes one request per task with a simple request-response pattern. Best for low-latency use cases, FAQ bots, translation services, and data lookups.",
+        )
+        console.print()
+        console.print(table)
+        console.print()
 
-    # Gather project information
-    template_type = questionary.select(
-        "What type of template would you like to create?",
-        choices=[
-            {"name": "Async - ACP Only", "value": TemplateType.DEFAULT},
-            {"name": "Async - Temporal", "value": "temporal_submenu"},
-            {"name": "Sync ACP", "value": "sync_submenu"},
-            {"name": "Conversational Agent", "value": TemplateType.VOICE},
-        ],
-    ).ask()
+        # Gather project information
+        template_type = questionary.select(
+            "What type of template would you like to create?",
+            choices=[
+                {"name": "Async - ACP Only", "value": TemplateType.DEFAULT},
+                {"name": "Async - Temporal", "value": "temporal_submenu"},
+                {"name": "Sync ACP", "value": "sync_submenu"},
+            ],
+        ).ask()
 
     def validate_agent_name(text: str) -> bool | str:
         """Validate agent name follows required format"""
