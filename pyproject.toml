@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.7.3"
+version = "0.9.1"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -39,7 +39,7 @@ dependencies = [
     "pytest>=8.4.0",
     "json_log_formatter>=1.1.1",
     "pytest-asyncio>=1.0.0",
-    "scale-gp-beta==0.1.0a20",
+    "scale-gp-beta>=0.1.0a20",
     "ipykernel>=6.29.5",
     "openai>=2.2,<3", # Required by openai-agents 0.4.2; litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
     "cloudpickle>=3.1.1",
@@ -179,7 +179,8 @@ xfail_strict = true
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 filterwarnings = [
-  "error"
+  "error",
+  "ignore::pydantic.warnings.PydanticDeprecatedSince20",
 ]
 
 [tool.pyright]

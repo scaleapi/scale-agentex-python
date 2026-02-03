@@ -13,6 +13,7 @@ dependencies = [
     "temporalio>=1.18.2",
     "scale-gp",
     "aiosqlite",
+    "pytest-html>=4.2.0",
 ]
 
 [project.optional-dependencies]

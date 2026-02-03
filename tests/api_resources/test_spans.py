@@ -185,10 +185,10 @@ class TestSpans:
     @parametrize
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         span = client.spans.list(
-            limit=0,
+            limit=1,
             order_by="order_by",
             order_direction="order_direction",
-            page_number=0,
+            page_number=1,
             trace_id="trace_id",
         )
         assert_matches_type(SpanListResponse, span, path=["response"])
@@ -387,10 +387,10 @@ class TestAsyncSpans:
     @parametrize
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         span = await async_client.spans.list(
-            limit=0,
+            limit=1,
             order_by="order_by",
             order_direction="order_direction",
-            page_number=0,
+            page_number=1,
             trace_id="trace_id",
         )
         assert_matches_type(SpanListResponse, span, path=["response"])

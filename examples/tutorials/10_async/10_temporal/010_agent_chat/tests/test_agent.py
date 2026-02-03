@@ -87,6 +87,7 @@ class TestNonStreamingEvents:
         # Send a simple message that shouldn't require tool use
         user_message = "Hello! Please introduce yourself briefly."
         messages = []
+        user_message_found = False
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -98,13 +99,16 @@ class TestNonStreamingEvents:
             assert isinstance(message, TaskMessage)
             messages.append(message)
 
-            if len(messages) == 1:
+            if message.content and message.content.author == "user":
                 assert message.content == TextContent(
                     author="user",
                     content=user_message,
                     type="text",
                 )
+                user_message_found = True
                 break
+
+        assert user_message_found, "User message not found"
 
     @pytest.mark.asyncio
     async def test_send_event_and_poll_with_calculator(self, client: AsyncAgentex, agent_id: str):
@@ -120,7 +124,6 @@ class TestNonStreamingEvents:
         # Send a message that could trigger the calculator tool (though with reasoning, it may not need it)
         user_message = "What is 15 multiplied by 37?"
         has_final_agent_response = False
-
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -140,7 +143,13 @@ class TestNonStreamingEvents:
 
     @pytest.mark.asyncio
     async def test_multi_turn_conversation(self, client: AsyncAgentex, agent_id: str):
-        """Test multiple turns of conversation with state preservation."""
+        """
+        Test message ordering by sending messages about distinct topics.
+
+        This validates that the agent receives messages in chronological order.
+        If messages are reversed (newest first), the agent would respond about
+        the wrong topic.
+        """
         # Create a task for this conversation
         task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
@@ -149,8 +158,9 @@ class TestNonStreamingEvents:
         # Wait for workflow to initialize
         await asyncio.sleep(1)
 
-        # First turn
-        user_message_1 = "My favorite color is blue."
+        # First turn - ask about tennis
+        user_message_1 = "Tell me about tennis. You must include the word 'tennis' in your response."
+        first_turn_found = False
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -166,14 +176,20 @@ class TestNonStreamingEvents:
                 and message.content.author == "agent"
                 and message.content.content
             ):
+                # Validate response is about tennis
+                assert "tennis" in message.content.content.lower(), "First response should be about tennis"
+                first_turn_found = True
                 break
+
+        assert first_turn_found, "First turn response not found"
 
         # Wait a bit for state to update
         await asyncio.sleep(2)
 
-        # Second turn - reference previous context
+        # Second turn - ask about basketball (different topic)
+        # If message ordering is wrong, agent might respond about tennis instead
         found_response = False
-        user_message_2 = "What did I just tell you my favorite color was?"
+        user_message_2 = "Now tell me about basketball. You must include the word 'basketball' in your response. Do not mention tennis."
         async for message in send_event_and_poll_yielding(
             client=client,
             agent_id=agent_id,
@@ -189,11 +205,12 @@ class TestNonStreamingEvents:
                 and message.content.content
             ):
                 response_text = message.content.content.lower()
-                assert "blue" in response_text, f"Expected 'blue' in response but got: {response_text}"
+                # Validate response is about basketball, not tennis
+                assert "basketball" in response_text, f"Second response should be about basketball, got: {response_text}"
                 found_response = True
                 break
 
-        assert found_response, "Did not receive final agent text response with context recall"
+        assert found_response, "Did not receive final agent text response with correct topic"
 
 
 class TestStreamingEvents:
@@ -216,8 +233,7 @@ class TestStreamingEvents:
         user_message_found = False
         agent_response_found = False
         reasoning_found = False
-
-        async def stream_messages() -> None:  # noqa: ANN101
+        async def stream_messages() -> None:
             nonlocal user_message_found, agent_response_found, reasoning_found
             async for event in stream_agent_response(
                 client=client,
@@ -249,9 +265,9 @@ class TestStreamingEvents:
                         break
 
                 elif msg_type == "done":
-                    task_message_update = StreamTaskMessageDone.model_validate(event)
-                    if task_message_update.parent_task_message and task_message_update.parent_task_message.id:
-                        finished_message = await client.messages.retrieve(task_message_update.parent_task_message.id)
+                    task_message_update_done = StreamTaskMessageDone.model_validate(event)
+                    if task_message_update_done.parent_task_message and task_message_update_done.parent_task_message.id:
+                        finished_message = await client.messages.retrieve(task_message_update_done.parent_task_message.id)
                         if finished_message.content and finished_message.content.type == "reasoning":
                             reasoning_found = True
                         elif (
@@ -260,22 +276,12 @@ class TestStreamingEvents:
                             and finished_message.content.author == "agent"
                         ):
                             agent_response_found = True
-
-                    # Exit early if we have what we need
-                    if user_message_found and agent_response_found:
-                        break
+                    break
 
         stream_task = asyncio.create_task(stream_messages())
-
         event_content = TextContentParam(type="text", author="user", content=user_message)
         await client.agents.send_event(agent_id=agent_id, params={"task_id": task.id, "content": event_content})
-
-        # Wait for streaming to complete with timeout
-        try:
-            await asyncio.wait_for(stream_task, timeout=120)  # Overall timeout for CI
-        except asyncio.TimeoutError:
-            stream_task.cancel()
-            pytest.fail("Test timed out waiting for streaming response")
+        await stream_task
 
         assert user_message_found, "User message not found in stream"
         assert agent_response_found, "Agent response not found in stream"

@@ -26,6 +26,8 @@ from agentex.lib.sdk.config.agent_manifest import AgentManifest
 from agentex.lib.cli.handlers.agent_handlers import (
     run_agent,
     build_agent,
+    parse_build_args,
+    prepare_cloud_build_context,
 )
 from agentex.lib.cli.handlers.deploy_handlers import (
     HelmError,
@@ -83,26 +85,24 @@ def delete(
 @agents.command()
 def cleanup_workflows(
     agent_name: str = typer.Argument(..., help="Name of the agent to cleanup workflows for"),
-    force: bool = typer.Option(False, help="Force cleanup using direct Temporal termination (bypasses development check)"),
+    force: bool = typer.Option(
+        False, help="Force cleanup using direct Temporal termination (bypasses development check)"
+    ),
 ):
     """
     Clean up all running workflows for an agent.
-    
+
     By default, uses graceful cancellation via agent RPC.
     With --force, directly terminates workflows via Temporal client.
     This is a convenience command that does the same thing as 'agentex tasks cleanup'.
     """
     try:
         console.print(f"[blue]Cleaning up workflows for agent '{agent_name}'...[/blue]")
-        
-        cleanup_agent_workflows(
-            agent_name=agent_name,
-            force=force,
-            development_only=True
-        )
-        
+
+        cleanup_agent_workflows(agent_name=agent_name, force=force, development_only=True)
+
         console.print(f"[green]✓ Workflow cleanup completed for agent '{agent_name}'[/green]")
-        
+
     except Exception as e:
         console.print(f"[red]Cleanup failed: {str(e)}[/red]")
         logger.exception("Agent workflow cleanup failed")
@@ -112,12 +112,8 @@ def cleanup_workflows(
 @agents.command()
 def build(
     manifest: str = typer.Option(..., help="Path to the manifest you want to use"),
-    registry: str | None = typer.Option(
-        None, help="Registry URL for pushing the built image"
-    ),
-    repository_name: str | None = typer.Option(
-        None, help="Repository name to use for the built image"
-    ),
+    registry: str | None = typer.Option(None, help="Registry URL for pushing the built image"),
+    repository_name: str | None = typer.Option(None, help="Repository name to use for the built image"),
     platforms: str | None = typer.Option(
         None, help="Platform to build the image for. Please enter a comma separated list of platforms."
     ),
@@ -126,9 +122,7 @@ def build(
         None,
         help="Docker build secret in the format 'id=secret-id,src=path-to-secret-file'",
     ),
-    tag: str | None = typer.Option(
-        None, help="Image tag to use (defaults to 'latest')"
-    ),
+    tag: str | None = typer.Option(None, help="Image tag to use (defaults to 'latest')"),
     build_arg: builtins.list[str] | None = typer.Option(  # noqa: B008
         None,
         help="Docker build argument in the format 'KEY=VALUE' (can be used multiple times)",
@@ -143,7 +137,7 @@ def build(
     if push and not registry:
         typer.echo("Error: --registry is required when --push is enabled", err=True)
         raise typer.Exit(1)
-    
+
     # Only proceed with build if we have a registry (for now, to match existing behavior)
     if not registry:
         typer.echo("No registry provided, skipping image build")
@@ -172,13 +166,105 @@ def build(
         raise typer.Exit(1) from e
 
 
+@agents.command(name="package")
+def package(
+    manifest: str = typer.Option(..., help="Path to the manifest you want to use"),
+    tag: str | None = typer.Option(
+        None,
+        "--tag",
+        "-t",
+        help="Image tag (defaults to deployment.image.tag from manifest, or 'latest')",
+    ),
+    output: str | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Output filename for the tarball (defaults to <agent-name>-<tag>.tar.gz)",
+    ),
+    build_arg: builtins.list[str] | None = typer.Option(  # noqa: B008
+        None,
+        "--build-arg",
+        "-b",
+        help="Build argument in KEY=VALUE format (can be repeated)",
+    ),
+):
+    """
+    Package an agent's build context into a tarball for cloud builds.
+
+    Reads manifest.yaml, prepares build context according to include_paths and
+    dockerignore, then saves a compressed tarball to the current directory.
+
+    The tag defaults to the value in deployment.image.tag from the manifest.
+
+    Example:
+        agentex agents package --manifest manifest.yaml
+        agentex agents package --manifest manifest.yaml --tag v1.0
+    """
+    typer.echo(f"Packaging build context from manifest: {manifest}")
+
+    # Validate manifest exists
+    manifest_path = Path(manifest)
+    if not manifest_path.exists():
+        typer.echo(f"Error: manifest not found at {manifest_path}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        # Prepare the build context (tag defaults from manifest if not provided)
+        build_context = prepare_cloud_build_context(
+            manifest_path=str(manifest_path),
+            tag=tag,
+            build_args=build_arg,
+        )
+
+        # Determine output filename using the resolved tag
+        if output:
+            output_filename = output
+        else:
+            output_filename = f"{build_context.agent_name}-{build_context.tag}.tar.gz"
+
+        # Save tarball to current working directory
+        output_path = Path.cwd() / output_filename
+        output_path.write_bytes(build_context.archive_bytes)
+
+        typer.echo(f"\nTarball saved to: {output_path}")
+        typer.echo(f"Size: {build_context.build_context_size_kb:.1f} KB")
+
+        # Output the build parameters needed for cloud build
+        typer.echo("\n" + "=" * 60)
+        typer.echo("Build Parameters for Cloud Build API:")
+        typer.echo("=" * 60)
+        typer.echo(f"  agent_name:      {build_context.agent_name}")
+        typer.echo(f"  image_name:      {build_context.image_name}")
+        typer.echo(f"  tag:             {build_context.tag}")
+        typer.echo(f"  context_file:    {output_path}")
+
+        if build_arg:
+            parsed_args = parse_build_args(build_arg)
+            typer.echo(f"  build_args:      {parsed_args}")
+
+        typer.echo("")
+        typer.echo("Command:")
+        build_args_str = ""
+        if build_arg:
+            build_args_str = " ".join(f'--build-arg "{arg}"' for arg in build_arg)
+            build_args_str = f" {build_args_str}"
+        typer.echo(
+            f'  sgp agentex build --context "{output_path}" '
+            f'--image-name "{build_context.image_name}" '
+            f'--tag "{build_context.tag}"{build_args_str}'
+        )
+        typer.echo("=" * 60)
+
+    except Exception as e:
+        typer.echo(f"Error packaging build context: {str(e)}", err=True)
+        logger.exception("Error packaging build context")
+        raise typer.Exit(1) from e
+
+
 @agents.command()
 def run(
     manifest: str = typer.Option(..., help="Path to the manifest you want to use"),
-    cleanup_on_start: bool = typer.Option(
-        False, 
-        help="Clean up existing workflows for this agent before starting"
-    ),
+    cleanup_on_start: bool = typer.Option(False, help="Clean up existing workflows for this agent before starting"),
     # Debug options
     debug: bool = typer.Option(False, help="Enable debug mode for both worker and ACP (disables auto-reload)"),
     debug_worker: bool = typer.Option(False, help="Enable debug mode for temporal worker only"),
@@ -190,26 +276,22 @@ def run(
     Run an agent locally from the given manifest.
     """
     typer.echo(f"Running agent from manifest: {manifest}")
-    
+
     # Optionally cleanup existing workflows before starting
     if cleanup_on_start:
         try:
             # Parse manifest to get agent name
             manifest_obj = AgentManifest.from_yaml(file_path=manifest)
             agent_name = manifest_obj.agent.name
-            
+
             console.print(f"[yellow]Cleaning up existing workflows for agent '{agent_name}'...[/yellow]")
-            cleanup_agent_workflows(
-                agent_name=agent_name,
-                force=False,
-                development_only=True
-            )
+            cleanup_agent_workflows(agent_name=agent_name, force=False, development_only=True)
             console.print("[green]✓ Pre-run cleanup completed[/green]")
-            
+
         except Exception as e:
             console.print(f"[yellow]⚠ Pre-run cleanup failed: {str(e)}[/yellow]")
             logger.warning(f"Pre-run cleanup failed: {e}")
-    
+
     # Create debug configuration based on CLI flags
     debug_config = None
     if debug or debug_worker or debug_acp:
@@ -224,19 +306,19 @@ def run(
             mode = DebugMode.ACP
         else:
             mode = DebugMode.NONE
-        
+
         debug_config = DebugConfig(
             enabled=True,
             mode=mode,
             port=debug_port,
             wait_for_attach=wait_for_debugger,
-            auto_port=False  # Use fixed port to match VS Code launch.json
+            auto_port=False,  # Use fixed port to match VS Code launch.json
         )
-        
+
         console.print(f"[blue]🐛 Debug mode enabled: {mode.value}[/blue]")
         if wait_for_debugger:
             console.print("[yellow]⏳ Processes will wait for debugger attachment[/yellow]")
-    
+
     try:
         run_agent(manifest_path=manifest, debug_config=debug_config)
     except Exception as e:
@@ -247,17 +329,16 @@ def run(
 
 @agents.command()
 def deploy(
-    cluster: str = typer.Option(
-        ..., help="Target cluster name (must match kubectl context)"
-    ),
+    cluster: str = typer.Option(..., help="Target cluster name (must match kubectl context)"),
     manifest: str = typer.Option("manifest.yaml", help="Path to the manifest file"),
     namespace: str | None = typer.Option(
         None,
         help="Override Kubernetes namespace (defaults to namespace from environments.yaml)",
     ),
     environment: str | None = typer.Option(
-        None, help="Environment name (dev, prod, etc.) - must be defined in environments.yaml. If not provided, the namespace must be set explicitly."
-    ),    
+        None,
+        help="Environment name (dev, prod, etc.) - must be defined in environments.yaml. If not provided, the namespace must be set explicitly.",
+    ),
     tag: str | None = typer.Option(None, help="Override the image tag for deployment"),
     repository: str | None = typer.Option(
         None, help="Override the repository for deployment"
@@ -271,9 +352,7 @@ def deploy(
 ):
     """Deploy an agent to a Kubernetes cluster using Helm"""
 
-    console.print(
-        Panel.fit("🚀 [bold blue]Deploy Agent[/bold blue]", border_style="blue")
-    )
+    console.print(Panel.fit("🚀 [bold blue]Deploy Agent[/bold blue]", border_style="blue"))
 
     try:
         # Validate manifest exists
@@ -284,17 +363,12 @@ def deploy(
 
         # Validate manifest and environments configuration
         try:
-            if environment:
-                _, environments_config = validate_manifest_and_environments(
-                    str(manifest_path), 
-                    required_environment=environment
-                )
-                agent_env_config = environments_config.get_config_for_env(environment)
-                console.print(f"[green]✓[/green] Environment config validated: {environment}")
-            else:
-                agent_env_config = None
-                console.print(f"[yellow]⚠[/yellow] No environment provided, skipping environment-specific config")
-            
+            _, environments_config = validate_manifest_and_environments(
+                str(manifest_path), required_environment=environment
+            )
+            agent_env_config = environments_config.get_config_for_env(environment)
+            console.print(f"[green]✓[/green] Environment config validated: {environment}")
+
         except EnvironmentsValidationError as e:
             error_msg = generate_helpful_error_message(e, "Environment validation failed")
             console.print(f"[red]Configuration Error:[/red]\n{error_msg}")
@@ -313,9 +387,13 @@ def deploy(
                 console.print(f"[blue]ℹ[/blue] Using namespace from environments.yaml: {namespace_from_config}")
                 namespace = namespace_from_config
             else:
-                raise DeploymentError(f"No namespace found in environments.yaml for environment: {environment}, and not passed in as --namespace")
+                raise DeploymentError(
+                    f"No namespace found in environments.yaml for environment: {environment}, and not passed in as --namespace"
+                )
         elif not namespace:
-            raise DeploymentError("No namespace provided, and not passed in as --namespace and no environment provided to read from an environments.yaml file")
+            raise DeploymentError(
+                "No namespace provided, and not passed in as --namespace and no environment provided to read from an environments.yaml file"
+            )
 
         # Confirm deployment (only in interactive mode)
         console.print("\n[bold]Deployment Summary:[/bold]")
@@ -330,9 +408,7 @@ def deploy(
 
         if interactive:
             proceed = questionary.confirm("Proceed with deployment?").ask()
-            proceed = handle_questionary_cancellation(
-                proceed, "deployment confirmation"
-            )
+            proceed = handle_questionary_cancellation(proceed, "deployment confirmation")
 
             if not proceed:
                 console.print("Deployment cancelled")
@@ -342,9 +418,7 @@ def deploy(
 
         check_and_switch_cluster_context(cluster)
         if not validate_namespace(namespace, cluster):
-            console.print(
-                f"[red]Error:[/red] Namespace '{namespace}' does not exist in cluster '{cluster}'"
-            )
+            console.print(f"[red]Error:[/red] Namespace '{namespace}' does not exist in cluster '{cluster}'")
             raise typer.Exit(1)
 
         deploy_overrides = InputDeployOverrides(repository=repository, image_tag=tag)
@@ -362,9 +436,7 @@ def deploy(
         # Use the already loaded manifest object
         release_name = f"{manifest_obj.agent.name}-{cluster}"
 
-        console.print(
-            "\n[bold green]🎉 Deployment completed successfully![/bold green]"
-        )
+        console.print("\n[bold green]🎉 Deployment completed successfully![/bold green]")
         console.print("\nTo check deployment status:")
         console.print(f"  kubectl get pods -n {namespace}")
         console.print(f"  helm status {release_name} -n {namespace}")
