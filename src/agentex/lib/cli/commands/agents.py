@@ -262,6 +262,9 @@ def deploy(
     repository: str | None = typer.Option(
         None, help="Override the repository for deployment"
     ),
+    use_latest_chart: bool = typer.Option(
+        False, "--use-latest-chart", help="Fetch and use the latest Helm chart version from OCI registry"
+    ),
     interactive: bool = typer.Option(
         True, "--interactive/--no-interactive", help="Enable interactive prompts"
     ),
@@ -322,6 +325,8 @@ def deploy(
         console.print(f"  Namespace: {namespace}")
         if tag:
             console.print(f"  Image Tag: {tag}")
+        if use_latest_chart:
+            console.print("  Chart Version: [cyan]latest (will be fetched)[/cyan]")
 
         if interactive:
             proceed = questionary.confirm("Proceed with deployment?").ask()
@@ -351,6 +356,7 @@ def deploy(
             namespace=namespace,
             deploy_overrides=deploy_overrides,
             environment_name=environment,
+            use_latest_chart=use_latest_chart,
         )
 
         # Use the already loaded manifest object

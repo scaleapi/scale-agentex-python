@@ -64,27 +64,40 @@ class AgentKubernetesConfig(BaseModel):
 
 class AgentEnvironmentConfig(BaseModel):
     """Complete configuration for an agent in a specific environment."""
-    
+
     kubernetes: AgentKubernetesConfig | None = Field(
-        default=None, 
+        default=None,
         description="Kubernetes deployment configuration"
     )
     auth: AgentAuthConfig = Field(
-        ..., 
+        ...,
         description="Authentication and authorization configuration"
     )
     helm_repository_name: str = Field(
-        default="scale-egp", 
-        description="Helm repository name for the environment"
+        default="scale-egp",
+        description="Helm repository name for the environment (classic mode)"
     )
     helm_repository_url: str = Field(
-        default="https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts", 
-        description="Helm repository url for the environment"
+        default="https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts",
+        description="Helm repository url for the environment (classic mode)"
+    )
+    helm_oci_registry: str | None = Field(
+        default=None,
+        description="OCI registry URL for Helm charts (e.g., 'us-west1-docker.pkg.dev/project/repo'). "
+                    "When set, OCI mode is used instead of classic helm repo."
+    )
+    helm_chart_version: str | None = Field(
+        default=None,
+        description="Helm chart version to deploy. If not set, uses the default version from the CLI."
     )
     helm_overrides: Dict[str, Any] = Field(
-        default_factory=dict, 
+        default_factory=dict,
         description="Helm chart value overrides for environment-specific tuning"
     )
+
+    def uses_oci_registry(self) -> bool:
+        """Check if this environment uses OCI registry for Helm charts."""
+        return self.helm_oci_registry is not None
 
 
 class AgentEnvironmentsConfig(UtilsBaseModel):
