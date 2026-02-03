@@ -53,8 +53,8 @@ class TracingModule:
         self,
         trace_id: str,
         name: str,
-        input: list[Any] | dict[str, Any] | BaseModel | None = None,
-        data: list[Any] | dict[str, Any] | BaseModel | None = None,
+        input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         parent_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
@@ -69,9 +69,9 @@ class TracingModule:
         Args:
             trace_id (str): The trace ID for the span.
             name (str): The name of the span.
-            input (Union[List, Dict, BaseModel]): The input for the span.
+            input (Union[Dict, List[Dict], BaseModel]): The input for the span.
             parent_id (Optional[str]): The parent span ID for the span.
-            data (Optional[Union[List, Dict, BaseModel]]): The data for the span.
+            data (Optional[Union[Dict, List[Dict], BaseModel]]): The data for the span.
             start_to_close_timeout (timedelta): The start to close timeout for the span.
             heartbeat_timeout (timedelta): The heartbeat timeout for the span.
             retry_policy (RetryPolicy): The retry policy for the span.
@@ -109,9 +109,9 @@ class TracingModule:
         self,
         trace_id: str,
         name: str,
-        input: list[Any] | dict[str, Any] | BaseModel | None = None,
+        input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         parent_id: str | None = None,
-        data: list[Any] | dict[str, Any] | BaseModel | None = None,
+        data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=1),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
@@ -122,9 +122,9 @@ class TracingModule:
         Args:
             trace_id (str): The trace ID for the span.
             name (str): The name of the span.
-            input (Union[List, Dict, BaseModel]): The input for the span.
+            input (Union[Dict, List[Dict], BaseModel]): The input for the span.
             parent_id (Optional[str]): The parent span ID for the span.
-            data (Optional[Union[List, Dict, BaseModel]]): The data for the span.
+            data (Optional[Union[Dict, List[Dict], BaseModel]]): The data for the span.
             start_to_close_timeout (timedelta): The start to close timeout for the span.
             heartbeat_timeout (timedelta): The heartbeat timeout for the span.
             retry_policy (RetryPolicy): The retry policy for the span.
