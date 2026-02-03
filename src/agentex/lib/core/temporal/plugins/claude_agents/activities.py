@@ -51,6 +51,7 @@ async def run_claude_agent_activity(
     system_prompt: str | None = None,
     resume_session_id: str | None = None,
     agents: dict[str, Any] | None = None,
+    mcp_servers: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute Claude SDK - wrapped in Temporal activity
 
@@ -69,6 +70,7 @@ async def run_claude_agent_activity(
         system_prompt: Optional system prompt override
         resume_session_id: Optional session ID to resume conversation context
         agents: Optional dict of subagent definitions for Task tool
+        mcp_servers: Optional dict of MCP server configurations
 
     Returns:
         dict with "messages", "session_id", "usage", and "cost_usd" keys
@@ -83,7 +85,8 @@ async def run_claude_agent_activity(
         f"[run_claude_agent_activity] Starting - "
         f"task_id={task_id}, workspace={workspace_path}, tools={allowed_tools}, "
         f"resume={'YES' if resume_session_id else 'NO (new session)'}, "
-        f"subagents={list(agents.keys()) if agents else 'NONE'}"
+        f"subagents={list(agents.keys()) if agents else 'NONE'}, "
+        f"mcp_servers={list(mcp_servers.keys()) if mcp_servers else 'NONE'}"
     )
 
     # Reconstruct AgentDefinition objects from serialized dicts
@@ -110,7 +113,7 @@ async def run_claude_agent_activity(
         parent_span_id=parent_span_id,
     )
 
-    # Configure Claude with workspace isolation, session resume, subagents, and hooks
+    # Configure Claude with workspace isolation, session resume, subagents, hooks, and MCP servers
     options = ClaudeAgentOptions(
         cwd=workspace_path,
         allowed_tools=allowed_tools,
@@ -119,6 +122,7 @@ async def run_claude_agent_activity(
         resume=resume_session_id,
         agents=agent_defs,
         hooks=hooks,  # Tool lifecycle hooks for streaming!
+        mcp_servers=mcp_servers,  # MCP server configurations
     )
 
     # Create message handler for streaming
