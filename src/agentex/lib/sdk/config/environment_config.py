@@ -79,8 +79,7 @@ class AgentEnvironmentConfig(BaseModel):
         description="Helm chart version to deploy. If not set, uses the default version from the CLI."
     )
     helm_overrides: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Helm chart value overrides for environment-specific tuning"
+        default_factory=dict, description="Helm chart value overrides for environment-specific tuning"
     )
 
     def uses_oci_registry(self) -> bool:

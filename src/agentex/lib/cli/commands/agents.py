@@ -340,15 +340,11 @@ def deploy(
         help="Environment name (dev, prod, etc.) - must be defined in environments.yaml. If not provided, the namespace must be set explicitly.",
     ),
     tag: str | None = typer.Option(None, help="Override the image tag for deployment"),
-    repository: str | None = typer.Option(
-        None, help="Override the repository for deployment"
-    ),
+    repository: str | None = typer.Option(None, help="Override the repository for deployment"),
     use_latest_chart: bool = typer.Option(
         False, "--use-latest-chart", help="Fetch and use the latest Helm chart version from OCI registry"
     ),
-    interactive: bool = typer.Option(
-        True, "--interactive/--no-interactive", help="Enable interactive prompts"
-    ),
+    interactive: bool = typer.Option(True, "--interactive/--no-interactive", help="Enable interactive prompts"),
 ):
     """Deploy an agent to a Kubernetes cluster using Helm"""
 
