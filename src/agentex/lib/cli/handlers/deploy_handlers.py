@@ -470,10 +470,19 @@ def deploy_agent(
     helm_repository_name: str | None = None
     oci_registry: str | None = None
 
+    # Track OCI provider for provider-specific features
+    oci_provider: str | None = None
+
     if use_oci:
         oci_registry = agent_env_config.helm_oci_registry  # type: ignore[union-attr]
+        oci_provider = agent_env_config.helm_oci_provider  # type: ignore[union-attr]
         console.print(f"[blue]ℹ[/blue] Using OCI Helm registry: {oci_registry}")
-        login_to_gar_registry(oci_registry)  # type: ignore[arg-type]
+
+        # Only auto-authenticate for GAR provider
+        if oci_provider == "gar":
+            login_to_gar_registry(oci_registry)  # type: ignore[arg-type]
+        else:
+            console.print("[blue]ℹ[/blue] Skipping auto-authentication (no provider specified, assuming already authenticated)")
     else:
         if agent_env_config:
             helm_repository_name = agent_env_config.helm_repository_name
@@ -496,6 +505,9 @@ def deploy_agent(
     if use_latest_chart:
         if not use_oci:
             console.print("[yellow]⚠[/yellow] --use-latest-chart only works with OCI registries, using default version")
+            chart_version = DEFAULT_HELM_CHART_VERSION
+        elif oci_provider != "gar":
+            console.print("[yellow]⚠[/yellow] --use-latest-chart only works with GAR provider (helm_oci_provider: gar), using default version")
             chart_version = DEFAULT_HELM_CHART_VERSION
         else:
             chart_version = get_latest_gar_chart_version(oci_registry)  # type: ignore[arg-type]

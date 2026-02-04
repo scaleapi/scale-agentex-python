@@ -7,7 +7,7 @@ configurations that are separate from the main manifest.yaml file.
 
 from __future__ import annotations
 
-from typing import Any, Dict, override
+from typing import Any, Dict, Literal, override
 from pathlib import Path
 
 import yaml
@@ -73,6 +73,12 @@ class AgentEnvironmentConfig(BaseModel):
         default=None,
         description="OCI registry URL for Helm charts (e.g., 'us-west1-docker.pkg.dev/project/repo'). "
                     "When set, OCI mode is used instead of classic helm repo."
+    )
+    helm_oci_provider: Literal["gar"] | None = Field(
+        default=None,
+        description="OCI registry provider for provider-specific features. "
+                    "Set to 'gar' for Google Artifact Registry to enable auto-authentication via gcloud "
+                    "and latest version fetching. When not set, assumes user has already authenticated."
     )
     helm_chart_version: str | None = Field(
         default=None,
