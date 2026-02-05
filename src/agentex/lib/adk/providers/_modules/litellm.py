@@ -26,7 +26,13 @@ from agentex.lib.core.temporal.activities.adk.providers.litellm_activities impor
 logger = make_logger(__name__)
 
 # Default retry policy for all LiteLLM operations
-DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
+# Retries with exponential backoff: 1s, 2s, 4s, ... up to 30s between attempts
+DEFAULT_RETRY_POLICY = RetryPolicy(
+    maximum_attempts=3,
+    initial_interval=timedelta(seconds=1),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(seconds=30),
+)
 
 
 class LiteLLMModule:
