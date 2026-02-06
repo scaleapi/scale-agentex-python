@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.2 (2026-02-06)
+
+Full Changelog: [v0.9.1...v0.9.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.1...v0.9.2)
+
+### Features
+
+* **client:** add custom JSON encoder for extended type support ([a0720ab](https://github.com/scaleapi/scale-agentex-python/commit/a0720abb088583ce4b596e464f7483a4be728e29))
+
+
+### Bug Fixes
+
+* add litellm retry with exponential backoff for rate limit errors ([ccdb24a](https://github.com/scaleapi/scale-agentex-python/commit/ccdb24a08607298f8dafd748ee9e7fe8ba13d5fe))
+
 ## 0.9.1 (2026-01-26)
 
 Full Changelog: [v0.9.0...v0.9.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.0...v0.9.1)
