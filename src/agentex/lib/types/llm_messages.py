@@ -58,6 +58,7 @@ class LLMConfig(BaseModel):
     parallel_tool_calls: bool | None = None
     logprobs: bool | None = None
     top_logprobs: int | None = None
+    num_retries: int | None = 3
 
 
 class ContentPartText(BaseModel):
