@@ -17,13 +17,13 @@ from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
+from agentex.lib.sdk.config.environment_config import OciRegistryConfig, AgentEnvironmentConfig
 
 logger = make_logger(__name__)
 console = Console()
 
 TEMPORAL_WORKER_KEY = "temporal-worker"
-AGENTEX_AGENTS_HELM_CHART_VERSION = "0.1.9"
+DEFAULT_HELM_CHART_VERSION = "0.1.9"
 
 
 class InputDeployOverrides(BaseModel):
@@ -42,7 +42,7 @@ def check_helm_installed() -> bool:
 
 
 def add_helm_repo(helm_repository_name: str, helm_repository_url: str) -> None:
-    """Add the agentex helm repository if not already added"""
+    """Add the agentex helm repository if not already added (classic mode)"""
     try:
         # Check if repo already exists
         result = subprocess.run(["helm", "repo", "list"], capture_output=True, text=True, check=True)
@@ -67,6 +67,166 @@ def add_helm_repo(helm_repository_name: str, helm_repository_url: str) -> None:
 
     except subprocess.CalledProcessError as e:
         raise HelmError(f"Failed to add helm repository: {e}") from e
+
+
+def login_to_gar_registry(oci_registry: str) -> None:
+    """Auto-login to Google Artifact Registry using gcloud credentials.
+
+    Args:
+        oci_registry: The GAR registry URL (e.g., 'us-west1-docker.pkg.dev/project-id/repo-name')
+    """
+    try:
+        # Extract the registry host (e.g., 'us-west1-docker.pkg.dev')
+        registry_host = oci_registry.split("/")[0]
+
+        # Get access token from gcloud
+        console.print(f"[blue]ℹ[/blue] Authenticating with Google Artifact Registry: {registry_host}")
+        result = subprocess.run(
+            ["gcloud", "auth", "print-access-token"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        access_token = result.stdout.strip()
+
+        # Login to helm registry using the access token
+        subprocess.run(
+            [
+                "helm",
+                "registry",
+                "login",
+                registry_host,
+                "--username",
+                "oauth2accesstoken",
+                "--password-stdin",
+            ],
+            input=access_token,
+            text=True,
+            check=True,
+        )
+        console.print(f"[green]✓[/green] Authenticated with GAR: {registry_host}")
+
+    except subprocess.CalledProcessError as e:
+        raise HelmError(
+            f"Failed to authenticate with Google Artifact Registry: {e}\n"
+            "Ensure you are logged in with 'gcloud auth login' and have access to the registry."
+        ) from e
+    except FileNotFoundError:
+        raise HelmError(
+            "gcloud CLI not found. Please install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install"
+        ) from None
+
+
+def get_latest_gar_chart_version(oci_registry: str, chart_name: str = "agentex-agent") -> str:
+    """Fetch the latest version of a Helm chart from Google Artifact Registry.
+
+    GAR stores Helm chart versions as tags (e.g., '0.1.9'), not as versions (which are SHA digests).
+    This function lists tags sorted by creation time and returns the most recent one.
+
+    Args:
+        oci_registry: The GAR registry URL (e.g., 'us-west1-docker.pkg.dev/project-id/repo-name')
+        chart_name: Name of the Helm chart
+
+    Returns:
+        The latest version string (e.g., '0.2.0')
+    """
+    try:
+        # Parse the OCI registry URL to extract components
+        # Format: REGION-docker.pkg.dev/PROJECT/REPOSITORY
+        parts = oci_registry.split("/")
+        if len(parts) < 3:
+            raise HelmError(
+                f"Invalid OCI registry format: {oci_registry}. "
+                "Expected format: REGION-docker.pkg.dev/PROJECT/REPOSITORY"
+            )
+
+        location = parts[0].replace("-docker.pkg.dev", "")
+        project = parts[1]
+        repository = parts[2]
+
+        console.print(f"[blue]ℹ[/blue] Fetching latest chart version from GAR...")
+
+        # Use gcloud to list tags (not versions - versions are SHA digests)
+        # Tags contain the semantic versions like '0.1.9'
+        result = subprocess.run(
+            [
+                "gcloud",
+                "artifacts",
+                "tags",
+                "list",
+                f"--repository={repository}",
+                f"--location={location}",
+                f"--project={project}",
+                f"--package={chart_name}",
+                "--sort-by=~createTime",
+                "--limit=1",
+                "--format=value(tag)",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        output = result.stdout.strip()
+        if not output:
+            raise HelmError(f"No tags found for chart '{chart_name}' in {oci_registry}")
+
+        # The output is the tag name (semantic version)
+        version = output
+        console.print(f"[green]✓[/green] Latest chart version: {version}")
+        return version
+
+    except subprocess.CalledProcessError as e:
+        raise HelmError(
+            f"Failed to fetch chart tags from GAR: {e.stderr}\nEnsure you have access to the Artifact Registry."
+        ) from e
+    except FileNotFoundError:
+        raise HelmError(
+            "gcloud CLI not found. Please install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install"
+        ) from None
+
+
+def resolve_chart(
+    oci_registry: OciRegistryConfig | None,
+    helm_repository_name: str | None,
+    use_latest_chart: bool,
+    chart_name: str = "agentex-agent",
+) -> tuple[str, str]:
+    """Resolve the chart reference and version based on the deployment mode.
+
+    For OCI mode, builds an oci:// reference and resolves version from:
+      --use-latest-chart (GAR only) > oci_registry.chart_version > default.
+    For classic mode, builds a repo/chart reference and uses default version.
+
+    Returns:
+        (chart_reference, chart_version)
+    """
+    if oci_registry:
+        chart_reference = f"oci://{oci_registry.url}/{chart_name}"
+
+        if use_latest_chart:
+            if oci_registry.provider != "gar":
+                console.print(
+                    "[yellow]⚠[/yellow] --use-latest-chart only works with GAR provider (provider: gar), using default version"
+                )
+                chart_version = DEFAULT_HELM_CHART_VERSION
+            else:
+                chart_version = get_latest_gar_chart_version(oci_registry.url)
+        elif oci_registry.chart_version:
+            chart_version = oci_registry.chart_version
+        else:
+            chart_version = DEFAULT_HELM_CHART_VERSION
+    else:
+        if not helm_repository_name:
+            raise HelmError("Helm repository name is required for classic mode")
+        chart_reference = f"{helm_repository_name}/{chart_name}"
+
+        if use_latest_chart:
+            console.print("[yellow]⚠[/yellow] --use-latest-chart only works with OCI registries, using default version")
+        chart_version = DEFAULT_HELM_CHART_VERSION
+
+    console.print(f"[blue]ℹ[/blue] Using Helm chart version: {chart_version}")
+    return chart_reference, chart_version
 
 
 def convert_env_vars_dict_to_list(env_vars: dict[str, str]) -> list[dict[str, str]]:
@@ -281,8 +441,18 @@ def deploy_agent(
     namespace: str,
     deploy_overrides: InputDeployOverrides,
     environment_name: str | None = None,
+    use_latest_chart: bool = False,
 ) -> None:
-    """Deploy an agent using helm"""
+    """Deploy an agent using helm
+
+    Args:
+        manifest_path: Path to the agent manifest file
+        cluster_name: Target Kubernetes cluster name
+        namespace: Kubernetes namespace to deploy to
+        deploy_overrides: Image repository/tag overrides
+        environment_name: Environment name from environments.yaml
+        use_latest_chart: If True, fetch and use the latest chart version from OCI registry (OCI mode only)
+    """
 
     # Validate prerequisites
     if not check_helm_installed():
@@ -304,14 +474,36 @@ def deploy_agent(
         else:
             console.print(f"[yellow]⚠[/yellow] No environments.yaml found, skipping environment-specific config")
 
-    if agent_env_config:
-        helm_repository_name = agent_env_config.helm_repository_name
-        helm_repository_url = agent_env_config.helm_repository_url
+    # Determine deployment mode: OCI registry or classic helm repo
+    oci_registry = agent_env_config.oci_registry if agent_env_config else None
+    helm_repository_name: str | None = None
+
+    if oci_registry:
+        console.print(f"[blue]ℹ[/blue] Using OCI Helm registry: {oci_registry.url}")
+
+        # Only auto-authenticate for GAR provider
+        if oci_registry.provider == "gar":
+            login_to_gar_registry(oci_registry.url)
+        else:
+            console.print(
+                "[blue]ℹ[/blue] Skipping auto-authentication (no provider specified, assuming already authenticated)"
+            )
     else:
-        helm_repository_name = "scale-egp"
-        helm_repository_url = "https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts"
-    # Add helm repository/update
-    add_helm_repo(helm_repository_name, helm_repository_url)
+        if agent_env_config:
+            helm_repository_name = agent_env_config.helm_repository_name
+            helm_repository_url = agent_env_config.helm_repository_url
+        else:
+            helm_repository_name = "scale-egp"
+            helm_repository_url = "https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts"
+        # Add helm repository/update (classic mode only)
+        add_helm_repo(helm_repository_name, helm_repository_url)
+
+    # Resolve chart reference and version in one step
+    chart_reference, chart_version = resolve_chart(
+        oci_registry=oci_registry,
+        helm_repository_name=helm_repository_name,
+        use_latest_chart=use_latest_chart,
+    )
 
     # Merge configurations
     helm_values = merge_deployment_configs(manifest, agent_env_config, deploy_overrides, manifest_path)
@@ -341,9 +533,9 @@ def deploy_agent(
                 "helm",
                 "upgrade",
                 release_name,
-                f"{helm_repository_name}/agentex-agent",
+                chart_reference,
                 "--version",
-                AGENTEX_AGENTS_HELM_CHART_VERSION,
+                chart_version,
                 "-f",
                 values_file,
                 "-n",
@@ -363,9 +555,9 @@ def deploy_agent(
                 "helm",
                 "install",
                 release_name,
-                f"{helm_repository_name}/agentex-agent",
+                chart_reference,
                 "--version",
-                AGENTEX_AGENTS_HELM_CHART_VERSION,
+                chart_version,
                 "-f",
                 values_file,
                 "-n",

@@ -7,7 +7,7 @@ configurations that are separate from the main manifest.yaml file.
 
 from __future__ import annotations
 
-from typing import Any, Dict, override
+from typing import Any, Dict, Literal, override
 from pathlib import Path
 
 import yaml
@@ -55,6 +55,25 @@ class AgentKubernetesConfig(BaseModel):
         return namespace
 
 
+class OciRegistryConfig(BaseModel):
+    """OCI registry configuration for Helm chart deployments."""
+
+    url: str = Field(
+        ...,
+        description="OCI registry URL for Helm charts (e.g., 'us-west1-docker.pkg.dev/project/repo'). "
+        "When set, OCI mode is used instead of classic helm repo.",
+    )
+    provider: Literal["gar"] | None = Field(
+        default=None,
+        description="OCI registry provider for provider-specific features. "
+        "Set to 'gar' for Google Artifact Registry to enable auto-authentication via gcloud "
+        "and latest version fetching. When not set, assumes user has already authenticated.",
+    )
+    chart_version: str | None = Field(
+        default=None, description="Helm chart version to deploy. If not set, uses the default version from the CLI."
+    )
+
+
 class AgentEnvironmentConfig(BaseModel):
     """Complete configuration for an agent in a specific environment."""
 
@@ -67,7 +86,10 @@ class AgentEnvironmentConfig(BaseModel):
     helm_repository_name: str = Field(default="scale-egp", description="Helm repository name for the environment")
     helm_repository_url: str = Field(
         default="https://scale-egp-helm-charts-us-west-2.s3.amazonaws.com/charts",
-        description="Helm repository url for the environment",
+        description="Helm repository url for the environment (classic mode)",
+    )
+    oci_registry: OciRegistryConfig | None = Field(
+        default=None, description="OCI registry configuration. When set, OCI mode is used instead of classic helm repo."
     )
     helm_overrides: Dict[str, Any] = Field(
         default_factory=dict, description="Helm chart value overrides for environment-specific tuning"
