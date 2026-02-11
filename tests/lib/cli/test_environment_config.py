@@ -296,3 +296,50 @@ environments:
 
             with pytest.raises(ValueError, match="Failed to load"):
                 AgentEnvironmentsConfig.from_yaml(f.name)
+
+    def test_load_yaml_with_oci_registry(self):
+        """Test loading YAML with nested oci_registry configuration."""
+        yaml_content = """
+schema_version: v1
+environments:
+  dev:
+    kubernetes:
+      namespace: dev-namespace
+    auth:
+      principal:
+        user_id: "user-123"
+    oci_registry:
+      url: us-west1-docker.pkg.dev/my-project/my-repo
+      provider: gar
+      chart_version: "0.2.0"
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            f.flush()
+
+            config = AgentEnvironmentsConfig.from_yaml(f.name)
+
+            env = config.environments["dev"]
+            assert env.oci_registry is not None
+            assert env.oci_registry.url == "us-west1-docker.pkg.dev/my-project/my-repo"
+            assert env.oci_registry.provider == "gar"
+            assert env.oci_registry.chart_version == "0.2.0"
+
+    def test_load_yaml_without_oci_registry(self):
+        """Test that oci_registry is None when not specified in YAML."""
+        yaml_content = """
+schema_version: v1
+environments:
+  dev:
+    kubernetes:
+      namespace: dev-namespace
+    auth:
+      principal:
+        user_id: "user-123"
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write(yaml_content)
+            f.flush()
+
+            config = AgentEnvironmentsConfig.from_yaml(f.name)
+            assert config.environments["dev"].oci_registry is None

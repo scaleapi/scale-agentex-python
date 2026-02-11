@@ -17,7 +17,7 @@ from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.sdk.config.agent_config import AgentConfig
 from agentex.lib.sdk.config.agent_manifest import AgentManifest
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig
+from agentex.lib.sdk.config.environment_config import OciRegistryConfig, AgentEnvironmentConfig
 
 logger = make_logger(__name__)
 console = Console()
@@ -113,8 +113,7 @@ def login_to_gar_registry(oci_registry: str) -> None:
         ) from e
     except FileNotFoundError:
         raise HelmError(
-            "gcloud CLI not found. Please install the Google Cloud SDK: "
-            "https://cloud.google.com/sdk/docs/install"
+            "gcloud CLI not found. Please install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install"
         ) from None
 
 
@@ -170,9 +169,7 @@ def get_latest_gar_chart_version(oci_registry: str, chart_name: str = "agentex-a
 
         output = result.stdout.strip()
         if not output:
-            raise HelmError(
-                f"No tags found for chart '{chart_name}' in {oci_registry}"
-            )
+            raise HelmError(f"No tags found for chart '{chart_name}' in {oci_registry}")
 
         # The output is the tag name (semantic version)
         version = output
@@ -181,43 +178,55 @@ def get_latest_gar_chart_version(oci_registry: str, chart_name: str = "agentex-a
 
     except subprocess.CalledProcessError as e:
         raise HelmError(
-            f"Failed to fetch chart tags from GAR: {e.stderr}\n"
-            "Ensure you have access to the Artifact Registry."
+            f"Failed to fetch chart tags from GAR: {e.stderr}\nEnsure you have access to the Artifact Registry."
         ) from e
     except FileNotFoundError:
         raise HelmError(
-            "gcloud CLI not found. Please install the Google Cloud SDK: "
-            "https://cloud.google.com/sdk/docs/install"
+            "gcloud CLI not found. Please install the Google Cloud SDK: https://cloud.google.com/sdk/docs/install"
         ) from None
 
 
-def get_chart_reference(
-    use_oci: bool,
-    helm_repository_name: str | None = None,
-    oci_registry: str | None = None,
+def resolve_chart(
+    oci_registry: OciRegistryConfig | None,
+    helm_repository_name: str | None,
+    use_latest_chart: bool,
     chart_name: str = "agentex-agent",
-) -> str:
-    """Get the chart reference based on the deployment mode.
+) -> tuple[str, str]:
+    """Resolve the chart reference and version based on the deployment mode.
 
-    Args:
-        use_oci: Whether to use OCI registry mode
-        helm_repository_name: Name of the classic helm repo (required if use_oci=False)
-        oci_registry: OCI registry URL (required if use_oci=True)
-        chart_name: Name of the helm chart
+    For OCI mode, builds an oci:// reference and resolves version from:
+      --use-latest-chart (GAR only) > oci_registry.chart_version > default.
+    For classic mode, builds a repo/chart reference and uses default version.
 
     Returns:
-        Chart reference string for helm install/upgrade commands
+        (chart_reference, chart_version)
     """
-    if use_oci:
-        if not oci_registry:
-            raise HelmError("OCI registry URL is required for OCI mode")
-        # OCI format: oci://registry/path/chart-name
-        return f"oci://{oci_registry}/{chart_name}"
+    if oci_registry:
+        chart_reference = f"oci://{oci_registry.url}/{chart_name}"
+
+        if use_latest_chart:
+            if oci_registry.provider != "gar":
+                console.print(
+                    "[yellow]⚠[/yellow] --use-latest-chart only works with GAR provider (provider: gar), using default version"
+                )
+                chart_version = DEFAULT_HELM_CHART_VERSION
+            else:
+                chart_version = get_latest_gar_chart_version(oci_registry.url)
+        elif oci_registry.chart_version:
+            chart_version = oci_registry.chart_version
+        else:
+            chart_version = DEFAULT_HELM_CHART_VERSION
     else:
         if not helm_repository_name:
             raise HelmError("Helm repository name is required for classic mode")
-        # Classic format: repo-name/chart-name
-        return f"{helm_repository_name}/{chart_name}"
+        chart_reference = f"{helm_repository_name}/{chart_name}"
+
+        if use_latest_chart:
+            console.print("[yellow]⚠[/yellow] --use-latest-chart only works with OCI registries, using default version")
+        chart_version = DEFAULT_HELM_CHART_VERSION
+
+    console.print(f"[blue]ℹ[/blue] Using Helm chart version: {chart_version}")
+    return chart_reference, chart_version
 
 
 def convert_env_vars_dict_to_list(env_vars: dict[str, str]) -> list[dict[str, str]]:
@@ -465,24 +474,20 @@ def deploy_agent(
         else:
             console.print(f"[yellow]⚠[/yellow] No environments.yaml found, skipping environment-specific config")
 
-    # Determine if using OCI or classic helm repo mode
-    use_oci = agent_env_config.uses_oci_registry() if agent_env_config else False
+    # Determine deployment mode: OCI registry or classic helm repo
+    oci_registry = agent_env_config.oci_registry if agent_env_config else None
     helm_repository_name: str | None = None
-    oci_registry: str | None = None
 
-    # Track OCI provider for provider-specific features
-    oci_provider: str | None = None
-
-    if use_oci:
-        oci_registry = agent_env_config.helm_oci_registry  # type: ignore[union-attr]
-        oci_provider = agent_env_config.helm_oci_provider  # type: ignore[union-attr]
-        console.print(f"[blue]ℹ[/blue] Using OCI Helm registry: {oci_registry}")
+    if oci_registry:
+        console.print(f"[blue]ℹ[/blue] Using OCI Helm registry: {oci_registry.url}")
 
         # Only auto-authenticate for GAR provider
-        if oci_provider == "gar":
-            login_to_gar_registry(oci_registry)  # type: ignore[arg-type]
+        if oci_registry.provider == "gar":
+            login_to_gar_registry(oci_registry.url)
         else:
-            console.print("[blue]ℹ[/blue] Skipping auto-authentication (no provider specified, assuming already authenticated)")
+            console.print(
+                "[blue]ℹ[/blue] Skipping auto-authentication (no provider specified, assuming already authenticated)"
+            )
     else:
         if agent_env_config:
             helm_repository_name = agent_env_config.helm_repository_name
@@ -493,30 +498,12 @@ def deploy_agent(
         # Add helm repository/update (classic mode only)
         add_helm_repo(helm_repository_name, helm_repository_url)
 
-    # Get the chart reference based on deployment mode
-    chart_reference = get_chart_reference(
-        use_oci=use_oci,
-        helm_repository_name=helm_repository_name,
+    # Resolve chart reference and version in one step
+    chart_reference, chart_version = resolve_chart(
         oci_registry=oci_registry,
+        helm_repository_name=helm_repository_name,
+        use_latest_chart=use_latest_chart,
     )
-
-    # Determine chart version
-    # Priority: --use-latest-chart > env config > default
-    if use_latest_chart:
-        if not use_oci:
-            console.print("[yellow]⚠[/yellow] --use-latest-chart only works with OCI registries, using default version")
-            chart_version = DEFAULT_HELM_CHART_VERSION
-        elif oci_provider != "gar":
-            console.print("[yellow]⚠[/yellow] --use-latest-chart only works with GAR provider (helm_oci_provider: gar), using default version")
-            chart_version = DEFAULT_HELM_CHART_VERSION
-        else:
-            chart_version = get_latest_gar_chart_version(oci_registry)  # type: ignore[arg-type]
-    elif agent_env_config and agent_env_config.helm_chart_version:
-        chart_version = agent_env_config.helm_chart_version
-    else:
-        chart_version = DEFAULT_HELM_CHART_VERSION
-
-    console.print(f"[blue]ℹ[/blue] Using Helm chart version: {chart_version}")
 
     # Merge configurations
     helm_values = merge_deployment_configs(manifest, agent_env_config, deploy_overrides, manifest_path)
