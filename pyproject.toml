@@ -48,6 +48,8 @@ dependencies = [
     "yaspin>=3.1.0",
     "claude-agent-sdk>=0.1.0",
     "anthropic>=0.40.0",
+    "partial-json-parser>=0.2.1",  # For voice agent streaming JSON parsing
+    "google-auth>=2.0.0",  # For Vertex AI authentication in voice agents
 ]
 
 requires-python = ">= 3.12,<4"

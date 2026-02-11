@@ -1,0 +1,37 @@
+# Agent Environment Configuration
+# ------------------------------
+# This file defines environment-specific settings for your voice agent.
+# This DIFFERS from manifest.yaml - use this for per-environment overrides.
+
+schema_version: "v1"
+
+environments:
+  dev:
+    auth:
+      principal:
+        user_id: # TODO: Fill in
+        account_id: # TODO: Fill in
+    
+    # Helm overrides for dev environment
+    helm_overrides:
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+      
+      # Environment-specific variables
+      env:
+        - name: LOG_LEVEL
+          value: "DEBUG"
+        - name: ENVIRONMENT
+          value: "development"
+  
+  # Add more environments as needed
+  # staging:
+  #   ...
+  # prod:
+  #   ...
