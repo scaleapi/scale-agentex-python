@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.3 (2026-02-13)
+
+Full Changelog: [v0.9.2...v0.9.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.2...v0.9.3)
+
+### Features
+
+* add HTTP-proxy LangGraph checkpointer ([19fae2f](https://github.com/scaleapi/scale-agentex-python/commit/19fae2f6e3ce4302066a403cac4c6499410ec4ad))
+* add OCI Helm registry support for agent deployments ([#255](https://github.com/scaleapi/scale-agentex-python/issues/255)) ([5f054b5](https://github.com/scaleapi/scale-agentex-python/commit/5f054b514ff919479b0914883ed163279820c848))
+
 ## 0.9.2 (2026-02-06)
 
 Full Changelog: [v0.9.1...v0.9.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.1...v0.9.2)
