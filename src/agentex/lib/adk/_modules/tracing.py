@@ -39,14 +39,51 @@ class TracingModule:
         Initialize the tracing interface.
 
         Args:
-            tracing_activities (Optional[TracingActivities]): Optional pre-configured tracing activities. If None, will be auto-initialized.
+            tracing_service (Optional[TracingService]): Optional pre-configured tracing service.
+                If None, will be lazily created on first use so the httpx client is
+                bound to the correct running event loop.
         """
-        if tracing_service is None:
-            agentex_client = create_async_agentex_client()
+        self._tracing_service_explicit = tracing_service
+        self._tracing_service_lazy: TracingService | None = None
+        self._bound_loop_id: int | None = None
+
+    @property
+    def _tracing_service(self) -> TracingService:
+        if self._tracing_service_explicit is not None:
+            return self._tracing_service_explicit
+
+        import asyncio
+
+        # Determine the current event loop (if any).
+        try:
+            loop = asyncio.get_running_loop()
+            loop_id = id(loop)
+        except RuntimeError:
+            loop_id = None
+
+        # Re-create the underlying httpx client when the event loop changes
+        # (e.g. between HTTP requests in a sync ASGI server) to avoid
+        # "Event loop is closed" / "bound to a different event loop" errors.
+        if self._tracing_service_lazy is None or (
+            loop_id is not None and loop_id != self._bound_loop_id
+        ):
+            import httpx
+
+            # Disable keepalive so each span HTTP call gets a fresh TCP
+            # connection.  Reused connections carry asyncio primitives bound
+            # to the event loop that created them; in sync-ACP / streaming
+            # contexts the loop context can shift between calls, causing
+            # "bound to a different event loop" RuntimeErrors.
+            agentex_client = create_async_agentex_client(
+                http_client=httpx.AsyncClient(
+                    limits=httpx.Limits(max_keepalive_connections=0),
+                ),
+            )
             tracer = AsyncTracer(agentex_client)
-            self._tracing_service = TracingService(tracer=tracer)
-        else:
-            self._tracing_service = tracing_service
+            self._tracing_service_lazy = TracingService(tracer=tracer)
+            self._bound_loop_id = loop_id
+
+        return self._tracing_service_lazy
 
     @asynccontextmanager
     async def span(

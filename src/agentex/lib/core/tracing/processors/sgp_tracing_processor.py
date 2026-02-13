@@ -17,6 +17,14 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 logger = make_logger(__name__)
 
 
+def _get_span_type(span: Span) -> str:
+    """Read span_type from span.data['__span_type__'], defaulting to STANDALONE."""
+    if isinstance(span.data, dict):
+        value = span.data.get("__span_type__", "STANDALONE")
+        return str(value)
+    return "STANDALONE"
+
+
 class SGPSyncTracingProcessor(SyncTracingProcessor):
     def __init__(self, config: SGPTracingProcessorConfig):
         disabled = config.sgp_api_key == "" or config.sgp_account_id == ""
@@ -46,9 +54,10 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
     @override
     def on_span_start(self, span: Span) -> None:
         self._add_source_to_span(span)
-        
+
         sgp_span = create_span(
             name=span.name,
+            span_type=_get_span_type(span),
             span_id=span.id,
             parent_id=span.parent_id,
             trace_id=span.trace_id,
@@ -86,11 +95,18 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
     def __init__(self, config: SGPTracingProcessorConfig):
         self.disabled = config.sgp_api_key == "" or config.sgp_account_id == ""
         self._spans: dict[str, SGPSpan] = {}
+        import httpx
+
+        # Disable keepalive so each HTTP call gets a fresh TCP connection,
+        # avoiding "bound to a different event loop" errors in sync-ACP.
         self.sgp_async_client = (
             AsyncSGPClient(
-                api_key=config.sgp_api_key, 
+                api_key=config.sgp_api_key,
                 account_id=config.sgp_account_id,
                 base_url=config.sgp_base_url,
+                http_client=httpx.AsyncClient(
+                    limits=httpx.Limits(max_keepalive_connections=0),
+                ),
             )
             if not self.disabled
             else None
@@ -114,6 +130,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         self._add_source_to_span(span)
         sgp_span = create_span(
             name=span.name,
+            span_type=_get_span_type(span),
             span_id=span.id,
             parent_id=span.parent_id,
             trace_id=span.trace_id,

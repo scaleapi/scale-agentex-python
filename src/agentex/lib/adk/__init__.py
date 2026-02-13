@@ -5,6 +5,10 @@
 from agentex.lib.adk._modules.acp import ACPModule
 from agentex.lib.adk._modules.agents import AgentsModule
 from agentex.lib.adk._modules.agent_task_tracker import AgentTaskTrackerModule
+from agentex.lib.adk._modules.checkpointer import create_checkpointer
+from agentex.lib.adk._modules._langgraph_tracing import create_langgraph_tracing_handler
+from agentex.lib.adk._modules._langgraph_async import stream_langgraph_events
+from agentex.lib.adk._modules._langgraph_sync import convert_langgraph_to_agentex_events
 from agentex.lib.adk._modules.events import EventsModule
 from agentex.lib.adk._modules.messages import MessagesModule
 from agentex.lib.adk._modules.state import StateModule
@@ -27,15 +31,21 @@ agent_task_tracker = AgentTaskTrackerModule()
 
 __all__ = [
     # Core
-    "acp", 
+    "acp",
     "agents",
-    "tasks", 
-    "messages", 
-    "state", 
-    "streaming", 
-    "tracing", 
+    "tasks",
+    "messages",
+    "state",
+    "streaming",
+    "tracing",
     "events",
     "agent_task_tracker",
+
+    # Checkpointing / LangGraph
+    "create_checkpointer",
+    "create_langgraph_tracing_handler",
+    "stream_langgraph_events",
+    "convert_langgraph_to_agentex_events",
 
     # Providers
     "providers",
