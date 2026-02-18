@@ -133,16 +133,16 @@ def init():
     table.add_column("Template", style="cyan", no_wrap=True)
     table.add_column("Description", style="white")
     table.add_row(
+        "[bold cyan]Sync ACP[/bold cyan]",
+        "Synchronous agent that processes one request per task with a simple request-response pattern. Best for low-latency use cases, FAQ bots, translation services, and data lookups.",
+    )
+    table.add_row(
         "[bold cyan]Async - ACP Only[/bold cyan]",
         "Asynchronous, non-blocking agent that can process multiple concurrent requests. Best for straightforward asynchronous agents that don't need durable execution. Good for asynchronous workflows, stateful applications, and multi-step analysis.",
     )
     table.add_row(
         "[bold cyan]Async - Temporal[/bold cyan]",
         "Asynchronous, non-blocking agent with durable execution for all steps. Best for production-grade agents that require complex multi-step tool calls, human-in-the-loop approvals, and long-running processes that require transactional reliability.",
-    )
-    table.add_row(
-        "[bold cyan]Sync ACP[/bold cyan]",
-        "Synchronous agent that processes one request per task with a simple request-response pattern. Best for low-latency use cases, FAQ bots, translation services, and data lookups.",
     )
     console.print()
     console.print(table)
@@ -159,9 +159,9 @@ def init():
     template_type = questionary.select(
         "What type of template would you like to create?",
         choices=[
+            {"name": "Sync ACP", "value": "sync_submenu"},
             {"name": "Async - ACP Only", "value": "async_submenu"},
             {"name": "Async - Temporal", "value": "temporal_submenu"},
-            {"name": "Sync ACP", "value": "sync_submenu"},
         ],
     ).ask()
     if not template_type:
