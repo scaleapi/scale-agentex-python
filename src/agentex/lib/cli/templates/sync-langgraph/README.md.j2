@@ -1,0 +1,83 @@
+# {{ agent_name }} - AgentEx Sync LangGraph Agent
+
+This template builds a **synchronous** LangGraph agent on AgentEx with:
+- Tool calling (ReAct pattern)
+- Streaming token output
+- Multi-turn conversation memory via AgentEx checkpointer
+- Tracing integration
+
+## Graph Structure
+
+```
+START --> agent --> [has tool calls?] --> tools --> agent
+                --> [no tool calls?]  --> END
+```
+
+## Running the Agent
+
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/
+│   ├── __init__.py
+│   ├── acp.py          # ACP server and message handler
+│   ├── graph.py         # LangGraph state graph definition
+│   └── tools.py         # Tool definitions
+├── Dockerfile
+├── manifest.yaml
+├── dev.ipynb
+{% if use_uv %}
+└── pyproject.toml
+{% else %}
+└── requirements.txt
+{% endif %}
+```
+
+## Key Concepts
+
+### Sync ACP with LangGraph
+The sync ACP model uses HTTP request/response. The `@acp.on_message_send` handler receives a message and yields streaming events from the LangGraph graph back to the client.
+
+### LangGraph Integration
+- **StateGraph**: Defines the agent's state machine with `AgentState` (message history)
+- **ToolNode**: Automatically executes tool calls from the LLM
+- **tools_condition**: Routes between tool execution and final response
+- **Checkpointer**: Uses AgentEx's HTTP checkpointer for cross-request memory
+
+### Streaming
+Tokens are streamed as they're generated using `convert_langgraph_to_agentex_events()`, which converts LangGraph's stream events into AgentEx `TaskMessageUpdate` events.
+
+## Development
+
+### 1. Add Your Own Tools
+Edit `project/tools.py` to define custom tools:
+
+```python
+from langchain_core.tools import Tool
+
+def my_tool(query: str) -> str:
+    """Your tool description."""
+    return "result"
+
+my_tool = Tool(name="my_tool", func=my_tool, description="...")
+TOOLS = [my_tool]
+```
+
+### 2. Customize the Graph
+Edit `project/graph.py` to modify the model, system prompt, or graph structure.
+
+### 3. Configure Credentials
+Set your OpenAI API key:
+1. In `manifest.yaml` under `env.OPENAI_API_KEY`
+2. Or export: `export OPENAI_API_KEY=...`
+3. Or create a `.env` file in the project directory
+
+### 4. Run Locally
+```bash
+export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
+```
