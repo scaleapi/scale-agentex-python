@@ -1,0 +1,58 @@
+build:
+  context:
+    root: ../../../
+    include_paths:
+      - 10_async/00_base/100_langgraph
+      - test_utils
+    dockerfile: 10_async/00_base/100_langgraph/Dockerfile
+    dockerignore: 10_async/00_base/100_langgraph/.dockerignore
+
+local_development:
+  agent:
+    port: 8000
+    host_address: host.docker.internal
+  paths:
+    acp: project/acp.py
+
+agent:
+  acp_type: async
+  name: ab100-langgraph
+  description: An async LangGraph agent with tool calling and Redis streaming
+
+  temporal:
+    enabled: false
+
+  credentials:
+    - env_var_name: OPENAI_API_KEY
+      secret_name: openai-api-key
+      secret_key: api-key
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+    - env_var_name: SGP_API_KEY
+      secret_name: sgp-api-key
+      secret_key: api-key
+    - env_var_name: SGP_ACCOUNT_ID
+      secret_name: sgp-account-id
+      secret_key: account-id
+    - env_var_name: SGP_CLIENT_BASE_URL
+      secret_name: sgp-client-base-url
+      secret_key: url
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+
+  global:
+    agent:
+      name: "ab100-langgraph"
+      description: "An async LangGraph agent with tool calling and Redis streaming"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

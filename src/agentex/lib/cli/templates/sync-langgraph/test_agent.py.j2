@@ -1,0 +1,70 @@
+"""
+Sample tests for AgentEx ACP agent.
+
+This test suite demonstrates how to test the main AgentEx API functions:
+- Non-streaming message sending
+- Streaming message sending
+- Task creation via RPC
+
+To run these tests:
+1. Make sure the agent is running (via docker-compose or `agentex agents run`)
+2. Set the AGENTEX_API_BASE_URL environment variable if not using default
+3. Run: pytest test_agent.py -v
+
+Configuration:
+- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
+- AGENT_NAME: Name of the agent to test (default: {{ agent_name }})
+"""
+
+import os
+import pytest
+from agentex import Agentex
+
+
+# Configuration from environment variables
+AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
+AGENT_NAME = os.environ.get("AGENT_NAME", "{{ agent_name }}")
+
+
+@pytest.fixture
+def client():
+    """Create an AgentEx client instance for testing."""
+    return Agentex(base_url=AGENTEX_API_BASE_URL)
+
+
+@pytest.fixture
+def agent_name():
+    """Return the agent name for testing."""
+    return AGENT_NAME
+
+
+@pytest.fixture
+def agent_id(client, agent_name):
+    """Retrieve the agent ID based on the agent name."""
+    agents = client.agents.list()
+    for agent in agents:
+        if agent.name == agent_name:
+            return agent.id
+    raise ValueError(f"Agent with name {agent_name} not found.")
+
+
+class TestNonStreamingMessages:
+    """Test non-streaming message sending."""
+
+    def test_send_message(self, client: Agentex, _agent_name: str):
+        """Test sending a message and receiving a response."""
+        # TODO: Fill in the test based on what data your agent is expected to handle
+        ...
+
+
+class TestStreamingMessages:
+    """Test streaming message sending."""
+
+    def test_send_stream_message(self, client: Agentex, _agent_name: str):
+        """Test streaming a message and aggregating deltas."""
+        # TODO: Fill in the test based on what data your agent is expected to handle
+        ...
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

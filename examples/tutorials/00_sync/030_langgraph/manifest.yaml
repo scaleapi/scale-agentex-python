@@ -1,0 +1,58 @@
+build:
+  context:
+    root: ../../
+    include_paths:
+      - 00_sync/030_langgraph
+      - test_utils
+    dockerfile: 00_sync/030_langgraph/Dockerfile
+    dockerignore: 00_sync/030_langgraph/.dockerignore
+
+local_development:
+  agent:
+    port: 8000
+    host_address: host.docker.internal
+  paths:
+    acp: project/acp.py
+
+agent:
+  acp_type: sync
+  name: s030-langgraph
+  description: A sync LangGraph agent with tool calling and streaming
+
+  temporal:
+    enabled: false
+
+  credentials:
+    - env_var_name: OPENAI_API_KEY
+      secret_name: openai-api-key
+      secret_key: api-key
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+    - env_var_name: SGP_API_KEY
+      secret_name: sgp-api-key
+      secret_key: api-key
+    - env_var_name: SGP_ACCOUNT_ID
+      secret_name: sgp-account-id
+      secret_key: account-id
+    - env_var_name: SGP_CLIENT_BASE_URL
+      secret_name: sgp-client-base-url
+      secret_key: url
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+
+  global:
+    agent:
+      name: "s030-langgraph"
+      description: "A sync LangGraph agent with tool calling and streaming"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
