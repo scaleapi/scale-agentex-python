@@ -18,7 +18,7 @@ base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 class TestTracker:
     parametrize = pytest.mark.parametrize("client", [False, True], indirect=True, ids=["loose", "strict"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_method_retrieve(self, client: Agentex) -> None:
         tracker = client.tracker.retrieve(
@@ -26,7 +26,7 @@ class TestTracker:
         )
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_raw_response_retrieve(self, client: Agentex) -> None:
         response = client.tracker.with_raw_response.retrieve(
@@ -38,7 +38,7 @@ class TestTracker:
         tracker = response.parse()
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_streaming_response_retrieve(self, client: Agentex) -> None:
         with client.tracker.with_streaming_response.retrieve(
@@ -52,7 +52,7 @@ class TestTracker:
 
         assert cast(Any, response.is_closed) is True
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_path_params_retrieve(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `tracker_id` but received ''"):
@@ -60,7 +60,7 @@ class TestTracker:
                 "",
             )
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_method_update(self, client: Agentex) -> None:
         tracker = client.tracker.update(
@@ -68,7 +68,7 @@ class TestTracker:
         )
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_method_update_with_all_params(self, client: Agentex) -> None:
         tracker = client.tracker.update(
@@ -79,7 +79,7 @@ class TestTracker:
         )
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_raw_response_update(self, client: Agentex) -> None:
         response = client.tracker.with_raw_response.update(
@@ -91,7 +91,7 @@ class TestTracker:
         tracker = response.parse()
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_streaming_response_update(self, client: Agentex) -> None:
         with client.tracker.with_streaming_response.update(
@@ -105,7 +105,7 @@ class TestTracker:
 
         assert cast(Any, response.is_closed) is True
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_path_params_update(self, client: Agentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `tracker_id` but received ''"):
@@ -113,13 +113,13 @@ class TestTracker:
                 tracker_id="",
             )
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_method_list(self, client: Agentex) -> None:
         tracker = client.tracker.list()
         assert_matches_type(TrackerListResponse, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         tracker = client.tracker.list(
@@ -132,7 +132,7 @@ class TestTracker:
         )
         assert_matches_type(TrackerListResponse, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_raw_response_list(self, client: Agentex) -> None:
         response = client.tracker.with_raw_response.list()
@@ -142,7 +142,7 @@ class TestTracker:
         tracker = response.parse()
         assert_matches_type(TrackerListResponse, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     def test_streaming_response_list(self, client: Agentex) -> None:
         with client.tracker.with_streaming_response.list() as response:
@@ -160,7 +160,7 @@ class TestAsyncTracker:
         "async_client", [False, True, {"http_client": "aiohttp"}], indirect=True, ids=["loose", "strict", "aiohttp"]
     )
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
         tracker = await async_client.tracker.retrieve(
@@ -168,7 +168,7 @@ class TestAsyncTracker:
         )
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tracker.with_raw_response.retrieve(
@@ -180,7 +180,7 @@ class TestAsyncTracker:
         tracker = await response.parse()
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
         async with async_client.tracker.with_streaming_response.retrieve(
@@ -194,7 +194,7 @@ class TestAsyncTracker:
 
         assert cast(Any, response.is_closed) is True
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `tracker_id` but received ''"):
@@ -202,7 +202,7 @@ class TestAsyncTracker:
                 "",
             )
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_method_update(self, async_client: AsyncAgentex) -> None:
         tracker = await async_client.tracker.update(
@@ -210,7 +210,7 @@ class TestAsyncTracker:
         )
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_method_update_with_all_params(self, async_client: AsyncAgentex) -> None:
         tracker = await async_client.tracker.update(
@@ -221,7 +221,7 @@ class TestAsyncTracker:
         )
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_raw_response_update(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tracker.with_raw_response.update(
@@ -233,7 +233,7 @@ class TestAsyncTracker:
         tracker = await response.parse()
         assert_matches_type(AgentTaskTracker, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_streaming_response_update(self, async_client: AsyncAgentex) -> None:
         async with async_client.tracker.with_streaming_response.update(
@@ -247,7 +247,7 @@ class TestAsyncTracker:
 
         assert cast(Any, response.is_closed) is True
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_path_params_update(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `tracker_id` but received ''"):
@@ -255,13 +255,13 @@ class TestAsyncTracker:
                 tracker_id="",
             )
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_method_list(self, async_client: AsyncAgentex) -> None:
         tracker = await async_client.tracker.list()
         assert_matches_type(TrackerListResponse, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         tracker = await async_client.tracker.list(
@@ -274,7 +274,7 @@ class TestAsyncTracker:
         )
         assert_matches_type(TrackerListResponse, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_raw_response_list(self, async_client: AsyncAgentex) -> None:
         response = await async_client.tracker.with_raw_response.list()
@@ -284,7 +284,7 @@ class TestAsyncTracker:
         tracker = await response.parse()
         assert_matches_type(TrackerListResponse, tracker, path=["response"])
 
-    @pytest.mark.skip(reason="Prism tests are disabled")
+    @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
     async def test_streaming_response_list(self, async_client: AsyncAgentex) -> None:
         async with async_client.tracker.with_streaming_response.list() as response:
