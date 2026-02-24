@@ -1,3 +1,4 @@
+<!-- This is the Agentex Python SDK -->
 [project]
 name = "agentex-sdk"
 version = "0.9.4"
