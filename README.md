@@ -388,6 +388,205 @@ import agentex
 print(agentex.__version__)
 ```
 
+## Troubleshooting
+
+### Authentication and API Key Issues
+
+**`AuthenticationError` (401) when making requests**
+
+Ensure your API key is set correctly. The SDK reads from the `AGENTEX_SDK_API_KEY` environment variable by default:
+
+```sh
+export AGENTEX_SDK_API_KEY="your-api-key-here"
+```
+
+Or pass it explicitly when creating the client:
+
+```python
+from agentex import Agentex
+
+client = Agentex(api_key="your-api-key-here")
+```
+
+**`PermissionDeniedError` (403) for valid requests**
+
+Your API key may not have the required permissions for the operation. Verify your key has access to the resource you are requesting.
+
+---
+
+### Installation Issues
+
+**`ModuleNotFoundError: No module named 'agentex'`**
+
+Install the SDK from PyPI:
+
+```sh
+pip install agentex-sdk
+```
+
+If you are using the `aiohttp` backend, install the optional dependency:
+
+```sh
+pip install agentex-sdk[aiohttp]
+```
+
+**Wrong Python version**
+
+The SDK requires Python 3.9 or higher. Check your version:
+
+```sh
+python --version
+```
+
+---
+
+### Connection and Timeout Errors
+
+**`APIConnectionError` — cannot reach the server**
+
+This usually indicates a network issue. Common causes:
+- No internet connection or firewall blocking outbound HTTPS
+- Incorrect `base_url` (check for typos in custom base URL configurations)
+- Proxy misconfiguration
+
+If you are behind a proxy, configure it via the HTTP client:
+
+```python
+import httpx
+from agentex import Agentex, DefaultHttpxClient
+
+client = Agentex(
+    http_client=DefaultHttpxClient(
+        proxy="http://my.proxy.example.com",
+    ),
+)
+```
+
+**`APITimeoutError` — requests timing out**
+
+The default timeout is 1 minute. For slow networks or large payloads, increase it:
+
+```python
+from agentex import Agentex
+
+client = Agentex(timeout=120.0)  # 2 minutes
+```
+
+---
+
+### Rate Limiting
+
+**`RateLimitError` (429) — too many requests**
+
+The SDK automatically retries rate-limited requests twice with exponential backoff. If you still hit limits, add explicit retry logic or reduce request frequency:
+
+```python
+from agentex import Agentex
+
+client = Agentex(max_retries=5)
+```
+
+To disable automatic retries entirely:
+
+```python
+client = Agentex(max_retries=0)
+```
+
+---
+
+### Environment and Logging
+
+**Enabling debug logging to diagnose issues**
+
+Set the `AGENTEX_LOG` environment variable before running your code:
+
+```sh
+# Info-level logs
+export AGENTEX_LOG=info
+
+# Verbose debug logs (includes request/response bodies)
+export AGENTEX_LOG=debug
+```
+
+**Identifying the installed SDK version**
+
+```python
+import agentex
+print(agentex.__version__)
+```
+
+If the version does not match what you expect, you may have multiple Python environments. Use `pip show agentex-sdk` to confirm which environment the package is installed in.
+
+---
+
+### Agent Development Issues
+
+**Agent fails to start with `agentex agents run`**
+
+1. Verify your `manifest.yaml` is valid and points to the correct agent entry point.
+2. Check that all dependencies are installed in your agent's virtual environment.
+3. Use the `--debug-worker` flag to attach a debugger and inspect runtime errors:
+
+   ```sh
+   uv run agentex agents run --manifest manifest.yaml --debug-worker
+   ```
+
+**Debugger not connecting in VS Code**
+
+Ensure your `.vscode/launch.json` uses the correct port (default `5678`):
+
+```json
+{
+  "name": "Attach to AgentEx Worker",
+  "type": "debugpy",
+  "request": "attach",
+  "connect": { "host": "localhost", "port": 5678 },
+  "pathMappings": [{ "localRoot": "${workspaceFolder}", "remoteRoot": "." }],
+  "justMyCode": false,
+  "console": "integratedTerminal"
+}
+```
+
+If port `5678` is already in use, specify a different port:
+
+```sh
+uv run agentex agents run --manifest manifest.yaml --debug-worker --debug-port 5679
+```
+
+And update the `port` in your launch configuration to match.
+
+**Using `--wait-for-debugger` to pause startup**
+
+If your breakpoints are not hit because execution finishes before the debugger attaches, use the `--wait-for-debugger` flag:
+
+```sh
+uv run agentex agents run --manifest manifest.yaml --debug-worker --wait-for-debugger
+```
+
+The worker will pause until the debugger connects.
+
+---
+
+### Type Checking and IDE Integration
+
+**No autocomplete or type errors in VS Code**
+
+Set `python.analysis.typeCheckingMode` to `basic` in your VS Code settings to enable Pyright-based type checking. This surfaces type errors in the editor before running your code.
+
+**Distinguishing `null` from a missing field in API responses**
+
+A field that is absent and a field explicitly set to `null` both appear as `None` in Python. Use `.model_fields_set` to tell them apart:
+
+```python
+if response.my_field is None:
+    if "my_field" not in response.model_fields_set:
+        print("Field was not present in the response")
+    else:
+        print("Field was explicitly null")
+```
+
+---
+
 ## Requirements
 
 Python 3.9 or higher.
