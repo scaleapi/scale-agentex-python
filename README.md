@@ -80,7 +80,7 @@ uv run agentex agents run --manifest manifest.yaml --debug-worker
 uv run agentex agents run --manifest manifest.yaml --debug-worker --wait-for-debugger
 
 # Custom debug port
-uv run agentex agents run --manifest manifest.yaml --debug-worker --debug-port 5679
+uv run agentex agents run --manifest manifest.yaml --debug-worker --debug-port 9679
 ```
 
 For **VS Code**, add this configuration to `.vscode/launch.json`:
@@ -90,14 +90,14 @@ For **VS Code**, add this configuration to `.vscode/launch.json`:
   "name": "Attach to AgentEx Worker",
   "type": "debugpy",
   "request": "attach",
-  "connect": { "host": "localhost", "port": 5678 },
+  "connect": { "host": "localhost", "port": 9678 },
   "pathMappings": [{ "localRoot": "${workspaceFolder}", "remoteRoot": "." }],
   "justMyCode": false,
   "console": "integratedTerminal"
 }
 ```
 
-The debug server automatically finds an available port starting from 5678 and prints connection details when starting.
+The debug server automatically finds an available port starting from 9678 and prints connection details when starting.
 
 ### With aiohttp
 

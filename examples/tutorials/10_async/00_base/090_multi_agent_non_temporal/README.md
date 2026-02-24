@@ -164,7 +164,7 @@ uv run agentex agents deploy --cluster your-cluster --manifest creator.yaml
 ### Shared Dockerfile
 The Dockerfile uses build arguments to run different agents:
 ```dockerfile
-CMD uvicorn project.${AGENT_FILE%.*}:acp --host 0.0.0.0 --port ${PORT:-8718}
+CMD ["sh", "-c", "exec uvicorn project.${AGENT_FILE%.*}:acp --host 0.0.0.0 --port ${PORT:-8718}"]
 ```
 
 Manifest files specify which agent to run:

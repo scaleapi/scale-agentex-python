@@ -16,7 +16,7 @@ if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
         from agentex.lib.utils.logging import make_logger
 
         logger = make_logger(__name__)
-        debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "5679"))
+        debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "9679"))
         debug_type = os.getenv("AGENTEX_DEBUG_TYPE", "acp")
         wait_for_attach = os.getenv("AGENTEX_DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true"
 
@@ -54,6 +54,6 @@ acp = FastACP.create(
         type="temporal",
         temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233"),
         plugins=[OpenAIAgentsPlugin(model_provider=streaming_model_provider)],
-        interceptors=[context_interceptor]
-    )
+        interceptors=[context_interceptor],
+    ),
 )

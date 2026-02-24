@@ -9,7 +9,7 @@ if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
     try:
         import debugpy
 
-        debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "5679"))
+        debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "9679"))
         debug_type = os.getenv("AGENTEX_DEBUG_TYPE", "acp")
         wait_for_attach = os.getenv("AGENTEX_DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true"
 
@@ -72,4 +72,3 @@ acp = FastACP.create(
 # @acp.on_task_cancel
 # This does not need to be handled by your workflow.
 # It is automatically handled by the temporal client which cancels the workflow directly
-

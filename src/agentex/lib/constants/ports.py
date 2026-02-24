@@ -15,7 +15,7 @@ ACP_SERVER_PORT = 8718
 HEALTH_CHECK_PORT = 5720
 
 # Debug server default port (configurable via AGENTEX_DEBUG_PORT env var)
-DEBUG_PORT = 5678
+DEBUG_PORT = 9678
 
 # Temporal server default address (configurable via TEMPORAL_ADDRESS env var)
 TEMPORAL_ADDRESS = "localhost:7233"

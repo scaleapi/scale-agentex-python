@@ -23,7 +23,7 @@ def setup_debug_if_enabled() -> None:
 
     Environment Variables:
         AGENTEX_DEBUG_ENABLED: Set to "true" to enable debug mode
-        AGENTEX_DEBUG_PORT: Port for debug server (default: 5678)
+        AGENTEX_DEBUG_PORT: Port for debug server (default: 9678)
         AGENTEX_DEBUG_TYPE: Type identifier for logging (default: "worker")
         AGENTEX_DEBUG_WAIT_FOR_ATTACH: Set to "true" to wait for debugger attachment
 
@@ -64,6 +64,6 @@ def get_debug_port() -> int:
     Get the debug port from environment variables.
 
     Returns:
-        int: Debug port (default: 5678)
+        int: Debug port (default: 9678)
     """
     return int(os.getenv("AGENTEX_DEBUG_PORT", str(_DEFAULT_DEBUG_PORT)))

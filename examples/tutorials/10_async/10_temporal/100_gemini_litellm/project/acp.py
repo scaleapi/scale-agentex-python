@@ -7,7 +7,8 @@ from agents.extensions.models.litellm_provider import LitellmProvider
 # === DEBUG SETUP (AgentEx CLI Debug Support) ===
 if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
     import debugpy
-    debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "5679"))
+
+    debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "9679"))
     debugpy.configure(subProcess=False)
     debugpy.listen(debug_port)
     if os.getenv("AGENTEX_DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true":
@@ -34,14 +35,14 @@ acp = FastACP.create(
         # route to different model providers (like Gemini) while keeping all that infrastructure.
         type="temporal",
         temporal_address=os.getenv("TEMPORAL_ADDRESS", "localhost:7233"),
-        plugins=[OpenAIAgentsPlugin(
-            model_params=ModelActivityParameters(
-                start_to_close_timeout=timedelta(days=1)
-            ),
-            model_provider=LitellmProvider(),
-        )],
-        interceptors=[context_interceptor]
-    )
+        plugins=[
+            OpenAIAgentsPlugin(
+                model_params=ModelActivityParameters(start_to_close_timeout=timedelta(days=1)),
+                model_provider=LitellmProvider(),
+            )
+        ],
+        interceptors=[context_interceptor],
+    ),
 )
 
 

@@ -38,7 +38,7 @@ The package provides the `agentex` CLI with these main commands:
 ### Agent Development
 - Run agents: `agentex agents run --manifest manifest.yaml`
 - Debug agents: `agentex agents run --manifest manifest.yaml --debug-worker`
-- Debug with custom port: `agentex agents run --manifest manifest.yaml --debug-worker --debug-port 5679`
+- Debug with custom port: `agentex agents run --manifest manifest.yaml --debug-worker --debug-port 9679`
 
 ## Architecture Overview
 
