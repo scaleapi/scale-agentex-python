@@ -28,14 +28,14 @@ python run_tutorial_test.py 10_async/00_base/010_multiturn
 python run_tutorial_test.py 10_async/00_base/020_streaming
 
 # Test with custom base URL
-python run_tutorial_test.py 10_async/00_base/000_hello_acp --base-url http://localhost:5003
+python run_tutorial_test.py 10_async/00_base/000_hello_acp --base-url http://localhost:5718
 ```
 
 ## What the Script Does
 
 1. **Validates Paths**: Checks that the tutorial directory, manifest.yaml, and tests directory exist
 2. **Starts Agent**: Runs `uv run agentex agents run --manifest manifest.yaml` in the tutorial directory
-3. **Health Check**: Polls the agent's health endpoint (default: http://localhost:5003/health) until it's live
+3. **Health Check**: Polls the agent's health endpoint (default: http://localhost:5718/health) until it's live
 4. **Runs Tests**: Executes `uv run pytest tests/ -v --tb=short` in the tutorial directory
 5. **Cleanup**: Gracefully stops the agent process (or kills it if necessary)
 
@@ -47,7 +47,7 @@ positional arguments:
 
 optional arguments:
   -h, --help            Show help message and exit
-  --base-url BASE_URL   Base URL for the AgentEx server (default: http://localhost:5003)
+  --base-url BASE_URL   Base URL for the AgentEx server (default: http://localhost:5718)
 ```
 
 ## Exit Codes
@@ -69,7 +69,7 @@ AgentEx Tutorial Test Runner
 📁 Working directory: 10_async/00_base/000_hello_acp
 ✅ Agent process started (PID: 12345)
 
-🔍 Checking agent health at http://localhost:5003/health...
+🔍 Checking agent health at http://localhost:5718/health...
 ⏳ Waiting for agent... (attempt 1/30)
 ⏳ Waiting for agent... (attempt 2/30)
 ✅ Agent is live! (attempt 3/30)
@@ -99,7 +99,7 @@ AgentEx Tutorial Test Runner
 ### Agent doesn't become live
 
 If the health check times out:
-- Check that port 5003 is not already in use
+- Check that port 5718 is not already in use
 - Look at the agent logs to see if there are startup errors
 - Try increasing the timeout by modifying the `max_attempts` parameter in the script
 

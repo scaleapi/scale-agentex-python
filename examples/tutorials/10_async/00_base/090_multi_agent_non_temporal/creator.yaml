@@ -8,11 +8,11 @@ build:
     dockerfile: Dockerfile
     build_args:
       AGENT_FILE: creator.py
-      PORT: 8001
+      PORT: 8719
 
 local_development:
   agent:
-    port: 8001
+    port: 8719
     host_address: host.docker.internal
   paths:
     acp: project/creator.py

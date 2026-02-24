@@ -8,11 +8,11 @@ build:
     dockerfile: Dockerfile
     build_args:
       AGENT_FILE: formatter.py
-      PORT: 8003
+      PORT: 8721
 
 local_development:
   agent:
-    port: 8003
+    port: 8721
     host_address: host.docker.internal
   paths:
     acp: project/formatter.py

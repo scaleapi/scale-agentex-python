@@ -9,7 +9,7 @@ build:
 
 local_development:
   agent:
-    port: 8000
+    port: 8718
     host_address: host.docker.internal
   paths:
     acp: project/acp.py

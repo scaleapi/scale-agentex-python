@@ -40,7 +40,7 @@ build:
 # Only used when running the agent locally
 local_development:
   agent:
-    port: 8000  # Port where your local ACP server is running
+    port: 8718  # Port where your local ACP server is running
     host_address: host.docker.internal  # Host address for Docker networking (host.docker.internal for Docker, localhost for direct) 
 
   # File paths for local development (relative to this manifest.yaml)
@@ -90,8 +90,8 @@ agent:
         queue_name: procurement_agent_queue
 
     # Optional: Health check port for temporal worker
-    # Defaults to 80 if not specified
-    # health_check_port: 80
+    # Defaults to 8080 if not specified
+    # health_check_port: 8080
 
   # Optional: Credentials mapping
   # Maps Kubernetes secrets to environment variables

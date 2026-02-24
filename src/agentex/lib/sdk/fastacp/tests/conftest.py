@@ -48,9 +48,7 @@ def free_port() -> int:
 @pytest.fixture
 def sample_task() -> Task:
     """Fixture that provides a sample Task object"""
-    return Task(
-        id="test-task-123", status="RUNNING"
-    )
+    return Task(id="test-task-123", status="RUNNING")
 
 
 @pytest.fixture
@@ -64,9 +62,7 @@ def sample_message_content() -> TaskMessageContent:
 
 
 @pytest.fixture
-def sample_send_message_params(
-    sample_task: Task, sample_message_content: TaskMessageContent
-) -> SendMessageParams:
+def sample_send_message_params(sample_task: Task, sample_message_content: TaskMessageContent) -> SendMessageParams:
     """Fixture that provides sample SendMessageParams"""
     return SendMessageParams(
         agent=Agent(
@@ -87,7 +83,14 @@ def sample_send_message_params(
 def sample_cancel_task_params() -> CancelTaskParams:
     """Fixture that provides sample CancelTaskParams"""
     return CancelTaskParams(
-        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync", created_at="2023-01-01T00:00:00Z", updated_at="2023-01-01T00:00:00Z"),
+        agent=Agent(
+            id="test-agent-456",
+            name="test-agent",
+            description="test-agent",
+            acp_type="sync",
+            created_at="2023-01-01T00:00:00Z",
+            updated_at="2023-01-01T00:00:00Z",
+        ),
         task=Task(id="test-task-123", status="RUNNING"),
     )
 
@@ -96,7 +99,14 @@ def sample_cancel_task_params() -> CancelTaskParams:
 def sample_create_task_params(sample_task: Task) -> CreateTaskParams:
     """Fixture that provides sample CreateTaskParams"""
     return CreateTaskParams(
-        agent=Agent(id="test-agent-456", name="test-agent", description="test-agent", acp_type="sync", created_at="2023-01-01T00:00:00Z", updated_at="2023-01-01T00:00:00Z"),
+        agent=Agent(
+            id="test-agent-456",
+            name="test-agent",
+            description="test-agent",
+            acp_type="sync",
+            created_at="2023-01-01T00:00:00Z",
+            updated_at="2023-01-01T00:00:00Z",
+        ),
         task=sample_task,
         params={},
     )
@@ -173,9 +183,7 @@ async def test_server_runner():
 @pytest.fixture
 def base_acp_server():
     """Fixture that provides a BaseACPServer instance for sync tests"""
-    with patch.dict(
-        "os.environ", {"AGENTEX_BASE_URL": ""}
-    ):  # Disable agent registration
+    with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):  # Disable agent registration
         server = BaseACPServer()
         return server
 
@@ -183,9 +191,7 @@ def base_acp_server():
 @pytest_asyncio.fixture
 async def async_base_acp_server():
     """Fixture that provides a BaseACPServer instance for async tests"""
-    with patch.dict(
-        "os.environ", {"AGENTEX_BASE_URL": ""}
-    ):  # Disable agent registration
+    with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):  # Disable agent registration
         server = BaseACPServer.create()
         return server
 
@@ -193,9 +199,7 @@ async def async_base_acp_server():
 @pytest.fixture
 def sync_acp_server():
     """Fixture that provides a SyncACP instance for sync tests"""
-    with patch.dict(
-        "os.environ", {"AGENTEX_BASE_URL": ""}
-    ):  # Disable agent registration
+    with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):  # Disable agent registration
         server = SyncACP()
         return server
 
@@ -203,9 +207,7 @@ def sync_acp_server():
 @pytest_asyncio.fixture
 async def async_sync_acp_server():
     """Fixture that provides a SyncACP instance for async tests"""
-    with patch.dict(
-        "os.environ", {"AGENTEX_BASE_URL": ""}
-    ):  # Disable agent registration
+    with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):  # Disable agent registration
         server = SyncACP.create()
         return server
 
@@ -213,9 +215,7 @@ async def async_sync_acp_server():
 @pytest.fixture
 def agentic_base_acp_server():
     """Fixture that provides an AgenticBaseACP instance for sync tests"""
-    with patch.dict(
-        "os.environ", {"AGENTEX_BASE_URL": ""}
-    ):  # Disable agent registration
+    with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):  # Disable agent registration
         server = AsyncBaseACP()
         return server
 
@@ -223,9 +223,7 @@ def agentic_base_acp_server():
 @pytest_asyncio.fixture
 async def async_agentic_base_acp_server():
     """Fixture that provides an AsyncBaseACP instance for async tests"""
-    with patch.dict(
-        "os.environ", {"AGENTEX_BASE_URL": ""}
-    ):  # Disable agent registration
+    with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):  # Disable agent registration
         server = AsyncBaseACP.create()
         return server
 
@@ -233,15 +231,9 @@ async def async_agentic_base_acp_server():
 @pytest_asyncio.fixture
 async def mock_temporal_acp_server():
     """Fixture that provides a mocked TemporalACP instance"""
-    with patch.dict(
-        "os.environ", {"AGENTEX_BASE_URL": ""}
-    ):  # Disable agent registration
-        with patch(
-            "agentex.sdk.fastacp.impl.temporal_acp.TemporalClient"
-        ) as mock_temporal_client:
-            with patch(
-                "agentex.sdk.fastacp.impl.temporal_acp.AsyncAgentexClient"
-            ) as mock_agentex_client:
+    with patch.dict("os.environ", {"AGENTEX_BASE_URL": ""}):  # Disable agent registration
+        with patch("agentex.sdk.fastacp.impl.temporal_acp.TemporalClient") as mock_temporal_client:
+            with patch("agentex.sdk.fastacp.impl.temporal_acp.AsyncAgentexClient") as mock_agentex_client:
                 # Mock the temporal client creation
                 mock_temporal_client.create.return_value = AsyncMock()
                 mock_agentex_client.return_value = AsyncMock()
@@ -270,9 +262,7 @@ class JSONRPCTestClient:
             )
             return response.json()
 
-    async def send_notification(
-        self, method: str, params: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def send_notification(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         """Send a JSON-RPC notification (no ID)"""
         return await self.call_method(method, params, request_id=None)
 
@@ -302,7 +292,7 @@ def mock_env_vars():
         "AGENT_NAME": "test-agent",
         "AGENT_DESCRIPTION": "Test agent description",
         "ACP_URL": "http://localhost",
-        "ACP_PORT": "8000",
+        "ACP_PORT": "8718",
         "WORKFLOW_NAME": "test-workflow",
         "WORKFLOW_TASK_QUEUE": "test-queue",
     }

@@ -8,11 +8,11 @@ build:
     dockerfile: Dockerfile
     build_args:
       AGENT_FILE: orchestrator.py
-      PORT: 8000
+      PORT: 8718
 
 local_development:
   agent:
-    port: 8000
+    port: 8718
     host_address: host.docker.internal
   paths:
     acp: project/orchestrator.py

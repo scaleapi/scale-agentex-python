@@ -48,4 +48,4 @@ ENV PYTHONPATH=/app
 ENV AGENT_NAME=ab080-batch-events
 
 # Run the agent using uvicorn
-CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8718"]

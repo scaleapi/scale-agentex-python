@@ -11,7 +11,7 @@ To run these tests:
 3. Run: pytest test_agent.py -v
 
 Configuration:
-- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
+- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5718)
 - AGENT_NAME: Name of the agent to test (default: at000-hello-acp)
 """
 
@@ -34,7 +34,7 @@ from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from agentex.types.text_content_param import TextContentParam
 
 # Configuration from environment variables
-AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
+AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5718")
 AGENT_NAME = os.environ.get("AGENT_NAME", "at000-hello-acp")
 
 

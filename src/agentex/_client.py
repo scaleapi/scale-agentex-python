@@ -54,8 +54,8 @@ __all__ = [
 ]
 
 ENVIRONMENTS: Dict[str, str] = {
-    "production": "http://localhost:5003",
-    "development": "http://localhost:5003",
+    "production": "http://localhost:5718",
+    "development": "http://localhost:5718",
 }
 
 

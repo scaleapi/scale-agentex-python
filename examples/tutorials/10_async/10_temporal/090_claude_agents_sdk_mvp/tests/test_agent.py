@@ -17,7 +17,7 @@ from agentex import AsyncAgentex
 # from agentex.types.text_content_param import TextContentParam
 
 # Configuration from environment variables
-AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
+AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5718")
 AGENT_NAME = os.environ.get("AGENT_NAME", "claude-mvp-agent")
 
 

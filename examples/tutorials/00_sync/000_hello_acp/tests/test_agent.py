@@ -12,7 +12,7 @@ To run these tests:
 3. Run: pytest test_agent.py -v
 
 Configuration:
-- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
+- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5718)
 - AGENT_NAME: Name of the agent to test (default: hello-acp)
 """
 
@@ -26,7 +26,7 @@ from agentex.types.agent_rpc_params import ParamsSendMessageRequest
 from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
 
 # Configuration from environment variables
-AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
+AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5718")
 AGENT_NAME = os.environ.get("AGENT_NAME", "s000-hello-acp")
 
 

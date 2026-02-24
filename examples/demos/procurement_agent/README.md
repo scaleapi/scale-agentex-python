@@ -85,7 +85,7 @@ uv sync
 export ENVIRONMENT=development && uv run agentex agents run --manifest manifest.yaml
 ```
 
-The agent will start and register with the AgentEx backend on port 8000.
+The agent will start and register with the AgentEx backend on port 8718.
 
 ### Step 4: Create a Task
 
@@ -365,7 +365,7 @@ tools=[
 ## Troubleshooting
 
 **Agent not appearing in UI**
-- Verify agent is running on port 8000: `lsof -i :8000`
+- Verify agent is running on port 8718: `lsof -i :8718`
 - Check `ENVIRONMENT=development` is set
 - Review agent logs for errors
 

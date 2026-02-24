@@ -12,12 +12,8 @@ class TemporalWorkflowConfig(BaseModel):
         queue_name: The name of the temporal queue to send tasks to.
     """
 
-    name: str = Field(
-        ..., description="The name of the temporal workflow that defines the agent."
-    )
-    queue_name: str = Field(
-        ..., description="The name of the temporal queue to send tasks to."
-    )
+    name: str = Field(..., description="The name of the temporal workflow that defines the agent.")
+    queue_name: str = Field(..., description="The name of the temporal queue to send tasks to.")
 
 
 # TODO: Remove this class when we remove the agentex agents create
@@ -30,9 +26,7 @@ class TemporalWorkerConfig(BaseModel):
         workflow: The temporal workflow configuration
     """
 
-    image: str | None = Field(
-        default=None, description="Image to use for the temporal worker"
-    )
+    image: str | None = Field(default=None, description="Image to use for the temporal worker")
     workflow: TemporalWorkflowConfig | None = Field(
         default=None,
         description="Configuration for the temporal workflow that defines the agent. Only required for agents that leverage Temporal.",
@@ -50,9 +44,7 @@ class TemporalConfig(BaseModel):
         health_check_port: Port for temporal worker health check endpoint
     """
 
-    enabled: bool = Field(
-        default=False, description="Whether this agent uses Temporal workflows"
-    )
+    enabled: bool = Field(default=False, description="Whether this agent uses Temporal workflows")
     workflow: TemporalWorkflowConfig | None = Field(
         default=None,
         description="Temporal workflow configuration. Required when enabled=True. (deprecated: use workflows instead)",
@@ -63,7 +55,7 @@ class TemporalConfig(BaseModel):
     )
     health_check_port: int | None = Field(
         default=None,
-        description="Port for temporal worker health check endpoint. Defaults to 80 if not specified.",
+        description="Port for temporal worker health check endpoint. Defaults to 8080 if not specified.",
     )
 
     @validator("workflows")

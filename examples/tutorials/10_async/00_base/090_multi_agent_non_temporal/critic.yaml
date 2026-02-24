@@ -8,11 +8,11 @@ build:
     dockerfile: Dockerfile
     build_args:
       AGENT_FILE: critic.py
-      PORT: 8002
+      PORT: 8720
 
 local_development:
   agent:
-    port: 8002
+    port: 8720
     host_address: host.docker.internal
   paths:
     acp: project/critic.py

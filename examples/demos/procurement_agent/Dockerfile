@@ -42,7 +42,7 @@ RUN uv pip install --system .
 COPY procurement_agent/project /app/procurement_agent/project
 
 # Run the ACP server using uvicorn
-CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8718"]
 
 # When we deploy the worker, we will replace the CMD with the following
 # CMD ["python", "-m", "run_worker"] 

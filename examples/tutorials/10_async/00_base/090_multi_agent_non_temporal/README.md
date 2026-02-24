@@ -81,22 +81,22 @@ The system uses a shared build configuration with type-safe interfaces:
 
 ## 🤖 Agent Responsibilities
 
-### **Creator Agent** (Port 8001)
+### **Creator Agent** (Port 8719)
 - Generates original content based on user requests
 - Revises content based on critic feedback
 - Maintains conversation history and iteration tracking
 
-### **Critic Agent** (Port 8002)  
+### **Critic Agent** (Port 8720)  
 - Reviews content against specified rules
 - Provides specific, actionable feedback
 - Approves content when all rules are met
 
-### **Formatter Agent** (Port 8003)
+### **Formatter Agent** (Port 8721)
 - Converts approved content to target formats (HTML, Markdown, JSON, etc.)
 - Preserves meaning while applying format-specific conventions
 - Supports multiple output formats
 
-### **Orchestrator Agent** (Port 8000)
+### **Orchestrator Agent** (Port 8718)
 - Coordinates the entire workflow using state machines
 - Manages inter-agent communication
 - Tracks progress and handles errors/retries
@@ -164,14 +164,14 @@ uv run agentex agents deploy --cluster your-cluster --manifest creator.yaml
 ### Shared Dockerfile
 The Dockerfile uses build arguments to run different agents:
 ```dockerfile
-CMD uvicorn project.${AGENT_FILE%.*}:acp --host 0.0.0.0 --port ${PORT:-8000}
+CMD uvicorn project.${AGENT_FILE%.*}:acp --host 0.0.0.0 --port ${PORT:-8718}
 ```
 
 Manifest files specify which agent to run:
 ```yaml
 build_args:
   AGENT_FILE: creator.py
-  PORT: 8001
+  PORT: 8719
 ```
 
 ### State Machine Flow

@@ -220,8 +220,8 @@ manual_cleanup() {
     fi
     
     # Check for occupied ports
-    print_colored $YELLOW "🔍 Checking common tutorial ports (8000-8003)..."
-    local port_check=$(lsof -i :8000 -i :8001 -i :8002 -i :8003 2>/dev/null || true)
+    print_colored $YELLOW "🔍 Checking common tutorial ports (8718-8721)..."
+    local port_check=$(lsof -i :8718 -i :8719 -i :8720 -i :8721 2>/dev/null || true)
     if [[ -n "$port_check" ]]; then
         found_processes=true
         echo "$port_check"

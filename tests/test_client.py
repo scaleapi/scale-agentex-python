@@ -695,7 +695,7 @@ class TestAgentex:
                 Agentex(api_key=api_key, _strict_response_validation=True, environment="production")
 
             client = Agentex(base_url=None, api_key=api_key, _strict_response_validation=True, environment="production")
-            assert str(client.base_url).startswith("http://localhost:5003")
+            assert str(client.base_url).startswith("http://localhost:5718")
 
             client.close()
 
@@ -1596,7 +1596,7 @@ class TestAsyncAgentex:
             client = AsyncAgentex(
                 base_url=None, api_key=api_key, _strict_response_validation=True, environment="production"
             )
-            assert str(client.base_url).startswith("http://localhost:5003")
+            assert str(client.base_url).startswith("http://localhost:5718")
 
             await client.close()
 

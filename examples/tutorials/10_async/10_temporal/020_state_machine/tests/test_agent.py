@@ -20,7 +20,7 @@ To run these tests:
 4. Run: pytest test_agent.py -v
 
 Configuration:
-- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
+- AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5718)
 - AGENT_NAME: Name of the agent to test (default: at020-state-machine)
 """
 
@@ -41,7 +41,7 @@ from agentex.types.text_content_param import TextContentParam
 from agentex.types.tool_request_content import ToolRequestContent
 
 # Configuration from environment variables
-AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
+AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5718")
 AGENT_NAME = os.environ.get("AGENT_NAME", "at020-state-machine")
 
 

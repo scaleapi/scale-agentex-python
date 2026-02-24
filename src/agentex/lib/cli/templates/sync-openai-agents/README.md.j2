@@ -16,7 +16,7 @@ This is a starter template for building synchronous agents with the AgentEx fram
 agentex agents run --manifest manifest.yaml
 ```
 
-The agent will start on port 8000 and respond immediately to any messages it receives.
+The agent will start on port 8718 and respond immediately to any messages it receives.
 
 ## What's Inside
 
@@ -289,7 +289,7 @@ pip install -r requirements.txt
 ### Common Issues
 
 1. **Agent not appearing in web UI**
-   - Check if agent is running on port 8000
+   - Check if agent is running on port 8718
    - Verify `ENVIRONMENT=development` is set
    - Check agent logs for errors
 
@@ -307,7 +307,7 @@ pip install -r requirements.txt
 {% endif %}
 
 4. **Port conflicts**
-   - Check if another service is using port 8000
-   - Use `lsof -i :8000` to find conflicting processes
+   - Check if another service is using port 8718
+   - Use `lsof -i :8718` to find conflicting processes
 
 Happy building with Sync ACP! 🚀⚡

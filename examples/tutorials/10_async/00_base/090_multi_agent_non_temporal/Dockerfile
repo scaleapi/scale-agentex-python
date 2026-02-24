@@ -54,4 +54,4 @@ ENV AGENT_NAME=ab090-multi-agent-non-temporal
 # (ab090-creator-agent, ab090-critic-agent, ab090-formatter-agent, or ab090-orchestrator-agent)
 
 # Run the agent using uvicorn
-CMD uvicorn project.${AGENT_FILE%.*}:acp --host 0.0.0.0 --port ${PORT:-8000}
+CMD uvicorn project.${AGENT_FILE%.*}:acp --host 0.0.0.0 --port ${PORT:-8718}

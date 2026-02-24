@@ -12,10 +12,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-ORCHESTRATOR_PORT=8000
-CREATOR_PORT=8001
-CRITIC_PORT=8002
-FORMATTER_PORT=8003
+ORCHESTRATOR_PORT=8718
+CREATOR_PORT=8719
+CRITIC_PORT=8720
+FORMATTER_PORT=8721
 
 # Base directory
 BASE_DIR="examples/tutorials/10_async/00_base/090_multi_agent_non_temporal"
@@ -199,7 +199,7 @@ test_system() {
     # Check if agents are responding on their ports
     echo -e "${YELLOW}🔍 Testing agent connectivity...${NC}"
     
-    ports=(8000 8001 8002 8003)
+    ports=(8718 8719 8720 8721)
     agents=("orchestrator" "creator" "critic" "formatter")
     all_responding=true
     
@@ -223,10 +223,10 @@ test_system() {
         echo "   3. Use direct HTTP calls to test individual agents"
         echo ""
         echo -e "${BLUE}🔗 Agent Endpoints:${NC}"
-        echo "   • Orchestrator: http://localhost:8000"
-        echo "   • Creator: http://localhost:8001"
-        echo "   • Critic: http://localhost:8002"
-        echo "   • Formatter: http://localhost:8003"
+        echo "   • Orchestrator: http://localhost:8718"
+        echo "   • Creator: http://localhost:8719"
+        echo "   • Critic: http://localhost:8720"
+        echo "   • Formatter: http://localhost:8721"
         echo ""
         echo -e "${BLUE}📝 Sample Request (send via AgentEx UI):${NC}"
         echo '{"request": "Write a brief welcome message for our new AI assistant", "rules": ["Under 100 words", "Friendly tone", "Include emoji"], "target_format": "HTML"}'
@@ -262,10 +262,10 @@ case "${1:-start}" in
         echo "  $0 stop      - Stop all agents"
         echo ""
         echo -e "${BLUE}📤 Agent Endpoints:${NC}"
-        echo "  • Orchestrator: http://localhost:8000"
-        echo "  • Creator: http://localhost:8001" 
-        echo "  • Critic: http://localhost:8002"
-        echo "  • Formatter: http://localhost:8003"
+        echo "  • Orchestrator: http://localhost:8718"
+        echo "  • Creator: http://localhost:8719" 
+        echo "  • Critic: http://localhost:8720"
+        echo "  • Formatter: http://localhost:8721"
         echo ""
         echo -e "${BLUE}💡 To interact with agents:${NC}"
         echo "  1. Use the AgentEx platform to send tasks"

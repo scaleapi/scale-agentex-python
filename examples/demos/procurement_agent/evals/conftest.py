@@ -21,7 +21,7 @@ from agentex.lib.types.acp import CreateTaskParams
 
 # Set environment variables for local development
 os.environ.setdefault("AGENT_NAME", "procurement-agent")
-os.environ.setdefault("ACP_URL", "http://localhost:8000")
+os.environ.setdefault("ACP_URL", "http://localhost:8718")
 os.environ.setdefault("WORKFLOW_NAME", "procurement-agent")
 os.environ.setdefault("WORKFLOW_TASK_QUEUE", "procurement_agent_queue")
 os.environ.setdefault("TEMPORAL_ADDRESS", "localhost:7233")
