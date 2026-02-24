@@ -3,7 +3,6 @@ import typer
 from agentex.lib.cli.commands.uv import uv
 from agentex.lib.cli.commands.init import init
 from agentex.lib.cli.commands.tasks import tasks
-from agentex.lib.cli.commands.agents import agents
 from agentex.lib.cli.commands.secrets import secrets
 
 # Create the main Typer application
@@ -15,7 +14,6 @@ app = typer.Typer(
 )
 
 # Add the subcommands
-app.add_typer(agents, name="agents", help="Get, list, run, build, and deploy agents")
 app.add_typer(tasks, name="tasks", help="Get, list, and delete tasks")
 app.add_typer(secrets, name="secrets", help="Sync, get, list, and delete secrets")
 app.add_typer(
