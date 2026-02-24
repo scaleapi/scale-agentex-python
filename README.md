@@ -21,6 +21,17 @@ The REST API documentation can be found on [docs.gp.scale.com](https://docs.gp.s
 pip install agentex-sdk
 ```
 
+## Hello World
+
+A simple hello world example to get started with the Agentex SDK:
+
+```python
+def hello_world():
+    print("Hello, World!")
+
+hello_world()
+```
+
 ## Usage
 
 The full API of this library can be found in [api.md](api.md).
