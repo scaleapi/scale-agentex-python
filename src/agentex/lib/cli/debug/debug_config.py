@@ -5,11 +5,13 @@ Debug configuration models for AgentEx CLI debugging.
 import socket
 from enum import Enum
 
+from agentex.lib.constants.ports import DEBUG_PORT as _DEFAULT_DEBUG_PORT
 from agentex.lib.utils.model_utils import BaseModel
 
 
 class DebugMode(str, Enum):
     """Debug mode options"""
+
     WORKER = "worker"
     ACP = "acp"
     BOTH = "both"
@@ -18,19 +20,19 @@ class DebugMode(str, Enum):
 
 class DebugConfig(BaseModel):
     """Configuration for debug mode"""
-    
+
     enabled: bool = False
     mode: DebugMode = DebugMode.NONE
-    port: int = 5678
+    port: int = _DEFAULT_DEBUG_PORT
     wait_for_attach: bool = False
     auto_port: bool = True  # Automatically find available port if specified port is busy
-    
+
     @classmethod
     def create_worker_debug(
-        cls, 
-        port: int = 5678, 
+        cls,
+        port: int = _DEFAULT_DEBUG_PORT,
         wait_for_attach: bool = False,
-        auto_port: bool = True
+        auto_port: bool = True,
     ) -> "DebugConfig":
         """Create debug config for worker debugging"""
         return cls(
@@ -38,15 +40,15 @@ class DebugConfig(BaseModel):
             mode=DebugMode.WORKER,
             port=port,
             wait_for_attach=wait_for_attach,
-            auto_port=auto_port
+            auto_port=auto_port,
         )
-    
+
     @classmethod
     def create_acp_debug(
-        cls, 
-        port: int = 5679, 
+        cls,
+        port: int = _DEFAULT_DEBUG_PORT + 1,
         wait_for_attach: bool = False,
-        auto_port: bool = True
+        auto_port: bool = True,
     ) -> "DebugConfig":
         """Create debug config for ACP debugging"""
         return cls(
@@ -54,16 +56,16 @@ class DebugConfig(BaseModel):
             mode=DebugMode.ACP,
             port=port,
             wait_for_attach=wait_for_attach,
-            auto_port=auto_port
+            auto_port=auto_port,
         )
-    
+
     @classmethod
     def create_both_debug(
-        cls, 
-        worker_port: int = 5678,
-        _acp_port: int = 5679,
+        cls,
+        worker_port: int = _DEFAULT_DEBUG_PORT,
+        _acp_port: int = _DEFAULT_DEBUG_PORT + 1,
         wait_for_attach: bool = False,
-        auto_port: bool = True
+        auto_port: bool = True,
     ) -> "DebugConfig":
         """Create debug config for both worker and ACP debugging"""
         return cls(
@@ -71,21 +73,21 @@ class DebugConfig(BaseModel):
             mode=DebugMode.BOTH,
             port=worker_port,  # Primary port for worker
             wait_for_attach=wait_for_attach,
-            auto_port=auto_port
+            auto_port=auto_port,
         )
-    
+
     def should_debug_worker(self) -> bool:
         """Check if worker should be debugged"""
         return self.enabled and self.mode in (DebugMode.WORKER, DebugMode.BOTH)
-    
+
     def should_debug_acp(self) -> bool:
         """Check if ACP should be debugged"""
         return self.enabled and self.mode in (DebugMode.ACP, DebugMode.BOTH)
-    
+
     def get_worker_port(self) -> int:
         """Get port for worker debugging"""
         return self.port
-    
+
     def get_acp_port(self) -> int:
         """Get port for ACP debugging"""
         if self.mode == DebugMode.BOTH:
@@ -93,16 +95,16 @@ class DebugConfig(BaseModel):
         return self.port
 
 
-def find_available_port(start_port: int = 5678, max_attempts: int = 10) -> int:
+def find_available_port(start_port: int = _DEFAULT_DEBUG_PORT, max_attempts: int = 10) -> int:
     """Find an available port starting from start_port"""
     for port in range(start_port, start_port + max_attempts):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('localhost', port))
+                s.bind(("localhost", port))
                 return port
         except OSError:
             continue
-    
+
     # If we can't find an available port, just return the start port
     # and let the debug server handle the error
     return start_port
@@ -112,4 +114,4 @@ def resolve_debug_port(config: DebugConfig, target_port: int) -> int:
     """Resolve the actual port to use for debugging"""
     if config.auto_port:
         return find_available_port(target_port)
-    return target_port 
+    return target_port

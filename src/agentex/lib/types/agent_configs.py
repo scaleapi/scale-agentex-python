@@ -55,7 +55,7 @@ class TemporalConfig(BaseModel):
     )
     health_check_port: int | None = Field(
         default=None,
-        description="Port for temporal worker health check endpoint. Defaults to 8080 if not specified.",
+        description="Port for temporal worker health check endpoint. Defaults to HEALTH_CHECK_PORT (5720) if not specified.",
     )
 
     @validator("workflows")

@@ -12,6 +12,7 @@ from rich.console import Console
 from agentex import Agentex
 from agentex.lib.cli.debug import DebugMode, DebugConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.constants.ports import DEBUG_PORT as _DEFAULT_DEBUG_PORT
 from agentex.lib.cli.utils.cli_utils import handle_questionary_cancellation
 from agentex.lib.sdk.config.validation import (
     EnvironmentsValidationError,
@@ -269,7 +270,9 @@ def run(
     debug: bool = typer.Option(False, help="Enable debug mode for both worker and ACP (disables auto-reload)"),
     debug_worker: bool = typer.Option(False, help="Enable debug mode for temporal worker only"),
     debug_acp: bool = typer.Option(False, help="Enable debug mode for ACP server only"),
-    debug_port: int = typer.Option(5678, help="Port for remote debugging (worker uses this, ACP uses port+1)"),
+    debug_port: int = typer.Option(
+        _DEFAULT_DEBUG_PORT, help="Port for remote debugging (worker uses this, ACP uses port+1)"
+    ),
     wait_for_debugger: bool = typer.Option(False, help="Wait for debugger to attach before starting"),
 ) -> None:
     """

@@ -9,6 +9,7 @@ import os
 import debugpy  # type: ignore
 
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.constants.ports import DEBUG_PORT as _DEFAULT_DEBUG_PORT
 
 logger = make_logger(__name__)
 
@@ -16,28 +17,28 @@ logger = make_logger(__name__)
 def setup_debug_if_enabled() -> None:
     """
     Setup debugpy if debug mode is enabled via environment variables.
-    
+
     This function checks for AgentEx debug environment variables and configures
     debugpy accordingly. It's designed to be called early in worker startup.
-    
+
     Environment Variables:
         AGENTEX_DEBUG_ENABLED: Set to "true" to enable debug mode
         AGENTEX_DEBUG_PORT: Port for debug server (default: 5678)
         AGENTEX_DEBUG_TYPE: Type identifier for logging (default: "worker")
         AGENTEX_DEBUG_WAIT_FOR_ATTACH: Set to "true" to wait for debugger attachment
-    
+
     Raises:
         Any exception from debugpy setup (will bubble up naturally)
     """
     if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
-        debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "5678"))
+        debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", str(_DEFAULT_DEBUG_PORT)))
         debug_type = os.getenv("AGENTEX_DEBUG_TYPE", "worker")
         wait_for_attach = os.getenv("AGENTEX_DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true"
-        
+
         # Configure debugpy
         debugpy.configure(subProcess=False)
         debugpy.listen(debug_port)
-        
+
         logger.info(f"🐛 [{debug_type.upper()}] Debug server listening on port {debug_port}")
 
         if wait_for_attach:
@@ -51,7 +52,7 @@ def setup_debug_if_enabled() -> None:
 def is_debug_enabled() -> bool:
     """
     Check if debug mode is currently enabled.
-    
+
     Returns:
         bool: True if AGENTEX_DEBUG_ENABLED is set to "true"
     """
@@ -61,8 +62,8 @@ def is_debug_enabled() -> bool:
 def get_debug_port() -> int:
     """
     Get the debug port from environment variables.
-    
+
     Returns:
         int: Debug port (default: 5678)
     """
-    return int(os.getenv("AGENTEX_DEBUG_PORT", "5678"))
+    return int(os.getenv("AGENTEX_DEBUG_PORT", str(_DEFAULT_DEBUG_PORT)))

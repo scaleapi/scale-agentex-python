@@ -15,7 +15,7 @@ class TestAgentexWorker:
         os.environ.pop("HEALTH_CHECK_PORT", None)
 
     def test_worker_init_uses_default_health_check_port(self):
-        """Test that worker uses default health_check_port of 8080 when not provided."""
+        """Test that worker uses default health_check_port of 5720 when not provided."""
         from agentex.lib.core.temporal.workers.worker import AgentexWorker
 
         # Ensure HEALTH_CHECK_PORT is not in environment
@@ -24,11 +24,11 @@ class TestAgentexWorker:
         # Mock EnvironmentVariables.refresh to avoid loading .env files
         with patch("agentex.lib.core.temporal.workers.worker.EnvironmentVariables") as mock_env_vars:
             mock_instance = mock_env_vars.refresh.return_value
-            mock_instance.HEALTH_CHECK_PORT = 8080
+            mock_instance.HEALTH_CHECK_PORT = 5720
 
             worker = AgentexWorker(task_queue="test-queue")
 
-            assert worker.health_check_port == 8080, "Worker should use default health_check_port of 8080"
+            assert worker.health_check_port == 5720, "Worker should use default health_check_port of 5720"
 
     def test_worker_init_with_explicit_health_check_port(self):
         """Test that worker uses explicit health_check_port parameter when provided."""
@@ -52,7 +52,7 @@ class TestAgentexWorker:
     @pytest.mark.parametrize(
         "env_port,expected_port",
         [
-            (None, 8080),  # No env var, should use default
+            (None, 5720),  # No env var, should use default
             ("8080", 8080),  # Env var set, should use it
             ("443", 443),  # Different port
         ],

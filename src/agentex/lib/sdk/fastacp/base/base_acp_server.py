@@ -382,6 +382,10 @@ class BaseACPServer(FastAPI):
     ACP Server Lifecycle Methods
     """
 
-    def run(self, host: str = "0.0.0.0", port: int = 8718, **kwargs):
+    def run(self, host: str = "0.0.0.0", port: int | None = None, **kwargs):
         """Start the Uvicorn server for async handlers."""
+        from agentex.lib.constants.ports import ACP_SERVER_PORT
+
+        if port is None:
+            port = ACP_SERVER_PORT
         uvicorn.run(self, host=host, port=port, **kwargs)

@@ -11,6 +11,10 @@ from rich.console import Console
 # Import debug functionality
 from agentex.lib.cli.debug import DebugConfig, start_acp_server_debug, start_temporal_worker_debug
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.constants.ports import (
+    REDIS_URL as _DEFAULT_REDIS_URL,
+    TEMPORAL_ADDRESS as _DEFAULT_TEMPORAL_ADDRESS,
+)
 from agentex.lib.cli.utils.path_utils import (
     get_file_paths,
     calculate_uvicorn_target_for_local,
@@ -94,16 +98,16 @@ async def start_temporal_worker_with_reload(
         worker_process = await start_temporal_worker(worker_path, env, manifest_dir)
         process_manager.add_process(worker_process)
         return asyncio.create_task(stream_process_output(worker_process, "WORKER"))
-    
+
     async def worker_runner() -> None:
         current_process: asyncio.subprocess.Process | None = None
         output_task: asyncio.Task[None] | None = None
-        
+
         console.print(f"[blue]Starting Temporal worker with auto-reload from {worker_path}...[/blue]")
-        
+
         async def start_worker() -> asyncio.subprocess.Process:
             nonlocal current_process, output_task
-            
+
             # PRE-RESTART CLEANUP - NEW!
             if current_process is not None:
                 # Extract agent name from worker path for cleanup
@@ -112,7 +116,7 @@ async def start_temporal_worker_with_reload(
                 console.print(f"FOUND AGENT_NAME FROM ENV VARS: {agent_name} {agent_name is None}")
                 if agent_name is None:
                     agent_name = worker_path.parent.parent.name
-                
+
                 # Perform cleanup if configured
                 if should_cleanup_on_restart():
                     console.print("[yellow]Cleaning up workflows before worker restart...[/yellow]")
@@ -121,7 +125,7 @@ async def start_temporal_worker_with_reload(
                     except Exception as e:
                         logger.warning(f"Cleanup failed: {e}")
                         console.print(f"[yellow]⚠ Cleanup failed: {str(e)}[/yellow]")
-            
+
             # Clean up previous process
             if current_process and current_process.returncode is None:
                 current_process.terminate()
@@ -130,7 +134,7 @@ async def start_temporal_worker_with_reload(
                 except asyncio.TimeoutError:
                     current_process.kill()
                     await current_process.wait()
-            
+
             # Cancel previous output task
             if output_task:
                 output_task.cancel()
@@ -138,33 +142,33 @@ async def start_temporal_worker_with_reload(
                     await output_task
                 except asyncio.CancelledError:
                     pass
-            
+
             current_process = await start_temporal_worker(worker_path, env, manifest_dir)
             process_manager.add_process(current_process)
             console.print("[green]Temporal worker started[/green]")
             return current_process
-        
+
         try:
             # Start initial worker
             current_process = await start_worker()
             if current_process:
                 output_task = asyncio.create_task(stream_process_output(current_process, "WORKER"))
-            
+
             # Watch for file changes
             async for changes in awatch(manifest_dir, recursive=True):
                 # Filter for Python files
-                py_changes = [(change, path) for change, path in changes if str(path).endswith('.py')]
-                
+                py_changes = [(change, path) for change, path in changes if str(path).endswith(".py")]
+
                 if py_changes:
                     changed_files = [str(Path(path).relative_to(worker_path.parent)) for _, path in py_changes]
                     console.print(f"[yellow]File changes detected: {changed_files}[/yellow]")
                     console.print("[yellow]Restarting Temporal worker...[/yellow]")
-                    
+
                     # Restart worker (with cleanup handled in start_worker)
                     await start_worker()
                     if current_process:
                         output_task = asyncio.create_task(stream_process_output(current_process, "WORKER"))
-                    
+
         except asyncio.CancelledError:
             # Clean shutdown
             if output_task:
@@ -173,7 +177,7 @@ async def start_temporal_worker_with_reload(
                     await output_task
                 except asyncio.CancelledError:
                     pass
-            
+
             if current_process and current_process.returncode is None:
                 current_process.terminate()
                 try:
@@ -182,7 +186,7 @@ async def start_temporal_worker_with_reload(
                     current_process.kill()
                     await current_process.wait()
             raise
-    
+
     return asyncio.create_task(worker_runner())
 
 
@@ -192,7 +196,7 @@ async def start_acp_server(
     """Start the ACP server process"""
     # Use file path relative to manifest directory if possible
     uvicorn_target = calculate_uvicorn_target_for_local(acp_path, manifest_dir)
-    
+
     cmd = [
         sys.executable,
         "-m",
@@ -296,11 +300,17 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
         manifest_dir = Path(manifest_path).parent
         if debug_config and debug_config.should_debug_acp():
             acp_process = await start_acp_server_debug(
-                file_paths["acp"], manifest.local_development.agent.port, agent_env, debug_config  # type: ignore[union-attr]
+                file_paths["acp"],
+                manifest.local_development.agent.port,
+                agent_env,
+                debug_config,  # type: ignore[union-attr]
             )
         else:
             acp_process = await start_acp_server(
-                file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir  # type: ignore[union-attr]
+                file_paths["acp"],
+                manifest.local_development.agent.port,
+                agent_env,
+                manifest_dir,  # type: ignore[union-attr]
             )
         process_manager.add_process(acp_process)
 
@@ -313,14 +323,14 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
         if is_temporal_agent(manifest) and file_paths["worker"]:
             if debug_config and debug_config.should_debug_worker():
                 # In debug mode, start worker without auto-reload to prevent conflicts
-                worker_process = await start_temporal_worker_debug(
-                    file_paths["worker"], agent_env, debug_config
-                )
+                worker_process = await start_temporal_worker_debug(file_paths["worker"], agent_env, debug_config)
                 process_manager.add_process(worker_process)
                 worker_task = asyncio.create_task(stream_process_output(worker_process, "WORKER"))
             else:
                 # Normal mode with auto-reload
-                worker_task = await start_temporal_worker_with_reload(file_paths["worker"], agent_env, process_manager, manifest_dir)
+                worker_task = await start_temporal_worker_with_reload(
+                    file_paths["worker"], agent_env, process_manager, manifest_dir
+                )
             tasks.append(worker_task)
 
         console.print(
@@ -333,7 +343,7 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
             await process_manager.wait_for_shutdown()
         except KeyboardInterrupt:
             console.print("\n[yellow]Received shutdown signal...[/yellow]")
-        
+
         # Cancel output streaming tasks
         for task in tasks:
             task.cancel()
@@ -351,9 +361,6 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
         await process_manager.cleanup_processes()
 
 
-
-
-
 def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
     """Create environment variables for agent processes without modifying os.environ"""
     # Start with current environment
@@ -364,8 +371,8 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
     # TODO: Combine this logic with the deploy_handlers so that we can reuse the env vars
     env_vars = {
         "ENVIRONMENT": "development",
-        "TEMPORAL_ADDRESS": "localhost:7233",
-        "REDIS_URL": "redis://localhost:6379",
+        "TEMPORAL_ADDRESS": _DEFAULT_TEMPORAL_ADDRESS,
+        "REDIS_URL": _DEFAULT_REDIS_URL,
         "AGENT_NAME": manifest.agent.name,
         "ACP_TYPE": manifest.agent.acp_type,
         "ACP_URL": f"http://{manifest.local_development.agent.host_address}",  # type: ignore[union-attr]
@@ -377,6 +384,7 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
 
     # Add authorization principal if set - for local development, auth is optional
     from agentex.lib.cli.utils.auth_utils import _encode_principal_context
+
     encoded_principal = _encode_principal_context(manifest)
     if encoded_principal:
         env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64] = encoded_principal
