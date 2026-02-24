@@ -38,6 +38,28 @@ client = Agentex(
 tasks = client.tasks.list()
 ```
 
+## Hello World
+
+A minimal example to get started with the Agentex Python library:
+
+```python
+import os
+from agentex import Agentex
+
+
+def hello_world() -> None:
+    client = Agentex(
+        api_key=os.environ.get("AGENTEX_SDK_API_KEY"),
+    )
+    tasks = client.tasks.list()
+    print("Hello, World! Connected to Agentex successfully.")
+    print(f"Found {len(tasks.data)} tasks.")
+
+
+if __name__ == "__main__":
+    hello_world()
+```
+
 While you can provide an `api_key` keyword argument,
 we recommend using [python-dotenv](https://pypi.org/project/python-dotenv/)
 to add `AGENTEX_SDK_API_KEY="My API Key"` to your `.env` file
