@@ -1,3 +1,4 @@
+# Python SDK for the AgentEx API — Scale AI's platform for building, deploying, and running AI agents.
 [project]
 name = "agentex-sdk"
 version = "0.9.4"
