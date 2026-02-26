@@ -9,8 +9,9 @@ from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_proce
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.model_utils import BaseModel
 
-from agentex.types.task_message_update import TaskMessageUpdate
+from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
 from agentex.types.task_message_content import TaskMessageContent
+from agentex.types.text_content import TextContent
 from agentex.lib.utils.logging import make_logger
 from agents import Agent, Runner, RunConfig, function_tool
 
