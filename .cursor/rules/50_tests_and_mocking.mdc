@@ -6,8 +6,8 @@ alwaysApply: true
 
 Testing:
 
-- Run tests with `rye run pytest` or `./scripts/test`
-- To run a specific test: `rye run pytest path/to/test_file.py::TestClass::test_method -v`
+- Run tests with `uv run pytest` or `./scripts/test`
+- To run a specific test: `uv run pytest path/to/test_file.py::TestClass::test_method -v`
 - A mock server is automatically started for tests on port 4010
 
 When writing tests:

@@ -5,32 +5,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Package Management in the top level repo
-- Use `rye` for dependency management (preferred)
+- Use `uv` for dependency management
 - Run `./scripts/bootstrap` to set up the environment
-- Or use `rye sync --all-features` directly
+- Or use `uv sync --all-groups` directly
 
-Special note: the individual tutorials maintain their own tutorial specific virtualenv using `uv`. So when testing/running tutorials, you `uv run` instead of `rye run`.  Everything else is similar.
+Special note: the individual tutorials maintain their own tutorial specific virtualenv using `uv`. So when testing/running tutorials, you `uv run` instead of the top-level scripts. Everything else is similar.
 
 #### Testing
-- Run tests: `rye run pytest` or `./scripts/test`
-- Run specific test: `rye run pytest path/to/test_file.py::TestClass::test_method -v`
+- Run tests: `uv run pytest` or `./scripts/test`
+- Run specific test: `uv run pytest path/to/test_file.py::TestClass::test_method -v`
 - Mock server is automatically started for tests, runs on port 4010
 
 #### Linting and Formatting
-- Format code: `rye run format` or `./scripts/format`
-  * The repository is still in flux, so running format might accidentally change files that aren't part of your scope of changes. So always run `run rye format` with additional arguments to constrain the formatting to the files that you are modifying.
-- Lint code: `rye run lint` or `./scripts/lint`
-- Type check: `rye run typecheck` (runs both pyright and mypy)
+- Format code: `uv run ruff format` or `./scripts/format`
+  * The repository is still in flux, so running format might accidentally change files that aren't part of your scope of changes. So always run `uv run ruff format` with additional arguments to constrain the formatting to the files that you are modifying.
+- Lint code: `uv run ruff check .` or `./scripts/lint`
+- Type check: `uv run pyright`
 
 ### Building and Running
-- Build package: `rye build`
+- Build package: `uv build`
 
 
 
 ### CLI Commands
 The package provides the `agentex` CLI with these main commands:
 - `agentex agents` - Get, list, run, build, and deploy agents
-- `agentex tasks` - Get, list, and delete tasks  
+- `agentex tasks` - Get, list, and delete tasks
 - `agentex secrets` - Sync, get, list, and delete secrets
 - `agentex uv` - UV wrapper with AgentEx-specific enhancements
 - `agentex init` - Initialize new agent projects
@@ -80,7 +80,7 @@ Most SDK code is auto-generated. Manual changes are preserved in:
 
 ### Key Dependencies
 - `temporalio` - Temporal workflow engine
-- `typer` - CLI framework  
+- `typer` - CLI framework
 - `pydantic` - Data validation
 - `httpx` - HTTP client
 - `fastapi` - Web framework
@@ -89,5 +89,5 @@ Most SDK code is auto-generated. Manual changes are preserved in:
 
 ### Environment Requirements
 - Python 3.12+ required
-- Uses Rye for dependency management
+- Uses uv for dependency management
 - Supports both sync and async client patterns

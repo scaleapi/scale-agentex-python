@@ -186,7 +186,7 @@ subagents = {
 
 ```bash
 # Install
-rye sync --all-features
+uv sync --all-groups
 
 # Configure
 export ANTHROPIC_API_KEY="your-key"

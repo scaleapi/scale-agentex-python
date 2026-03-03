@@ -701,13 +701,13 @@ The streaming model implementation has comprehensive tests in `tests/test_stream
 
 ```bash
 # Run all tests
-rye run pytest src/agentex/lib/core/temporal/plugins/openai_agents/tests/test_streaming_model.py -v
+uv run pytest src/agentex/lib/core/temporal/plugins/openai_agents/tests/test_streaming_model.py -v
 
 # Run without parallel execution (more stable)
-rye run pytest src/agentex/lib/core/temporal/plugins/openai_agents/tests/test_streaming_model.py -v -n0
+uv run pytest src/agentex/lib/core/temporal/plugins/openai_agents/tests/test_streaming_model.py -v -n0
 
 # Run specific test
-rye run pytest src/agentex/lib/core/temporal/plugins/openai_agents/tests/test_streaming_model.py::TestStreamingModelSettings::test_temperature_setting -v
+uv run pytest src/agentex/lib/core/temporal/plugins/openai_agents/tests/test_streaming_model.py::TestStreamingModelSettings::test_temperature_setting -v
 ```
 
 #### From Test Directory
@@ -716,13 +716,13 @@ rye run pytest src/agentex/lib/core/temporal/plugins/openai_agents/tests/test_st
 cd src/agentex/lib/core/temporal/plugins/openai_agents/tests
 
 # Run all tests
-rye run pytest test_streaming_model.py -v
+uv run pytest test_streaming_model.py -v
 
 # Run without parallel execution (recommended)
-rye run pytest test_streaming_model.py -v -n0
+uv run pytest test_streaming_model.py -v -n0
 
 # Run specific test class
-rye run pytest test_streaming_model.py::TestStreamingModelSettings -v
+uv run pytest test_streaming_model.py::TestStreamingModelSettings -v
 ```
 
 #### Test Coverage

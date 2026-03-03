@@ -80,10 +80,15 @@ dev = [
 [project.scripts]
 agentex = "agentex.lib.cli.commands.main:app"
 
-[tool.rye]
+[tool.uv]
 managed = true
-# version pins are in requirements-dev.lock
-dev-dependencies = [
+
+[build-system]
+requires = ["hatchling==1.26.3", "hatch-fancy-pypi-readme"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
     "pyright==1.1.399",
     "mypy==1.17",
     "respx",
@@ -98,42 +103,6 @@ dev-dependencies = [
     "nest_asyncio==1.6.0",
     "pytest-xdist>=3.6.1",
     "debugpy>=1.8.15",
-]
-
-[tool.rye.scripts]
-format = { chain = [
-  "format:ruff",
-  "format:docs",
-  "fix:ruff",
-  # run formatting again to fix any inconsistencies when imports are stripped
-  "format:ruff",
-]}
-"format:docs" = "python scripts/utils/ruffen-docs.py README.md api.md"
-"format:ruff" = "ruff format"
-
-"lint" = { chain = [
-  "check:ruff",
-  "typecheck",
-  "check:importable",
-]}
-"check:ruff" = "ruff check ."
-"fix:ruff" = "ruff check --fix ."
-
-"check:importable" = "python -c 'import agentex'"
-
-typecheck = { chain = [
-  "typecheck:pyright"
-]}
-"typecheck:pyright" = "pyright"
-"typecheck:verify-types" = "pyright --verifytypes agentex --ignoreexternal"
-"typecheck:mypy" = "mypy ."
-
-[build-system]
-requires = ["hatchling==1.26.3", "hatch-fancy-pypi-readme"]
-build-backend = "hatchling.build"
-
-[dependency-groups]
-dev = [
     "ipywidgets>=8.1.7",
     "nbstripout>=0.8.1",
     "yaspin>=3.1.0",

@@ -4,15 +4,15 @@ globs: "**/*"
 alwaysApply: true
 ---
 
-Use Rye for Python dependency management and workflows. Prefer these commands:
+Use uv for Python dependency management and workflows. Prefer these commands:
 
-- Setup env: `./scripts/bootstrap` or `rye sync --all-features` [[Use Rye in this repo]]
-- Run tests: `rye run pytest` or `./scripts/test`
-- Run a specific test: `rye run pytest path/to/test_file.py::TestClass::test_method -v`
-- Format: `rye run format` or `./scripts/format`
-- Lint: `rye run lint` or `./scripts/lint`
-- Type check: `rye run typecheck` (runs pyright and mypy)
-- Build: `rye build`
+- Setup env: `./scripts/bootstrap` or `uv sync --all-groups`
+- Run tests: `uv run pytest` or `./scripts/test`
+- Run a specific test: `uv run pytest path/to/test_file.py::TestClass::test_method -v`
+- Format: `uv run ruff format` or `./scripts/format`
+- Lint: `uv run ruff check .` or `./scripts/lint`
+- Type check: `uv run pyright`
+- Build: `uv build`
 
 Environment requirements:
 
@@ -21,4 +21,4 @@ Environment requirements:
 
 Notes:
 
-- Only use `uv` inside of tutorial folders which have their own virtualenv (managed by a tutorial specific pyproject.toml inside the relevant tutorial folder). Otherwise use rye at the top level.
+- Tutorial folders have their own virtualenv (managed by a tutorial specific pyproject.toml inside the relevant tutorial folder). Use `uv run` within those folders.

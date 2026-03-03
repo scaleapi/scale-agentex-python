@@ -6,9 +6,9 @@ alwaysApply: true
 
 Standards:
 
-- Format code via `rye run format` or `./scripts/format`
-- Lint via `rye run lint` or `./scripts/lint`
-- Type check via `rye run typecheck` (pyright + mypy)
+- Format code via `uv run ruff format` or `./scripts/format`
+- Lint via `uv run ruff check .` or `./scripts/lint`
+- Type check via `uv run pyright`
 
 Guidance:
 

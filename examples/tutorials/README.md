@@ -122,7 +122,7 @@ uv run python hello_acp.py
 
 ```bash
 # Format tutorial code (always scope to specific files you're modifying)
-rye run format examples/tutorials/00_sync/000_hello_acp/
+uv run ruff format examples/tutorials/00_sync/000_hello_acp/
 
 # Run all async tutorial tests
 cd examples/tutorials
