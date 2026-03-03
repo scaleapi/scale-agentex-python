@@ -11,7 +11,6 @@ from pydantic import Field, BaseModel
 from rich.console import Console
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.constants.ports import ACP_SERVER_PORT
 from agentex.lib.cli.utils.exceptions import HelmError, DeploymentError
 from agentex.lib.cli.utils.path_utils import PathResolutionError, calculate_docker_acp_module
 from agentex.lib.environment_variables import EnvVarKeys
@@ -240,12 +239,12 @@ def add_acp_command_to_helm_values(helm_values: dict[str, Any], manifest: AgentM
     try:
         docker_acp_module = calculate_docker_acp_module(manifest, manifest_path)
         # Create the uvicorn command with the correct module path
-        helm_values["command"] = ["uvicorn", f"{docker_acp_module}:acp", "--host", "0.0.0.0", "--port", str(ACP_SERVER_PORT)]
+        helm_values["command"] = ["uvicorn", f"{docker_acp_module}:acp", "--host", "0.0.0.0", "--port", "8000"]
         logger.info(f"Using dynamic ACP command: uvicorn {docker_acp_module}:acp")
     except (PathResolutionError, Exception) as e:
         # Fallback to default command structure
         logger.warning(f"Could not calculate dynamic ACP module ({e}), using default: project.acp")
-        helm_values["command"] = ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", str(ACP_SERVER_PORT)]
+        helm_values["command"] = ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
 
 
 def merge_deployment_configs(
