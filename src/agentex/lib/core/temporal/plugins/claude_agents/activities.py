@@ -145,6 +145,11 @@ async def run_claude_agent_activity(
         await handler.cleanup()
 
         results = handler.get_results()
+        if not results.get("messages"):
+            logger.warning(
+                f"[run_claude_agent_activity] Claude returned 0 messages — "
+                f"possible model connectivity issue (task_id={task_id}, workspace={workspace_path})"
+            )
         logger.debug(f"Returning results with keys: {results.keys()}")
         return results
 
