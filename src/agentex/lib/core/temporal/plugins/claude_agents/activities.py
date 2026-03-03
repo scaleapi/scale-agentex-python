@@ -146,9 +146,10 @@ async def run_claude_agent_activity(
 
         results = handler.get_results()
         if not results.get("messages"):
-            logger.warning(
+            raise RuntimeError(
                 f"[run_claude_agent_activity] Claude returned 0 messages — "
-                f"possible model connectivity issue (task_id={task_id}, workspace={workspace_path})"
+                f"possible model connectivity issue (task_id={task_id}, workspace={workspace_path}). "
+                f"Check that the model API is reachable."
             )
         logger.debug(f"Returning results with keys: {results.keys()}")
         return results
