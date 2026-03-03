@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import os
@@ -7,12 +8,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.constants.ports import (
-    ACP_SERVER_PORT as _DEFAULT_ACP_PORT,
-    TEMPORAL_ADDRESS as _DEFAULT_TEMPORAL_ADDRESS,
-    HEALTH_CHECK_PORT as _DEFAULT_HEALTH_CHECK_PORT,
-    AGENTEX_API_BASE_URL as _DEFAULT_AGENTEX_BASE_URL,
-)
 from agentex.lib.utils.model_utils import BaseModel
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -61,9 +56,9 @@ refreshed_environment_variables: EnvironmentVariables | None = None
 
 class EnvironmentVariables(BaseModel):
     ENVIRONMENT: str = Environment.DEV
-    TEMPORAL_ADDRESS: str | None = _DEFAULT_TEMPORAL_ADDRESS
+    TEMPORAL_ADDRESS: str | None = "localhost:7233"
     REDIS_URL: str | None = None
-    AGENTEX_BASE_URL: str | None = _DEFAULT_AGENTEX_BASE_URL
+    AGENTEX_BASE_URL: str | None = "http://localhost:5003"
     # Agent Identifiers
     AGENT_NAME: str
     AGENT_DESCRIPTION: str | None = None
@@ -73,12 +68,12 @@ class EnvironmentVariables(BaseModel):
     AGENT_INPUT_TYPE: str | None = None
     # ACP Configuration
     ACP_URL: str
-    ACP_PORT: int = _DEFAULT_ACP_PORT
+    ACP_PORT: int = 8000
     # Workflow Configuration
     WORKFLOW_TASK_QUEUE: str | None = None
     WORKFLOW_NAME: str | None = None
     # Temporal Worker Configuration
-    HEALTH_CHECK_PORT: int = _DEFAULT_HEALTH_CHECK_PORT
+    HEALTH_CHECK_PORT: int = 80
     # Auth Configuration
     AUTH_PRINCIPAL_B64: str | None = None
     # Build Information
