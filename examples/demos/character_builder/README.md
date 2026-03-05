@@ -1,0 +1,279 @@
+# character-builder - AgentEx Sync ACP Template
+
+This is a starter template for building synchronous agents with the AgentEx framework. It provides a basic implementation of the Agent 2 Client Protocol (ACP) with immediate response capabilities to help you get started quickly.
+
+## What You'll Learn
+
+- **Tasks**: A task is a grouping mechanism for related messages. Think of it as a conversation thread or a session.
+- **Messages**: Messages are communication objects within a task. They can contain text, data, or instructions.
+- **Sync ACP**: Synchronous Agent Communication Protocol that requires immediate responses
+- **Message Handling**: How to process and respond to messages in real-time
+
+## Running the Agent
+
+1. Run the agent locally:
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+The agent will start on port 8000 and respond immediately to any messages it receives.
+
+## What's Inside
+
+This template:
+- Sets up a basic sync ACP server
+- Handles incoming messages with immediate responses
+- Provides a foundation for building real-time agents
+- Can include streaming support for long responses
+
+## Next Steps
+
+For more advanced agent development, check out the AgentEx tutorials:
+
+- **Tutorials 00-08**: Learn about building synchronous agents with ACP
+- **Tutorials 09-10**: Learn how to use Temporal to power asynchronous agents
+  - Tutorial 09: Basic Temporal workflow setup
+  - Tutorial 10: Advanced Temporal patterns and best practices
+
+These tutorials will help you understand:
+- How to handle long-running tasks
+- Implementing state machines
+- Managing complex workflows
+- Best practices for async agent development
+
+## The Manifest File
+
+The `manifest.yaml` file is your agent's configuration file. It defines:
+- How your agent should be built and packaged
+- What files are included in your agent's Docker image
+- Your agent's name and description
+- Local development settings (like the port your agent runs on)
+
+This file is essential for both local development and deployment of your agent.
+
+## Project Structure
+
+```
+character_builder/
+├── project/                  # Your agent's code
+│   ├── __init__.py
+│   └── acp.py               # ACP server and event handlers
+├── Dockerfile               # Container definition
+├── manifest.yaml            # Deployment config
+├── dev.ipynb                # Development notebook for testing
+
+└── pyproject.toml          # Dependencies (uv)
+
+```
+
+## Development
+
+### 1. Customize Message Handlers
+- Modify the handlers in `acp.py` to implement your agent's logic
+- Add your own tools and capabilities
+- Implement custom response generation
+
+### 2. Test Your Agent with the Development Notebook
+Use the included `dev.ipynb` Jupyter notebook to test your agent interactively:
+
+```bash
+# Start Jupyter notebook (make sure you have jupyter installed)
+jupyter notebook dev.ipynb
+
+# Or use VS Code to open the notebook directly
+code dev.ipynb
+```
+
+The notebook includes:
+- **Setup**: Connect to your local AgentEx backend
+- **Non-streaming tests**: Send messages and get complete responses
+- **Streaming tests**: Test real-time streaming responses
+- **Task management**: Optional task creation and management
+
+The notebook automatically uses your agent name (`character-builder`) and provides examples for both streaming and non-streaming message handling.
+
+### 3. Manage Dependencies
+
+
+You chose **uv** for package management. Here's how to work with dependencies:
+
+```bash
+# Add new dependencies
+agentex uv add requests openai anthropic
+
+# Install/sync dependencies
+agentex uv sync
+
+# Run commands with uv
+uv run agentex agents run --manifest manifest.yaml
+```
+
+**Benefits of uv:**
+- Faster dependency resolution and installation
+- Better dependency isolation
+- Modern Python packaging standards
+
+
+
+### 4. Configure Credentials
+Options:
+1. Add any required credentials to your manifest.yaml via the `env` section
+2. Export them in your shell: `export OPENAI_API_KEY=...`
+3. For local development, create a `.env.local` file in the project directory
+
+## Local Development
+
+### 1. Start the Agentex Backend
+```bash
+# Navigate to the backend directory
+cd agentex
+
+# Start all services using Docker Compose
+make dev
+
+# Optional: In a separate terminal, use lazydocker for a better UI (everything should say "healthy")
+lzd
+```
+
+### 3. Run Your Agent
+```bash
+# From this directory
+export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
+```
+
+### 4. Interact with Your Agent
+
+**Option 1: Web UI (Recommended)**
+```bash
+# Start the local web interface
+cd agentex-web
+make dev
+
+# Then open http://localhost:3000 in your browser to chat with your agent
+```
+
+**Option 2: CLI (Deprecated)**
+```bash
+# Submit a task via CLI
+agentex tasks submit --agent character-builder --task "Your task here"
+```
+
+## Development Tips
+
+### Environment Variables
+- Set environment variables in project/.env for any required credentials
+- Or configure them in the manifest.yaml under the `env` section
+- The `.env` file is automatically loaded in development mode
+
+### Local Testing
+- Use `export ENVIRONMENT=development` before running your agent
+- This enables local service discovery and debugging features
+- Your agent will automatically connect to locally running services
+
+### Sync ACP Considerations
+- Responses must be immediate (no long-running operations)
+- Use streaming for longer responses
+- Keep processing lightweight and fast
+- Consider caching for frequently accessed data
+
+### Debugging
+- Check agent logs in the terminal where you ran the agent
+- Use the web UI to inspect task history and responses
+- Monitor backend services with `lzd` (LazyDocker)
+- Test response times and optimize for speed
+
+### To build the agent Docker image locally (normally not necessary):
+
+1. Build the agent image:
+```bash
+agentex agents build --manifest manifest.yaml
+```
+
+```bash
+# Build with uv
+agentex agents build --manifest manifest.yaml --push
+```
+
+
+
+## Advanced Features
+
+### Streaming Responses
+Handle long responses with streaming:
+
+```python
+# In project/acp.py
+@acp.on_message_send
+async def handle_message_send(params: SendMessageParams):
+    # For streaming responses
+    async def stream_response():
+        for chunk in generate_response_chunks():
+            yield TaskMessageUpdate(
+                content=chunk,
+                is_complete=False
+            )
+        yield TaskMessageUpdate(
+            content="",
+            is_complete=True
+        )
+    
+    return stream_response()
+```
+
+### Custom Response Logic
+Add sophisticated response generation:
+
+```python
+# In project/acp.py
+@acp.on_message_send
+async def handle_message_send(params: SendMessageParams):
+    # Analyze input
+    user_message = params.content.content
+    
+    # Generate response
+    response = await generate_intelligent_response(user_message)
+    
+    return TextContent(
+        author=MessageAuthor.AGENT,
+        content=response
+    )
+```
+
+### Integration with External Services
+
+```bash
+# Add service clients
+agentex uv add httpx requests-oauthlib
+
+# Add AI/ML libraries
+agentex uv add openai anthropic transformers
+
+# Add fast processing libraries
+agentex uv add numpy pandas
+```
+
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Agent not appearing in web UI**
+   - Check if agent is running on port 8000
+   - Verify `ENVIRONMENT=development` is set
+   - Check agent logs for errors
+
+2. **Slow response times**
+   - Profile your message handling code
+   - Consider caching expensive operations
+   - Optimize database queries and API calls
+
+3. **Dependency issues**
+
+   - Run `agentex uv sync` to ensure all dependencies are installed
+
+
+4. **Port conflicts**
+   - Check if another service is using port 8000
+   - Use `lsof -i :8000` to find conflicting processes
+
+Happy building with Sync ACP! 🚀⚡

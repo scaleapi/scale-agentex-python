@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "character_builder"
+version = "0.1.0"
+description = "An Agent for building a Level 1 Dungeons and Dragons Character"
+requires-python = ">=3.12"
+dependencies = [
+    "agentex-sdk",
+    "openai-agents>=0.4.2",
+    "scale-gp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "ty"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["project"]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "A",      # Prevent builtins shadowing
+    "ANN",    # Require type annotations
+    "ASYNC",  # Good async rules
+    "B",      # Good common bug catching
+    "C4",     # Catch incorrect use of comprehensions, dict, list, etc
+    "C90",    # Reduce function complexity
+    "D",      # Require docstrings
+    "DTZ",    # No naive datetimes
+    "E",      # PyCodeStyle errors
+    "ERA",    # No commented out code
+    "F",      # Pyflakes rules
+    "FIX",    # FIXMEs and TODOs
+    "FURB",   # Modern python guidance
+    "I",      # Sort imports properly
+    "ICN",    # Use common import conventions
+    "ISC",    # Good use of string concatenation
+    "LOG",    # Require cood logging
+    "NPY",    # Some numpy-specific things
+    "PLC",    # Good conventions, specifically PLC0415 for imports not in functions
+    "PTH",    # Use pathlib instead of os.path
+    "RET",    # Good return practices
+    "SIM",    # Common simplification rules
+    "T20",    # No print statements
+    "TC",     # Enforce importing certain types in a TYPE_CHECKING block
+    "TID",    # Some good import practices
+    "TRY",    # Better exception handling
+    "UP",     # Warn if certain things can changed due to newer Python versions
+    "W",      # PyCodeStyle warnings
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
