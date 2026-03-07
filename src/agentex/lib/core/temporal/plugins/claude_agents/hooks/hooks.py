@@ -66,6 +66,7 @@ class TemporalStreamingHooks:
             Empty dict (allow execution to proceed)
         """
         if not self.task_id or not tool_use_id:
+            logger.debug(f"Hooks skipping pre_tool_use — task_id={self.task_id}, tool_use_id={tool_use_id}")
             return {}
 
         tool_name = input_data.get("tool_name", "unknown")
@@ -133,6 +134,7 @@ class TemporalStreamingHooks:
             Empty dict
         """
         if not self.task_id or not tool_use_id:
+            logger.debug(f"Hooks skipping post_tool_use — task_id={self.task_id}, tool_use_id={tool_use_id}")
             return {}
 
         tool_name = input_data.get("tool_name", "unknown")
