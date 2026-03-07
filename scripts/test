@@ -55,4 +55,4 @@ fi
 export DEFER_PYDANTIC_BUILD=false
 
 echo "==> Running tests"
-rye run pytest "$@"
+uv run pytest "$@"

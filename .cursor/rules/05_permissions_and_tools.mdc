@@ -8,11 +8,11 @@ When invoking external tools or the terminal, follow these constraints:
 
 - Web search is allowed when needed for docs and references
 - Prefer fetching docs from `docs.temporal.io` when researching Temporal topics
-- Allowed bash commands should go through Rye workflows:
-  - `rye run pytest:*`
-  - `rye run lint:*`
-  - `rye run typecheck:*`
-  - `rye run sync:*`
-  - `rye run build:*`
+- Allowed bash commands should go through uv workflows:
+  - `uv run pytest`
+  - `uv run ruff check .`
+  - `uv run pyright`
+  - `uv sync`
+  - `uv build`
 
-Default to Rye; only use other tools when explicitly required by the codebase.
+Default to uv; only use other tools when explicitly required by the codebase.

@@ -7,21 +7,18 @@
     "context": ".."
   },
 
-  "postStartCommand": "rye sync --all-features",
+  "postStartCommand": "uv sync --all-groups",
 
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python"
       ],
-      "settings": { 
+      "settings": {
         "terminal.integrated.shell.linux": "/bin/bash",
         "python.pythonPath": ".venv/bin/python",
         "python.defaultInterpreterPath": ".venv/bin/python",
-        "python.typeChecking": "basic",
-        "terminal.integrated.env.linux": {
-          "PATH": "/home/vscode/.rye/shims:${env:PATH}"
-        }
+        "python.typeChecking": "basic"
       }
     }
   },
