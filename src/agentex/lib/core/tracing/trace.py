@@ -146,19 +146,36 @@ class Trace:
         parent_id: str | None = None,
         input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        fail_open: bool = False,
     ):
         """
         Context manager for spans.
         If trace_id is falsy, acts as a no-op context manager.
+
+        When fail_open is True, tracing errors during span setup or teardown are
+        logged and suppressed instead of propagated. This ensures that tracing
+        infrastructure failures never interrupt the caller's business logic.
         """
         if not self.trace_id:
             yield None
             return
-        span = self.start_span(name, parent_id, input, data)
+        try:
+            span = self.start_span(name, parent_id, input, data)
+        except Exception:
+            if fail_open:
+                logger.warning(f"Tracing span setup failed for '{name}', proceeding without tracing", exc_info=True)
+                yield None
+                return
+            raise
         try:
             yield span
         finally:
-            self.end_span(span)
+            try:
+                self.end_span(span)
+            except Exception:
+                if not fail_open:
+                    raise
+                logger.warning(f"Tracing span teardown failed for '{name}'", exc_info=True)
 
 
 class AsyncTrace:
@@ -225,9 +242,7 @@ class AsyncTrace:
         )
 
         if self.processors:
-            await asyncio.gather(
-                *[processor.on_span_start(span) for processor in self.processors]
-            )
+            await asyncio.gather(*[processor.on_span_start(span) for processor in self.processors])
 
         return span
 
@@ -252,9 +267,7 @@ class AsyncTrace:
         span.data = recursive_model_dump(span.data) if span.data else None
 
         if self.processors:
-            await asyncio.gather(
-                *[processor.on_span_end(span) for processor in self.processors]
-            )
+            await asyncio.gather(*[processor.on_span_end(span) for processor in self.processors])
 
         return span
 
@@ -290,24 +303,42 @@ class AsyncTrace:
         parent_id: str | None = None,
         input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        fail_open: bool = False,
     ) -> AsyncGenerator[Span | None, None]:
         """
         Context manager for spans.
+
+        When fail_open is True, tracing errors during span setup or teardown are
+        logged and suppressed instead of propagated. This ensures that tracing
+        infrastructure failures never interrupt the caller's business logic.
 
         Args:
             name: Name of the span.
             parent_id: Optional parent span ID.
             input: Optional input data for the span.
             data: Optional additional data for the span.
+            fail_open: If True, suppress tracing errors instead of raising.
 
         Yields:
-            The span object.
+            The span object, or None if fail_open is True and setup failed.
         """
         if not self.trace_id:
             yield None
             return
-        span = await self.start_span(name, parent_id, input, data)
+        try:
+            span = await self.start_span(name, parent_id, input, data)
+        except Exception:
+            if fail_open:
+                logger.warning(f"Tracing span setup failed for '{name}', proceeding without tracing", exc_info=True)
+                yield None
+                return
+            raise
         try:
             yield span
         finally:
-            await self.end_span(span)
+            try:
+                await self.end_span(span)
+            except Exception:
+                if not fail_open:
+                    raise
+                logger.warning(f"Tracing span teardown failed for '{name}'", exc_info=True)

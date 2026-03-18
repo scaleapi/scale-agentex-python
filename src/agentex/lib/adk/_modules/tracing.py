@@ -64,9 +64,7 @@ class TracingModule:
         # Re-create the underlying httpx client when the event loop changes
         # (e.g. between HTTP requests in a sync ASGI server) to avoid
         # "Event loop is closed" / "bound to a different event loop" errors.
-        if self._tracing_service_lazy is None or (
-            loop_id is not None and loop_id != self._bound_loop_id
-        ):
+        if self._tracing_service_lazy is None or (loop_id is not None and loop_id != self._bound_loop_id):
             import httpx
 
             # Disable keepalive so each span HTTP call gets a fresh TCP
@@ -96,12 +94,17 @@ class TracingModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+        fail_open: bool = False,
     ) -> AsyncGenerator[Span | None, None]:
         """
         Async context manager for creating and automatically closing a span.
         Yields the started span object. The span is automatically ended when the context exits.
 
         If trace_id is falsy, acts as a no-op context manager.
+
+        When fail_open is True, tracing errors during span setup or teardown are
+        logged and suppressed instead of propagated. This ensures that tracing
+        infrastructure failures never interrupt the caller's business logic.
 
         Args:
             trace_id (str): The trace ID for the span.
@@ -112,6 +115,7 @@ class TracingModule:
             start_to_close_timeout (timedelta): The start to close timeout for the span.
             heartbeat_timeout (timedelta): The heartbeat timeout for the span.
             retry_policy (RetryPolicy): The retry policy for the span.
+            fail_open (bool): If True, suppress tracing errors instead of raising.
 
         Returns:
             AsyncGenerator[Optional[Span], None]: An async generator that yields the started span object.
@@ -120,27 +124,39 @@ class TracingModule:
             yield None
             return
 
-        span: Span | None = await self.start_span(
-            trace_id=trace_id,
-            name=name,
-            input=input,
-            parent_id=parent_id,
-            data=data,
-            start_to_close_timeout=start_to_close_timeout,
-            heartbeat_timeout=heartbeat_timeout,
-            retry_policy=retry_policy,
-        )
+        try:
+            span: Span | None = await self.start_span(
+                trace_id=trace_id,
+                name=name,
+                input=input,
+                parent_id=parent_id,
+                data=data,
+                start_to_close_timeout=start_to_close_timeout,
+                heartbeat_timeout=heartbeat_timeout,
+                retry_policy=retry_policy,
+            )
+        except Exception:
+            if fail_open:
+                logger.warning(f"Tracing span setup failed for '{name}', proceeding without tracing", exc_info=True)
+                yield None
+                return
+            raise
         try:
             yield span
         finally:
             if span:
-                await self.end_span(
-                    trace_id=trace_id,
-                    span=span,
-                    start_to_close_timeout=start_to_close_timeout,
-                    heartbeat_timeout=heartbeat_timeout,
-                    retry_policy=retry_policy,
-                )
+                try:
+                    await self.end_span(
+                        trace_id=trace_id,
+                        span=span,
+                        start_to_close_timeout=start_to_close_timeout,
+                        heartbeat_timeout=heartbeat_timeout,
+                        retry_policy=retry_policy,
+                    )
+                except Exception:
+                    if not fail_open:
+                        raise
+                    logger.warning(f"Tracing span teardown failed for '{name}'", exc_info=True)
 
     async def start_span(
         self,
