@@ -1,0 +1,64 @@
+# Agent Manifest Configuration
+# ---------------------------
+# This file defines how your agent should be built and deployed.
+
+build:
+  context:
+    root: ../../
+    include_paths:
+      - deep_research/orchestrator
+    dockerfile: deep_research/orchestrator/Dockerfile
+    dockerignore: deep_research/orchestrator/.dockerignore
+
+local_development:
+  agent:
+    port: 8010
+    host_address: host.docker.internal
+
+  paths:
+    acp: project/acp.py
+    worker: project/run_worker.py
+
+agent:
+  acp_type: async
+  name: deep-research-orchestrator
+  description: Orchestrates deep research by dispatching GitHub, Docs, and Slack subagents
+
+  temporal:
+    enabled: true
+    workflows:
+      - name: deep-research-orchestrator
+        queue_name: deep_research_orchestrator_queue
+
+  credentials:
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+  #   - env_var_name: OPENAI_API_KEY
+  #     secret_name: openai-api-key
+  #     secret_key: api-key
+
+  env:
+    OPENAI_ORG_ID: ""
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+
+  imagePullSecrets:
+    - name: my-registry-secret
+
+  global:
+    agent:
+      name: "deep-research-orchestrator"
+      description: "Orchestrates deep research by dispatching GitHub, Docs, and Slack subagents"
+
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
