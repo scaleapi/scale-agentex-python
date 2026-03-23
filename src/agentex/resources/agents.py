@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Union, Optional, Generator, AsyncGenerator
+from typing import Any, Union, Optional, Generator, AsyncGenerator
 from typing_extensions import Literal
 
 import httpx
@@ -453,38 +453,73 @@ class AgentsResource(SyncAPIResource):
     ) -> SendMessageResponse:
       if agent_id is not None and agent_name is not None:
         raise ValueError("Either agent_id or agent_name must be provided, but not both")
-      
+
       if "stream" in params and params["stream"] == True:
         raise ValueError("If stream is set to True, use send_message_stream() instead")
+
+      if agent_id is not None:
+        streaming_response = self.with_streaming_response.rpc(
+          agent_id=agent_id,
+          method="message/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        streaming_response = self.with_streaming_response.rpc_by_name(
+          agent_name=agent_name,
+          method="message/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
       else:
-        if agent_id is not None:
-          raw_agent_rpc_response = self.rpc(
-            agent_id=agent_id,
-            method="message/send",
-            params=params,
-            id=id,
-            jsonrpc=jsonrpc,
-            extra_headers=extra_headers,
-            extra_query=extra_query,
-            extra_body=extra_body,
-            timeout=timeout,
-          )
-        elif agent_name is not None:
-          raw_agent_rpc_response = self.rpc_by_name(
-            agent_name=agent_name,
-            method="message/send",
-            params=params,
-            id=id,
-            jsonrpc=jsonrpc,
-            extra_headers=extra_headers,
-            extra_query=extra_query,
-            extra_body=extra_body,
-            timeout=timeout,
-          )
-        else:
-          raise ValueError("Either agent_id or agent_name must be provided")
-        
-        return SendMessageResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
+        raise ValueError("Either agent_id or agent_name must be provided")
+
+      task_messages: list[Any] = []
+      response_meta: dict[str, Any] = {}
+
+      with streaming_response as response:
+        for _line in response.iter_lines():
+          if not _line:
+            continue
+          line = _line.strip()
+          if line.startswith("data:"):
+            line = line[len("data:"):].strip()
+          if not line:
+            continue
+          try:
+            chunk = json.loads(line)
+            if not response_meta:
+              response_meta = {"id": chunk.get("id"), "jsonrpc": chunk.get("jsonrpc")}
+            # If the server already aggregated into a list result, return directly
+            try:
+              return SendMessageResponse.model_validate(chunk)
+            except ValidationError:
+              pass
+            # Parse as a streaming event and collect parent_task_message
+            chunk_stream = SendMessageStreamResponse.model_validate(chunk, from_attributes=True)
+            result = chunk_stream.result
+            if result is not None and hasattr(result, 'type') and result.type == 'full':
+              parent = getattr(result, 'parent_task_message', None)
+              if parent is not None:
+                task_messages.append(parent)
+          except (json.JSONDecodeError, ValidationError):
+            continue
+
+      return SendMessageResponse(
+        id=response_meta.get("id"),
+        jsonrpc=response_meta.get("jsonrpc"),
+        result=task_messages,
+      )
     
     def send_message_stream(
       self,
@@ -552,10 +587,10 @@ class AgentsResource(SyncAPIResource):
               from_attributes=True
             )
             yield chunk_rpc_response
-          except json.JSONDecodeError:
-            # Skip invalid JSON lines
+          except (json.JSONDecodeError, ValidationError):
+            # Skip invalid JSON lines or lines that can't be validated
             continue
-    
+
     def send_event(
       self,
       agent_id: str | None = None,
@@ -1021,38 +1056,73 @@ class AsyncAgentsResource(AsyncAPIResource):
     ) -> SendMessageResponse:
       if agent_id is not None and agent_name is not None:
         raise ValueError("Either agent_id or agent_name must be provided, but not both")
-      
+
       if "stream" in params and params["stream"] == True:
         raise ValueError("If stream is set to True, use send_message_stream() instead")
+
+      if agent_id is not None:
+        streaming_response = self.with_streaming_response.rpc(
+          agent_id=agent_id,
+          method="message/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
+      elif agent_name is not None:
+        streaming_response = self.with_streaming_response.rpc_by_name(
+          agent_name=agent_name,
+          method="message/send",
+          params=params,
+          id=id,
+          jsonrpc=jsonrpc,
+          extra_headers=extra_headers,
+          extra_query=extra_query,
+          extra_body=extra_body,
+          timeout=timeout,
+        )
       else:
-        if agent_id is not None:
-          raw_agent_rpc_response = await self.rpc(
-            agent_id=agent_id,
-            method="message/send",
-            params=params,
-            id=id,
-            jsonrpc=jsonrpc,
-            extra_headers=extra_headers,
-            extra_query=extra_query,
-            extra_body=extra_body,
-            timeout=timeout,
-          )
-        elif agent_name is not None:
-          raw_agent_rpc_response = await self.rpc_by_name(
-            agent_name=agent_name,
-            method="message/send",
-            params=params,
-            id=id,
-            jsonrpc=jsonrpc,
-            extra_headers=extra_headers,
-            extra_query=extra_query,
-            extra_body=extra_body,
-            timeout=timeout,
-          )
-        else:
-          raise ValueError("Either agent_id or agent_name must be provided")
-        
-        return SendMessageResponse.model_validate(raw_agent_rpc_response, from_attributes=True)
+        raise ValueError("Either agent_id or agent_name must be provided")
+
+      task_messages: list[Any] = []
+      response_meta: dict[str, Any] = {}
+
+      async with streaming_response as response:
+        async for _line in response.iter_lines():
+          if not _line:
+            continue
+          line = _line.strip()
+          if line.startswith("data:"):
+            line = line[len("data:"):].strip()
+          if not line:
+            continue
+          try:
+            chunk = json.loads(line)
+            if not response_meta:
+              response_meta = {"id": chunk.get("id"), "jsonrpc": chunk.get("jsonrpc")}
+            # If the server already aggregated into a list result, return directly
+            try:
+              return SendMessageResponse.model_validate(chunk)
+            except ValidationError:
+              pass
+            # Parse as a streaming event and collect parent_task_message
+            chunk_stream = SendMessageStreamResponse.model_validate(chunk, from_attributes=True)
+            result = chunk_stream.result
+            if result is not None and hasattr(result, 'type') and result.type == 'full':
+              parent = getattr(result, 'parent_task_message', None)
+              if parent is not None:
+                task_messages.append(parent)
+          except (json.JSONDecodeError, ValidationError):
+            continue
+
+      return SendMessageResponse(
+        id=response_meta.get("id"),
+        jsonrpc=response_meta.get("jsonrpc"),
+        result=task_messages,
+      )
     
     async def send_message_stream(
       self,

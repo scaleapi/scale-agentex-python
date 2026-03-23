@@ -117,6 +117,7 @@ async def handle_event_send(params: SendEventParams):
                 ),
                 parent_span_id=span.id if span else None,
             )
+            return
 
         #########################################################
         # 7. Call an LLM to respond to the user's message

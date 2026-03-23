@@ -94,6 +94,7 @@ async def handle_event_send(params: SendEventParams):
                 content="Hey, sorry I'm unable to respond to your message because you're running this example without an OpenAI API key. Please set the OPENAI_API_KEY environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
             ),
         )
+        return
 
     #########################################################
     # 5. (👋) Retrieve the task state.

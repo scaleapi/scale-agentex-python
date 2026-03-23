@@ -216,6 +216,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
                     ),
                     parent_span_id=span.id if span else None,
                 )
+                return
 
             # Call an LLM to respond to the user's message
             # When send_as_agent_task_message=True, returns a TaskMessage
@@ -234,13 +235,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
                     "to provide accurate and well-reasoned responses."
                 ),
                 parent_span_id=span.id if span else None,
-                model="gpt-5",
-                model_settings=ModelSettings(
-                    # Include reasoning items in the response (IDs, summaries)
-                    # response_include=["reasoning.encrypted_content"],
-                    # Ask the model to include a short reasoning summary
-                    reasoning=Reasoning(effort="medium", summary="detailed"),
-                ),
+                model="gpt-4o",
                 # tools=[CALCULATOR_TOOL],
             )
             if self._state:
