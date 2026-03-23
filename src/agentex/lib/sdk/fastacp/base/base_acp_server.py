@@ -11,8 +11,8 @@ from collections.abc import Callable, Awaitable, AsyncGenerator
 import uvicorn
 from fastapi import FastAPI, Request
 from pydantic import TypeAdapter, ValidationError
+from starlette.types import Send, Scope, ASGIApp, Receive
 from fastapi.responses import StreamingResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from agentex.lib.types.acp import (
     RPC_SYNC_METHODS,
@@ -43,17 +43,25 @@ logger = make_logger(__name__)
 task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
 
 
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    """Middleware to extract or generate request IDs and add them to logs and response headers"""
+class RequestIDMiddleware:
+    """Pure ASGI middleware to extract or generate request IDs and set them in the logging context.
 
-    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        # Extract request ID from header or generate a new one if there isn't one
-        request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
-        # Store request ID in request state for access in handlers
-        ctx_var_request_id.set(request_id)
-        # Process request
-        response = await call_next(request)
-        return response
+    Implemented as a pure ASGI middleware (rather than BaseHTTPMiddleware) so that it never
+    buffers the response body.  BaseHTTPMiddleware's call_next() silently swallows
+    StreamingResponse bodies in several starlette versions, which caused message/send handlers
+    to return result=null through the Agentex server proxy.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            raw_request_id = headers.get(b"x-request-id", b"")
+            request_id = raw_request_id.decode() if raw_request_id else uuid.uuid4().hex
+            ctx_var_request_id.set(request_id)
+        await self.app(scope, receive, send)
 
 
 class BaseACPServer(FastAPI):

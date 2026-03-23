@@ -408,6 +408,7 @@ class At050AgentChatGuardrailsWorkflow(BaseWorkflow):
                     ),
                     parent_span_id=span.id if span else None,
                 )
+                return
 
             # Call an LLM to respond to the user's message
             # When send_as_agent_task_message=True, returns a TaskMessage

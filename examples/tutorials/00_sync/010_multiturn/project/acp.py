@@ -88,6 +88,9 @@ async def handle_message_send(
     # Convert task messages to OpenAI Agents SDK format
     input_list = convert_task_messages_to_oai_agents_inputs(task_messages)
 
+    # Append the current user message (not yet persisted in task history)
+    input_list.append({"role": "user", "content": params.content.content})
+
     # Run the agent
     result = await Runner.run(test_agent, input_list, run_config=run_config)
 

@@ -16,6 +16,7 @@ Configuration:
 """
 
 import os
+import uuid
 
 import pytest
 import pytest_asyncio
@@ -23,7 +24,6 @@ import pytest_asyncio
 from agentex import AsyncAgentex
 from agentex.types import TextContentParam
 from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
-from agentex.lib.sdk.fastacp.base.base_acp_server import uuid
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")

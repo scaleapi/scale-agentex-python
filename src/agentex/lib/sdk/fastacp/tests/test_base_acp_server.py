@@ -126,11 +126,20 @@ class TestJSONRPCEndpointCore:
             "jsonrpc": "2.0",
             "method": "event/send",
             "params": {
-                "task": {"id": "test-task", "agent_id": "test-agent", "status": "RUNNING"},
-                "message": {
-                    "type": "text",
-                    "author": "user",
-                    "content": "test message",
+                "agent": {
+                    "id": "test-agent-456",
+                    "name": "test-agent",
+                    "description": "test agent",
+                    "acp_type": "sync",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                },
+                "task": {"id": "test-task"},
+                "event": {
+                    "id": "evt-1",
+                    "agent_id": "test-agent-456",
+                    "sequence_id": 1,
+                    "task_id": "test-task",
                 },
             },
             "id": "test-1",
@@ -218,11 +227,20 @@ class TestBackgroundProcessing:
             "jsonrpc": "2.0",
             "method": "event/send",
             "params": {
-                "task": {"id": "test-task", "agent_id": "test-agent", "status": "RUNNING"},
-                "message": {
-                    "type": "text",
-                    "author": "user",
-                    "content": "test message",
+                "agent": {
+                    "id": "test-agent-456",
+                    "name": "test-agent",
+                    "description": "test agent",
+                    "acp_type": "sync",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                },
+                "task": {"id": "test-task"},
+                "event": {
+                    "id": "evt-1",
+                    "agent_id": "test-agent-456",
+                    "sequence_id": 1,
+                    "task_id": "test-task",
                 },
             },
             # No ID = notification
@@ -256,7 +274,17 @@ class TestBackgroundProcessing:
         request = {
             "jsonrpc": "2.0",
             "method": "task/cancel",
-            "params": {"task_id": "test-task-123"},
+            "params": {
+                "agent": {
+                    "id": "test-agent-456",
+                    "name": "test-agent",
+                    "description": "test agent",
+                    "acp_type": "sync",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                },
+                "task": {"id": "test-task-123"},
+            },
             "id": "test-request-1",
         }
 
@@ -280,7 +308,7 @@ class TestSynchronousRPCMethods:
         async def mock_execute_handler(params):
             return {
                 "task_id": params.task.id,
-                "message_content": params.message.content,
+                "message_content": params.content.content,
                 "status": "executed_synchronously",
                 "custom_data": {"processed": True, "timestamp": "2024-01-01T12:00:00Z"},
             }
@@ -291,8 +319,16 @@ class TestSynchronousRPCMethods:
             "jsonrpc": "2.0",
             "method": "message/send",
             "params": {
-                "task": {"id": "test-task-123", "agent_id": "test-agent", "status": "RUNNING"},
-                "message": {
+                "agent": {
+                    "id": "test-agent-456",
+                    "name": "test-agent",
+                    "description": "test agent",
+                    "acp_type": "sync",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                },
+                "task": {"id": "test-task-123"},
+                "content": {
                     "type": "text",
                     "author": "user",
                     "content": "Execute this task please",
@@ -340,7 +376,15 @@ class TestSynchronousRPCMethods:
             "jsonrpc": "2.0",
             "method": "task/create",
             "params": {
-                "task": {"id": "test-task-456", "agent_id": "test-agent", "status": "RUNNING"}
+                "agent": {
+                    "id": "test-agent-456",
+                    "name": "test-agent",
+                    "description": "test agent",
+                    "acp_type": "sync",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                },
+                "task": {"id": "test-task-456"},
             },
             "id": "test-init-1",
         }
@@ -428,11 +472,20 @@ class TestErrorHandling:
             "jsonrpc": "2.0",
             "method": "event/send",
             "params": {
-                "task": {"id": "test-task", "agent_id": "test-agent", "status": "RUNNING"},
-                "message": {
-                    "type": "text",
-                    "author": "user",
-                    "content": "test message",
+                "agent": {
+                    "id": "test-agent-456",
+                    "name": "test-agent",
+                    "description": "test agent",
+                    "acp_type": "sync",
+                    "created_at": "2023-01-01T00:00:00Z",
+                    "updated_at": "2023-01-01T00:00:00Z",
+                },
+                "task": {"id": "test-task"},
+                "event": {
+                    "id": "evt-1",
+                    "agent_id": "test-agent-456",
+                    "sequence_id": 1,
+                    "task_id": "test-task",
                 },
             },
             "id": "test-1",

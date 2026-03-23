@@ -40,7 +40,7 @@ class SendMessageResponse(BaseAgentRpcResponse):
     """The result of the message sending"""
 
 class SendMessageStreamResponse(BaseAgentRpcResponse):
-    result: TaskMessageUpdate
+    result: Optional[TaskMessageUpdate] = None
     """The result of the message sending"""
 
 

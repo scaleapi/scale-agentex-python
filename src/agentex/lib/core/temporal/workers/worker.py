@@ -24,7 +24,6 @@ from temporalio.converter import (
     DefaultPayloadConverter,
     CompositePayloadConverter,
     JSONPlainPayloadConverter,
-    _JSONTypeConverterUnhandled,
 )
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
@@ -45,7 +44,7 @@ class DateTimeJSONEncoder(AdvancedJSONEncoder):
 
 class DateTimeJSONTypeConverter(JSONTypeConverter):
     @override
-    def to_typed_value(self, hint: type, value: Any) -> Any | None | _JSONTypeConverterUnhandled:
+    def to_typed_value(self, hint: type, value: Any) -> Any:
         if hint == datetime.datetime:
             return datetime.datetime.fromisoformat(value)
         return JSONTypeConverter.Unhandled

@@ -204,7 +204,8 @@ class At080OpenAiAgentsSdkHumanInTheLoopWorkflow(BaseWorkflow):
                         self._state.input_list.append(msg)
 
             # Set span output for tracing - include full state
-            span.output = self._state.model_dump()
+            if span:
+                span.output = self._state.model_dump()
 
     @workflow.run
     async def on_task_create(self, params: CreateTaskParams) -> str:

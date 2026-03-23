@@ -16,6 +16,7 @@ Configuration:
 """
 
 import os
+import uuid
 
 import pytest
 from test_utils.sync import validate_text_in_string, collect_streaming_response
@@ -23,7 +24,6 @@ from test_utils.sync import validate_text_in_string, collect_streaming_response
 from agentex import Agentex
 from agentex.types import TextContent, TextContentParam
 from agentex.types.agent_rpc_params import ParamsCreateTaskRequest, ParamsSendMessageRequest
-from agentex.lib.sdk.fastacp.base.base_acp_server import uuid
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
