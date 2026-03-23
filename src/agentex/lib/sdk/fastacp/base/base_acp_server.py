@@ -10,8 +10,8 @@ from collections.abc import Callable, Awaitable, AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI, Request
-from pydantic import TypeAdapter, ValidationError
 from fastapi.responses import StreamingResponse
+from pydantic import TypeAdapter, ValidationError
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from agentex.lib.types.acp import (
