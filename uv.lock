@@ -32,6 +32,8 @@ dependencies = [
     { name = "mcp", extra = ["cli"] },
     { name = "openai" },
     { name = "openai-agents" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
     { name = "pydantic" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -44,7 +46,7 @@ dependencies = [
     { name = "scale-gp-beta" },
     { name = "sniffio" },
     { name = "starlette" },
-    { name = "temporalio", extra = ["opentelemetry"] },
+    { name = "temporalio" },
     { name = "tornado" },
     { name = "typer" },
     { name = "typing-extensions" },
@@ -96,6 +98,8 @@ requires-dist = [
     { name = "mcp", extras = ["cli"], specifier = ">=1.4.1" },
     { name = "openai", specifier = ">=2.2,<3" },
     { name = "openai-agents", specifier = "==0.4.2" },
+    { name = "opentelemetry-api", specifier = ">=1.11.1,<2" },
+    { name = "opentelemetry-sdk", specifier = ">=1.11.1,<2" },
     { name = "pydantic", specifier = ">=2.0.0,<3" },
     { name = "pytest", specifier = ">=8.4.0" },
     { name = "pytest-asyncio", specifier = ">=1.0.0" },
@@ -109,7 +113,7 @@ requires-dist = [
     { name = "scale-gp-beta", specifier = ">=0.1.0a20" },
     { name = "sniffio" },
     { name = "starlette", specifier = ">=0.49.1" },
-    { name = "temporalio", extras = ["opentelemetry"], specifier = ">=1.18.2,<2" },
+    { name = "temporalio", specifier = ">=1.18.2,<2" },
     { name = "tornado", specifier = ">=6.5.5" },
     { name = "typer", specifier = ">=0.16,<0.17" },
     { name = "typing-extensions", specifier = ">=4.10,<5" },
@@ -2492,12 +2496,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fc/39/53d9add2e8c1d4066ea0c288476cdc944453ea309e36e7b24d4a1c43db79/temporalio-1.18.2-cp39-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f45b124099dbbe32a76a4df0d851db2ad94e6725f778fd74fccc8d33ee4868e9", size = 12733544, upload-time = "2025-10-27T19:24:36.871Z" },
     { url = "https://files.pythonhosted.org/packages/22/b2/5558978e9002fd1e71a1a459ddcc8fdd1fc1f4f595fd578eb7568be266a6/temporalio-1.18.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d427a398f6f402920e9f78d571b7d7a72876244d5affeaeaec8843c34013e84e", size = 12926857, upload-time = "2025-10-27T19:24:43.443Z" },
     { url = "https://files.pythonhosted.org/packages/5d/a2/ea81149ae7faa154aa842e9dd88390df3158a687db694e06d08716c030b6/temporalio-1.18.2-cp39-abi3-win_amd64.whl", hash = "sha256:7e1f3da98cf23af7094467f1c1180374a10c38aa712cd7e868e15412dd2c6cde", size = 13059111, upload-time = "2025-10-27T19:24:48.382Z" },
-]
-
-[package.optional-dependencies]
-opentelemetry = [
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-sdk" },
 ]
 
 [[package]]
