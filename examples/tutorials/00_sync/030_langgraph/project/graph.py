@@ -20,7 +20,7 @@ from langgraph.graph.message import add_messages
 from project.tools import TOOLS
 from agentex.lib.adk import create_checkpointer
 
-MODEL_NAME = "gpt-5"
+MODEL_NAME = "gpt-4o"
 SYSTEM_PROMPT = """You are a helpful AI assistant with access to tools.
 
 Current date and time: {timestamp}
@@ -46,7 +46,6 @@ async def create_graph():
     """
     llm = ChatOpenAI(
         model=MODEL_NAME,
-        reasoning={"effort": "high", "summary": "auto"},
     )
     llm_with_tools = llm.bind_tools(TOOLS)
 

@@ -56,6 +56,7 @@ async def handle_message_send(
                 content="Hey, sorry I'm unable to respond to your message because you're running this example without an OpenAI API key. Please set the OPENAI_API_KEY environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
             ),
         )
+        return
 
     # Try to retrieve the state. If it doesn't exist, create it.
     task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
@@ -85,6 +86,9 @@ async def handle_message_send(
 
     # Convert task messages to OpenAI Agents SDK format
     input_list = convert_task_messages_to_oai_agents_inputs(task_messages)
+
+    # Append the current user message (not yet persisted in task history)
+    input_list.append({"role": "user", "content": params.content.content})
 
     # Run the agent and stream the events
     result = Runner.run_streamed(test_agent, input_list, run_config=run_config)
