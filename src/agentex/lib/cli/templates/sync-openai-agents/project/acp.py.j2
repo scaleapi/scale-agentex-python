@@ -9,8 +9,9 @@ from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_proce
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.model_utils import BaseModel
 
-from agentex.types.task_message_update import TaskMessageUpdate
+from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
 from agentex.types.task_message_content import TaskMessageContent
+from agentex.types.text_content import TextContent
 from agentex.lib.utils.logging import make_logger
 from agents import Agent, Runner, RunConfig, function_tool
 
@@ -83,6 +84,7 @@ async def handle_message_send(
                 content="Hey, sorry I'm unable to respond to your message because you're running this example without an OpenAI API key. Please set the OPENAI_API_KEY environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
             ),
         )
+        return
 
     user_prompt = params.content.content
 

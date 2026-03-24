@@ -6,7 +6,6 @@ from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.worker import Interceptor
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
 #     def default(self, o: Any) -> Any:
@@ -97,6 +96,8 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
         validate_client_plugins(plugins)
 
     # Check if OpenAI plugin is present - it needs to configure its own data converter
+    # Lazy import to avoid pulling in opentelemetry.sdk for non-Temporal agents
+    from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
     has_openai_plugin = any(
         isinstance(p, OpenAIAgentsPlugin) for p in (plugins or [])
     )
