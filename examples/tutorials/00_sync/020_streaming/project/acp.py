@@ -5,12 +5,12 @@ from agents import Agent, Runner, RunConfig
 
 from agentex.lib import adk
 from agentex.lib.types.acp import SendMessageParams
+from agentex.types.text_content import TextContent
 from agentex.lib.types.converters import convert_task_messages_to_oai_agents_inputs
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
 from agentex.types.task_message_content import TaskMessageContent
-from agentex.types.text_content import TextContent
 from agentex.lib.adk.providers._modules.sync_provider import (
     SyncStreamingProvider,
     convert_openai_to_agentex_events,

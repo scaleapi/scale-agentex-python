@@ -145,24 +145,30 @@ jobs:
         working-directory: ./examples/tutorials
         run: |
           echo "🚨 Test failed for tutorial: ${{ matrix.tutorial }}"
-          echo "📋 Printing agent logs..."
 
-          # Look for agent log files in the tutorial directory
-          if find "${{ matrix.tutorial }}" -name "*.log" -type f 2>/dev/null | grep -q .; then
-            echo "Found agent log files:"
-            find "${{ matrix.tutorial }}" -name "*.log" -type f -exec echo "=== {} ===" \; -exec cat {} \;
+          # Print agent logs from /tmp (where run_agent_test.sh writes them)
+          tutorial_name=$(basename "${{ matrix.tutorial }}")
+          agent_log="/tmp/agentex-${tutorial_name}.log"
+          if [[ -f "$agent_log" ]]; then
+            echo "📋 Agent logs ($agent_log):"
+            echo "----------------------------------------"
+            tail -100 "$agent_log"
+            echo "----------------------------------------"
           else
-            echo "No .log files found, checking for other common log locations..."
+            echo "⚠️ No agent log at $agent_log"
+            echo "Available /tmp/agentex-*.log files:"
+            ls -la /tmp/agentex-*.log 2>/dev/null || echo "  (none)"
           fi
 
-          # Check for any output files or dumps
-          if find "${{ matrix.tutorial }}" -name "agent_output*" -o -name "debug*" -o -name "*.out" 2>/dev/null | grep -q .; then
-            echo "Found other output files:"
-            find "${{ matrix.tutorial }}" -name "agent_output*" -o -name "debug*" -o -name "*.out" -exec echo "=== {} ===" \; -exec cat {} \;
-          fi
+          # Print Docker server logs
+          echo ""
+          echo "📋 AgentEx Server (Docker) logs:"
+          echo "----------------------------------------"
+          cd ../../scale-agentex/agentex && docker compose logs --tail=100 agentex 2>/dev/null || echo "Could not retrieve Docker logs"
+          echo "----------------------------------------"
 
-          # Print the last 50 lines of any python processes that might still be running
-          echo "🔍 Checking for running python processes..."
+          echo ""
+          echo "🔍 Running python processes:"
           ps aux | grep python || echo "No python processes found"
 
       - name: Record test result

@@ -9,7 +9,7 @@ This test suite demonstrates how to test the main AgentEx API functions:
 To run these tests:
 1. Make sure the agent is running (via docker-compose or `agentex agents run`)
 2. Set the AGENTEX_API_BASE_URL environment variable if not using default
-3. Run: pytest tests/test_agent.py -v
+3. Run: pytest test_agent.py -v
 
 Configuration:
 - AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
