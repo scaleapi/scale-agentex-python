@@ -270,16 +270,7 @@ run_test() {
         fi
 
         # Stream pytest output directly in real-time
-        if [ "$BUILD_CLI" = true ]; then
-            local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
-            if [[ -n "$wheel_file" ]]; then
-                uv run --with "$wheel_file" pytest tests/test_agent.py -v -s
-            else
-                uv run pytest tests/test_agent.py -v -s
-            fi
-        else
-            uv run pytest tests/test_agent.py -v -s
-        fi
+        uv run pytest tests/test_agent.py -v -s
         exit_code=$?
 
         if [ $exit_code -eq 0 ]; then
