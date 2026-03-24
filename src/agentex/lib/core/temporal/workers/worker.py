@@ -24,9 +24,7 @@ from temporalio.converter import (
     DefaultPayloadConverter,
     CompositePayloadConverter,
     JSONPlainPayloadConverter,
-    _JSONTypeConverterUnhandled,
 )
-from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.registration import register_agent
@@ -45,7 +43,7 @@ class DateTimeJSONEncoder(AdvancedJSONEncoder):
 
 class DateTimeJSONTypeConverter(JSONTypeConverter):
     @override
-    def to_typed_value(self, hint: type, value: Any) -> Any | None | _JSONTypeConverterUnhandled:
+    def to_typed_value(self, hint: type, value: Any) -> Any | None:
         if hint == datetime.datetime:
             return datetime.datetime.fromisoformat(value)
         return JSONTypeConverter.Unhandled
@@ -96,6 +94,8 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
         _validate_plugins(plugins)
 
     # Check if OpenAI plugin is present - it needs to configure its own data converter
+    # Lazy import to avoid pulling in opentelemetry.sdk for non-Temporal agents
+    from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
     has_openai_plugin = any(
         isinstance(p, OpenAIAgentsPlugin) for p in (plugins or [])
     )
