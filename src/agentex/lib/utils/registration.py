@@ -45,9 +45,11 @@ async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
     )
 
     # Prepare registration data
-    registration_metadata = get_build_info() or {}
+    registration_metadata = get_build_info()
     if agent_card is not None:
         card_data = agent_card.model_dump() if hasattr(agent_card, "model_dump") else agent_card
+        if registration_metadata is None:
+            registration_metadata = {}
         registration_metadata["agent_card"] = card_data
 
     registration_data = {
