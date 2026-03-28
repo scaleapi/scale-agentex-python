@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Literal, override
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,6 +25,7 @@ class WaitingWorkflow(StateWorkflow):
     accepts = ["text", "doc_upload"]
     transitions = [SampleState.PROCESSING]
 
+    @override
     async def execute(self, state_machine, state_machine_data=None):
         return SampleState.PROCESSING
 
@@ -34,6 +35,7 @@ class ProcessingWorkflow(StateWorkflow):
     accepts = ["text"]
     transitions = [SampleState.DONE, SampleState.WAITING]
 
+    @override
     async def execute(self, state_machine, state_machine_data=None):
         return SampleState.DONE
 
@@ -42,6 +44,7 @@ class DoneWorkflow(StateWorkflow):
     description = "Terminal state"
     transitions = []
 
+    @override
     async def execute(self, state_machine, state_machine_data=None):
         return SampleState.DONE
 
@@ -51,6 +54,7 @@ class SampleData(AgentexBaseModel):
 
 
 class SampleStateMachine(StateMachine[SampleData]):
+    @override
     async def terminal_condition(self):
         return self.get_current_state() == SampleState.DONE
 
