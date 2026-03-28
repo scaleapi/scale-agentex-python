@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import inspect
-from typing import Literal
+from typing import Any, Literal
 from pathlib import Path
 from typing_extensions import deprecated
 
@@ -88,7 +88,10 @@ class FastACP:
 
     @staticmethod
     def create(
-        acp_type: Literal["sync", "async", "agentic"], config: BaseACPConfig | None = None, **kwargs
+        acp_type: Literal["sync", "async", "agentic"],
+        config: BaseACPConfig | None = None,
+        agent_card: Any | None = None,
+        **kwargs,
     ) -> BaseACPServer | SyncACP | AsyncBaseACP | TemporalACP:
         """Main factory method to create any ACP type
 
@@ -102,10 +105,17 @@ class FastACP:
 
         if acp_type == "sync":
             sync_config = config if isinstance(config, SyncACPConfig) else None
-            return FastACP.create_sync_acp(sync_config, **kwargs)
+            instance = FastACP.create_sync_acp(sync_config, **kwargs)
         elif acp_type == "async" or acp_type == "agentic":
             if config is None:
                 config = AsyncACPConfig(type="base")
             if not isinstance(config, AsyncACPConfig):
                 raise ValueError("AsyncACPConfig is required for async/agentic ACP type")
-            return FastACP.create_async_acp(config, **kwargs)
+            instance = FastACP.create_async_acp(config, **kwargs)
+        else:
+            raise ValueError(f"Unknown acp_type: {acp_type}")
+
+        if agent_card is not None:
+            instance._agent_card = agent_card  # type: ignore[attr-defined]
+
+        return instance
