@@ -7,10 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import BaseModel
 
-from agentex.lib.types.agent_card import AgentCard, AgentLifecycle, LifecycleState, extract_literal_values
-from agentex.lib.sdk.state_machine import StateMachine, StateWorkflow, State
+from agentex.lib.types.agent_card import AgentCard, extract_literal_values
+from agentex.lib.sdk.state_machine import State, StateMachine, StateWorkflow
 from agentex.lib.utils.model_utils import BaseModel as AgentexBaseModel
-
 
 # --- Fixtures & helpers ---
 

@@ -1,9 +1,9 @@
+from agentex.lib.types.agent_card import AgentCard, AgentLifecycle, LifecycleState
+
 from .state import State
 from .noop_workflow import NoOpWorkflow
 from .state_machine import StateMachine
 from .state_workflow import StateWorkflow
-
-from agentex.lib.types.agent_card import AgentCard, AgentLifecycle, LifecycleState
 
 __all__ = [
     "StateMachine",
