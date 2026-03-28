@@ -197,6 +197,72 @@ class TestAgentCardDirect:
         assert restored == card
 
 
+# --- AgentCard.from_states ---
+
+class TestAgentCardFromStates:
+    def test_lifecycle_derivation(self, sample_states):
+        card = AgentCard.from_states(initial_state=SampleState.WAITING, states=sample_states)
+
+        assert card.lifecycle is not None
+        assert card.lifecycle.initial_state == "waiting"
+        assert len(card.lifecycle.states) == 3
+
+    def test_initial_state_string(self, sample_states):
+        card = AgentCard.from_states(initial_state="waiting", states=sample_states)
+        assert card.lifecycle is not None
+        assert card.lifecycle.initial_state == "waiting"
+
+    def test_input_types_union(self, sample_states):
+        card = AgentCard.from_states(initial_state=SampleState.WAITING, states=sample_states)
+        assert card.input_types == ["doc_upload", "text"]
+
+    def test_extra_input_types(self, sample_states):
+        card = AgentCard.from_states(
+            initial_state=SampleState.WAITING,
+            states=sample_states,
+            extra_input_types=["admin_command"],
+        )
+        assert card.input_types == ["admin_command", "doc_upload", "text"]
+
+    def test_data_events_and_schema(self, sample_states):
+        card = AgentCard.from_states(
+            initial_state=SampleState.WAITING,
+            states=sample_states,
+            output_event_model=SampleOutputEvent,
+            queries=["get_current_state"],
+        )
+        assert card.data_events == ["plan_update", "status_change", "report_done"]
+        assert card.output_schema is not None
+        assert card.lifecycle is not None
+        assert card.lifecycle.queries == ["get_current_state"]
+
+    def test_state_fields(self, sample_states):
+        card = AgentCard.from_states(initial_state=SampleState.WAITING, states=sample_states)
+        assert card.lifecycle is not None
+        states_by_name = {s.name: s for s in card.lifecycle.states}
+
+        waiting = states_by_name["waiting"]
+        assert waiting.description == "Waiting for input"
+        assert waiting.waits_for_input is True
+        assert waiting.accepts == ["text", "doc_upload"]
+        assert waiting.transitions == ["processing"]
+
+    def test_matches_from_state_machine(self, sample_states, sample_sm):
+        """from_states and from_state_machine should produce identical cards."""
+        card_states = AgentCard.from_states(
+            initial_state=SampleState.WAITING,
+            states=sample_states,
+            output_event_model=SampleOutputEvent,
+            queries=["get_current_state"],
+        )
+        card_sm = AgentCard.from_state_machine(
+            state_machine=sample_sm,
+            output_event_model=SampleOutputEvent,
+            queries=["get_current_state"],
+        )
+        assert card_states == card_sm
+
+
 # --- AgentCard.from_state_machine ---
 
 class TestAgentCardFromStateMachine:
