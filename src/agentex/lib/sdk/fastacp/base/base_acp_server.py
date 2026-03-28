@@ -82,6 +82,9 @@ class BaseACPServer(FastAPI):
         # Agent info to return in healthz
         self.agent_id: str | None = None
 
+        # Optional agent card for registration metadata
+        self._agent_card: Any | None = None
+
     @classmethod
     def create(cls):
         """Create and initialize BaseACPServer instance"""
@@ -99,7 +102,7 @@ class BaseACPServer(FastAPI):
         async def lifespan_context(app: FastAPI):  # noqa: ARG001
             env_vars = EnvironmentVariables.refresh()
             if env_vars.AGENTEX_BASE_URL:
-                await register_agent(env_vars)
+                await register_agent(env_vars, agent_card=self._agent_card)
                 self.agent_id = env_vars.AGENT_ID
             else:
                 logger.warning("AGENTEX_BASE_URL not set, skipping agent registration")

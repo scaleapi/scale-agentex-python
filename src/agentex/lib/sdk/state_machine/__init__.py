@@ -3,4 +3,14 @@ from .noop_workflow import NoOpWorkflow
 from .state_machine import StateMachine
 from .state_workflow import StateWorkflow
 
-__all__ = ["StateMachine", "StateWorkflow", "State", "NoOpWorkflow"]
+from agentex.lib.types.agent_card import AgentCard, AgentLifecycle, LifecycleState
+
+__all__ = [
+    "StateMachine",
+    "StateWorkflow",
+    "State",
+    "NoOpWorkflow",
+    "AgentCard",
+    "AgentLifecycle",
+    "LifecycleState",
+]

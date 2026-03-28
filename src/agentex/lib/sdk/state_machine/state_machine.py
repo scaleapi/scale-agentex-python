@@ -129,6 +129,30 @@ class StateMachine(ABC, Generic[T]):
             span.output = {"output_state": self._initial_state}  # type: ignore[assignment,union-attr]
             await adk.tracing.end_span(trace_id=self._task_id, span=span)
 
+    def get_lifecycle(self) -> dict[str, Any]:
+        """Export the state machine's lifecycle as a dict suitable for AgentCard."""
+        states = []
+        for state in self._state_map.values():
+            workflow = state.workflow
+            states.append({
+                "name": state.name,
+                "description": workflow.description,
+                "waits_for_input": workflow.waits_for_input,
+                "accepts": list(workflow.accepts),
+                "transitions": [
+                    t.value if hasattr(t, "value") else str(t)
+                    for t in workflow.transitions
+                ],
+            })
+        initial = self._initial_state
+        if hasattr(initial, "value"):
+            initial = initial.value
+
+        return {
+            "states": states,
+            "initial_state": initial,
+        }
+
     def dump(self) -> dict[str, Any]:
         """
         Save the current state of the state machine to a serializable dictionary.
