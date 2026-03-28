@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Any, Generic, TypeVar
 
 from agentex.lib import adk
@@ -140,13 +141,11 @@ class StateMachine(ABC, Generic[T]):
                 "waits_for_input": workflow.waits_for_input,
                 "accepts": list(workflow.accepts),
                 "transitions": [
-                    t.value if hasattr(t, "value") else str(t)
+                    t.value if isinstance(t, Enum) else str(t)
                     for t in workflow.transitions
                 ],
             })
-        initial = self._initial_state
-        if hasattr(initial, "value"):
-            initial = initial.value
+        initial: str = self._initial_state.value if isinstance(self._initial_state, Enum) else self._initial_state
 
         return {
             "states": states,
