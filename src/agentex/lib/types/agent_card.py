@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import types
 import typing
 from typing import Any, get_args, get_origin
 
@@ -66,8 +67,8 @@ def extract_literal_values(model: type[BaseModel], field: str) -> list[str]:
     if annotation is None:
         return []
 
-    # Unwrap Optional (Union[X, None]) to get the inner type
-    if get_origin(annotation) is typing.Union:
+    # Unwrap Optional (Union[X, None] or PEP 604 X | None) to get the inner type
+    if get_origin(annotation) is typing.Union or isinstance(annotation, types.UnionType):
         args = [a for a in get_args(annotation) if a is not type(None)]
         annotation = args[0] if len(args) == 1 else annotation
 
