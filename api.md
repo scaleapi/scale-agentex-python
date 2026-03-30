@@ -15,9 +15,13 @@ from agentex.types import (
     AgentRpcRequest,
     AgentRpcResponse,
     AgentRpcResult,
+    CancelTaskRequest,
+    CreateTaskRequest,
     DataDelta,
     ReasoningContentDelta,
     ReasoningSummaryDelta,
+    SendEventRequest,
+    SendMessageRequest,
     TaskMessageContent,
     TaskMessageDelta,
     TaskMessageUpdate,
@@ -43,7 +47,13 @@ Methods:
 Types:
 
 ```python
-from agentex.types import Task, TaskRetrieveResponse, TaskListResponse, TaskRetrieveByNameResponse
+from agentex.types import (
+    Task,
+    TaskRetrieveResponse,
+    TaskListResponse,
+    TaskQueryWorkflowResponse,
+    TaskRetrieveByNameResponse,
+)
 ```
 
 Methods:
@@ -51,10 +61,18 @@ Methods:
 - <code title="get /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve</a>(task_id, \*\*<a href="src/agentex/types/task_retrieve_params.py">params</a>) -> <a href="./src/agentex/types/task_retrieve_response.py">TaskRetrieveResponse</a></code>
 - <code title="get /tasks">client.tasks.<a href="./src/agentex/resources/tasks.py">list</a>(\*\*<a href="src/agentex/types/task_list_params.py">params</a>) -> <a href="./src/agentex/types/task_list_response.py">TaskListResponse</a></code>
 - <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /tasks/{task_id}/cancel">client.tasks.<a href="./src/agentex/resources/tasks.py">cancel</a>(task_id, \*\*<a href="src/agentex/types/task_cancel_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="post /tasks/{task_id}/complete">client.tasks.<a href="./src/agentex/resources/tasks.py">complete</a>(task_id, \*\*<a href="src/agentex/types/task_complete_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
 - <code title="delete /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete_by_name</a>(task_name) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /tasks/{task_id}/fail">client.tasks.<a href="./src/agentex/resources/tasks.py">fail</a>(task_id, \*\*<a href="src/agentex/types/task_fail_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="get /tasks/{task_id}/query/{query_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">query_workflow</a>(query_name, \*, task_id) -> <a href="./src/agentex/types/task_query_workflow_response.py">TaskQueryWorkflowResponse</a></code>
 - <code title="get /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve_by_name</a>(task_name, \*\*<a href="src/agentex/types/task_retrieve_by_name_params.py">params</a>) -> <a href="./src/agentex/types/task_retrieve_by_name_response.py">TaskRetrieveByNameResponse</a></code>
 - <code title="get /tasks/{task_id}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events</a>(task_id) -> object</code>
 - <code title="get /tasks/name/{task_name}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events_by_name</a>(task_name) -> object</code>
+- <code title="post /tasks/{task_id}/terminate">client.tasks.<a href="./src/agentex/resources/tasks.py">terminate</a>(task_id, \*\*<a href="src/agentex/types/task_terminate_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="post /tasks/{task_id}/timeout">client.tasks.<a href="./src/agentex/resources/tasks.py">timeout</a>(task_id, \*\*<a href="src/agentex/types/task_timeout_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="put /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">update_by_id</a>(task_id, \*\*<a href="src/agentex/types/task_update_by_id_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="put /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">update_by_name</a>(task_name, \*\*<a href="src/agentex/types/task_update_by_name_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
 
 # Messages
 
@@ -160,10 +178,10 @@ Methods:
 Types:
 
 ```python
-from agentex.types import DeploymentHistory, DeploymentHistoryListResponse
+from agentex.types import DeploymentHistoryRetrieveResponse, DeploymentHistoryListResponse
 ```
 
 Methods:
 
-- <code title="get /deployment-history/{deployment_id}">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">retrieve</a>(deployment_id) -> <a href="./src/agentex/types/deployment_history.py">DeploymentHistory</a></code>
+- <code title="get /deployment-history/{deployment_id}">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">retrieve</a>(deployment_id) -> <a href="./src/agentex/types/deployment_history_retrieve_response.py">DeploymentHistoryRetrieveResponse</a></code>
 - <code title="get /deployment-history">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">list</a>(\*\*<a href="src/agentex/types/deployment_history_list_params.py">params</a>) -> <a href="./src/agentex/types/deployment_history_list_response.py">DeploymentHistoryListResponse</a></code>

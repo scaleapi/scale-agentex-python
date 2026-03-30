@@ -1,15 +1,13 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import List
 from datetime import datetime
-from typing_extensions import TypeAlias
 
 from .._models import BaseModel
 
-__all__ = ["DeploymentHistoryListResponse", "DeploymentHistoryListResponseItem"]
+__all__ = ["DeploymentHistoryRetrieveResponse"]
 
 
-class DeploymentHistoryListResponseItem(BaseModel):
+class DeploymentHistoryRetrieveResponse(BaseModel):
     """API schema for deployment history."""
 
     id: str
@@ -35,6 +33,3 @@ class DeploymentHistoryListResponseItem(BaseModel):
 
     deployment_timestamp: datetime
     """When this deployment was first seen in the system"""
-
-
-DeploymentHistoryListResponse: TypeAlias = List[DeploymentHistoryListResponseItem]
