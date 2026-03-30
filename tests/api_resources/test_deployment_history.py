@@ -8,10 +8,7 @@ from typing import Any, cast
 import pytest
 
 from agentex import Agentex, AsyncAgentex
-from agentex.types import (
-    DeploymentHistoryListResponse,
-    DeploymentHistoryRetrieveResponse,
-)
+from agentex.types import DeploymentHistory, DeploymentHistoryListResponse
 
 from ..utils import assert_matches_type
 
@@ -27,7 +24,7 @@ class TestDeploymentHistory:
         deployment_history = client.deployment_history.retrieve(
             "deployment_id",
         )
-        assert_matches_type(DeploymentHistoryRetrieveResponse, deployment_history, path=["response"])
+        assert_matches_type(DeploymentHistory, deployment_history, path=["response"])
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
@@ -39,7 +36,7 @@ class TestDeploymentHistory:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         deployment_history = response.parse()
-        assert_matches_type(DeploymentHistoryRetrieveResponse, deployment_history, path=["response"])
+        assert_matches_type(DeploymentHistory, deployment_history, path=["response"])
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
@@ -51,7 +48,7 @@ class TestDeploymentHistory:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             deployment_history = response.parse()
-            assert_matches_type(DeploymentHistoryRetrieveResponse, deployment_history, path=["response"])
+            assert_matches_type(DeploymentHistory, deployment_history, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 
@@ -116,7 +113,7 @@ class TestAsyncDeploymentHistory:
         deployment_history = await async_client.deployment_history.retrieve(
             "deployment_id",
         )
-        assert_matches_type(DeploymentHistoryRetrieveResponse, deployment_history, path=["response"])
+        assert_matches_type(DeploymentHistory, deployment_history, path=["response"])
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
@@ -128,7 +125,7 @@ class TestAsyncDeploymentHistory:
         assert response.is_closed is True
         assert response.http_request.headers.get("X-Stainless-Lang") == "python"
         deployment_history = await response.parse()
-        assert_matches_type(DeploymentHistoryRetrieveResponse, deployment_history, path=["response"])
+        assert_matches_type(DeploymentHistory, deployment_history, path=["response"])
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
@@ -140,7 +137,7 @@ class TestAsyncDeploymentHistory:
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
 
             deployment_history = await response.parse()
-            assert_matches_type(DeploymentHistoryRetrieveResponse, deployment_history, path=["response"])
+            assert_matches_type(DeploymentHistory, deployment_history, path=["response"])
 
         assert cast(Any, response.is_closed) is True
 

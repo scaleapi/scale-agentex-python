@@ -1,40 +1,10 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
 from typing import List
-from datetime import datetime
 from typing_extensions import TypeAlias
 
-from .._models import BaseModel
+from .deployment_history import DeploymentHistory
 
-__all__ = ["DeploymentHistoryListResponse", "DeploymentHistoryListResponseItem"]
+__all__ = ["DeploymentHistoryListResponse"]
 
-
-class DeploymentHistoryListResponseItem(BaseModel):
-    """API schema for deployment history."""
-
-    id: str
-    """The unique identifier of the deployment record"""
-
-    agent_id: str
-    """The ID of the agent this deployment belongs to"""
-
-    author_email: str
-    """Email of the commit author"""
-
-    author_name: str
-    """Name of the commit author"""
-
-    branch_name: str
-    """Name of the branch"""
-
-    build_timestamp: datetime
-    """When the build was created"""
-
-    commit_hash: str
-    """Git commit hash for this deployment"""
-
-    deployment_timestamp: datetime
-    """When this deployment was first seen in the system"""
-
-
-DeploymentHistoryListResponse: TypeAlias = List[DeploymentHistoryListResponseItem]
+DeploymentHistoryListResponse: TypeAlias = List[DeploymentHistory]
