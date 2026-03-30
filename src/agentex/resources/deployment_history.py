@@ -18,8 +18,8 @@ from .._response import (
     async_to_streamed_response_wrapper,
 )
 from .._base_client import make_request_options
+from ..types.deployment_history import DeploymentHistory
 from ..types.deployment_history_list_response import DeploymentHistoryListResponse
-from ..types.deployment_history_retrieve_response import DeploymentHistoryRetrieveResponse
 
 __all__ = ["DeploymentHistoryResource", "AsyncDeploymentHistoryResource"]
 
@@ -54,7 +54,7 @@ class DeploymentHistoryResource(SyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> DeploymentHistoryRetrieveResponse:
+    ) -> DeploymentHistory:
         """
         Get a deployment record by its unique ID.
 
@@ -74,7 +74,7 @@ class DeploymentHistoryResource(SyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=DeploymentHistoryRetrieveResponse,
+            cast_to=DeploymentHistory,
         )
 
     def list(
@@ -158,7 +158,7 @@ class AsyncDeploymentHistoryResource(AsyncAPIResource):
         extra_query: Query | None = None,
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
-    ) -> DeploymentHistoryRetrieveResponse:
+    ) -> DeploymentHistory:
         """
         Get a deployment record by its unique ID.
 
@@ -178,7 +178,7 @@ class AsyncDeploymentHistoryResource(AsyncAPIResource):
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
-            cast_to=DeploymentHistoryRetrieveResponse,
+            cast_to=DeploymentHistory,
         )
 
     async def list(

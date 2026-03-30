@@ -4,10 +4,10 @@ from datetime import datetime
 
 from .._models import BaseModel
 
-__all__ = ["DeploymentHistoryRetrieveResponse"]
+__all__ = ["DeploymentHistory"]
 
 
-class DeploymentHistoryRetrieveResponse(BaseModel):
+class DeploymentHistory(BaseModel):
     """API schema for deployment history."""
 
     id: str

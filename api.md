@@ -174,10 +174,10 @@ Methods:
 Types:
 
 ```python
-from agentex.types import DeploymentHistoryRetrieveResponse, DeploymentHistoryListResponse
+from agentex.types import DeploymentHistory, DeploymentHistoryListResponse
 ```
 
 Methods:
 
-- <code title="get /deployment-history/{deployment_id}">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">retrieve</a>(deployment_id) -> <a href="./src/agentex/types/deployment_history_retrieve_response.py">DeploymentHistoryRetrieveResponse</a></code>
+- <code title="get /deployment-history/{deployment_id}">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">retrieve</a>(deployment_id) -> <a href="./src/agentex/types/deployment_history.py">DeploymentHistory</a></code>
 - <code title="get /deployment-history">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">list</a>(\*\*<a href="src/agentex/types/deployment_history_list_params.py">params</a>) -> <a href="./src/agentex/types/deployment_history_list_response.py">DeploymentHistoryListResponse</a></code>
