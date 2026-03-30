@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.7 (2026-03-30)
+
+Full Changelog: [v0.9.6...v0.9.7](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.6...v0.9.7)
+
+### Features
+
+* **lib:** Add task updates to adk ([ff12ae1](https://github.com/scaleapi/scale-agentex-python/commit/ff12ae199b38223c7c71b703fc8b11d5de99b0d8))
+
 ## 0.9.6 (2026-03-30)
 
 Full Changelog: [v0.9.5...v0.9.6](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.5...v0.9.6)
