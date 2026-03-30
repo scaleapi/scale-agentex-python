@@ -8,7 +8,7 @@ import httpx
 
 from ..types import tracker_list_params, tracker_update_params
 from .._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
-from .._utils import maybe_transform, async_maybe_transform
+from .._utils import path_template, maybe_transform, async_maybe_transform
 from .._compat import cached_property
 from .._resource import SyncAPIResource, AsyncAPIResource
 from .._response import (
@@ -70,7 +70,7 @@ class TrackerResource(SyncAPIResource):
         if not tracker_id:
             raise ValueError(f"Expected a non-empty value for `tracker_id` but received {tracker_id!r}")
         return self._get(
-            f"/tracker/{tracker_id}",
+            path_template("/tracker/{tracker_id}", tracker_id=tracker_id),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -112,7 +112,7 @@ class TrackerResource(SyncAPIResource):
         if not tracker_id:
             raise ValueError(f"Expected a non-empty value for `tracker_id` but received {tracker_id!r}")
         return self._put(
-            f"/tracker/{tracker_id}",
+            path_template("/tracker/{tracker_id}", tracker_id=tracker_id),
             body=maybe_transform(
                 {
                     "last_processed_event_id": last_processed_event_id,
@@ -236,7 +236,7 @@ class AsyncTrackerResource(AsyncAPIResource):
         if not tracker_id:
             raise ValueError(f"Expected a non-empty value for `tracker_id` but received {tracker_id!r}")
         return await self._get(
-            f"/tracker/{tracker_id}",
+            path_template("/tracker/{tracker_id}", tracker_id=tracker_id),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -278,7 +278,7 @@ class AsyncTrackerResource(AsyncAPIResource):
         if not tracker_id:
             raise ValueError(f"Expected a non-empty value for `tracker_id` but received {tracker_id!r}")
         return await self._put(
-            f"/tracker/{tracker_id}",
+            path_template("/tracker/{tracker_id}", tracker_id=tracker_id),
             body=await async_maybe_transform(
                 {
                     "last_processed_event_id": last_processed_event_id,

@@ -8,7 +8,7 @@ import httpx
 
 from ..types import deployment_history_list_params
 from .._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
-from .._utils import maybe_transform, async_maybe_transform
+from .._utils import path_template, maybe_transform, async_maybe_transform
 from .._compat import cached_property
 from .._resource import SyncAPIResource, AsyncAPIResource
 from .._response import (
@@ -70,7 +70,7 @@ class DeploymentHistoryResource(SyncAPIResource):
         if not deployment_id:
             raise ValueError(f"Expected a non-empty value for `deployment_id` but received {deployment_id!r}")
         return self._get(
-            f"/deployment-history/{deployment_id}",
+            path_template("/deployment-history/{deployment_id}", deployment_id=deployment_id),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -83,6 +83,8 @@ class DeploymentHistoryResource(SyncAPIResource):
         agent_id: Optional[str] | Omit = omit,
         agent_name: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -115,6 +117,8 @@ class DeploymentHistoryResource(SyncAPIResource):
                         "agent_id": agent_id,
                         "agent_name": agent_name,
                         "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                         "page_number": page_number,
                     },
                     deployment_history_list_params.DeploymentHistoryListParams,
@@ -170,7 +174,7 @@ class AsyncDeploymentHistoryResource(AsyncAPIResource):
         if not deployment_id:
             raise ValueError(f"Expected a non-empty value for `deployment_id` but received {deployment_id!r}")
         return await self._get(
-            f"/deployment-history/{deployment_id}",
+            path_template("/deployment-history/{deployment_id}", deployment_id=deployment_id),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -183,6 +187,8 @@ class AsyncDeploymentHistoryResource(AsyncAPIResource):
         agent_id: Optional[str] | Omit = omit,
         agent_name: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
+        order_by: Optional[str] | Omit = omit,
+        order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -215,6 +221,8 @@ class AsyncDeploymentHistoryResource(AsyncAPIResource):
                         "agent_id": agent_id,
                         "agent_name": agent_name,
                         "limit": limit,
+                        "order_by": order_by,
+                        "order_direction": order_direction,
                         "page_number": page_number,
                     },
                     deployment_history_list_params.DeploymentHistoryListParams,

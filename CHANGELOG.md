@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.9.6 (2026-03-30)
+
+Full Changelog: [v0.9.5...v0.9.6](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.5...v0.9.6)
+
+### Features
+
+* **api:** add task state update methods ([d699e24](https://github.com/scaleapi/scale-agentex-python/commit/d699e245d6c8f28034370ea6a654e11a3b78dc20))
+* **api:** keep backwards compatible models ([3ec2a1e](https://github.com/scaleapi/scale-agentex-python/commit/3ec2a1e9987cd69fbcfeee8a8a6449b6825a1d49))
+* **api:** use DeploymentHistory instead of DeploymentHistoryRetrieveResponse ([4c63d9c](https://github.com/scaleapi/scale-agentex-python/commit/4c63d9c340e56d7f602f77f2f1fb33b005577402))
+* **internal:** implement indices array format for query and form serialization ([3bf3db1](https://github.com/scaleapi/scale-agentex-python/commit/3bf3db1f692b44ceb5f4ea39cb8c4fd0f81c01ee))
+
+
+### Bug Fixes
+
+* **deps:** bump minimum typing-extensions version ([fd76bc9](https://github.com/scaleapi/scale-agentex-python/commit/fd76bc994dca633c4966967c132323985eafa642))
+* **pydantic:** do not pass `by_alias` unless set ([235636b](https://github.com/scaleapi/scale-agentex-python/commit/235636b424dd4595f1510a87e6b79f3b2e103c97))
+* sanitize endpoint path params ([e6472be](https://github.com/scaleapi/scale-agentex-python/commit/e6472bea7d34a72d070079441b359bef25e87830))
+
+
+### Chores
+
+* **ci:** skip lint on metadata-only changes ([f4d5053](https://github.com/scaleapi/scale-agentex-python/commit/f4d5053766e5864338229218f2402d60f431d1fa))
+* **ci:** skip uploading artifacts on stainless-internal branches ([45e7622](https://github.com/scaleapi/scale-agentex-python/commit/45e76227d8b0d5d1c2f398e9945b71eb5953e791))
+* format all `api.md` files ([e67fa69](https://github.com/scaleapi/scale-agentex-python/commit/e67fa69c072f462ea86ecd67b888afa5f97cc7cc))
+* **internal:** add request options to SSE classes ([b788da0](https://github.com/scaleapi/scale-agentex-python/commit/b788da0d1b9fb6100dffb4a99b761ddcb7f0160e))
+* **internal:** bump dependencies ([95112dd](https://github.com/scaleapi/scale-agentex-python/commit/95112dd25a3bf8a49bd1080bfddefd403e64cfcb))
+* **internal:** fix lint error on Python 3.14 ([cb99db1](https://github.com/scaleapi/scale-agentex-python/commit/cb99db1857e373c3dc47d4f5ff6861d06b0ddce4))
+* **internal:** make `test_proxy_environment_variables` more resilient ([7bfaa75](https://github.com/scaleapi/scale-agentex-python/commit/7bfaa75be00bf8f11030f42a3dc6fdcd980c5823))
+* **internal:** make `test_proxy_environment_variables` more resilient to env ([fd1a06e](https://github.com/scaleapi/scale-agentex-python/commit/fd1a06e212cf1a314ac7c61e4d51879401e120f9))
+* **internal:** remove mock server code ([3a5ae0f](https://github.com/scaleapi/scale-agentex-python/commit/3a5ae0f0451610ae56284307d4c2bee1ac2964c1))
+* **internal:** tweak CI branches ([2e74af0](https://github.com/scaleapi/scale-agentex-python/commit/2e74af08e3e2dd4179550e9dd1cf22881195ac91))
+* **internal:** update gitignore ([aba7c4f](https://github.com/scaleapi/scale-agentex-python/commit/aba7c4f8264fdad515a4926884f855c2d87aa910))
+* **internal:** version bump ([1ef69ed](https://github.com/scaleapi/scale-agentex-python/commit/1ef69ed5415d3112055a8040eccfb6eca452e532))
+* **internal:** version bump ([1132255](https://github.com/scaleapi/scale-agentex-python/commit/1132255a0cd7aec1daed38e4110cd6bac53f930a))
+* **internal:** version bump ([60e5402](https://github.com/scaleapi/scale-agentex-python/commit/60e5402c4502957aee7848ab3cdcbfb41503a8ae))
+* update mock server docs ([8c5c6d3](https://github.com/scaleapi/scale-agentex-python/commit/8c5c6d38214b13f645f6fbd75efbbb8116458589))
+
 ## 0.9.5 (2026-03-24)
 
 Full Changelog: [v0.9.4...v0.9.5](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.4...v0.9.5)

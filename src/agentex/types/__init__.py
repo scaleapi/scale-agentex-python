@@ -20,6 +20,7 @@ from .message_author import MessageAuthor as MessageAuthor
 from .agent_rpc_params import AgentRpcParams as AgentRpcParams
 from .agent_rpc_result import AgentRpcResult as AgentRpcResult
 from .span_list_params import SpanListParams as SpanListParams
+from .task_fail_params import TaskFailParams as TaskFailParams
 from .task_list_params import TaskListParams as TaskListParams
 from .agent_list_params import AgentListParams as AgentListParams
 from .event_list_params import EventListParams as EventListParams
@@ -32,6 +33,7 @@ from .deployment_history import DeploymentHistory as DeploymentHistory
 from .span_create_params import SpanCreateParams as SpanCreateParams
 from .span_list_response import SpanListResponse as SpanListResponse
 from .span_update_params import SpanUpdateParams as SpanUpdateParams
+from .task_cancel_params import TaskCancelParams as TaskCancelParams
 from .task_list_response import TaskListResponse as TaskListResponse
 from .task_message_delta import TaskMessageDelta as TaskMessageDelta
 from .text_content_param import TextContentParam as TextContentParam
@@ -43,14 +45,17 @@ from .state_create_params import StateCreateParams as StateCreateParams
 from .state_list_response import StateListResponse as StateListResponse
 from .state_update_params import StateUpdateParams as StateUpdateParams
 from .task_message_update import TaskMessageUpdate as TaskMessageUpdate
+from .task_timeout_params import TaskTimeoutParams as TaskTimeoutParams
 from .tool_response_delta import ToolResponseDelta as ToolResponseDelta
 from .tracker_list_params import TrackerListParams as TrackerListParams
+from .task_complete_params import TaskCompleteParams as TaskCompleteParams
 from .task_message_content import TaskMessageContent as TaskMessageContent
 from .task_retrieve_params import TaskRetrieveParams as TaskRetrieveParams
 from .tool_request_content import ToolRequestContent as ToolRequestContent
 from .message_create_params import MessageCreateParams as MessageCreateParams
 from .message_list_response import MessageListResponse as MessageListResponse
 from .message_update_params import MessageUpdateParams as MessageUpdateParams
+from .task_terminate_params import TaskTerminateParams as TaskTerminateParams
 from .tool_response_content import ToolResponseContent as ToolResponseContent
 from .tracker_list_response import TrackerListResponse as TrackerListResponse
 from .tracker_update_params import TrackerUpdateParams as TrackerUpdateParams
@@ -59,9 +64,12 @@ from .reasoning_content_delta import ReasoningContentDelta as ReasoningContentDe
 from .reasoning_content_param import ReasoningContentParam as ReasoningContentParam
 from .reasoning_summary_delta import ReasoningSummaryDelta as ReasoningSummaryDelta
 from .agent_rpc_by_name_params import AgentRpcByNameParams as AgentRpcByNameParams
+from .task_update_by_id_params import TaskUpdateByIDParams as TaskUpdateByIDParams
 from .task_message_content_param import TaskMessageContentParam as TaskMessageContentParam
+from .task_update_by_name_params import TaskUpdateByNameParams as TaskUpdateByNameParams
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
 from .tool_response_content_param import ToolResponseContentParam as ToolResponseContentParam
+from .task_query_workflow_response import TaskQueryWorkflowResponse as TaskQueryWorkflowResponse
 from .task_retrieve_by_name_params import TaskRetrieveByNameParams as TaskRetrieveByNameParams
 from .message_list_paginated_params import MessageListPaginatedParams as MessageListPaginatedParams
 from .deployment_history_list_params import DeploymentHistoryListParams as DeploymentHistoryListParams

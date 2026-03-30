@@ -8,6 +8,8 @@ __all__ = ["DeploymentHistory"]
 
 
 class DeploymentHistory(BaseModel):
+    """API schema for deployment history."""
+
     id: str
     """The unique identifier of the deployment record"""
 
