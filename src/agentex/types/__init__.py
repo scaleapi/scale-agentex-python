@@ -63,11 +63,7 @@ from .reasoning_content_delta import ReasoningContentDelta as ReasoningContentDe
 from .reasoning_content_param import ReasoningContentParam as ReasoningContentParam
 from .reasoning_summary_delta import ReasoningSummaryDelta as ReasoningSummaryDelta
 from .agent_rpc_by_name_params import AgentRpcByNameParams as AgentRpcByNameParams
-from .send_event_request_param import SendEventRequestParam as SendEventRequestParam
 from .task_update_by_id_params import TaskUpdateByIDParams as TaskUpdateByIDParams
-from .cancel_task_request_param import CancelTaskRequestParam as CancelTaskRequestParam
-from .create_task_request_param import CreateTaskRequestParam as CreateTaskRequestParam
-from .send_message_request_param import SendMessageRequestParam as SendMessageRequestParam
 from .task_message_content_param import TaskMessageContentParam as TaskMessageContentParam
 from .task_update_by_name_params import TaskUpdateByNameParams as TaskUpdateByNameParams
 from .tool_request_content_param import ToolRequestContentParam as ToolRequestContentParam
