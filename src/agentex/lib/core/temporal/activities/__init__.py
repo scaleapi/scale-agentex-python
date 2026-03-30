@@ -180,6 +180,13 @@ def get_all_activities(sgp_client=None):
         ## Tasks activities
         tasks_activities.get_task,
         tasks_activities.delete_task,
+        tasks_activities.cancel_task,
+        tasks_activities.complete_task,
+        tasks_activities.fail_task,
+        tasks_activities.terminate_task,
+        tasks_activities.timeout_task,
+        tasks_activities.update_task,
+        tasks_activities.query_workflow,
         ## Tracing activities
         tracing_activities.start_span,
         tracing_activities.end_span,
