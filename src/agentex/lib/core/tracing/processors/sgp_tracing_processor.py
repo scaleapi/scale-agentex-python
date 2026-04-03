@@ -30,7 +30,7 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
         disabled = config.sgp_api_key == "" or config.sgp_account_id == ""
         tracing.init(
             SGPClient(
-                api_key=config.sgp_api_key, 
+                api_key=config.sgp_api_key,
                 account_id=config.sgp_account_id,
                 base_url=config.sgp_base_url,
             ),
@@ -72,11 +72,9 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
 
     @override
     def on_span_end(self, span: Span) -> None:
-        sgp_span = self._spans.get(span.id)
+        sgp_span = self._spans.pop(span.id, None)
         if sgp_span is None:
-            logger.warning(
-                f"Span {span.id} not found in stored spans, skipping span end"
-            )
+            logger.warning(f"Span {span.id} not found in stored spans, skipping span end")
             return
 
         self._add_source_to_span(span)
@@ -151,11 +149,9 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
 
     @override
     async def on_span_end(self, span: Span) -> None:
-        sgp_span = self._spans.get(span.id)
+        sgp_span = self._spans.pop(span.id, None)
         if sgp_span is None:
-            logger.warning(
-                f"Span {span.id} not found in stored spans, skipping span end"
-            )
+            logger.warning(f"Span {span.id} not found in stored spans, skipping span end")
             return
 
         self._add_source_to_span(span)
