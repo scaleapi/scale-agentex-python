@@ -56,7 +56,7 @@ async def register_agent(env_vars: EnvironmentVariables):
         "acp_url": full_acp_url,
         "acp_type": env_vars.ACP_TYPE,
         "principal_context": get_auth_principal(env_vars),
-        "registration_metadata": registration_metadata or None,
+        "registration_metadata": registration_metadata or None,  # Send null instead of {} when no metadata
     }
 
     if env_vars.AGENT_ID:
