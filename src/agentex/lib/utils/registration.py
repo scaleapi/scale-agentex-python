@@ -44,6 +44,11 @@ async def register_agent(env_vars: EnvironmentVariables):
         or f"Generic description for agent: {env_vars.AGENT_NAME}"
     )
 
+    # Build registration metadata from build-info.json + deployment env var
+    registration_metadata = get_build_info() or {}
+    if env_vars.AGENTEX_DEPLOYMENT_ID:
+        registration_metadata["deployment_id"] = env_vars.AGENTEX_DEPLOYMENT_ID
+
     # Prepare registration data
     registration_data = {
         "name": env_vars.AGENT_NAME,
@@ -51,7 +56,7 @@ async def register_agent(env_vars: EnvironmentVariables):
         "acp_url": full_acp_url,
         "acp_type": env_vars.ACP_TYPE,
         "principal_context": get_auth_principal(env_vars),
-        "registration_metadata": get_build_info()
+        "registration_metadata": registration_metadata or None,  # Send null instead of {} when no metadata
     }
 
     if env_vars.AGENT_ID:
