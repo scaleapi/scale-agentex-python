@@ -186,7 +186,8 @@ class TestAsyncSpanQueueIntegration:
             )
 
             async with trace.span("test-operation") as span:
-                span.output = {"result": "ok"}
+                output: dict[str, object] = {"result": "ok"}
+                span.output = output
 
         await queue.shutdown()
 
