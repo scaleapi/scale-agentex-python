@@ -31,7 +31,7 @@ def get_build_info():
     except Exception:
         return None
 
-async def register_agent(env_vars: EnvironmentVariables):
+async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
     """Register this agent with the Agentex server"""
     if not env_vars.AGENTEX_BASE_URL:
         logger.warning("AGENTEX_BASE_URL is not set, skipping registration")
@@ -45,13 +45,20 @@ async def register_agent(env_vars: EnvironmentVariables):
     )
 
     # Prepare registration data
+    registration_metadata = get_build_info()
+    if agent_card is not None:
+        card_data = agent_card.model_dump() if hasattr(agent_card, "model_dump") else agent_card
+        if registration_metadata is None:
+            registration_metadata = {}
+        registration_metadata["agent_card"] = card_data
+
     registration_data = {
         "name": env_vars.AGENT_NAME,
         "description": description,
         "acp_url": full_acp_url,
         "acp_type": env_vars.ACP_TYPE,
         "principal_context": get_auth_principal(env_vars),
-        "registration_metadata": get_build_info()
+        "registration_metadata": registration_metadata,
     }
 
     if env_vars.AGENT_ID:

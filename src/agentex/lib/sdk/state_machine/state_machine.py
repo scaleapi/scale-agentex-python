@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Any, Generic, TypeVar
 
 from agentex.lib import adk
@@ -128,6 +129,28 @@ class StateMachine(ABC, Generic[T]):
         if self._trace_transitions:
             span.output = {"output_state": self._initial_state}  # type: ignore[assignment,union-attr]
             await adk.tracing.end_span(trace_id=self._task_id, span=span)
+
+    def get_lifecycle(self) -> dict[str, Any]:
+        """Export the state machine's lifecycle as a dict suitable for AgentCard."""
+        states = []
+        for state in self._state_map.values():
+            workflow = state.workflow
+            states.append({
+                "name": state.name,
+                "description": workflow.description,
+                "waits_for_input": workflow.waits_for_input,
+                "accepts": list(workflow.accepts),
+                "transitions": [
+                    t.value if isinstance(t, Enum) else str(t)
+                    for t in workflow.transitions
+                ],
+            })
+        initial: str = self._initial_state.value if isinstance(self._initial_state, Enum) else self._initial_state
+
+        return {
+            "states": states,
+            "initial_state": initial,
+        }
 
     def dump(self) -> dict[str, Any]:
         """

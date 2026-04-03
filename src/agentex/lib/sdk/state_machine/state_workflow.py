@@ -11,6 +11,11 @@ if TYPE_CHECKING:
 
 
 class StateWorkflow(ABC):
+    description: str = ""
+    waits_for_input: bool = False
+    accepts: list[str] = []
+    transitions: list[str] = []
+
     @abstractmethod
     async def execute(
         self, state_machine: "StateMachine", state_machine_data: BaseModel | None = None
