@@ -232,7 +232,7 @@ class AsyncTrace:
         )
 
         if self.processors:
-            self._span_queue.enqueue(SpanEventType.START, span, self.processors)
+            self._span_queue.enqueue(SpanEventType.START, span.model_copy(deep=True), self.processors)
 
         return span
 
@@ -257,7 +257,7 @@ class AsyncTrace:
         span.data = recursive_model_dump(span.data) if span.data else None
 
         if self.processors:
-            self._span_queue.enqueue(SpanEventType.END, span, self.processors)
+            self._span_queue.enqueue(SpanEventType.END, span.model_copy(deep=True), self.processors)
 
         return span
 
