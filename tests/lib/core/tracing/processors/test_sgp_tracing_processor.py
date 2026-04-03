@@ -42,29 +42,34 @@ def _make_mock_sgp_span() -> MagicMock:
 
 
 class TestSGPSyncTracingProcessorMemoryLeak:
-    @patch(f"{MODULE}.EnvironmentVariables")
-    @patch(f"{MODULE}.flush_queue")
-    @patch(f"{MODULE}.create_span")
-    @patch(f"{MODULE}.SGPClient")
-    @patch(f"{MODULE}.tracing")
-    def _make_processor(self, mock_tracing, mock_sgp_client, mock_create_span, mock_flush, mock_env):
+    @staticmethod
+    def _make_processor():
+        mock_env = MagicMock()
         mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
-        mock_create_span.side_effect = lambda **kwargs: _make_mock_sgp_span()
+        mock_create_span = MagicMock(side_effect=lambda **kwargs: _make_mock_sgp_span())
 
-        from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
-            SGPSyncTracingProcessor,
-        )
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), \
+             patch(f"{MODULE}.SGPClient"), \
+             patch(f"{MODULE}.tracing"), \
+             patch(f"{MODULE}.flush_queue"), \
+             patch(f"{MODULE}.create_span", mock_create_span):
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPSyncTracingProcessor,
+            )
 
-        return SGPSyncTracingProcessor(_make_config()), mock_create_span
+            processor = SGPSyncTracingProcessor(_make_config())
+
+        return processor, mock_create_span
 
     def test_spans_not_leaked_after_completed_lifecycle(self):
         processor, _ = self._make_processor()
 
-        for _ in range(100):
-            span = _make_span()
-            processor.on_span_start(span)
-            span.end_time = datetime.now(UTC)
-            processor.on_span_end(span)
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            for _ in range(100):
+                span = _make_span()
+                processor.on_span_start(span)
+                span.end_time = datetime.now(UTC)
+                processor.on_span_end(span)
 
         assert len(processor._spans) == 0, (
             f"Expected 0 spans after 100 complete lifecycles, got {len(processor._spans)} — memory leak!"
@@ -73,13 +78,14 @@ class TestSGPSyncTracingProcessorMemoryLeak:
     def test_spans_present_during_active_lifecycle(self):
         processor, _ = self._make_processor()
 
-        span = _make_span()
-        processor.on_span_start(span)
-        assert len(processor._spans) == 1, "Span should be tracked while active"
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            span = _make_span()
+            processor.on_span_start(span)
+            assert len(processor._spans) == 1, "Span should be tracked while active"
 
-        span.end_time = datetime.now(UTC)
-        processor.on_span_end(span)
-        assert len(processor._spans) == 0, "Span should be removed after end"
+            span.end_time = datetime.now(UTC)
+            processor.on_span_end(span)
+            assert len(processor._spans) == 0, "Span should be removed after end"
 
     def test_span_end_for_unknown_span_is_noop(self):
         processor, _ = self._make_processor()
