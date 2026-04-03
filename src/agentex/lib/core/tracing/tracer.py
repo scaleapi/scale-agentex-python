@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agentex import Agentex, AsyncAgentex
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
+from agentex.lib.core.tracing.span_queue import AsyncSpanQueue
 from agentex.lib.core.tracing.tracing_processor_manager import (
     get_sync_tracing_processors,
     get_async_tracing_processors,
@@ -55,12 +56,13 @@ class AsyncTracer:
         """
         self.client = client
 
-    def trace(self, trace_id: str | None = None) -> AsyncTrace:
+    def trace(self, trace_id: str | None = None, span_queue: AsyncSpanQueue | None = None) -> AsyncTrace:
         """
         Create a new trace with the given trace ID.
 
         Args:
             trace_id: The trace ID to use.
+            span_queue: Optional span queue for background processing.
 
         Returns:
             A new AsyncTrace instance.
@@ -69,4 +71,5 @@ class AsyncTracer:
             processors=get_async_tracing_processors(),
             client=self.client,
             trace_id=trace_id,
+            span_queue=span_queue,
         )
