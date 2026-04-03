@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-import asyncio
 from typing import Any, AsyncGenerator
 from datetime import UTC, datetime
 from contextlib import contextmanager, asynccontextmanager
@@ -12,6 +11,11 @@ from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
+from agentex.lib.core.tracing.span_queue import (
+    SpanEventType,
+    AsyncSpanQueue,
+    get_default_span_queue,
+)
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     SyncTracingProcessor,
     AsyncTracingProcessor,
@@ -173,6 +177,7 @@ class AsyncTrace:
         processors: list[AsyncTracingProcessor],
         client: AsyncAgentex,
         trace_id: str | None = None,
+        span_queue: AsyncSpanQueue | None = None,
     ):
         """
         Initialize a new trace with the specified trace ID.
@@ -180,10 +185,12 @@ class AsyncTrace:
         Args:
             trace_id: Required trace ID to use for this trace.
             processors: Optional list of tracing processors to use for this trace.
+            span_queue: Optional span queue for background processing.
         """
         self.processors = processors
         self.client = client
         self.trace_id = trace_id
+        self._span_queue = span_queue or get_default_span_queue()
 
     async def start_span(
         self,
@@ -225,9 +232,7 @@ class AsyncTrace:
         )
 
         if self.processors:
-            await asyncio.gather(
-                *[processor.on_span_start(span) for processor in self.processors]
-            )
+            self._span_queue.enqueue(SpanEventType.START, span.model_copy(deep=True), self.processors)
 
         return span
 
@@ -252,9 +257,7 @@ class AsyncTrace:
         span.data = recursive_model_dump(span.data) if span.data else None
 
         if self.processors:
-            await asyncio.gather(
-                *[processor.on_span_end(span) for processor in self.processors]
-            )
+            self._span_queue.enqueue(SpanEventType.END, span.model_copy(deep=True), self.processors)
 
         return span
 

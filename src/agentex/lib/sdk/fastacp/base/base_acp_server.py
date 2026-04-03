@@ -32,6 +32,7 @@ from agentex.lib.utils.registration import register_agent
 from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
 from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
 from agentex.types.task_message_content import TaskMessageContent
+from agentex.lib.core.tracing.span_queue import shutdown_default_span_queue
 from agentex.lib.sdk.fastacp.base.constants import (
     FASTACP_HEADER_SKIP_EXACT,
     FASTACP_HEADER_SKIP_PREFIXES,
@@ -103,7 +104,10 @@ class BaseACPServer(FastAPI):
             else:
                 logger.warning("AGENTEX_BASE_URL not set, skipping agent registration")
 
-            yield
+            try:
+                yield
+            finally:
+                await shutdown_default_span_queue()
 
         return lifespan_context
 
