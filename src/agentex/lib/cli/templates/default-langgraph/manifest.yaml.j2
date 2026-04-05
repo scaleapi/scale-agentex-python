@@ -76,8 +76,8 @@ agent:
   # Maps Kubernetes secrets to environment variables
   # Common credentials include:
   credentials:
-    - env_var_name: OPENAI_API_KEY
-      secret_name: openai-api-key
+    - env_var_name: LITELLM_API_KEY
+      secret_name: litellm-api-key
       secret_key: api-key
     - env_var_name: SGP_API_KEY
       secret_name: sgp-api-key
@@ -89,7 +89,7 @@ agent:
   # Optional: Set Environment variables for running your agent locally as well
   # as for deployment later on
   env:
-    OPENAI_API_KEY: ""  # Set your OpenAI API key
+    LITELLM_API_KEY: ""  # Set your LLM API key
   #   OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
 
 # Deployment Configuration

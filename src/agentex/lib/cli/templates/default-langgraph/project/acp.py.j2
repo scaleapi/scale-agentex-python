@@ -9,6 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 
+# LiteLLM proxy auth: copy LITELLM_API_KEY to OPENAI_API_KEY for OpenAI client compatibility
+_litellm_key = os.environ.get("LITELLM_API_KEY")
+if _litellm_key:
+    os.environ["OPENAI_API_KEY"] = _litellm_key
+
 import agentex.lib.adk as adk
 from agentex.lib.adk import create_langgraph_tracing_handler, stream_langgraph_events
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
