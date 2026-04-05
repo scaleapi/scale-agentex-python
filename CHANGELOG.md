@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.0 (2026-04-05)
+
+Full Changelog: [v0.9.7...v0.10.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.7...v0.10.0)
+
+### Features
+
+* **tracing:** Add background queue for async span processing ([#303](https://github.com/scaleapi/scale-agentex-python/issues/303)) ([3a60add](https://github.com/scaleapi/scale-agentex-python/commit/3a60add048ff24266a45700b4e78def8ffed3e0b))
+
+
+### Bug Fixes
+
+* **tracing:** Fix memory leak in SGP tracing processors ([#302](https://github.com/scaleapi/scale-agentex-python/issues/302)) ([f43dac4](https://github.com/scaleapi/scale-agentex-python/commit/f43dac4fa7ca7090b37c6c3bf285eb12515764bb))
+
 ## 0.9.7 (2026-03-30)
 
 Full Changelog: [v0.9.6...v0.9.7](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.6...v0.9.7)
