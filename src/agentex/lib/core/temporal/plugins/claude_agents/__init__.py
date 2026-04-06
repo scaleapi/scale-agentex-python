@@ -40,6 +40,7 @@ from agentex.lib.core.temporal.plugins.claude_agents.hooks import (
     create_streaming_hooks,
 )
 from agentex.lib.core.temporal.plugins.claude_agents.activities import (
+    claude_options_to_dict,
     run_claude_agent_activity,
     create_workspace_directory,
 )
@@ -59,6 +60,7 @@ __all__ = [
     # Activities
     "run_claude_agent_activity",
     "create_workspace_directory",
+    "claude_options_to_dict",
     # Message handling
     "ClaudeMessageHandler",
     # Hooks

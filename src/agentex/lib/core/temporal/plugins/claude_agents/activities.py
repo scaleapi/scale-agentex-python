@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import dataclasses
 from typing import Any
 
 from temporalio import activity
@@ -18,6 +19,65 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 )
 
 logger = make_logger(__name__)
+
+# Fields that are not serializable across the Temporal boundary and should be
+# excluded from claude_options_to_dict output.
+_NON_SERIALIZABLE_FIELDS = {"debug_stderr", "stderr", "can_use_tool", "hooks"}
+
+
+def claude_options_to_dict(options: ClaudeAgentOptions) -> dict[str, Any]:
+    """Convert a ClaudeAgentOptions to a Temporal-serializable dict.
+
+    Use this at the workflow call site so you get full type safety and
+    autocomplete when constructing options, while Temporal gets a plain dict.
+
+    Non-serializable fields (callbacks, file objects, hooks) are excluded —
+    the activity injects AgentEx streaming hooks automatically.
+
+    Example::
+
+        extra = ClaudeAgentOptions(
+            mcp_servers={"my-server": McpServerConfig(command="npx", args=[...])},
+            model="sonnet",
+        )
+
+        result = await workflow.execute_activity(
+            run_claude_agent_activity,
+            args=[prompt, workspace, tools, "acceptEdits", None, None, None,
+                  claude_options_to_dict(extra)],
+            ...
+        )
+    """
+    result = {}
+    for field in dataclasses.fields(options):
+        if field.name in _NON_SERIALIZABLE_FIELDS:
+            continue
+        value = getattr(options, field.name)
+        # Skip fields left at their default to keep the dict minimal
+        if value == field.default or (
+            callable(field.default_factory) and value == field.default_factory()  # type: ignore[arg-type]
+        ):
+            continue
+        result[field.name] = value
+    return result
+
+
+def _reconstruct_agent_defs(agents: dict[str, Any] | None) -> dict[str, AgentDefinition] | None:
+    """Reconstruct AgentDefinition objects from Temporal-serialized dicts."""
+    if not agents:
+        return None
+    agent_defs = {}
+    for name, agent_data in agents.items():
+        if isinstance(agent_data, AgentDefinition):
+            agent_defs[name] = agent_data
+        else:
+            agent_defs[name] = AgentDefinition(
+                description=agent_data.get('description', ''),
+                prompt=agent_data.get('prompt', ''),
+                tools=agent_data.get('tools'),
+                model=agent_data.get('model'),
+            )
+    return agent_defs
 
 
 @activity.defn
@@ -51,8 +111,9 @@ async def run_claude_agent_activity(
     system_prompt: str | None = None,
     resume_session_id: str | None = None,
     agents: dict[str, Any] | None = None,
+    claude_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Execute Claude SDK - wrapped in Temporal activity
+    """Execute Claude SDK - wrapped in Temporal activity.
 
     This activity:
     1. Gets task_id from ContextVar (set by ContextInterceptor)
@@ -69,6 +130,11 @@ async def run_claude_agent_activity(
         system_prompt: Optional system prompt override
         resume_session_id: Optional session ID to resume conversation context
         agents: Optional dict of subagent definitions for Task tool
+        claude_options: Optional dict of additional ClaudeAgentOptions kwargs.
+            Any field supported by the Claude SDK can be passed here
+            (e.g. mcp_servers, model, max_turns, max_budget_usd, etc.).
+            These are merged with the explicit params above, with explicit
+            params taking precedence.
 
     Returns:
         dict with "messages", "session_id", "usage", and "cost_usd" keys
@@ -88,38 +154,49 @@ async def run_claude_agent_activity(
 
     # Reconstruct AgentDefinition objects from serialized dicts
     # Temporal serializes dataclasses to dicts, need to recreate them
-    agent_defs = None
-    if agents:
-        agent_defs = {}
-        for name, agent_data in agents.items():
-            if isinstance(agent_data, AgentDefinition):
-                agent_defs[name] = agent_data
-            else:
-                # Reconstruct from dict
-                agent_defs[name] = AgentDefinition(
-                    description=agent_data.get('description', ''),
-                    prompt=agent_data.get('prompt', ''),
-                    tools=agent_data.get('tools'),
-                    model=agent_data.get('model'),
-                )
+    agent_defs = _reconstruct_agent_defs(agents)
+
+    # Build options dict from explicit params
+    options_dict: dict[str, Any] = {
+        "cwd": workspace_path,
+        "allowed_tools": allowed_tools,
+        "permission_mode": permission_mode,
+        "system_prompt": system_prompt,
+        "resume": resume_session_id,
+        "agents": agent_defs,
+    }
+
+    # Merge in any additional claude_options (explicit params take precedence)
+    if claude_options:
+        # Reconstruct agents in claude_options too if present
+        if "agents" in claude_options:
+            claude_options["agents"] = _reconstruct_agent_defs(claude_options["agents"])
+        merged = {**claude_options, **options_dict}
+        # Remove None values from explicit params so claude_options defaults aren't masked
+        options_dict = {k: v for k, v in merged.items() if v is not None}
 
     # Create hooks for streaming tool calls and subagent execution
-    hooks = create_streaming_hooks(
+    streaming_hooks = create_streaming_hooks(
         task_id=task_id,
         trace_id=trace_id,
         parent_span_id=parent_span_id,
     )
 
-    # Configure Claude with workspace isolation, session resume, subagents, and hooks
-    options = ClaudeAgentOptions(
-        cwd=workspace_path,
-        allowed_tools=allowed_tools,
-        permission_mode=permission_mode,  # type: ignore
-        system_prompt=system_prompt,
-        resume=resume_session_id,
-        agents=agent_defs,
-        hooks=hooks,  # Tool lifecycle hooks for streaming!
-    )
+    # Merge streaming hooks with any user-provided hooks from claude_options
+    user_hooks = options_dict.pop("hooks", None)
+    if user_hooks:
+        merged_hooks = dict(streaming_hooks)
+        for event, matchers in user_hooks.items():
+            if event in merged_hooks:
+                merged_hooks[event] = merged_hooks[event] + matchers
+            else:
+                merged_hooks[event] = matchers
+        options_dict["hooks"] = merged_hooks
+    else:
+        options_dict["hooks"] = streaming_hooks
+
+    # Construct ClaudeAgentOptions — any SDK field works via claude_options
+    options = ClaudeAgentOptions(**options_dict)
 
     # Create message handler for streaming
     handler = ClaudeMessageHandler(
