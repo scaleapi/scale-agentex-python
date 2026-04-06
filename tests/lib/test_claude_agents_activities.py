@@ -330,6 +330,66 @@ class TestRunClaudeAgentActivity:
     @patch(
         "agentex.lib.core.temporal.plugins.claude_agents.activities.create_streaming_hooks",
     )
+    async def test_claude_options_not_masked_by_none_explicit_params(
+        self,
+        mock_create_hooks,
+        mock_client_cls,
+        mock_handler_cls,
+        mock_parent_span_id,
+        mock_trace_id,
+        mock_task_id,
+    ):
+        """claude_options values should not be silently dropped when explicit params are None."""
+        from agentex.lib.core.temporal.plugins.claude_agents.activities import (
+            run_claude_agent_activity,
+        )
+
+        mock_task_id.get.return_value = "task-1"
+        mock_trace_id.get.return_value = "trace-1"
+        mock_parent_span_id.get.return_value = "span-1"
+        mock_create_hooks.return_value = {"PreToolUse": [], "PostToolUse": []}
+
+        mock_client = AsyncMock()
+        mock_client.receive_response = MagicMock(return_value=AsyncIteratorMock([]))
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        mock_handler = AsyncMock()
+        mock_handler.get_results = MagicMock(return_value={
+            "messages": [], "session_id": "s", "usage": {}, "cost_usd": 0.0,
+        })
+        mock_handler_cls.return_value = mock_handler
+
+        # system_prompt explicit param is None (default), but claude_options has a value
+        await run_claude_agent_activity(
+            prompt="Hello",
+            workspace_path="/workspace",
+            allowed_tools=["Read"],
+            claude_options={"system_prompt": "Be helpful"},
+        )
+
+        call_args = mock_client_cls.call_args
+        options = call_args.kwargs.get("options") or call_args[1].get("options")
+        assert options.system_prompt == "Be helpful"
+
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_task_id",
+    )
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_trace_id",
+    )
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_parent_span_id",
+    )
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeMessageHandler",
+    )
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeSDKClient",
+    )
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.create_streaming_hooks",
+    )
     async def test_merges_user_hooks_with_streaming_hooks(
         self,
         mock_create_hooks,

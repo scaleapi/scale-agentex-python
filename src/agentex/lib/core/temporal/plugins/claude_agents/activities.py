@@ -107,7 +107,7 @@ async def run_claude_agent_activity(
     prompt: str,
     workspace_path: str,
     allowed_tools: list[str],
-    permission_mode: str = "acceptEdits",
+    permission_mode: str | None = None,
     system_prompt: str | None = None,
     resume_session_id: str | None = None,
     agents: dict[str, Any] | None = None,
@@ -156,24 +156,29 @@ async def run_claude_agent_activity(
     # Temporal serializes dataclasses to dicts, need to recreate them
     agent_defs = _reconstruct_agent_defs(agents)
 
-    # Build options dict from explicit params
-    options_dict: dict[str, Any] = {
+    # Only include explicit params that were actually supplied (non-None),
+    # so claude_options values for system_prompt/resume/agents are not masked.
+    explicit_params: dict[str, Any] = {k: v for k, v in {
         "cwd": workspace_path,
         "allowed_tools": allowed_tools,
         "permission_mode": permission_mode,
         "system_prompt": system_prompt,
         "resume": resume_session_id,
         "agents": agent_defs,
-    }
+    }.items() if v is not None}
 
     # Merge in any additional claude_options (explicit params take precedence)
     if claude_options:
-        # Reconstruct agents in claude_options too if present
+        claude_options = dict(claude_options)  # avoid mutating caller's dict
         if "agents" in claude_options:
             claude_options["agents"] = _reconstruct_agent_defs(claude_options["agents"])
-        merged = {**claude_options, **options_dict}
-        # Remove None values from explicit params so claude_options defaults aren't masked
-        options_dict = {k: v for k, v in merged.items() if v is not None}
+        options_dict = {**claude_options, **explicit_params}
+    else:
+        options_dict = explicit_params
+
+    # Apply default for permission_mode if neither source supplied a value
+    if "permission_mode" not in options_dict:
+        options_dict["permission_mode"] = "acceptEdits"
 
     # Create hooks for streaming tool calls and subagent execution
     streaming_hooks = create_streaming_hooks(
