@@ -18,6 +18,11 @@ from agents import Agent, Runner, RunConfig, function_tool
 
 logger = make_logger(__name__)
 
+# LiteLLM proxy auth: copy LITELLM_API_KEY to OPENAI_API_KEY for OpenAI client compatibility
+_litellm_key = os.environ.get("LITELLM_API_KEY")
+if _litellm_key:
+    os.environ["OPENAI_API_KEY"] = _litellm_key
+
 SGP_API_KEY = os.environ.get("SGP_API_KEY", "")
 SGP_ACCOUNT_ID = os.environ.get("SGP_ACCOUNT_ID", "")
 
@@ -75,13 +80,13 @@ class StateModel(BaseModel):
 async def handle_message_send(
     params: SendMessageParams
 ) -> TaskMessageContent | list[TaskMessageContent] | AsyncGenerator[TaskMessageUpdate, None]:
-    if not os.environ.get("OPENAI_API_KEY"):
+    if not os.environ.get("LITELLM_API_KEY"):
         yield StreamTaskMessageFull(
             index=0,
             type="full",
             content=TextContent(
                 author="agent",
-                content="Hey, sorry I'm unable to respond to your message because you're running this example without an OpenAI API key. Please set the OPENAI_API_KEY environment variable to run this example. Do this by either by adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
+                content="Hey, sorry I'm unable to respond to your message because you're running this example without a LiteLLM API key. Please set the LITELLM_API_KEY environment variable to run this example. Do this by either adding a .env file to the project/ directory or by setting the environment variable in your terminal.",
             ),
         )
         return

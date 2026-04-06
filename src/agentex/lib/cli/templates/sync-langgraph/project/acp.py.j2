@@ -22,6 +22,11 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 
+# LiteLLM proxy auth: copy LITELLM_API_KEY to OPENAI_API_KEY for OpenAI client compatibility
+_litellm_key = os.environ.get("LITELLM_API_KEY")
+if _litellm_key:
+    os.environ["OPENAI_API_KEY"] = _litellm_key
+
 from project.graph import create_graph
 
 logger = make_logger(__name__)
