@@ -25,18 +25,16 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from claude_agent_sdk import HookMatcher, AgentDefinition, ClaudeAgentOptions
+from claude_agent_sdk.types import (
+    TextBlock,
+    ToolUseBlock,
+    ResultMessage,
+    SystemMessage,
+    AssistantMessage,
+)
 
 _SRC = Path(__file__).resolve().parents[2] / "src"
-_ACTIVITIES_PATH = (
-    _SRC
-    / "agentex"
-    / "lib"
-    / "core"
-    / "temporal"
-    / "plugins"
-    / "claude_agents"
-    / "activities.py"
-)
+_ACTIVITIES_PATH = _SRC / "agentex" / "lib" / "core" / "temporal" / "plugins" / "claude_agents" / "activities.py"
 
 # Stub the modules that activities.py imports (hooks, message_handler, interceptor)
 _hooks_mock = MagicMock()
@@ -47,9 +45,13 @@ _interceptor_mock.streaming_trace_id = contextvars.ContextVar("streaming_trace_i
 _interceptor_mock.streaming_parent_span_id = contextvars.ContextVar("streaming_parent_span_id", default=None)
 
 # Register stubs for all imports that activities.py does
+_adk_mock = MagicMock()
+_hooks_hooks_mock = MagicMock()
 _stubs = {
+    "agentex.lib.adk": _adk_mock,
     "agentex.lib.utils.logging": MagicMock(),
     "agentex.lib.core.temporal.plugins.claude_agents.hooks": _hooks_mock,
+    "agentex.lib.core.temporal.plugins.claude_agents.hooks.hooks": _hooks_hooks_mock,
     "agentex.lib.core.temporal.plugins.claude_agents.message_handler": _handler_mock,
     "agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor": _interceptor_mock,
 }
@@ -243,19 +245,19 @@ class TestRunClaudeAgentActivity:
         "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_parent_span_id",
     )
     @patch(
-        "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeMessageHandler",
-    )
-    @patch(
         "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeSDKClient",
     )
     @patch(
         "agentex.lib.core.temporal.plugins.claude_agents.activities.create_streaming_hooks",
     )
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.adk",
+    )
     async def test_passes_claude_options_to_sdk(
         self,
+        _mock_adk,
         mock_create_hooks,
         mock_client_cls,
-        mock_handler_cls,
         mock_parent_span_id,
         mock_trace_id,
         mock_task_id,
@@ -278,16 +280,6 @@ class TestRunClaudeAgentActivity:
         mock_client.receive_response = MagicMock(return_value=AsyncIteratorMock([]))
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        # Set up handler (get_results is sync, so use MagicMock for it)
-        mock_handler = AsyncMock()
-        mock_handler.get_results = MagicMock(return_value={
-            "messages": [],
-            "session_id": "sess-1",
-            "usage": {},
-            "cost_usd": 0.0,
-        })
-        mock_handler_cls.return_value = mock_handler
 
         # Extra SDK options passed via claude_options
         extra = {
@@ -322,19 +314,19 @@ class TestRunClaudeAgentActivity:
         "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_parent_span_id",
     )
     @patch(
-        "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeMessageHandler",
-    )
-    @patch(
         "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeSDKClient",
     )
     @patch(
         "agentex.lib.core.temporal.plugins.claude_agents.activities.create_streaming_hooks",
     )
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.adk",
+    )
     async def test_claude_options_not_masked_by_none_explicit_params(
         self,
+        _mock_adk,
         mock_create_hooks,
         mock_client_cls,
-        mock_handler_cls,
         mock_parent_span_id,
         mock_trace_id,
         mock_task_id,
@@ -353,12 +345,6 @@ class TestRunClaudeAgentActivity:
         mock_client.receive_response = MagicMock(return_value=AsyncIteratorMock([]))
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        mock_handler = AsyncMock()
-        mock_handler.get_results = MagicMock(return_value={
-            "messages": [], "session_id": "s", "usage": {}, "cost_usd": 0.0,
-        })
-        mock_handler_cls.return_value = mock_handler
 
         # system_prompt explicit param is None (default), but claude_options has a value
         await run_claude_agent_activity(
@@ -382,19 +368,19 @@ class TestRunClaudeAgentActivity:
         "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_parent_span_id",
     )
     @patch(
-        "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeMessageHandler",
-    )
-    @patch(
         "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeSDKClient",
     )
     @patch(
         "agentex.lib.core.temporal.plugins.claude_agents.activities.create_streaming_hooks",
     )
+    @patch(
+        "agentex.lib.core.temporal.plugins.claude_agents.activities.adk",
+    )
     async def test_merges_user_hooks_with_streaming_hooks(
         self,
+        _mock_adk,
         mock_create_hooks,
         mock_client_cls,
-        mock_handler_cls,
         mock_parent_span_id,
         mock_trace_id,
         mock_task_id,
@@ -417,15 +403,6 @@ class TestRunClaudeAgentActivity:
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        mock_handler = AsyncMock()
-        mock_handler.get_results = MagicMock(return_value={
-            "messages": [],
-            "session_id": "s",
-            "usage": {},
-            "cost_usd": 0.0,
-        })
-        mock_handler_cls.return_value = mock_handler
-
         # User-provided hook via claude_options
         user_pre = HookMatcher(matcher="Bash", hooks=[AsyncMock()])
 
@@ -440,6 +417,299 @@ class TestRunClaudeAgentActivity:
         options = call_args.kwargs.get("options") or call_args[1].get("options")
         # Should have both streaming and user hooks merged
         assert len(options.hooks["PreToolUse"]) == 2
+
+
+class _AsyncCtxManager:
+    """Simple async context manager that yields a given value."""
+
+    def __init__(self, value):
+        self.value = value
+        self.exited = False
+
+    async def __aenter__(self):
+        return self.value
+
+    async def __aexit__(self, *args):
+        self.exited = True
+
+
+def _setup_activity_mocks(
+    mock_adk, mock_create_hooks, mock_client_cls, mock_task_id, mock_trace_id, mock_parent_span_id, messages
+):
+    """Common setup for activity tests that send messages through the client."""
+    mock_task_id.get.return_value = "task-1"
+    mock_trace_id.get.return_value = "trace-1"
+    mock_parent_span_id.get.return_value = "span-1"
+    mock_create_hooks.return_value = {"PreToolUse": [], "PostToolUse": [], "PostToolUseFailure": []}
+
+    mock_client = AsyncMock()
+    mock_client.receive_response = MagicMock(return_value=AsyncIteratorMock(messages))
+    mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    return mock_adk
+
+
+_ACTIVITY_PATCHES = [
+    "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_task_id",
+    "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_trace_id",
+    "agentex.lib.core.temporal.plugins.claude_agents.activities.streaming_parent_span_id",
+    "agentex.lib.core.temporal.plugins.claude_agents.activities.ClaudeSDKClient",
+    "agentex.lib.core.temporal.plugins.claude_agents.activities.create_streaming_hooks",
+    "agentex.lib.core.temporal.plugins.claude_agents.activities.adk",
+]
+
+
+class TestActivityMessageHandling:
+    """Tests for run_claude_agent_activity message streaming behavior."""
+
+    @patch(_ACTIVITY_PATCHES[0])
+    @patch(_ACTIVITY_PATCHES[1])
+    @patch(_ACTIVITY_PATCHES[2])
+    @patch(_ACTIVITY_PATCHES[3])
+    @patch(_ACTIVITY_PATCHES[4])
+    @patch(_ACTIVITY_PATCHES[5])
+    async def test_text_block_opens_and_closes_streaming_context(
+        self,
+        mock_adk,
+        mock_create_hooks,
+        mock_client_cls,
+        mock_parent_span_id,
+        mock_trace_id,
+        mock_task_id,
+    ):
+        """TextBlock should open a text streaming CM, use it for deltas, and close it via __aexit__."""
+        from agentex.lib.core.temporal.plugins.claude_agents.activities import run_claude_agent_activity
+
+        text_ctx = MagicMock()
+        text_ctx.task_message = MagicMock()
+        text_ctx.stream_update = AsyncMock()
+        text_cm = _AsyncCtxManager(text_ctx)
+
+        mock_adk = _setup_activity_mocks(
+            mock_adk,
+            mock_create_hooks,
+            mock_client_cls,
+            mock_task_id,
+            mock_trace_id,
+            mock_parent_span_id,
+            messages=[AssistantMessage(content=[TextBlock(text="Hello world")], model="claude")],
+        )
+        mock_adk.streaming.streaming_task_message_context.return_value = text_cm
+
+        result = await run_claude_agent_activity(prompt="Hi", workspace_path="/ws", allowed_tools=["Read"])
+
+        # streaming_task_message_context was called to open the text stream
+        mock_adk.streaming.streaming_task_message_context.assert_called()
+        # The CM was entered and then exited via close_text_stream (uses __aexit__)
+        assert text_cm.exited is True
+        # Result includes the text in serialized_messages
+        assert len(result["messages"]) == 1
+        assert result["messages"][0]["content"] == "Hello world"
+
+    @patch(_ACTIVITY_PATCHES[0])
+    @patch(_ACTIVITY_PATCHES[1])
+    @patch(_ACTIVITY_PATCHES[2])
+    @patch(_ACTIVITY_PATCHES[3])
+    @patch(_ACTIVITY_PATCHES[4])
+    @patch(_ACTIVITY_PATCHES[5])
+    async def test_tool_use_block_closes_text_stream_first(
+        self,
+        mock_adk,
+        mock_create_hooks,
+        mock_client_cls,
+        mock_parent_span_id,
+        mock_trace_id,
+        mock_task_id,
+    ):
+        """ToolUseBlock should close any open text stream before streaming the tool request."""
+        from agentex.lib.core.temporal.plugins.claude_agents.activities import run_claude_agent_activity
+
+        text_ctx = MagicMock()
+        text_ctx.task_message = MagicMock()
+        text_ctx.stream_update = AsyncMock()
+        text_cm = _AsyncCtxManager(text_ctx)
+
+        # Tool request CM
+        tool_ctx = MagicMock()
+        tool_ctx.task_message = MagicMock()
+        tool_ctx.stream_update = AsyncMock()
+        tool_cm = _AsyncCtxManager(tool_ctx)
+
+        mock_adk = _setup_activity_mocks(
+            mock_adk,
+            mock_create_hooks,
+            mock_client_cls,
+            mock_task_id,
+            mock_trace_id,
+            mock_parent_span_id,
+            messages=[
+                AssistantMessage(
+                    content=[
+                        TextBlock(text="Let me check"),
+                        ToolUseBlock(id="tu-1", name="Read", input={"file": "foo.py"}),
+                    ],
+                    model="claude",
+                ),
+            ],
+        )
+        # First call returns text CM, second returns tool CM
+        mock_adk.streaming.streaming_task_message_context.side_effect = [text_cm, tool_cm]
+
+        await run_claude_agent_activity(prompt="Hi", workspace_path="/ws", allowed_tools=["Read"])
+
+        # Text CM was closed (via __aexit__) before tool streaming started
+        assert text_cm.exited is True
+        assert mock_adk.streaming.streaming_task_message_context.call_count == 2
+
+    @patch(_ACTIVITY_PATCHES[0])
+    @patch(_ACTIVITY_PATCHES[1])
+    @patch(_ACTIVITY_PATCHES[2])
+    @patch(_ACTIVITY_PATCHES[3])
+    @patch(_ACTIVITY_PATCHES[4])
+    @patch(_ACTIVITY_PATCHES[5])
+    async def test_result_message_captures_session_and_cost(
+        self,
+        mock_adk,
+        mock_create_hooks,
+        mock_client_cls,
+        mock_parent_span_id,
+        mock_trace_id,
+        mock_task_id,
+    ):
+        """ResultMessage should capture session_id, usage, and cost."""
+        from agentex.lib.core.temporal.plugins.claude_agents.activities import run_claude_agent_activity
+
+        _setup_activity_mocks(
+            mock_adk,
+            mock_create_hooks,
+            mock_client_cls,
+            mock_task_id,
+            mock_trace_id,
+            mock_parent_span_id,
+            messages=[
+                ResultMessage(
+                    subtype="result",
+                    duration_ms=1500,
+                    duration_api_ms=1200,
+                    is_error=False,
+                    num_turns=3,
+                    session_id="sess-abc",
+                    total_cost_usd=0.05,
+                    usage={"input_tokens": 100, "output_tokens": 50},
+                ),
+            ],
+        )
+
+        result = await run_claude_agent_activity(prompt="Hi", workspace_path="/ws", allowed_tools=["Read"])
+
+        assert result["session_id"] == "sess-abc"
+        assert result["cost_usd"] == 0.05
+        assert result["usage"] == {"input_tokens": 100, "output_tokens": 50}
+
+    @patch(_ACTIVITY_PATCHES[0])
+    @patch(_ACTIVITY_PATCHES[1])
+    @patch(_ACTIVITY_PATCHES[2])
+    @patch(_ACTIVITY_PATCHES[3])
+    @patch(_ACTIVITY_PATCHES[4])
+    @patch(_ACTIVITY_PATCHES[5])
+    async def test_system_init_message_captures_session_id(
+        self,
+        mock_adk,
+        mock_create_hooks,
+        mock_client_cls,
+        mock_parent_span_id,
+        mock_trace_id,
+        mock_task_id,
+    ):
+        """SystemMessage with subtype 'init' should capture session_id."""
+        from agentex.lib.core.temporal.plugins.claude_agents.activities import run_claude_agent_activity
+
+        _setup_activity_mocks(
+            mock_adk,
+            mock_create_hooks,
+            mock_client_cls,
+            mock_task_id,
+            mock_trace_id,
+            mock_parent_span_id,
+            messages=[
+                SystemMessage(subtype="init", data={"session_id": "sess-init-123"}),
+            ],
+        )
+
+        result = await run_claude_agent_activity(prompt="Hi", workspace_path="/ws", allowed_tools=["Read"])
+
+        assert result["session_id"] == "sess-init-123"
+
+    @patch(_ACTIVITY_PATCHES[0])
+    @patch(_ACTIVITY_PATCHES[1])
+    @patch(_ACTIVITY_PATCHES[2])
+    @patch(_ACTIVITY_PATCHES[3])
+    @patch(_ACTIVITY_PATCHES[4])
+    @patch(_ACTIVITY_PATCHES[5])
+    async def test_exception_cleans_up_text_stream_and_subagent_spans(
+        self,
+        mock_adk,
+        mock_create_hooks,
+        mock_client_cls,
+        mock_parent_span_id,
+        mock_trace_id,
+        mock_task_id,
+    ):
+        """On exception, both text stream and subagent spans should be cleaned up."""
+        from agentex.lib.core.temporal.plugins.claude_agents.activities import run_claude_agent_activity
+
+        mock_adk = _setup_activity_mocks(
+            mock_adk,
+            mock_create_hooks,
+            mock_client_cls,
+            mock_task_id,
+            mock_trace_id,
+            mock_parent_span_id,
+            messages=[],
+        )
+
+        # Make the client raise after entering
+        mock_client = AsyncMock()
+        mock_client.receive_response = MagicMock(side_effect=RuntimeError("connection lost"))
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+
+        import pytest
+
+        with pytest.raises(RuntimeError, match="connection lost"):
+            await run_claude_agent_activity(prompt="Hi", workspace_path="/ws", allowed_tools=["Read"])
+
+    @patch(_ACTIVITY_PATCHES[0])
+    @patch(_ACTIVITY_PATCHES[1])
+    @patch(_ACTIVITY_PATCHES[2])
+    @patch(_ACTIVITY_PATCHES[3])
+    @patch(_ACTIVITY_PATCHES[4])
+    @patch(_ACTIVITY_PATCHES[5])
+    async def test_empty_text_block_not_serialized(
+        self,
+        mock_adk,
+        mock_create_hooks,
+        mock_client_cls,
+        mock_parent_span_id,
+        mock_trace_id,
+        mock_task_id,
+    ):
+        """TextBlock with empty text should not appear in serialized messages."""
+        from agentex.lib.core.temporal.plugins.claude_agents.activities import run_claude_agent_activity
+
+        _setup_activity_mocks(
+            mock_adk,
+            mock_create_hooks,
+            mock_client_cls,
+            mock_task_id,
+            mock_trace_id,
+            mock_parent_span_id,
+            messages=[AssistantMessage(content=[TextBlock(text="")], model="claude")],
+        )
+
+        result = await run_claude_agent_activity(prompt="Hi", workspace_path="/ws", allowed_tools=["Read"])
+
+        assert result["messages"] == []
 
 
 class AsyncIteratorMock:
