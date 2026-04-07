@@ -1,4 +1,9 @@
-"""Temporal activities for Claude Agents SDK integration."""
+"""Temporal activities for Claude Agents SDK integration.
+
+Processes all content blocks from the AssistantMessage stream in iteration order
+(TextBlock, ThinkingBlock, ToolUseBlock) with correct timestamps. Tool results
+come from PostToolUse/PostToolUseFailure hooks which fire between message yields.
+"""
 
 from __future__ import annotations
 
@@ -8,10 +13,25 @@ from typing import Any
 
 from temporalio import activity
 from claude_agent_sdk import AgentDefinition, ClaudeSDKClient, ClaudeAgentOptions
+from claude_agent_sdk.types import (
+    AssistantMessage,
+    HookEvent,
+    HookMatcher,
+    ResultMessage,
+    SystemMessage,
+    TextBlock,
+    ThinkingBlock,
+    ToolUseBlock,
+)
 
+from agentex.lib import adk
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.core.temporal.plugins.claude_agents.hooks import create_streaming_hooks
-from agentex.lib.core.temporal.plugins.claude_agents.message_handler import ClaudeMessageHandler
+from agentex.lib.core.temporal.plugins.claude_agents.hooks.hooks import create_streaming_hooks
+from agentex.types.text_content import TextContent
+from agentex.types.text_delta import TextDelta
+from agentex.types.reasoning_content import ReasoningContent
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.task_message_update import StreamTaskMessageDelta, StreamTaskMessageFull
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     streaming_task_id,
     streaming_trace_id,
@@ -115,12 +135,11 @@ async def run_claude_agent_activity(
 ) -> dict[str, Any]:
     """Execute Claude SDK - wrapped in Temporal activity.
 
-    This activity:
-    1. Gets task_id from ContextVar (set by ContextInterceptor)
-    2. Configures Claude with workspace isolation and session resume
-    3. Runs Claude SDK and processes messages via ClaudeMessageHandler
-    4. Streams messages to UI in real-time
-    5. Returns session_id, usage, and cost for next turn
+    Streams all content block types to the Agentex UI:
+    - TextBlock → streamed as text deltas (from message stream)
+    - ThinkingBlock → streamed as ReasoningContent (from message stream)
+    - ToolUseBlock → streamed as tool_request (from message stream)
+    - Tool results → streamed as tool_response (from PostToolUse hook)
 
     Args:
         prompt: User message to send to Claude
@@ -157,15 +176,19 @@ async def run_claude_agent_activity(
     agent_defs = _reconstruct_agent_defs(agents)
 
     # Only include explicit params that were actually supplied (non-None),
-    # so claude_options values for system_prompt/resume/agents are not masked.
-    explicit_params: dict[str, Any] = {k: v for k, v in {
-        "cwd": workspace_path,
-        "allowed_tools": allowed_tools,
-        "permission_mode": permission_mode,
-        "system_prompt": system_prompt,
-        "resume": resume_session_id,
-        "agents": agent_defs,
-    }.items() if v is not None}
+    # so claude_options values are not masked.
+    explicit_params: dict[str, Any] = {
+        k: v
+        for k, v in {
+            "cwd": workspace_path,
+            "allowed_tools": allowed_tools,
+            "permission_mode": permission_mode,
+            "system_prompt": system_prompt,
+            "resume": resume_session_id,
+            "agents": agent_defs,
+        }.items()
+        if v is not None
+    }
 
     # Merge in any additional claude_options (explicit params take precedence)
     if claude_options:
@@ -176,61 +199,210 @@ async def run_claude_agent_activity(
     else:
         options_dict = explicit_params
 
-    # Apply default for permission_mode if neither source supplied a value
     if "permission_mode" not in options_dict:
         options_dict["permission_mode"] = "acceptEdits"
 
-    # Create hooks for streaming tool calls and subagent execution
-    streaming_hooks = create_streaming_hooks(
+    # Shared subagent span tracking — hooks and message-level streaming both use this
+    subagent_spans: dict[str, Any] = {}
+
+    # PreToolUse: auto-allow permissions
+    # PostToolUse/PostToolUseFailure: stream tool results (richer than ToolResultBlock)
+    # Subagent spans tracked for Task tool tracing
+    activity_hooks: dict[HookEvent, list[HookMatcher]] = create_streaming_hooks(
         task_id=task_id,
         trace_id=trace_id,
         parent_span_id=parent_span_id,
+        subagent_spans=subagent_spans,
     )
 
-    # Merge streaming hooks with any user-provided hooks from claude_options
+    # Merge with any user-provided hooks from claude_options
     user_hooks = options_dict.pop("hooks", None)
     if user_hooks:
-        merged_hooks = dict(streaming_hooks)
         for event, matchers in user_hooks.items():
-            if event in merged_hooks:
-                merged_hooks[event] = merged_hooks[event] + matchers
+            if event in activity_hooks:
+                activity_hooks[event] = activity_hooks[event] + matchers  # type: ignore[operator]
             else:
-                merged_hooks[event] = matchers
-        options_dict["hooks"] = merged_hooks
-    else:
-        options_dict["hooks"] = streaming_hooks
+                activity_hooks[event] = matchers  # type: ignore[assignment]
 
-    # Construct ClaudeAgentOptions — any SDK field works via claude_options
+    options_dict["hooks"] = activity_hooks
     options = ClaudeAgentOptions(**options_dict)
 
-    # Create message handler for streaming
-    handler = ClaudeMessageHandler(
-        task_id=task_id,
-        trace_id=trace_id,
-        parent_span_id=parent_span_id,
-    )
+    text_streaming_ctx: Any = None
+    session_id: str | None = None
+    usage_info: dict[str, Any] | None = None
+    cost_info: float | None = None
+    serialized_messages: list[dict[str, Any]] = []
 
-    # Run Claude and process messages
+    async def close_text_stream() -> None:
+        nonlocal text_streaming_ctx
+        if text_streaming_ctx:
+            try:
+                await text_streaming_ctx.close()
+            except Exception as e:
+                logger.warning(f"Failed to close text stream: {e}")
+            text_streaming_ctx = None
+
+    async def ensure_text_stream() -> Any:
+        nonlocal text_streaming_ctx
+        if text_streaming_ctx is None and task_id:
+            text_streaming_ctx = await adk.streaming.streaming_task_message_context(
+                task_id=task_id,
+                initial_content=TextContent(author="agent", content="", format="markdown"),
+            ).__aenter__()
+        return text_streaming_ctx
+
+    async def stream_text_delta(text: str) -> None:
+        if not text:
+            return
+        ctx = await ensure_text_stream()
+        if not ctx:
+            return
+        try:
+            await ctx.stream_update(
+                StreamTaskMessageDelta(
+                    parent_task_message=ctx.task_message,
+                    delta=TextDelta(type="text", text_delta=text),
+                    type="delta",
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Failed to stream text delta: {e}")
+
+    async def stream_tool_request(block: ToolUseBlock) -> None:
+        await close_text_stream()
+
+        # Subagent tracing
+        if block.name == "Task" and trace_id and parent_span_id:
+            subagent_type = block.input.get("subagent_type", "unknown")
+            logger.info(f"Subagent started: {subagent_type}")
+            subagent_ctx = adk.tracing.span(
+                trace_id=trace_id,
+                parent_id=parent_span_id,
+                name=f"Subagent: {subagent_type}",
+                input=block.input,
+            )
+            subagent_span = await subagent_ctx.__aenter__()
+            subagent_spans[block.id] = (subagent_ctx, subagent_span)
+
+        if not task_id:
+            return
+        try:
+            async with adk.streaming.streaming_task_message_context(
+                task_id=task_id,
+                initial_content=ToolRequestContent(
+                    author="agent",
+                    name=block.name,
+                    arguments=block.input,
+                    tool_call_id=block.id,
+                ),
+            ) as ctx:
+                await ctx.stream_update(
+                    StreamTaskMessageFull(
+                        parent_task_message=ctx.task_message,
+                        content=ToolRequestContent(
+                            author="agent",
+                            name=block.name,
+                            arguments=block.input,
+                            tool_call_id=block.id,
+                        ),
+                        type="full",
+                    )
+                )
+        except Exception as e:
+            logger.warning(f"Failed to stream tool request: {e}")
+
+    async def stream_reasoning(block: ThinkingBlock) -> None:
+        if not task_id or not block.thinking:
+            return
+        lines = block.thinking.strip().split("\n", 1)
+        summary = [lines[0]] if lines else ["Thinking..."]
+        content = ReasoningContent(
+            author="agent",
+            summary=summary,
+            content=[block.thinking],
+            style="static",
+            type="reasoning",
+        )
+        try:
+            async with adk.streaming.streaming_task_message_context(
+                task_id=task_id,
+                initial_content=content,
+            ) as ctx:
+                await ctx.stream_update(
+                    StreamTaskMessageFull(
+                        parent_task_message=ctx.task_message,
+                        content=content,
+                        type="full",
+                    )
+                )
+        except Exception as e:
+            logger.warning(f"Failed to stream reasoning: {e}")
+
+    async def handle_assistant_message(message: AssistantMessage) -> None:
+        text_parts: list[str] = []
+        for block in message.content:
+            if isinstance(block, TextBlock):
+                await stream_text_delta(block.text)
+                if block.text:
+                    text_parts.append(block.text)
+
+            elif isinstance(block, ThinkingBlock):
+                if block.thinking:
+                    await close_text_stream()
+                    await stream_reasoning(block)
+
+            elif isinstance(block, ToolUseBlock):
+                await stream_tool_request(block)
+
+            # ToolResultBlock skipped — tool results come from PostToolUse hook
+
+        if text_parts:
+            serialized_messages.append(
+                {
+                    "role": "assistant",
+                    "content": "\n".join(text_parts),
+                }
+            )
+
+    async def handle_system_message(message: SystemMessage) -> None:
+        nonlocal session_id
+        if message.subtype == "init":
+            session_id = message.data.get("session_id")
+            logger.debug(f"Session initialized: {session_id[:16] if session_id else 'unknown'}...")
+
+    async def handle_result_message(message: ResultMessage) -> None:
+        nonlocal session_id, usage_info, cost_info
+        usage_info = message.usage
+        cost_info = message.total_cost_usd
+        if message.session_id:
+            session_id = message.session_id
+        logger.info(f"Cost: ${cost_info:.4f}, Duration: {message.duration_ms}ms, Turns: {message.num_turns}")
+
     try:
-        await handler.initialize()
-
         async with ClaudeSDKClient(options=options) as client:
             await client.query(prompt)
-
-            # Use receive_response() instead of receive_messages()
-            # receive_response() yields messages until ResultMessage, then stops
-            # receive_messages() is infinite and never completes!
             async for message in client.receive_response():
-                await handler.handle_message(message)
+                if isinstance(message, AssistantMessage):
+                    await handle_assistant_message(message)
+                elif isinstance(message, SystemMessage):
+                    await handle_system_message(message)
+                elif isinstance(message, ResultMessage):
+                    await handle_result_message(message)
 
-        logger.debug(f"Message loop completed, cleaning up...")
-        await handler.cleanup()
+        logger.debug("Message loop completed, cleaning up...")
+        await close_text_stream()
 
-        results = handler.get_results()
+        results = {
+            "messages": serialized_messages,
+            "task_id": task_id,
+            "session_id": session_id,
+            "usage": usage_info,
+            "cost_usd": cost_info,
+        }
         logger.debug(f"Returning results with keys: {results.keys()}")
         return results
 
     except Exception as e:
         logger.error(f"[run_claude_agent_activity] Error: {e}", exc_info=True)
-        await handler.cleanup()
+        await close_text_stream()
         raise

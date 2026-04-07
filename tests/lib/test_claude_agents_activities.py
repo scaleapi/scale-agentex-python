@@ -27,16 +27,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from claude_agent_sdk import HookMatcher, AgentDefinition, ClaudeAgentOptions
 
 _SRC = Path(__file__).resolve().parents[2] / "src"
-_ACTIVITIES_PATH = (
-    _SRC
-    / "agentex"
-    / "lib"
-    / "core"
-    / "temporal"
-    / "plugins"
-    / "claude_agents"
-    / "activities.py"
-)
+_ACTIVITIES_PATH = _SRC / "agentex" / "lib" / "core" / "temporal" / "plugins" / "claude_agents" / "activities.py"
 
 # Stub the modules that activities.py imports (hooks, message_handler, interceptor)
 _hooks_mock = MagicMock()
@@ -47,9 +38,13 @@ _interceptor_mock.streaming_trace_id = contextvars.ContextVar("streaming_trace_i
 _interceptor_mock.streaming_parent_span_id = contextvars.ContextVar("streaming_parent_span_id", default=None)
 
 # Register stubs for all imports that activities.py does
+_adk_mock = MagicMock()
+_hooks_hooks_mock = MagicMock()
 _stubs = {
+    "agentex.lib.adk": _adk_mock,
     "agentex.lib.utils.logging": MagicMock(),
     "agentex.lib.core.temporal.plugins.claude_agents.hooks": _hooks_mock,
+    "agentex.lib.core.temporal.plugins.claude_agents.hooks.hooks": _hooks_hooks_mock,
     "agentex.lib.core.temporal.plugins.claude_agents.message_handler": _handler_mock,
     "agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor": _interceptor_mock,
 }
@@ -281,12 +276,14 @@ class TestRunClaudeAgentActivity:
 
         # Set up handler (get_results is sync, so use MagicMock for it)
         mock_handler = AsyncMock()
-        mock_handler.get_results = MagicMock(return_value={
-            "messages": [],
-            "session_id": "sess-1",
-            "usage": {},
-            "cost_usd": 0.0,
-        })
+        mock_handler.get_results = MagicMock(
+            return_value={
+                "messages": [],
+                "session_id": "sess-1",
+                "usage": {},
+                "cost_usd": 0.0,
+            }
+        )
         mock_handler_cls.return_value = mock_handler
 
         # Extra SDK options passed via claude_options
@@ -355,9 +352,14 @@ class TestRunClaudeAgentActivity:
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         mock_handler = AsyncMock()
-        mock_handler.get_results = MagicMock(return_value={
-            "messages": [], "session_id": "s", "usage": {}, "cost_usd": 0.0,
-        })
+        mock_handler.get_results = MagicMock(
+            return_value={
+                "messages": [],
+                "session_id": "s",
+                "usage": {},
+                "cost_usd": 0.0,
+            }
+        )
         mock_handler_cls.return_value = mock_handler
 
         # system_prompt explicit param is None (default), but claude_options has a value
@@ -418,12 +420,14 @@ class TestRunClaudeAgentActivity:
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         mock_handler = AsyncMock()
-        mock_handler.get_results = MagicMock(return_value={
-            "messages": [],
-            "session_id": "s",
-            "usage": {},
-            "cost_usd": 0.0,
-        })
+        mock_handler.get_results = MagicMock(
+            return_value={
+                "messages": [],
+                "session_id": "s",
+                "usage": {},
+                "cost_usd": 0.0,
+            }
+        )
         mock_handler_cls.return_value = mock_handler
 
         # User-provided hook via claude_options
