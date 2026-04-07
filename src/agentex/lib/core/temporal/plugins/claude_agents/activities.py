@@ -379,7 +379,8 @@ async def run_claude_agent_activity(
         cost_info = message.total_cost_usd
         if message.session_id:
             session_id = message.session_id
-        logger.info(f"Cost: ${cost_info:.4f}, Duration: {message.duration_ms}ms, Turns: {message.num_turns}")
+        cost_str = f"${cost_info:.4f}" if cost_info is not None else "N/A"
+        logger.info(f"Cost: {cost_str}, Duration: {message.duration_ms}ms, Turns: {message.num_turns}")
 
     try:
         async with ClaudeSDKClient(options=options) as client:
