@@ -405,4 +405,10 @@ async def run_claude_agent_activity(
     except Exception as e:
         logger.error(f"[run_claude_agent_activity] Error: {e}", exc_info=True)
         await close_text_stream()
+        for _ctx, _span in list(subagent_spans.values()):
+            try:
+                await _ctx.__aexit__(None, None, None)
+            except Exception:
+                pass
+        subagent_spans.clear()
         raise

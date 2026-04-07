@@ -248,7 +248,7 @@ class TestRunClaudeAgentActivity:
     )
     async def test_passes_claude_options_to_sdk(
         self,
-        mock_adk,
+        _mock_adk,
         mock_create_hooks,
         mock_client_cls,
         mock_parent_span_id,
@@ -317,7 +317,7 @@ class TestRunClaudeAgentActivity:
     )
     async def test_claude_options_not_masked_by_none_explicit_params(
         self,
-        mock_adk,
+        _mock_adk,
         mock_create_hooks,
         mock_client_cls,
         mock_parent_span_id,
@@ -371,7 +371,7 @@ class TestRunClaudeAgentActivity:
     )
     async def test_merges_user_hooks_with_streaming_hooks(
         self,
-        mock_adk,
+        _mock_adk,
         mock_create_hooks,
         mock_client_cls,
         mock_parent_span_id,
