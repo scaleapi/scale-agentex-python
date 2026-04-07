@@ -100,30 +100,28 @@ class TemporalStreamingHooks:
 
         # Close subagent span if applicable
         if tool_use_id in self.subagent_spans:
-            subagent_ctx, subagent_span = self.subagent_spans[tool_use_id]
+            subagent_ctx, subagent_span = self.subagent_spans.pop(tool_use_id)
             subagent_span.output = {"result": tool_output}
-            await subagent_ctx.__aexit__(None, None, None)
-            del self.subagent_spans[tool_use_id]
+            try:
+                await subagent_ctx.__aexit__(None, None, None)
+            except Exception as e:
+                logger.warning(f"Failed to close subagent span: {e}")
 
+        response_content = ToolResponseContent(
+            author="agent",
+            name=tool_name,
+            content=tool_output,
+            tool_call_id=tool_use_id,
+        )
         try:
             async with adk.streaming.streaming_task_message_context(
                 task_id=self.task_id,
-                initial_content=ToolResponseContent(
-                    author="agent",
-                    name=tool_name,
-                    content=tool_output,
-                    tool_call_id=tool_use_id,
-                ),
+                initial_content=response_content,
             ) as ctx:
                 await ctx.stream_update(
                     StreamTaskMessageFull(
                         parent_task_message=ctx.task_message,
-                        content=ToolResponseContent(
-                            author="agent",
-                            name=tool_name,
-                            content=tool_output,
-                            tool_call_id=tool_use_id,
-                        ),
+                        content=response_content,
                         type="full",
                     )
                 )
@@ -152,30 +150,28 @@ class TemporalStreamingHooks:
 
         # Close subagent span if applicable
         if tool_use_id in self.subagent_spans:
-            subagent_ctx, subagent_span = self.subagent_spans[tool_use_id]
+            subagent_ctx, subagent_span = self.subagent_spans.pop(tool_use_id)
             subagent_span.output = {"error": error}
-            await subagent_ctx.__aexit__(None, None, None)
-            del self.subagent_spans[tool_use_id]
+            try:
+                await subagent_ctx.__aexit__(None, None, None)
+            except Exception as e:
+                logger.warning(f"Failed to close subagent span: {e}")
 
+        response_content = ToolResponseContent(
+            author="agent",
+            name=tool_name,
+            content=f"Error: {error}",
+            tool_call_id=tool_use_id,
+        )
         try:
             async with adk.streaming.streaming_task_message_context(
                 task_id=self.task_id,
-                initial_content=ToolResponseContent(
-                    author="agent",
-                    name=tool_name,
-                    content=f"Error: {error}",
-                    tool_call_id=tool_use_id,
-                ),
+                initial_content=response_content,
             ) as ctx:
                 await ctx.stream_update(
                     StreamTaskMessageFull(
                         parent_task_message=ctx.task_message,
-                        content=ToolResponseContent(
-                            author="agent",
-                            name=tool_name,
-                            content=f"Error: {error}",
-                            tool_call_id=tool_use_id,
-                        ),
+                        content=response_content,
                         type="full",
                     )
                 )

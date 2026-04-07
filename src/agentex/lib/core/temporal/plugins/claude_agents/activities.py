@@ -92,10 +92,10 @@ def _reconstruct_agent_defs(agents: dict[str, Any] | None) -> dict[str, AgentDef
             agent_defs[name] = agent_data
         else:
             agent_defs[name] = AgentDefinition(
-                description=agent_data.get('description', ''),
-                prompt=agent_data.get('prompt', ''),
-                tools=agent_data.get('tools'),
-                model=agent_data.get('model'),
+                description=agent_data.get("description", ""),
+                prompt=agent_data.get("prompt", ""),
+                tools=agent_data.get("tools"),
+                model=agent_data.get("model"),
             )
     return agent_defs
 
@@ -318,7 +318,7 @@ async def run_claude_agent_activity(
         if not task_id or not block.thinking:
             return
         lines = block.thinking.strip().split("\n", 1)
-        summary = [lines[0]] if lines else ["Thinking..."]
+        summary = [lines[0]]
         content = ReasoningContent(
             author="agent",
             summary=summary,
