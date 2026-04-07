@@ -89,8 +89,6 @@ class TemporalStreamingHooks:
         _continue = SyncHookJSONOutput(continue_=True)
         if input_data["hook_event_name"] != "PostToolUse":
             return _continue
-        if not self.task_id:
-            return _continue
 
         tool_name = input_data["tool_name"]
         tool_use_id = input_data["tool_use_id"]
@@ -98,7 +96,8 @@ class TemporalStreamingHooks:
 
         logger.info(f"Tool result: {tool_name}")
 
-        # Close subagent span if applicable
+        # Close subagent span before the task_id guard — spans are opened
+        # based on trace_id/parent_span_id, not task_id.
         if tool_use_id in self.subagent_spans:
             subagent_ctx, subagent_span = self.subagent_spans.pop(tool_use_id)
             subagent_span.output = {"result": tool_output}
@@ -106,6 +105,9 @@ class TemporalStreamingHooks:
                 await subagent_ctx.__aexit__(None, None, None)
             except Exception as e:
                 logger.warning(f"Failed to close subagent span: {e}")
+
+        if not self.task_id:
+            return _continue
 
         response_content = ToolResponseContent(
             author="agent",
@@ -139,8 +141,6 @@ class TemporalStreamingHooks:
         _continue = SyncHookJSONOutput(continue_=True)
         if input_data["hook_event_name"] != "PostToolUseFailure":
             return _continue
-        if not self.task_id:
-            return _continue
 
         tool_name = input_data["tool_name"]
         tool_use_id = input_data["tool_use_id"]
@@ -148,7 +148,8 @@ class TemporalStreamingHooks:
 
         logger.warning(f"Tool failed: {tool_name} — {error}")
 
-        # Close subagent span if applicable
+        # Close subagent span before the task_id guard — spans are opened
+        # based on trace_id/parent_span_id, not task_id.
         if tool_use_id in self.subagent_spans:
             subagent_ctx, subagent_span = self.subagent_spans.pop(tool_use_id)
             subagent_span.output = {"error": error}
@@ -156,6 +157,9 @@ class TemporalStreamingHooks:
                 await subagent_ctx.__aexit__(None, None, None)
             except Exception as e:
                 logger.warning(f"Failed to close subagent span: {e}")
+
+        if not self.task_id:
+            return _continue
 
         response_content = ToolResponseContent(
             author="agent",
