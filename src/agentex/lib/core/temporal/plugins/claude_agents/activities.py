@@ -227,28 +227,31 @@ async def run_claude_agent_activity(
     options_dict["hooks"] = activity_hooks
     options = ClaudeAgentOptions(**options_dict)
 
-    text_streaming_ctx: Any = None
+    text_streaming_cm: Any = None  # the context manager itself
+    text_streaming_ctx: Any = None  # the value returned by __aenter__
     session_id: str | None = None
     usage_info: dict[str, Any] | None = None
     cost_info: float | None = None
     serialized_messages: list[dict[str, Any]] = []
 
     async def close_text_stream() -> None:
-        nonlocal text_streaming_ctx
-        if text_streaming_ctx:
+        nonlocal text_streaming_cm, text_streaming_ctx
+        if text_streaming_ctx and text_streaming_cm:
             try:
-                await text_streaming_ctx.close()
+                await text_streaming_cm.__aexit__(None, None, None)
             except Exception as e:
                 logger.warning(f"Failed to close text stream: {e}")
+            text_streaming_cm = None
             text_streaming_ctx = None
 
     async def ensure_text_stream() -> Any:
-        nonlocal text_streaming_ctx
+        nonlocal text_streaming_cm, text_streaming_ctx
         if text_streaming_ctx is None and task_id:
-            text_streaming_ctx = await adk.streaming.streaming_task_message_context(
+            text_streaming_cm = adk.streaming.streaming_task_message_context(
                 task_id=task_id,
                 initial_content=TextContent(author="agent", content="", format="markdown"),
-            ).__aenter__()
+            )
+            text_streaming_ctx = await text_streaming_cm.__aenter__()
         return text_streaming_ctx
 
     async def stream_text_delta(text: str) -> None:
