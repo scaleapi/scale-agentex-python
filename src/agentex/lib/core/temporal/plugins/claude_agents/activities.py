@@ -14,24 +14,24 @@ from typing import Any
 from temporalio import activity
 from claude_agent_sdk import AgentDefinition, ClaudeSDKClient, ClaudeAgentOptions
 from claude_agent_sdk.types import (
-    AssistantMessage,
     HookEvent,
+    TextBlock,
     HookMatcher,
+    ToolUseBlock,
     ResultMessage,
     SystemMessage,
-    TextBlock,
     ThinkingBlock,
-    ToolUseBlock,
+    AssistantMessage,
 )
 
 from agentex.lib import adk
-from agentex.lib.utils.logging import make_logger
-from agentex.lib.core.temporal.plugins.claude_agents.hooks.hooks import create_streaming_hooks
-from agentex.types.text_content import TextContent
 from agentex.types.text_delta import TextDelta
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
 from agentex.types.reasoning_content import ReasoningContent
+from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
 from agentex.types.tool_request_content import ToolRequestContent
-from agentex.types.task_message_update import StreamTaskMessageDelta, StreamTaskMessageFull
+from agentex.lib.core.temporal.plugins.claude_agents.hooks.hooks import create_streaming_hooks
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     streaming_task_id,
     streaming_trace_id,
