@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.10 (2026-04-07)
+
+Full Changelog: [v0.9.9...v0.9.10](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.9...v0.9.10)
+
+### Features
+
+* **adk:** Revamp run_claude_agent_activity to use more streaming ([#309](https://github.com/scaleapi/scale-agentex-python/issues/309)) ([25069d3](https://github.com/scaleapi/scale-agentex-python/commit/25069d3dccc7534ecfba114b581878af758c3487))
+
 ## 0.9.9 (2026-04-07)
 
 Full Changelog: [v0.9.8...v0.9.9](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.8...v0.9.9)
