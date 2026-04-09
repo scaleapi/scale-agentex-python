@@ -94,10 +94,15 @@ class BuildContextManager:
             dockerignore_path = (
                 self.build_context_root / self.agent_manifest.build.context.dockerignore
             )
-            self.add_dockerignore(
-                root_path=self.path, dockerignore_path=dockerignore_path
-            )
-            ignore_patterns = _extract_dockerignore_patterns(dockerignore_path)
+            if dockerignore_path.exists():
+                self.add_dockerignore(
+                    root_path=self.path, dockerignore_path=dockerignore_path
+                )
+                ignore_patterns = _extract_dockerignore_patterns(dockerignore_path)
+            else:
+                logger.warning(
+                    f"Dockerignore file not found at {dockerignore_path}, skipping."
+                )
 
         for directory in self.agent_manifest.build.context.include_paths:
             directory_path = self.build_context_root / directory
