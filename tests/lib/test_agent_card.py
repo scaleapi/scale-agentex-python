@@ -333,6 +333,7 @@ class TestRegisterAgentCardMerge:
             "AGENT_ID": None,
             "AGENT_INPUT_TYPE": None,
             "AGENT_API_KEY": None,
+            "AGENTEX_DEPLOYMENT_ID": None,
         })()
         return mock
 
