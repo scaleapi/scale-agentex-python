@@ -31,7 +31,7 @@ def get_build_info():
     except Exception:
         return None
 
-async def register_agent(env_vars: EnvironmentVariables):
+async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
     """Register this agent with the Agentex server"""
     if not env_vars.AGENTEX_BASE_URL:
         logger.warning("AGENTEX_BASE_URL is not set, skipping registration")
@@ -48,6 +48,9 @@ async def register_agent(env_vars: EnvironmentVariables):
     registration_metadata = get_build_info() or {}
     if env_vars.AGENTEX_DEPLOYMENT_ID:
         registration_metadata["deployment_id"] = env_vars.AGENTEX_DEPLOYMENT_ID
+    if agent_card is not None:
+        card_data = agent_card.model_dump() if hasattr(agent_card, "model_dump") else agent_card
+        registration_metadata["agent_card"] = card_data
 
     # Prepare registration data
     registration_data = {
