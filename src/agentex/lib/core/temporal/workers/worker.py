@@ -128,6 +128,7 @@ class AgentexWorker:
         health_check_port: int | None = None,
         plugins: list = [],
         interceptors: list = [],
+        metrics_url: str | None = None,
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -138,6 +139,7 @@ class AgentexWorker:
         self.health_check_port = health_check_port if health_check_port is not None else EnvironmentVariables.refresh().HEALTH_CHECK_PORT
         self.plugins = plugins
         self.interceptors = interceptors
+        self.metrics_url = metrics_url
 
     @overload
     async def run(
@@ -172,6 +174,7 @@ class AgentexWorker:
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
             plugins=self.plugins,
+            metrics_url=self.metrics_url,
         )
 
         # Enable debug mode if AgentEx debug is enabled (disables deadlock detection)
