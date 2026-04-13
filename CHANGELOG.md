@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.10.0 (2026-04-13)
+
+Full Changelog: [v0.9.10...v0.10.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.10...v0.10.0)
+
+### Features
+
+* add AgentCard for self-describing agent capabilities ([#296](https://github.com/scaleapi/scale-agentex-python/issues/296)) ([6509be1](https://github.com/scaleapi/scale-agentex-python/commit/6509be1e5d9bc53e6058b22c45c760e04a4c4006))
+* **api:** api update ([0ed71a9](https://github.com/scaleapi/scale-agentex-python/commit/0ed71a97249478a35cddcd79ec39cae4d531fc6d))
+
+
+### Bug Fixes
+
+* ensure file data are only sent as 1 parameter ([dea857a](https://github.com/scaleapi/scale-agentex-python/commit/dea857a5a18363ba1aae4ae699069331d4f7280d))
+
 ## 0.9.10 (2026-04-07)
 
 Full Changelog: [v0.9.9...v0.9.10](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.9...v0.9.10)
