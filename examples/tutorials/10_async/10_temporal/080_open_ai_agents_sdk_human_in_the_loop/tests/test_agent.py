@@ -143,15 +143,21 @@ class TestNonStreamingEvents:
             # Track tool_response messages (child workflow completion)
             if message.content and message.content.type == "tool_response":
                 seen_tool_response = True
+                # If we already saw DONE but were waiting for tool_response, exit now
+                if found_final_response:
+                    break
 
             # Track agent text messages and their streaming updates
             if message.content and message.content.type == "text" and message.content.author == "agent":
                 content_length = len(message.content.content) if message.content.content else 0
 
-                # Stop when we get DONE status with actual content
+                # Stop when we get DONE with content, but only if tool_response
+                # is already visible. The DONE text can be persisted before the
+                # lifecycle activity persists tool_response to the message list.
                 if message.streaming_status == "DONE" and content_length > 0:
                     found_final_response = True
-                    break
+                    if not seen_tool_request or seen_tool_response:
+                        break
 
         # Verify that we saw the complete flow: tool_request -> human approval -> tool_response -> final answer
         assert seen_tool_request, "Expected to see tool_request message (agent calling wait_for_confirmation)"

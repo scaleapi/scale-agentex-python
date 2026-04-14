@@ -139,8 +139,8 @@ class TemporalStreamingHooks(RunHooks):
                     author="agent",
                     tool_call_id=tool_call_id,
                     name=tool.name,
-                    arguments=tool_arguments,  # Now properly extracted from context
-                ),
+                    arguments=tool_arguments,
+                ).model_dump(),
             ],
             start_to_close_timeout=self.timeout,
         )
@@ -176,7 +176,7 @@ class TemporalStreamingHooks(RunHooks):
                     tool_call_id=tool_call_id,
                     name=tool.name,
                     content=result,
-                ),
+                ).model_dump(),
             ],
             start_to_close_timeout=self.timeout,
         )
@@ -203,7 +203,7 @@ class TemporalStreamingHooks(RunHooks):
                     author="agent",
                     content=f"Handoff from {from_agent.name} to {to_agent.name}",
                     type="text",
-                ),
+                ).model_dump(),
             ],
             start_to_close_timeout=self.timeout,
         )

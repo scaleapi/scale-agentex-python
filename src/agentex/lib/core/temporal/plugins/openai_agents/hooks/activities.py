@@ -4,7 +4,7 @@ This module provides reusable Temporal activities for streaming content
 to the AgentEx UI, designed to work with TemporalStreamingHooks.
 """
 
-from typing import Union
+from typing import Any, Dict
 
 from temporalio import activity
 
@@ -12,16 +12,32 @@ from agentex.lib import adk
 from agentex.types.text_content import TextContent
 from agentex.types.task_message_update import StreamTaskMessageFull
 from agentex.types.task_message_content import (
-    TaskMessageContent,
     ToolRequestContent,
     ToolResponseContent,
 )
 
 
+def _deserialize_content(data: Dict[str, Any]):
+    """Reconstruct the correct content type from a dict using the 'type' discriminator.
+
+    Temporal's payload converter deserializes Union types by trying each variant
+    in order, which causes ToolResponseContent to be misdeserialized as TextContent
+    (both have 'author' and 'content' fields). This function uses the 'type' field
+    to pick the correct Pydantic model.
+    """
+    content_type = data.get("type")
+    if content_type == "tool_request":
+        return ToolRequestContent.model_validate(data)
+    elif content_type == "tool_response":
+        return ToolResponseContent.model_validate(data)
+    else:
+        return TextContent.model_validate(data)
+
+
 @activity.defn(name="stream_lifecycle_content")
 async def stream_lifecycle_content(
     task_id: str,
-    content: Union[TextContent, ToolRequestContent, ToolResponseContent, TaskMessageContent],
+    content: Dict[str, Any],
 ) -> None:
     """Stream agent lifecycle content to the AgentEx UI.
 
@@ -32,28 +48,16 @@ async def stream_lifecycle_content(
     Designed to work seamlessly with TemporalStreamingHooks. The hooks class
     will call this activity automatically when lifecycle events occur.
 
+    Note: The content parameter is a dict (not a typed Union) because Temporal's
+    payload converter misdeserializes Union types with overlapping fields.
+    The correct Pydantic model is reconstructed using the 'type' discriminator.
+
     Args:
         task_id: The AgentEx task ID for routing the content to the correct UI session
-        content: The content to stream - can be any of:
-            - TextContent: Plain text messages (e.g., handoff notifications)
-            - ToolRequestContent: Tool invocation requests with call_id and name
-            - ToolResponseContent: Tool execution results with call_id and output
-            - TaskMessageContent: Generic task message content
-
-    Example:
-        Register this activity with your Temporal worker::
-
-            from agentex.lib.core.temporal.plugins.openai_agents import (
-                TemporalStreamingHooks,
-                stream_lifecycle_content,
-            )
-
-            # In your workflow
-            hooks = TemporalStreamingHooks(
-                task_id=params.task.id,
-                stream_activity=stream_lifecycle_content
-            )
-            result = await Runner.run(agent, input, hooks=hooks)
+        content: Dict with a 'type' field that determines the content model:
+            - type="text": TextContent (plain text messages, handoff notifications)
+            - type="tool_request": ToolRequestContent (tool invocation with call_id)
+            - type="tool_response": ToolResponseContent (tool result with call_id)
 
     Note:
         This activity is non-blocking and will not throw exceptions to the workflow.
@@ -61,18 +65,17 @@ async def stream_lifecycle_content(
         that streaming failures don't break the agent execution.
     """
     try:
+        typed_content = _deserialize_content(content)
         async with adk.streaming.streaming_task_message_context(
             task_id=task_id,
-            initial_content=content,
+            initial_content=typed_content,
         ) as streaming_context:
-            # Send the content as a full message update
             await streaming_context.stream_update(
                 StreamTaskMessageFull(
                     parent_task_message=streaming_context.task_message,
-                    content=content,
+                    content=typed_content,
                     type="full",
                 )
             )
     except Exception as e:
-        # Log error but don't fail the activity - streaming failures shouldn't break execution
         activity.logger.warning(f"Failed to stream content to task {task_id}: {e}")
