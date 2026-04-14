@@ -118,9 +118,12 @@ class TestNonStreamingEvents:
                 content_length = len(str(agent_text))
                 final_message = message
 
-                # Stop when we get DONE status
+                # Stop when we get DONE with content. If the agent invoked a tool, keep polling
+                # until tool_response is visible: the final text can be marked DONE before the
+                # lifecycle activity persists tool_response to the message list.
                 if message.streaming_status == "DONE" and content_length > 0:
-                    break
+                    if not seen_tool_request or seen_tool_response:
+                        break
 
         # Verify we got all the expected pieces
         assert seen_tool_request, "Expected to see tool_request message (agent calling get_weather)"

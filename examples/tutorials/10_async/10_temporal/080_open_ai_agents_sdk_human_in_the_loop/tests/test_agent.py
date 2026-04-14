@@ -148,10 +148,13 @@ class TestNonStreamingEvents:
             if message.content and message.content.type == "text" and message.content.author == "agent":
                 content_length = len(message.content.content) if message.content.content else 0
 
-                # Stop when we get DONE status with actual content
+                # Stop when we get DONE with content. If the agent invoked a tool, keep polling
+                # until tool_response is visible: final text can be marked DONE before the
+                # lifecycle activity persists tool_response to the message list.
                 if message.streaming_status == "DONE" and content_length > 0:
                     found_final_response = True
-                    break
+                    if not seen_tool_request or seen_tool_response:
+                        break
 
         # Verify that we saw the complete flow: tool_request -> human approval -> tool_response -> final answer
         assert seen_tool_request, "Expected to see tool_request message (agent calling wait_for_confirmation)"
