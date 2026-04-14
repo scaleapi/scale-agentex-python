@@ -19,6 +19,20 @@ from agentex.types.agent_rpc_result import StreamTaskMessageDone, StreamTaskMess
 from agentex.types.text_content_param import TextContentParam
 
 
+def _task_message_poll_sort_key(message: TaskMessage) -> tuple[int, datetime]:
+    """Order messages within one poll so tool lifecycle rows precede other content.
+
+    Streaming assistant ``text`` rows are often created before ``tool_request`` /
+    ``tool_response`` rows from the same model turn (earlier ``created_at``). Sorting
+    only by ``created_at`` makes consumers that ``break`` on DONE agent text exit the
+    poll generator before tool rows in the same ``list()`` batch are yielded.
+    """
+    ts = message.created_at if message.created_at else datetime.min.replace(tzinfo=timezone.utc)
+    ctype = getattr(message.content, "type", None) if message.content else None
+    phase = 0 if ctype in ("tool_request", "tool_response") else 1
+    return (phase, ts)
+
+
 async def send_event_and_poll_yielding(
     client: AsyncAgentex,
     agent_id: str,
@@ -90,7 +104,11 @@ async def poll_messages(
                       If False, only yield each message ID once (default: False)
 
     Yields:
-        TaskMessage objects as they are discovered or updated
+        TaskMessage objects as they are discovered or updated.
+
+    Within each poll, ``tool_request`` and ``tool_response`` messages are yielded before
+    other types (when present in the same batch), so streaming tests can stop on DONE
+    agent text without missing tool lifecycle rows.
     """
     # Keep track of messages we've already yielded
     seen_message_ids = set()
@@ -102,12 +120,9 @@ async def poll_messages(
     while (datetime.now() - start_time).seconds < timeout:
         messages = await client.messages.list(task_id=task_id)
 
-        # Sort messages by created_at to ensure chronological order
-        # Use datetime.min for messages without created_at timestamp
-        sorted_messages = sorted(
-            messages,
-            key=lambda m: m.created_at if m.created_at else datetime.min.replace(tzinfo=timezone.utc)
-        )
+        # Sort so tool_request / tool_response appear before agent text in the same poll;
+        # then by created_at (see _task_message_poll_sort_key).
+        sorted_messages = sorted(messages, key=_task_message_poll_sort_key)
 
         new_messages_found = 0
         for message in sorted_messages:
