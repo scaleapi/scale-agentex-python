@@ -32,6 +32,9 @@ class Agent(BaseModel):
     agent_input_type: Optional[Literal["text", "json"]] = None
     """The type of input the agent expects."""
 
+    production_deployment_id: Optional[str] = None
+    """ID of the current production deployment."""
+
     registered_at: Optional[datetime] = None
     """The timestamp when the agent was last registered"""
 
