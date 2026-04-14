@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.0 (2026-04-14)
+
+Full Changelog: [v0.9.10...v0.10.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.10...v0.10.0)
+
+### Features
+
+* add AgentCard for self-describing agent capabilities ([#296](https://github.com/scaleapi/scale-agentex-python/issues/296)) ([6509be1](https://github.com/scaleapi/scale-agentex-python/commit/6509be1e5d9bc53e6058b22c45c760e04a4c4006))
+* **api:** api update ([8abce2b](https://github.com/scaleapi/scale-agentex-python/commit/8abce2ba6131732688f04bacff33da506e47c77f))
+
+
+### Bug Fixes
+
+* ensure file data are only sent as 1 parameter ([48fae27](https://github.com/scaleapi/scale-agentex-python/commit/48fae27b6a761984f7fb70cb7a87da76a4192d12))
+* Temporal Union deserialization causing tool_response messages to be lost ([79ef4dd](https://github.com/scaleapi/scale-agentex-python/commit/79ef4dd7a0ab1b8bb1151f5e16124ec5a947dfd4))
+* **temporal:** allowing-ACP-temporal-telemetry ([9b44eb0](https://github.com/scaleapi/scale-agentex-python/commit/9b44eb0f5c6482984f972674d7a8612980c5b576))
+
 ## 0.9.10 (2026-04-07)
 
 Full Changelog: [v0.9.9...v0.9.10](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.9...v0.9.10)
