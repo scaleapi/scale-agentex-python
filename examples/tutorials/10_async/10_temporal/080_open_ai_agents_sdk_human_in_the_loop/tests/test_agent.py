@@ -148,9 +148,12 @@ class TestNonStreamingEvents:
             if message.content and message.content.type == "text" and message.content.author == "agent":
                 content_length = len(message.content.content) if message.content.content else 0
 
-                # Stop when we get DONE status with actual content
+                # Stop when we get DONE with content (after tool_response if a tool ran;
+                # tool rows can appear on a later poll than final text).
                 if message.streaming_status == "DONE" and content_length > 0:
                     found_final_response = True
+                    if seen_tool_request and not seen_tool_response:
+                        continue
                     break
 
         # Verify that we saw the complete flow: tool_request -> human approval -> tool_response -> final answer

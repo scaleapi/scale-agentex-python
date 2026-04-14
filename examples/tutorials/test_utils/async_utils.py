@@ -17,19 +17,26 @@ from agentex.types.task_message import TaskMessage
 from agentex.types.agent_rpc_params import ParamsSendEventRequest
 from agentex.types.agent_rpc_result import StreamTaskMessageDone, StreamTaskMessageFull
 from agentex.types.text_content_param import TextContentParam
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_response_content import ToolResponseContent
 
 
-def _task_message_poll_sort_key(message: TaskMessage) -> tuple[int, datetime]:
-    """Order messages within one poll so tool lifecycle rows precede other content.
+def _is_tool_lifecycle_message(message: TaskMessage) -> bool:
+    """True for tool request/response rows (by model type or ``content.type`` string)."""
+    c = message.content
+    if c is None:
+        return False
+    if isinstance(c, (ToolRequestContent, ToolResponseContent)):
+        return True
+    ctype = getattr(c, "type", None)
+    return ctype in ("tool_request", "tool_response")
 
-    Streaming assistant ``text`` rows are often created before ``tool_request`` /
-    ``tool_response`` rows from the same model turn (earlier ``created_at``). Sorting
-    only by ``created_at`` makes consumers that ``break`` on DONE agent text exit the
-    poll generator before tool rows in the same ``list()`` batch are yielded.
-    """
-    ts = message.created_at if message.created_at else datetime.min.replace(tzinfo=timezone.utc)
-    ctype = getattr(message.content, "type", None) if message.content else None
-    phase = 0 if ctype in ("tool_request", "tool_response") else 1
+
+def _pending_poll_sort_key(item: tuple[TaskMessage, int | None]) -> tuple[int, datetime]:
+    """Yield tool lifecycle messages before other content in the same poll batch."""
+    m, _ = item
+    ts = m.created_at if m.created_at else datetime.min.replace(tzinfo=timezone.utc)
+    phase = 0 if _is_tool_lifecycle_message(m) else 1
     return (phase, ts)
 
 
@@ -106,12 +113,14 @@ async def poll_messages(
     Yields:
         TaskMessage objects as they are discovered or updated.
 
-    Within each poll, ``tool_request`` and ``tool_response`` messages are yielded before
-    other types (when present in the same batch), so streaming tests can stop on DONE
-    agent text without missing tool lifecycle rows.
+    Within each poll, messages to emit are collected first, then re-ordered so
+    ``tool_request`` / ``tool_response`` rows are yielded before other content in that
+    batch. ``tool_response`` can also appear on a later poll than final assistant text;
+    callers that ``break`` on DONE text should keep polling until they have seen
+    ``tool_response`` after a ``tool_request`` (see tutorial tests).
     """
     # Keep track of messages we've already yielded
-    seen_message_ids = set()
+    seen_message_ids: set[str] = set()
     # Track message content hashes to detect updates (for streaming)
     message_content_hashes: dict[str, int] = {}
     start_time = datetime.now()
@@ -120,11 +129,15 @@ async def poll_messages(
     while (datetime.now() - start_time).seconds < timeout:
         messages = await client.messages.list(task_id=task_id)
 
-        # Sort so tool_request / tool_response appear before agent text in the same poll;
-        # then by created_at (see _task_message_poll_sort_key).
-        sorted_messages = sorted(messages, key=_task_message_poll_sort_key)
+        sorted_messages = sorted(
+            messages,
+            key=lambda m: m.created_at if m.created_at else datetime.min.replace(tzinfo=timezone.utc),
+        )
 
-        new_messages_found = 0
+        # Collect (message, hash) for this poll without mutating dedupe state yet, then
+        # yield tool lifecycle rows before streaming text / other updates in the same batch.
+        pending: list[tuple[TaskMessage, int | None]] = []
+
         for message in sorted_messages:
             # Check if message passes timestamp filter
             if messages_created_after and message.created_at:
@@ -156,16 +169,22 @@ async def poll_messages(
                 is_updated = message.id in message_content_hashes and message_content_hashes[message.id] != content_hash
 
                 if is_new_message or is_updated:
-                    message_content_hashes[message.id] = content_hash
-                    seen_message_ids.add(message.id)
-                    new_messages_found += 1
-                    yield message
+                    pending.append((message, content_hash))
             else:
                 # Original behavior: only yield each message ID once
                 if is_new_message:
-                    seen_message_ids.add(message.id)
-                    new_messages_found += 1
-                    yield message
+                    pending.append((message, None))
+
+        pending.sort(key=_pending_poll_sort_key)
+
+        for message, content_hash in pending:
+            mid = message.id
+            if not mid:
+                continue
+            if yield_updates and content_hash is not None:
+                message_content_hashes[mid] = content_hash
+            seen_message_ids.add(mid)
+            yield message
 
         # Sleep before next poll
         await asyncio.sleep(sleep_interval)

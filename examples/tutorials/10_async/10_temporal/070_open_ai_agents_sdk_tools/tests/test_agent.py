@@ -118,8 +118,11 @@ class TestNonStreamingEvents:
                 content_length = len(str(agent_text))
                 final_message = message
 
-                # Stop when we get DONE status
+                # Stop when we get DONE status (after tool_response if a tool was used;
+                # tool rows can appear on a later poll than final text).
                 if message.streaming_status == "DONE" and content_length > 0:
+                    if seen_tool_request and not seen_tool_response:
+                        continue
                     break
 
         # Verify we got all the expected pieces
