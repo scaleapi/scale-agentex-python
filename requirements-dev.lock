@@ -64,8 +64,6 @@ click==8.3.1
     # via uvicorn
 cloudpickle==3.1.2
     # via agentex-sdk
-colorama==0.4.6
-    # via griffe
 colorlog==6.10.1
     # via nox
 comm==0.2.3
@@ -114,7 +112,7 @@ fsspec==2026.3.0
     # via huggingface-hub
 google-auth==2.49.1
     # via kubernetes
-griffe==1.15.0
+griffelib==2.0.2
     # via openai-agents
 h11==0.16.0
     # via httpcore
@@ -194,7 +192,7 @@ langgraph-checkpoint==4.0.1
     # via agentex-sdk
 langsmith==0.7.22
     # via langchain-core
-litellm==1.82.6
+litellm==1.83.0
     # via agentex-sdk
 markdown-it-py==3.0.0
     # via rich
@@ -229,7 +227,7 @@ openai==2.30.0
     # via agentex-sdk
     # via litellm
     # via openai-agents
-openai-agents==0.4.2
+openai-agents==0.14.1
     # via agentex-sdk
 opentelemetry-api==1.40.0
     # via agentex-sdk
@@ -391,7 +389,7 @@ stack-data==0.6.3
 starlette==0.46.2
     # via fastapi
     # via mcp
-temporalio==1.24.0
+temporalio==1.26.0
     # via agentex-sdk
 tenacity==9.1.4
     # via langchain-core
@@ -478,6 +476,8 @@ wcwidth==0.6.0
     # via prompt-toolkit
 websocket-client==1.9.0
     # via kubernetes
+websockets==15.0.1
+    # via openai-agents
 wrapt==2.1.2
     # via ddtrace
 xxhash==3.6.0
