@@ -27,6 +27,11 @@ from agents.tool import (
     CodeInterpreterTool,
     ImageGenerationTool,
 )
+
+try:
+    from agents.tool import ShellTool  # type: ignore[attr-defined]
+except ImportError:
+    ShellTool = None  # type: ignore[assignment,misc]
 from agents.usage import Usage, InputTokensDetails, OutputTokensDetails  # type: ignore[attr-defined]
 from agents.model_settings import MCPToolChoice
 from openai.types.responses import (
@@ -324,6 +329,13 @@ class TemporalStreamingModel(Model):
                 # The executor handles execution details internally
                 response_tools.append({
                     "type": "local_shell",
+                })
+
+            elif ShellTool is not None and isinstance(tool, ShellTool):
+                environment = dict(tool.environment) if tool.environment else {"type": "local"}
+                response_tools.append({
+                    "type": "shell",
+                    "environment": environment,
                 })
 
             else:
