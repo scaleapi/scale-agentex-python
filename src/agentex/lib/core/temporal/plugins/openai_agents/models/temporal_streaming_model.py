@@ -27,6 +27,7 @@ from agents.tool import (
     CodeInterpreterTool,
     ImageGenerationTool,
 )
+from agents.computer import Computer, AsyncComputer
 
 try:
     from agents.tool import ShellTool  # type: ignore[attr-defined]
@@ -308,11 +309,28 @@ class TemporalStreamingModel(Model):
                     tool_includes.append("file_search_call.results")
 
             elif isinstance(tool, ComputerTool):
+                # In newer openai-agents, tool.computer may be a factory
+                # (ComputerCreate/ComputerProvider). Only concrete Computer
+                # / AsyncComputer instances expose environment/dimensions.
+                computer = tool.computer
+                if not isinstance(computer, (Computer, AsyncComputer)):
+                    raise ValueError(
+                        "ComputerTool.computer must be a Computer or AsyncComputer "
+                        "instance for Responses API serialization; got "
+                        f"{type(computer).__name__}"
+                    )
+                environment = computer.environment
+                dimensions = computer.dimensions
+                if environment is None or dimensions is None:
+                    raise ValueError(
+                        "ComputerTool requires `environment` and `dimensions` on the "
+                        "Computer/AsyncComputer implementation."
+                    )
                 response_tools.append({
                     "type": "computer_use_preview",
-                    "environment": tool.computer.environment,
-                    "display_width": tool.computer.dimensions[0],
-                    "display_height": tool.computer.dimensions[1],
+                    "environment": environment,
+                    "display_width": dimensions[0],
+                    "display_height": dimensions[1],
                 })
 
             elif isinstance(tool, HostedMCPTool):
