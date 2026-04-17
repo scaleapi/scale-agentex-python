@@ -109,7 +109,7 @@ class Trace:
         if span.end_time is None:
             span.end_time = datetime.now(UTC)
 
-        span.input = recursive_model_dump(span.input) if span.input else None
+        # input was already serialized at start_span; skip redundant re-serialization
         span.output = recursive_model_dump(span.output) if span.output else None
         span.data = recursive_model_dump(span.data) if span.data else None
 
@@ -252,12 +252,17 @@ class AsyncTrace:
         if span.end_time is None:
             span.end_time = datetime.now(UTC)
 
-        span.input = recursive_model_dump(span.input) if span.input else None
+        # input was already serialized at start_span; skip redundant re-serialization
         span.output = recursive_model_dump(span.output) if span.output else None
         span.data = recursive_model_dump(span.data) if span.data else None
 
         if self.processors:
-            self._span_queue.enqueue(SpanEventType.END, span.model_copy(deep=True), self.processors)
+            end_copy = span.model_copy(deep=True)
+            # input was already sent with the START event; drop it from the END
+            # copy to avoid retaining large payloads (system prompts, full
+            # conversation histories) in the async queue.
+            end_copy.input = None
+            self._span_queue.enqueue(SpanEventType.END, end_copy, self.processors)
 
         return span
 

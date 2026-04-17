@@ -162,3 +162,18 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         await processor.on_span_end(span)
 
         assert len(processor._spans) == 0
+
+    async def test_sgp_span_input_cleared_after_start(self):
+        """After on_span_start sends the data, sgp_span.input should be None to release memory."""
+        processor, _ = self._make_processor()
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            span = _make_span()
+            span.input = {"system_prompt": "x" * 10_000}
+            await processor.on_span_start(span)
+
+        assert len(processor._spans) == 1
+        sgp_span = next(iter(processor._spans.values()))
+        assert sgp_span.input is None, (
+            "SGP span input should be cleared after upsert to release memory"
+        )

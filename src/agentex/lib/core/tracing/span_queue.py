@@ -12,6 +12,8 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 
 logger = make_logger(__name__)
 
+_DEFAULT_BATCH_SIZE = 50
+
 
 class SpanEventType(str, Enum):
     START = "start"
@@ -28,15 +30,18 @@ class _SpanQueueItem:
 class AsyncSpanQueue:
     """Background FIFO queue for async span processing.
 
-    Span events are enqueued synchronously (non-blocking) and processed
-    sequentially by a background drain task. This keeps tracing HTTP calls
-    off the critical request path while preserving start-before-end ordering.
+    Span events are enqueued synchronously (non-blocking) and drained by a
+    background task.  Items are processed in batches: all START events in a
+    batch are flushed concurrently, then all END events, so that per-span
+    start-before-end ordering is preserved while HTTP calls for independent
+    spans execute in parallel.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, batch_size: int = _DEFAULT_BATCH_SIZE) -> None:
         self._queue: asyncio.Queue[_SpanQueueItem] = asyncio.Queue()
         self._drain_task: asyncio.Task[None] | None = None
         self._stopping = False
+        self._batch_size = batch_size
 
     def enqueue(
         self,
@@ -54,9 +59,45 @@ class AsyncSpanQueue:
         if self._drain_task is None or self._drain_task.done():
             self._drain_task = asyncio.create_task(self._drain_loop())
 
+    # ------------------------------------------------------------------
+    # Drain loop
+    # ------------------------------------------------------------------
+
     async def _drain_loop(self) -> None:
         while True:
-            item = await self._queue.get()
+            # Block until at least one item is available.
+            first = await self._queue.get()
+            batch: list[_SpanQueueItem] = [first]
+
+            # Opportunistically grab more ready items (non-blocking).
+            while len(batch) < self._batch_size:
+                try:
+                    batch.append(self._queue.get_nowait())
+                except asyncio.QueueEmpty:
+                    break
+
+            try:
+                # Separate START and END events.  Processing all STARTs before
+                # ENDs ensures that on_span_start completes before on_span_end
+                # for any span whose both events land in the same batch.
+                starts = [i for i in batch if i.event_type == SpanEventType.START]
+                ends = [i for i in batch if i.event_type == SpanEventType.END]
+
+                if starts:
+                    await self._process_items(starts)
+                if ends:
+                    await self._process_items(ends)
+            finally:
+                for _ in batch:
+                    self._queue.task_done()
+                # Release span data for GC.
+                batch.clear()
+
+    @staticmethod
+    async def _process_items(items: list[_SpanQueueItem]) -> None:
+        """Process a list of span events concurrently."""
+
+        async def _handle(item: _SpanQueueItem) -> None:
             try:
                 if item.event_type == SpanEventType.START:
                     coros = [p.on_span_start(item.span) for p in item.processors]
@@ -72,9 +113,15 @@ class AsyncSpanQueue:
                             exc_info=result,
                         )
             except Exception:
-                logger.exception("Unexpected error in span queue drain loop for span %s", item.span.id)
-            finally:
-                self._queue.task_done()
+                logger.exception(
+                    "Unexpected error in span queue for span %s", item.span.id
+                )
+
+        await asyncio.gather(*[_handle(item) for item in items])
+
+    # ------------------------------------------------------------------
+    # Shutdown
+    # ------------------------------------------------------------------
 
     async def shutdown(self, timeout: float = 30.0) -> None:
         self._stopping = True
