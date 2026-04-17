@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1 (2026-04-17)
+
+Full Changelog: [v0.10.0...v0.10.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.0...v0.10.1)
+
 ## 0.10.0 (2026-04-14)
 
 Full Changelog: [v0.9.10...v0.10.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.9.10...v0.10.0)
