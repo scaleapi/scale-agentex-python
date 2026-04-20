@@ -145,9 +145,6 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             items=[sgp_span.to_request_params()]
         )
 
-        # Input has been serialized and sent; clear it on the retained span to
-        # release memory.  on_span_end only needs output/metadata/end_time.
-        sgp_span.input = None  # type: ignore[assignment]
         self._spans[span.id] = sgp_span
 
     @override
@@ -158,6 +155,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             return
 
         self._add_source_to_span(span)
+        sgp_span.input = span.input  # type: ignore[assignment]
         sgp_span.output = span.output  # type: ignore[assignment]
         sgp_span.metadata = span.data  # type: ignore[assignment]
         sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]

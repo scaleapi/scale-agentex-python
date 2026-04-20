@@ -163,17 +163,28 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
 
         assert len(processor._spans) == 0
 
-    async def test_sgp_span_input_cleared_after_start(self):
-        """After on_span_start sends the data, sgp_span.input should be None to release memory."""
+    async def test_sgp_span_input_updated_on_end(self):
+        """on_span_end should update sgp_span.input from the incoming span."""
         processor, _ = self._make_processor()
 
         with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
             span = _make_span()
-            span.input = {"system_prompt": "x" * 10_000}
+            span.input = {"messages": [{"role": "user", "content": "hello"}]}
             await processor.on_span_start(span)
 
         assert len(processor._spans) == 1
-        sgp_span = next(iter(processor._spans.values()))
-        assert sgp_span.input is None, (
-            "SGP span input should be cleared after upsert to release memory"
-        )
+
+        # Simulate modified input at end time
+        updated_input = {"messages": [
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "hi"},
+        ]}
+        span.input = updated_input
+        span.output = {"response": "hi"}
+        span.end_time = datetime.now(UTC)
+        await processor.on_span_end(span)
+
+        # Span should be removed after end
+        assert len(processor._spans) == 0
+        # The end upsert should have been called
+        assert processor.sgp_async_client.spans.upsert_batch.call_count == 2  # start + end
