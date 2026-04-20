@@ -141,6 +141,9 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         if self.disabled:
             logger.warning("SGP is disabled, skipping span upsert")
             return
+        # TODO(AGX1-198): Batch multiple spans into a single upsert_batch call
+        # instead of one span per HTTP request.
+        # https://linear.app/scale-epd/issue/AGX1-198/actually-use-sgp-batching-for-spans
         await self.sgp_async_client.spans.upsert_batch(  # type: ignore[union-attr]
             items=[sgp_span.to_request_params()]
         )

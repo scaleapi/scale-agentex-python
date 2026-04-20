@@ -29,21 +29,21 @@ To compare before/after the fix:
 
 from __future__ import annotations
 
-import asyncio
 import gc
 import os
-import resource
 import sys
 import time
 import uuid
+import asyncio
+import resource
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from agentex.types.span import Span
-from agentex.lib.core.tracing.span_queue import AsyncSpanQueue
 from agentex.lib.core.tracing.trace import AsyncTrace
+from agentex.lib.core.tracing.span_queue import AsyncSpanQueue
 
 # ---------------------------------------------------------------------------
 # Configuration — tune to match production load profile
