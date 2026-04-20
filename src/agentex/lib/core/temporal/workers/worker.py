@@ -19,6 +19,7 @@ from temporalio.worker import (
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.converter import (
     DataConverter,
+    PayloadCodec,
     JSONTypeConverter,
     AdvancedJSONEncoder,
     DefaultPayloadConverter,
@@ -89,7 +90,12 @@ def _validate_interceptors(interceptors: list) -> None:
             )
 
 
-async def get_temporal_client(temporal_address: str, metrics_url: str | None = None, plugins: list = []) -> Client:
+async def get_temporal_client(
+    temporal_address: str,
+    metrics_url: str | None = None,
+    plugins: list = [],
+    payload_codec: PayloadCodec | None = None,
+) -> Client:
     if plugins != []:  # We don't need to validate the plugins if they are empty
         _validate_plugins(plugins)
 
@@ -108,7 +114,10 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
 
     # Only set data_converter if OpenAI plugin is not present
     if not has_openai_plugin:
-        connect_kwargs["data_converter"] = custom_data_converter
+        data_converter = custom_data_converter
+        if payload_codec:
+            data_converter = dataclasses.replace(data_converter, payload_codec=payload_codec)
+        connect_kwargs["data_converter"] = data_converter
 
     if not metrics_url:
         client = await Client.connect(**connect_kwargs)
@@ -129,6 +138,7 @@ class AgentexWorker:
         plugins: list = [],
         interceptors: list = [],
         metrics_url: str | None = None,
+        payload_codec: PayloadCodec | None = None,
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -140,6 +150,7 @@ class AgentexWorker:
         self.plugins = plugins
         self.interceptors = interceptors
         self.metrics_url = metrics_url
+        self.payload_codec = payload_codec
 
     @overload
     async def run(
@@ -175,6 +186,7 @@ class AgentexWorker:
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
             plugins=self.plugins,
             metrics_url=self.metrics_url,
+            payload_codec=self.payload_codec,
         )
 
         # Enable debug mode if AgentEx debug is enabled (disables deadlock detection)

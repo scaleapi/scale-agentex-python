@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+import dataclasses
+
 from temporalio.client import Client, Plugin as ClientPlugin
+from temporalio.converter import PayloadCodec
 from temporalio.worker import Interceptor
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -79,7 +82,12 @@ def validate_worker_interceptors(interceptors: list[Any]) -> None:
             )
 
 
-async def get_temporal_client(temporal_address: str, metrics_url: str | None = None, plugins: list[Any] = []) -> Client:
+async def get_temporal_client(
+    temporal_address: str,
+    metrics_url: str | None = None,
+    plugins: list[Any] = [],
+    payload_codec: PayloadCodec | None = None,
+) -> Client:
     """
     Create a Temporal client with plugin integration.
 
@@ -87,6 +95,7 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
         temporal_address: Temporal server address
         metrics_url: Optional metrics endpoint URL
         plugins: List of Temporal plugins to include
+        payload_codec: Optional payload codec for encoding/decoding payloads (e.g. encryption, compression)
 
     Returns:
         Configured Temporal client
@@ -109,7 +118,10 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
     }
 
     if not has_openai_plugin:
-        connect_kwargs["data_converter"] = pydantic_data_converter
+        data_converter = pydantic_data_converter
+        if payload_codec:
+            data_converter = dataclasses.replace(data_converter, payload_codec=payload_codec)
+        connect_kwargs["data_converter"] = data_converter
 
     if not metrics_url:
         client = await Client.connect(**connect_kwargs)
