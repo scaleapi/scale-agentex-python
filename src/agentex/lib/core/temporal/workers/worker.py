@@ -105,6 +105,13 @@ async def get_temporal_client(
 
     has_openai_plugin = any(isinstance(p, OpenAIAgentsPlugin) for p in (plugins or []))
 
+    if has_openai_plugin and payload_codec is not None:
+        raise ValueError(
+            "payload_codec is not supported alongside OpenAIAgentsPlugin: the plugin "
+            "installs its own data converter and the codec would be silently ignored, "
+            "leaving payloads unencoded. Remove one or the other."
+        )
+
     # Build connection kwargs
     connect_kwargs = {
         "target_host": temporal_address,
