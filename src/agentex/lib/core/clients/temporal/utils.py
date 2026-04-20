@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
-import dataclasses
-
 from temporalio.client import Client, Plugin as ClientPlugin
-from temporalio.converter import PayloadCodec
 from temporalio.worker import Interceptor
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
+from temporalio.converter import PayloadCodec
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
@@ -107,9 +106,8 @@ async def get_temporal_client(
     # Check if OpenAI plugin is present - it needs to configure its own data converter
     # Lazy import to avoid pulling in opentelemetry.sdk for non-Temporal agents
     from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
-    has_openai_plugin = any(
-        isinstance(p, OpenAIAgentsPlugin) for p in (plugins or [])
-    )
+
+    has_openai_plugin = any(isinstance(p, OpenAIAgentsPlugin) for p in (plugins or []))
 
     # Only set data_converter if OpenAI plugin is not present
     connect_kwargs = {

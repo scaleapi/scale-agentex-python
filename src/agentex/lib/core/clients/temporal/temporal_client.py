@@ -77,7 +77,9 @@ DUPLICATE_POLICY_TO_ID_REUSE_POLICY = {
 
 
 class TemporalClient:
-    def __init__(self, temporal_client: Client | None = None, plugins: list[Any] = [], payload_codec: PayloadCodec | None = None):
+    def __init__(
+        self, temporal_client: Client | None = None, plugins: list[Any] = [], payload_codec: PayloadCodec | None = None
+    ):
         self._client: Client | None = temporal_client
         self._plugins = plugins
         self._payload_codec = payload_codec

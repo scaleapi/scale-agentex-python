@@ -34,7 +34,7 @@ class FastACP:
     Supports three main ACP types:
     - "sync": Simple synchronous ACP implementation
     - "async": Advanced ACP with sub-types "base" or "temporal" (requires config)
-    - "agentic": (Deprecated, use "async") Identical to "async" 
+    - "agentic": (Deprecated, use "async") Identical to "async"
     """
 
     @staticmethod

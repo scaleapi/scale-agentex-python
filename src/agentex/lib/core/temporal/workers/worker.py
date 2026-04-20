@@ -18,8 +18,8 @@ from temporalio.worker import (
 )
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.converter import (
-    DataConverter,
     PayloadCodec,
+    DataConverter,
     JSONTypeConverter,
     AdvancedJSONEncoder,
     DefaultPayloadConverter,
@@ -102,9 +102,8 @@ async def get_temporal_client(
     # Check if OpenAI plugin is present - it needs to configure its own data converter
     # Lazy import to avoid pulling in opentelemetry.sdk for non-Temporal agents
     from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
-    has_openai_plugin = any(
-        isinstance(p, OpenAIAgentsPlugin) for p in (plugins or [])
-    )
+
+    has_openai_plugin = any(isinstance(p, OpenAIAgentsPlugin) for p in (plugins or []))
 
     # Build connection kwargs
     connect_kwargs = {
@@ -146,7 +145,9 @@ class AgentexWorker:
         self.max_concurrent_activities = max_concurrent_activities
         self.health_check_server_running = False
         self.healthy = False
-        self.health_check_port = health_check_port if health_check_port is not None else EnvironmentVariables.refresh().HEALTH_CHECK_PORT
+        self.health_check_port = (
+            health_check_port if health_check_port is not None else EnvironmentVariables.refresh().HEALTH_CHECK_PORT
+        )
         self.plugins = plugins
         self.interceptors = interceptors
         self.metrics_url = metrics_url

@@ -39,7 +39,9 @@ class AsyncACPConfig(BaseACPConfig):
 
     type: Literal["temporal", "base"] = Field(..., frozen=True)
 
+
 AgenticACPConfig = AsyncACPConfig
+
 
 class TemporalACPConfig(AsyncACPConfig):
     """
@@ -86,5 +88,6 @@ class AsyncBaseACPConfig(AsyncACPConfig):
     """
 
     type: Literal["base"] = Field(default="base", frozen=True)
+
 
 AgenticBaseACPConfig = AsyncBaseACPConfig

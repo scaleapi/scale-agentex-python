@@ -43,11 +43,19 @@ class TemporalACP(BaseACPServer):
 
     @classmethod
     @override
-    def create(cls, temporal_address: str, plugins: list[Any] | None = None, interceptors: list[Any] | None = None, payload_codec: PayloadCodec | None = None) -> "TemporalACP":
+    def create(
+        cls,
+        temporal_address: str,
+        plugins: list[Any] | None = None,
+        interceptors: list[Any] | None = None,
+        payload_codec: PayloadCodec | None = None,
+    ) -> "TemporalACP":
         logger.info("Initializing TemporalACP instance")
 
         # Create instance without temporal client initially
-        temporal_acp = cls(temporal_address=temporal_address, plugins=plugins, interceptors=interceptors, payload_codec=payload_codec)
+        temporal_acp = cls(
+            temporal_address=temporal_address, plugins=plugins, interceptors=interceptors, payload_codec=payload_codec
+        )
         temporal_acp._setup_handlers()
         logger.info("TemporalACP instance initialized now")
         return temporal_acp
