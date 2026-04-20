@@ -50,6 +50,11 @@ class TemporalACPConfig(AsyncACPConfig):
         temporal_address: The address of the temporal server
         plugins: List of Temporal client plugins
         interceptors: List of Temporal worker interceptors
+        payload_codec: Optional ``temporalio.converter.PayloadCodec`` for
+            encoding/decoding payloads (e.g. encryption, compression). NOTE:
+            this only configures the ACP (client) side. The worker side must
+            be configured separately via ``AgentexWorker(payload_codec=...)``
+            with the SAME codec, or decode will fail at runtime.
     """
 
     type: Literal["temporal"] = Field(default="temporal", frozen=True)

@@ -4,6 +4,7 @@ from typing import Any, Callable, AsyncGenerator, override
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from temporalio.converter import PayloadCodec
 
 from agentex.lib.types.acp import (
     SendEventParams,
@@ -31,7 +32,7 @@ class TemporalACP(BaseACPServer):
         temporal_task_service: TemporalTaskService | None = None,
         plugins: list[Any] | None = None,
         interceptors: list[Any] | None = None,
-        payload_codec: Any | None = None,
+        payload_codec: PayloadCodec | None = None,
     ):
         super().__init__()
         self._temporal_task_service = temporal_task_service
@@ -42,7 +43,7 @@ class TemporalACP(BaseACPServer):
 
     @classmethod
     @override
-    def create(cls, temporal_address: str, plugins: list[Any] | None = None, interceptors: list[Any] | None = None, payload_codec: Any | None = None) -> "TemporalACP":
+    def create(cls, temporal_address: str, plugins: list[Any] | None = None, interceptors: list[Any] | None = None, payload_codec: PayloadCodec | None = None) -> "TemporalACP":
         logger.info("Initializing TemporalACP instance")
 
         # Create instance without temporal client initially
