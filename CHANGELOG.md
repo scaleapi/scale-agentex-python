@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.10.2 (2026-04-21)
+
+Full Changelog: [v0.10.1...v0.10.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.1...v0.10.2)
+
+### Features
+
+* **api:** api update ([d5b9945](https://github.com/scaleapi/scale-agentex-python/commit/d5b99455c248a629bb2c56a2b5daf192d9f70db8))
+
+
+### Bug Fixes
+
+* **adk:** fix to queue drain ([#327](https://github.com/scaleapi/scale-agentex-python/issues/327)) ([b59d6d8](https://github.com/scaleapi/scale-agentex-python/commit/b59d6d8b59cec9548ec468cae3827d785c9f86f7))
+
+
+### Performance Improvements
+
+* **client:** optimize file structure copying in multipart requests ([87fe899](https://github.com/scaleapi/scale-agentex-python/commit/87fe899713a2ec88f1c32b347a7d5c78124aaf56))
+
 ## 0.10.1 (2026-04-17)
 
 Full Changelog: [v0.10.0...v0.10.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.0...v0.10.1)
