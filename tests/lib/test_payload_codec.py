@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -10,17 +10,21 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 class _NoopCodec(PayloadCodec):
+    @override
     async def encode(self, payloads):
         return list(payloads)
 
+    @override
     async def decode(self, payloads):
         return list(payloads)
 
 
 class _FakeOpenAIPlugin(ClientPlugin):
+    @override
     def configure_client(self, config):
         return config
 
+    @override
     async def connect_service_client(self, config, next):
         return await next(config)
 
