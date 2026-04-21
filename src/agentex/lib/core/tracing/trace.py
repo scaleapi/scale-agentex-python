@@ -54,6 +54,7 @@ class Trace:
         parent_id: str | None = None,
         input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        task_id: str | None = None,
     ) -> Span:
         """
         Start a new span and register it with the API.
@@ -63,6 +64,7 @@ class Trace:
             parent_id: Optional parent span ID.
             input: Optional input data for the span.
             data: Optional additional data for the span.
+            task_id: Optional ID of the task this span belongs to.
 
         Returns:
             The newly created span.
@@ -86,6 +88,7 @@ class Trace:
             start_time=start_time,
             input=serialized_input,
             data=serialized_data,
+            task_id=task_id,
         )
 
         for processor in self.processors:
@@ -150,6 +153,7 @@ class Trace:
         parent_id: str | None = None,
         input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        task_id: str | None = None,
     ):
         """
         Context manager for spans.
@@ -158,7 +162,7 @@ class Trace:
         if not self.trace_id:
             yield None
             return
-        span = self.start_span(name, parent_id, input, data)
+        span = self.start_span(name, parent_id, input, data, task_id=task_id)
         try:
             yield span
         finally:
@@ -198,6 +202,7 @@ class AsyncTrace:
         parent_id: str | None = None,
         input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        task_id: str | None = None,
     ) -> Span:
         """
         Start a new span and register it with the API.
@@ -207,6 +212,7 @@ class AsyncTrace:
             parent_id: Optional parent span ID.
             input: Optional input data for the span.
             data: Optional additional data for the span.
+            task_id: Optional ID of the task this span belongs to.
 
         Returns:
             The newly created span.
@@ -229,6 +235,7 @@ class AsyncTrace:
             start_time=start_time,
             input=serialized_input,
             data=serialized_data,
+            task_id=task_id,
         )
 
         if self.processors:
@@ -293,6 +300,7 @@ class AsyncTrace:
         parent_id: str | None = None,
         input: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
         data: dict[str, Any] | list[dict[str, Any]] | BaseModel | None = None,
+        task_id: str | None = None,
     ) -> AsyncGenerator[Span | None, None]:
         """
         Context manager for spans.
@@ -302,6 +310,7 @@ class AsyncTrace:
             parent_id: Optional parent span ID.
             input: Optional input data for the span.
             data: Optional additional data for the span.
+            task_id: Optional ID of the task this span belongs to.
 
         Yields:
             The span object.
@@ -309,7 +318,7 @@ class AsyncTrace:
         if not self.trace_id:
             yield None
             return
-        span = await self.start_span(name, parent_id, input, data)
+        span = await self.start_span(name, parent_id, input, data, task_id=task_id)
         try:
             yield span
         finally:
