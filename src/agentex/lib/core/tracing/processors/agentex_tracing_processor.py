@@ -79,6 +79,9 @@ class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
             ),
         )
 
+    # TODO(AGX1-199): Add batch create/update endpoints to Agentex API and use
+    # them here instead of one HTTP call per span.
+    # https://linear.app/scale-epd/issue/AGX1-199/add-agentex-batch-endpoint-for-traces
     @override
     async def on_span_start(self, span: Span) -> None:
         await self.client.spans.create(

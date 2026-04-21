@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 import asyncio
+from typing import cast
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -52,7 +53,8 @@ class TestAsyncSpanQueueNonBlocking:
 
 
 class TestAsyncSpanQueueOrdering:
-    async def test_fifo_ordering_preserved(self):
+    async def test_per_span_start_before_end(self):
+        """START always completes before END for the same span, even with batching."""
         call_log: list[tuple[str, str]] = []
 
         async def record_start(span: Span) -> None:
@@ -77,12 +79,19 @@ class TestAsyncSpanQueueOrdering:
 
         await queue.shutdown()
 
-        assert call_log == [
-            ("start", "span-a"),
-            ("end", "span-a"),
-            ("start", "span-b"),
-            ("end", "span-b"),
-        ]
+        # All 4 events should fire
+        assert len(call_log) == 4
+
+        # Per-span invariant: START before END
+        for span_id in ("span-a", "span-b"):
+            start_idx = next(i for i, (ev, sid) in enumerate(call_log) if ev == "start" and sid == span_id)
+            end_idx = next(i for i, (ev, sid) in enumerate(call_log) if ev == "end" and sid == span_id)
+            assert start_idx < end_idx, f"START should come before END for {span_id}"
+
+        # All STARTs before all ENDs within a batch
+        start_indices = [i for i, (ev, _) in enumerate(call_log) if ev == "start"]
+        end_indices = [i for i, (ev, _) in enumerate(call_log) if ev == "end"]
+        assert max(start_indices) < min(end_indices), "All STARTs should complete before any END"
 
 
 class TestAsyncSpanQueueErrorHandling:
@@ -154,6 +163,61 @@ class TestAsyncSpanQueueShutdown:
         proc.on_span_start.assert_not_called()
 
 
+class TestAsyncSpanQueueBatchConcurrency:
+    async def test_batch_processes_multiple_items_concurrently(self):
+        """Items in the same batch should run concurrently, not serially."""
+        concurrency = 0
+        max_concurrency = 0
+        lock = asyncio.Lock()
+
+        async def slow_start(span: Span) -> None:
+            nonlocal concurrency, max_concurrency
+            async with lock:
+                concurrency += 1
+                max_concurrency = max(max_concurrency, concurrency)
+            await asyncio.sleep(0.05)
+            async with lock:
+                concurrency -= 1
+
+        proc = _make_processor(on_span_start=AsyncMock(side_effect=slow_start))
+        queue = AsyncSpanQueue()
+
+        # Enqueue 10 START events before the drain loop runs — they should
+        # all land in the same batch and be processed concurrently.
+        for i in range(10):
+            queue.enqueue(SpanEventType.START, _make_span(f"span-{i}"), [proc])
+
+        await queue.shutdown()
+
+        assert max_concurrency > 1, (
+            f"Expected concurrent processing, but max concurrency was {max_concurrency}"
+        )
+
+    async def test_batch_faster_than_serial(self):
+        """Batched drain should be significantly faster than serial for slow processors."""
+        n_items = 10
+        per_item_delay = 0.05  # 50ms per processor call
+
+        async def slow_start(span: Span) -> None:
+            await asyncio.sleep(per_item_delay)
+
+        proc = _make_processor(on_span_start=AsyncMock(side_effect=slow_start))
+        queue = AsyncSpanQueue()
+
+        for i in range(n_items):
+            queue.enqueue(SpanEventType.START, _make_span(f"span-{i}"), [proc])
+
+        start = time.monotonic()
+        await queue.shutdown()
+        elapsed = time.monotonic() - start
+
+        serial_time = n_items * per_item_delay
+        assert elapsed < serial_time * 0.5, (
+            f"Batch drain took {elapsed:.3f}s — serial would be {serial_time:.3f}s. "
+            f"Expected at least 2x speedup from concurrency."
+        )
+
+
 class TestAsyncSpanQueueIntegration:
     async def test_integration_with_async_trace(self):
         call_log: list[tuple[str, str]] = []
@@ -196,3 +260,55 @@ class TestAsyncSpanQueueIntegration:
         assert call_log[1][0] == "end"
         # Same span ID for both events
         assert call_log[0][1] == call_log[1][1]
+
+    async def test_end_event_preserves_modified_input(self):
+        """END event should carry span.input so modifications after start are preserved."""
+        start_spans: list[Span] = []
+        end_spans: list[Span] = []
+
+        async def capture_start(span: Span) -> None:
+            start_spans.append(span)
+
+        async def capture_end(span: Span) -> None:
+            end_spans.append(span)
+
+        proc = _make_processor(
+            on_span_start=AsyncMock(side_effect=capture_start),
+            on_span_end=AsyncMock(side_effect=capture_end),
+        )
+        queue = AsyncSpanQueue()
+
+        from agentex.lib.core.tracing.trace import AsyncTrace
+
+        mock_client = MagicMock()
+        trace = AsyncTrace(
+            processors=[proc],
+            client=mock_client,
+            trace_id="test-trace",
+            span_queue=queue,
+        )
+
+        initial_input: dict[str, object] = {"messages": [{"role": "user", "content": "hello"}]}
+        async with trace.span("llm-call", input=initial_input) as span:
+            # Simulate modifying input after start (e.g. chatbot appending messages)
+            messages = cast(list[dict[str, str]], cast(dict[str, object], span.input)["messages"])
+            messages.append({"role": "assistant", "content": "hi there"})
+            messages.append({"role": "user", "content": "how are you?"})
+            span.output = cast(dict[str, object], {"response": "I'm good!"})
+
+        await queue.shutdown()
+
+        assert len(start_spans) == 1
+        assert len(end_spans) == 1
+
+        # START should carry the original input (serialized at start time)
+        assert start_spans[0].input is not None
+        assert len(cast(dict[str, list[object]], start_spans[0].input)["messages"]) == 1  # only the original message
+
+        # END should carry the modified input (re-serialized at end time)
+        assert end_spans[0].input is not None
+        assert len(cast(dict[str, list[object]], end_spans[0].input)["messages"]) == 3  # all three messages
+
+        # END should still carry output and end_time
+        assert end_spans[0].output is not None
+        assert end_spans[0].end_time is not None
