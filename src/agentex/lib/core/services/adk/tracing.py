@@ -22,6 +22,7 @@ class TracingService:
         parent_id: str | None = None,
         input: list[Any] | dict[str, Any] | BaseModel | None = None,
         data: list[Any] | dict[str, Any] | BaseModel | None = None,
+        task_id: str | None = None,
     ) -> Span | None:
         trace = self._tracer.trace(trace_id)
         span = await trace.start_span(
@@ -29,6 +30,7 @@ class TracingService:
             parent_id=parent_id,
             input=input or {},
             data=data,
+            task_id=task_id,
         )
         heartbeat_if_in_workflow("start span")
         return span
