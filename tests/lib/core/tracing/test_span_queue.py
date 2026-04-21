@@ -21,9 +21,25 @@ def _make_span(span_id: str | None = None) -> Span:
 
 
 def _make_processor(**overrides: AsyncMock) -> AsyncMock:
+    """Build a mock processor compatible with the queue's batched dispatch.
+
+    The queue now calls on_spans_start(list) / on_spans_end(list) on each
+    processor.  Mirror the behavior of AsyncTracingProcessor's default fallback
+    by fanning out the list to per-span calls concurrently, so tests that
+    assert on on_span_start / on_span_end continue to observe per-span calls.
+    """
     proc = AsyncMock()
     proc.on_span_start = overrides.get("on_span_start", AsyncMock())
     proc.on_span_end = overrides.get("on_span_end", AsyncMock())
+
+    async def _fanout_start(spans: list[Span]) -> None:
+        await asyncio.gather(*(proc.on_span_start(s) for s in spans), return_exceptions=True)
+
+    async def _fanout_end(spans: list[Span]) -> None:
+        await asyncio.gather(*(proc.on_span_end(s) for s in spans), return_exceptions=True)
+
+    proc.on_spans_start = AsyncMock(side_effect=_fanout_start)
+    proc.on_spans_end = AsyncMock(side_effect=_fanout_end)
     return proc
 
 
@@ -216,6 +232,61 @@ class TestAsyncSpanQueueBatchConcurrency:
             f"Batch drain took {elapsed:.3f}s — serial would be {serial_time:.3f}s. "
             f"Expected at least 2x speedup from concurrency."
         )
+
+
+class TestAsyncSpanQueueBatchedDispatch:
+    """The queue should dispatch a whole drain batch to each processor via the
+    batched methods (on_spans_start / on_spans_end) in one call per processor,
+    so processors that support real HTTP batching can send one request instead
+    of N.
+    """
+
+    async def test_batched_start_dispatch_single_call_per_drain(self):
+        received: list[list[str]] = []
+
+        async def capture_starts(spans: list[Span]) -> None:
+            received.append([s.id for s in spans])
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=capture_starts)
+        proc.on_spans_end = AsyncMock()
+
+        queue = AsyncSpanQueue()
+
+        # Enqueue several spans synchronously before the drain has a chance to
+        # run — they should all land in a single drain batch.
+        ids = [f"span-{i}" for i in range(5)]
+        for i in ids:
+            queue.enqueue(SpanEventType.START, _make_span(i), [proc])
+
+        await queue.shutdown()
+
+        # on_spans_start must have been called exactly once with all 5 spans.
+        assert proc.on_spans_start.call_count == 1, (
+            f"Expected one batched call, got {proc.on_spans_start.call_count}"
+        )
+        assert received == [ids]
+
+    async def test_batched_end_dispatch_single_call_per_drain(self):
+        received: list[list[str]] = []
+
+        async def capture_ends(spans: list[Span]) -> None:
+            received.append([s.id for s in spans])
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock()
+        proc.on_spans_end = AsyncMock(side_effect=capture_ends)
+
+        queue = AsyncSpanQueue()
+
+        ids = [f"span-{i}" for i in range(5)]
+        for i in ids:
+            queue.enqueue(SpanEventType.END, _make_span(i), [proc])
+
+        await queue.shutdown()
+
+        assert proc.on_spans_end.call_count == 1
+        assert received == [ids]
 
 
 class TestAsyncSpanQueueIntegration:

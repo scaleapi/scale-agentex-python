@@ -95,29 +95,36 @@ class AsyncSpanQueue:
 
     @staticmethod
     async def _process_items(items: list[_SpanQueueItem]) -> None:
-        """Process a list of span events concurrently."""
+        """Dispatch a batch of same-event-type items to each processor in one call.
 
-        async def _handle(item: _SpanQueueItem) -> None:
+        Groups spans by processor so each processor sees its full slice of the
+        drain batch at once.  Processors that override the batched methods can
+        then send a single HTTP request per drain cycle instead of N.
+        """
+        if not items:
+            return
+
+        event_type = items[0].event_type
+        by_processor: dict[AsyncTracingProcessor, list[Span]] = {}
+        for item in items:
+            for p in item.processors:
+                by_processor.setdefault(p, []).append(item.span)
+
+        async def _handle(p: AsyncTracingProcessor, spans: list[Span]) -> None:
             try:
-                if item.event_type == SpanEventType.START:
-                    coros = [p.on_span_start(item.span) for p in item.processors]
+                if event_type == SpanEventType.START:
+                    await p.on_spans_start(spans)
                 else:
-                    coros = [p.on_span_end(item.span) for p in item.processors]
-                results = await asyncio.gather(*coros, return_exceptions=True)
-                for result in results:
-                    if isinstance(result, Exception):
-                        logger.error(
-                            "Tracing processor error during %s for span %s",
-                            item.event_type.value,
-                            item.span.id,
-                            exc_info=result,
-                        )
+                    await p.on_spans_end(spans)
             except Exception:
                 logger.exception(
-                    "Unexpected error in span queue for span %s", item.span.id
+                    "Tracing processor %s failed handling %d spans during %s",
+                    type(p).__name__,
+                    len(spans),
+                    event_type.value,
                 )
 
-        await asyncio.gather(*[_handle(item) for item in items])
+        await asyncio.gather(*[_handle(p, spans) for p, spans in by_processor.items()])
 
     # ------------------------------------------------------------------
     # Shutdown
