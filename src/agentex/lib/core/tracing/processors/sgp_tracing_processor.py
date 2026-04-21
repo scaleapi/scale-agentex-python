@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import override
 
 import scale_gp_beta.lib.tracing as tracing
