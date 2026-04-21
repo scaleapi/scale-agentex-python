@@ -64,9 +64,7 @@ class TracingModule:
         # Re-create the underlying httpx client when the event loop changes
         # (e.g. between HTTP requests in a sync ASGI server) to avoid
         # "Event loop is closed" / "bound to a different event loop" errors.
-        if self._tracing_service_lazy is None or (
-            loop_id is not None and loop_id != self._bound_loop_id
-        ):
+        if self._tracing_service_lazy is None or (loop_id is not None and loop_id != self._bound_loop_id):
             import httpx
 
             # Disable keepalive so each span HTTP call gets a fresh TCP
@@ -93,6 +91,7 @@ class TracingModule:
         input: list[Any] | dict[str, Any] | BaseModel | None = None,
         data: list[Any] | dict[str, Any] | BaseModel | None = None,
         parent_id: str | None = None,
+        task_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
@@ -109,6 +108,7 @@ class TracingModule:
             input (Union[List, Dict, BaseModel]): The input for the span.
             parent_id (Optional[str]): The parent span ID for the span.
             data (Optional[Union[List, Dict, BaseModel]]): The data for the span.
+            task_id (Optional[str]): The task ID this span belongs to.
             start_to_close_timeout (timedelta): The start to close timeout for the span.
             heartbeat_timeout (timedelta): The heartbeat timeout for the span.
             retry_policy (RetryPolicy): The retry policy for the span.
@@ -126,6 +126,7 @@ class TracingModule:
             input=input,
             parent_id=parent_id,
             data=data,
+            task_id=task_id,
             start_to_close_timeout=start_to_close_timeout,
             heartbeat_timeout=heartbeat_timeout,
             retry_policy=retry_policy,
@@ -149,6 +150,7 @@ class TracingModule:
         input: list[Any] | dict[str, Any] | BaseModel | None = None,
         parent_id: str | None = None,
         data: list[Any] | dict[str, Any] | BaseModel | None = None,
+        task_id: str | None = None,
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=1),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
@@ -162,6 +164,7 @@ class TracingModule:
             input (Union[List, Dict, BaseModel]): The input for the span.
             parent_id (Optional[str]): The parent span ID for the span.
             data (Optional[Union[List, Dict, BaseModel]]): The data for the span.
+            task_id (Optional[str]): The task ID this span belongs to.
             start_to_close_timeout (timedelta): The start to close timeout for the span.
             heartbeat_timeout (timedelta): The heartbeat timeout for the span.
             retry_policy (RetryPolicy): The retry policy for the span.
@@ -175,6 +178,7 @@ class TracingModule:
             name=name,
             input=input,
             data=data,
+            task_id=task_id,
         )
         if in_temporal_workflow():
             return await ActivityHelpers.execute_activity(
@@ -192,6 +196,7 @@ class TracingModule:
                 input=input,
                 parent_id=parent_id,
                 data=data,
+                task_id=task_id,
             )
 
     async def end_span(

@@ -24,6 +24,7 @@ class StartSpanParams(BaseModel):
     name: str
     input: list[Any] | dict[str, Any] | BaseModel | None = None
     data: list[Any] | dict[str, Any] | BaseModel | None = None
+    task_id: str | None = None
 
 
 class EndSpanParams(BaseModel):
@@ -47,6 +48,7 @@ class TracingActivities:
             name=params.name,
             input=params.input,
             data=params.data,
+            task_id=params.task_id,
         )
 
     @activity.defn(name=TracingActivityName.END_SPAN)
