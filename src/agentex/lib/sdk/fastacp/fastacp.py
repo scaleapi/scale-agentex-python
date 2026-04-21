@@ -34,7 +34,7 @@ class FastACP:
     Supports three main ACP types:
     - "sync": Simple synchronous ACP implementation
     - "async": Advanced ACP with sub-types "base" or "temporal" (requires config)
-    - "agentic": (Deprecated, use "async") Identical to "async" 
+    - "agentic": (Deprecated, use "async") Identical to "async"
     """
 
     @staticmethod
@@ -63,6 +63,8 @@ class FastACP:
                 temporal_config["plugins"] = config.plugins  # type: ignore[attr-defined]
             if hasattr(config, "interceptors"):
                 temporal_config["interceptors"] = config.interceptors  # type: ignore[attr-defined]
+            if hasattr(config, "payload_codec"):
+                temporal_config["payload_codec"] = config.payload_codec  # type: ignore[attr-defined]
             return implementation_class.create(**temporal_config)
         else:
             return implementation_class.create(**kwargs)

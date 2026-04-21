@@ -7,6 +7,7 @@ from collections.abc import Callable
 from temporalio.client import Client, WorkflowExecutionStatus
 from temporalio.common import RetryPolicy as TemporalRetryPolicy, WorkflowIDReusePolicy
 from temporalio.service import RPCError, RPCStatusCode
+from temporalio.converter import PayloadCodec
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
@@ -76,9 +77,12 @@ DUPLICATE_POLICY_TO_ID_REUSE_POLICY = {
 
 
 class TemporalClient:
-    def __init__(self, temporal_client: Client | None = None, plugins: list[Any] = []):
+    def __init__(
+        self, temporal_client: Client | None = None, plugins: list[Any] = [], payload_codec: PayloadCodec | None = None
+    ):
         self._client: Client | None = temporal_client
         self._plugins = plugins
+        self._payload_codec = payload_codec
 
     @property
     def client(self) -> Client:
@@ -88,7 +92,7 @@ class TemporalClient:
         return self._client
 
     @classmethod
-    async def create(cls, temporal_address: str, plugins: list[Any] = []):
+    async def create(cls, temporal_address: str, plugins: list[Any] = [], payload_codec: PayloadCodec | None = None):
         if temporal_address in [
             "false",
             "False",
@@ -101,8 +105,8 @@ class TemporalClient:
         ]:
             _client = None
         else:
-            _client = await get_temporal_client(temporal_address, plugins=plugins)
-        return cls(_client, plugins)
+            _client = await get_temporal_client(temporal_address, plugins=plugins, payload_codec=payload_codec)
+        return cls(_client, plugins, payload_codec)
 
     async def setup(self, temporal_address: str):
         self._client = await self._get_temporal_client(temporal_address=temporal_address)
@@ -120,7 +124,7 @@ class TemporalClient:
         ]:
             return None
         else:
-            return await get_temporal_client(temporal_address, plugins=self._plugins)
+            return await get_temporal_client(temporal_address, plugins=self._plugins, payload_codec=self._payload_codec)
 
     async def start_workflow(
         self,

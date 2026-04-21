@@ -39,7 +39,9 @@ class AsyncACPConfig(BaseACPConfig):
 
     type: Literal["temporal", "base"] = Field(..., frozen=True)
 
+
 AgenticACPConfig = AsyncACPConfig
+
 
 class TemporalACPConfig(AsyncACPConfig):
     """
@@ -50,12 +52,18 @@ class TemporalACPConfig(AsyncACPConfig):
         temporal_address: The address of the temporal server
         plugins: List of Temporal client plugins
         interceptors: List of Temporal worker interceptors
+        payload_codec: Optional ``temporalio.converter.PayloadCodec`` for
+            encoding/decoding payloads (e.g. encryption, compression). NOTE:
+            this only configures the ACP (client) side. The worker side must
+            be configured separately via ``AgentexWorker(payload_codec=...)``
+            with the SAME codec, or decode will fail at runtime.
     """
 
     type: Literal["temporal"] = Field(default="temporal", frozen=True)
     temporal_address: str = Field(default="temporal-frontend.temporal.svc.cluster.local:7233", frozen=True)
     plugins: list[Any] = Field(default=[], frozen=True)
     interceptors: list[Any] = Field(default=[], frozen=True)
+    payload_codec: Any = Field(default=None, frozen=True)
 
     @field_validator("plugins")
     @classmethod
@@ -80,5 +88,6 @@ class AsyncBaseACPConfig(AsyncACPConfig):
     """
 
     type: Literal["base"] = Field(default="base", frozen=True)
+
 
 AgenticBaseACPConfig = AsyncBaseACPConfig

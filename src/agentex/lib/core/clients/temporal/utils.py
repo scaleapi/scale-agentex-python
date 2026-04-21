@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.worker import Interceptor
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
+from temporalio.converter import PayloadCodec
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
@@ -79,7 +81,12 @@ def validate_worker_interceptors(interceptors: list[Any]) -> None:
             )
 
 
-async def get_temporal_client(temporal_address: str, metrics_url: str | None = None, plugins: list[Any] = []) -> Client:
+async def get_temporal_client(
+    temporal_address: str,
+    metrics_url: str | None = None,
+    plugins: list[Any] = [],
+    payload_codec: PayloadCodec | None = None,
+) -> Client:
     """
     Create a Temporal client with plugin integration.
 
@@ -87,6 +94,7 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
         temporal_address: Temporal server address
         metrics_url: Optional metrics endpoint URL
         plugins: List of Temporal plugins to include
+        payload_codec: Optional payload codec for encoding/decoding payloads (e.g. encryption, compression)
 
     Returns:
         Configured Temporal client
@@ -98,18 +106,26 @@ async def get_temporal_client(temporal_address: str, metrics_url: str | None = N
     # Check if OpenAI plugin is present - it needs to configure its own data converter
     # Lazy import to avoid pulling in opentelemetry.sdk for non-Temporal agents
     from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
-    has_openai_plugin = any(
-        isinstance(p, OpenAIAgentsPlugin) for p in (plugins or [])
-    )
 
-    # Only set data_converter if OpenAI plugin is not present
+    has_openai_plugin = any(isinstance(p, OpenAIAgentsPlugin) for p in (plugins or []))
+
+    if has_openai_plugin and payload_codec is not None:
+        raise ValueError(
+            "payload_codec is not supported alongside OpenAIAgentsPlugin: the plugin "
+            "installs its own data converter and the codec would be silently ignored, "
+            "leaving payloads unencoded. Remove one or the other."
+        )
+
     connect_kwargs = {
         "target_host": temporal_address,
         "plugins": plugins,
     }
 
     if not has_openai_plugin:
-        connect_kwargs["data_converter"] = pydantic_data_converter
+        data_converter = pydantic_data_converter
+        if payload_codec:
+            data_converter = dataclasses.replace(data_converter, payload_codec=payload_codec)
+        connect_kwargs["data_converter"] = data_converter
 
     if not metrics_url:
         client = await Client.connect(**connect_kwargs)
