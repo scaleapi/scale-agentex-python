@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 import asyncio
+from typing import cast
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -287,12 +288,13 @@ class TestAsyncSpanQueueIntegration:
             span_queue=queue,
         )
 
-        initial_input = {"messages": [{"role": "user", "content": "hello"}]}
+        initial_input: dict[str, object] = {"messages": [{"role": "user", "content": "hello"}]}
         async with trace.span("llm-call", input=initial_input) as span:
             # Simulate modifying input after start (e.g. chatbot appending messages)
-            span.input["messages"].append({"role": "assistant", "content": "hi there"})
-            span.input["messages"].append({"role": "user", "content": "how are you?"})
-            span.output = {"response": "I'm good!"}
+            messages = cast(list[dict[str, str]], cast(dict[str, object], span.input)["messages"])
+            messages.append({"role": "assistant", "content": "hi there"})
+            messages.append({"role": "user", "content": "how are you?"})
+            span.output = cast(dict[str, object], {"response": "I'm good!"})
 
         await queue.shutdown()
 
@@ -301,11 +303,11 @@ class TestAsyncSpanQueueIntegration:
 
         # START should carry the original input (serialized at start time)
         assert start_spans[0].input is not None
-        assert len(start_spans[0].input["messages"]) == 1  # only the original message
+        assert len(cast(dict[str, list[object]], start_spans[0].input)["messages"]) == 1  # only the original message
 
         # END should carry the modified input (re-serialized at end time)
         assert end_spans[0].input is not None
-        assert len(end_spans[0].input["messages"]) == 3  # all three messages
+        assert len(cast(dict[str, list[object]], end_spans[0].input)["messages"]) == 3  # all three messages
 
         # END should still carry output and end_time
         assert end_spans[0].output is not None

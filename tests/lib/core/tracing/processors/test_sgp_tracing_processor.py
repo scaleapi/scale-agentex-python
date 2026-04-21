@@ -175,7 +175,7 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         assert len(processor._spans) == 1
 
         # Simulate modified input at end time
-        updated_input = {"messages": [
+        updated_input: dict[str, object] = {"messages": [
             {"role": "user", "content": "hello"},
             {"role": "assistant", "content": "hi"},
         ]}
