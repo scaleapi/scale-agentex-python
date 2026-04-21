@@ -17,6 +17,4 @@ class SpanListParams(TypedDict, total=False):
 
     page_number: int
 
-    task_id: Optional[str]
-
     trace_id: Optional[str]

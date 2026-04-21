@@ -34,6 +34,3 @@ class Span(BaseModel):
 
     parent_id: Optional[str] = None
     """ID of the parent span if this is a child span in a trace"""
-
-    task_id: Optional[str] = None
-    """ID of the task this span belongs to"""
