@@ -33,8 +33,5 @@ class SpanUpdateParams(TypedDict, total=False):
     start_time: Annotated[Union[str, datetime, None], PropertyInfo(format="iso8601")]
     """The time the span started"""
 
-    task_id: Optional[str]
-    """ID of the task this span belongs to"""
-
     trace_id: Optional[str]
     """Unique identifier for the trace this span belongs to"""

@@ -57,7 +57,6 @@ class SpansResource(SyncAPIResource):
         input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
         output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
         parent_id: Optional[str] | Omit = omit,
-        task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -87,8 +86,6 @@ class SpansResource(SyncAPIResource):
 
           parent_id: ID of the parent span if this is a child span in a trace
 
-          task_id: ID of the task this span belongs to
-
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -110,7 +107,6 @@ class SpansResource(SyncAPIResource):
                     "input": input,
                     "output": output,
                     "parent_id": parent_id,
-                    "task_id": task_id,
                 },
                 span_create_params.SpanCreateParams,
             ),
@@ -164,7 +160,6 @@ class SpansResource(SyncAPIResource):
         output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
         parent_id: Optional[str] | Omit = omit,
         start_time: Union[str, datetime, None] | Omit = omit,
-        task_id: Optional[str] | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -191,8 +186,6 @@ class SpansResource(SyncAPIResource):
 
           start_time: The time the span started
 
-          task_id: ID of the task this span belongs to
-
           trace_id: Unique identifier for the trace this span belongs to
 
           extra_headers: Send extra headers
@@ -216,7 +209,6 @@ class SpansResource(SyncAPIResource):
                     "output": output,
                     "parent_id": parent_id,
                     "start_time": start_time,
-                    "task_id": task_id,
                     "trace_id": trace_id,
                 },
                 span_update_params.SpanUpdateParams,
@@ -234,7 +226,6 @@ class SpansResource(SyncAPIResource):
         order_by: Optional[str] | Omit = omit,
         order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
-        task_id: Optional[str] | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -244,7 +235,7 @@ class SpansResource(SyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> SpanListResponse:
         """
-        List spans, optionally filtered by trace_id and/or task_id
+        List all spans for a given trace ID
 
         Args:
           extra_headers: Send extra headers
@@ -268,7 +259,6 @@ class SpansResource(SyncAPIResource):
                         "order_by": order_by,
                         "order_direction": order_direction,
                         "page_number": page_number,
-                        "task_id": task_id,
                         "trace_id": trace_id,
                     },
                     span_list_params.SpanListParams,
@@ -310,7 +300,6 @@ class AsyncSpansResource(AsyncAPIResource):
         input: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
         output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
         parent_id: Optional[str] | Omit = omit,
-        task_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -340,8 +329,6 @@ class AsyncSpansResource(AsyncAPIResource):
 
           parent_id: ID of the parent span if this is a child span in a trace
 
-          task_id: ID of the task this span belongs to
-
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -363,7 +350,6 @@ class AsyncSpansResource(AsyncAPIResource):
                     "input": input,
                     "output": output,
                     "parent_id": parent_id,
-                    "task_id": task_id,
                 },
                 span_create_params.SpanCreateParams,
             ),
@@ -417,7 +403,6 @@ class AsyncSpansResource(AsyncAPIResource):
         output: Union[Dict[str, object], Iterable[Dict[str, object]], None] | Omit = omit,
         parent_id: Optional[str] | Omit = omit,
         start_time: Union[str, datetime, None] | Omit = omit,
-        task_id: Optional[str] | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -444,8 +429,6 @@ class AsyncSpansResource(AsyncAPIResource):
 
           start_time: The time the span started
 
-          task_id: ID of the task this span belongs to
-
           trace_id: Unique identifier for the trace this span belongs to
 
           extra_headers: Send extra headers
@@ -469,7 +452,6 @@ class AsyncSpansResource(AsyncAPIResource):
                     "output": output,
                     "parent_id": parent_id,
                     "start_time": start_time,
-                    "task_id": task_id,
                     "trace_id": trace_id,
                 },
                 span_update_params.SpanUpdateParams,
@@ -487,7 +469,6 @@ class AsyncSpansResource(AsyncAPIResource):
         order_by: Optional[str] | Omit = omit,
         order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
-        task_id: Optional[str] | Omit = omit,
         trace_id: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -497,7 +478,7 @@ class AsyncSpansResource(AsyncAPIResource):
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> SpanListResponse:
         """
-        List spans, optionally filtered by trace_id and/or task_id
+        List all spans for a given trace ID
 
         Args:
           extra_headers: Send extra headers
@@ -521,7 +502,6 @@ class AsyncSpansResource(AsyncAPIResource):
                         "order_by": order_by,
                         "order_direction": order_direction,
                         "page_number": page_number,
-                        "task_id": task_id,
                         "trace_id": trace_id,
                     },
                     span_list_params.SpanListParams,
