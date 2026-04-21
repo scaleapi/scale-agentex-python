@@ -162,3 +162,29 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         await processor.on_span_end(span)
 
         assert len(processor._spans) == 0
+
+    async def test_sgp_span_input_updated_on_end(self):
+        """on_span_end should update sgp_span.input from the incoming span."""
+        processor, _ = self._make_processor()
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            span = _make_span()
+            span.input = {"messages": [{"role": "user", "content": "hello"}]}
+            await processor.on_span_start(span)
+
+        assert len(processor._spans) == 1
+
+        # Simulate modified input at end time
+        updated_input: dict[str, object] = {"messages": [
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "hi"},
+        ]}
+        span.input = updated_input
+        span.output = {"response": "hi"}
+        span.end_time = datetime.now(UTC)
+        await processor.on_span_end(span)
+
+        # Span should be removed after end
+        assert len(processor._spans) == 0
+        # The end upsert should have been called
+        assert processor.sgp_async_client.spans.upsert_batch.call_count == 2  # start + end
