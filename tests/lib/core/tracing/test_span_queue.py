@@ -234,6 +234,32 @@ class TestAsyncSpanQueueBatchConcurrency:
         )
 
 
+class TestProcessItemsPreconditions:
+    """_process_items assumes every item in the list has the same event_type.
+    Violating that precondition silently causes END events to be treated as
+    STARTs (or vice versa), which is a silent data-corruption bug.  Guard it
+    with an assertion."""
+
+    async def test_mixed_event_types_raise_assertion(self):
+        from agentex.lib.core.tracing.span_queue import _SpanQueueItem
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock()
+        proc.on_spans_end = AsyncMock()
+
+        mixed = [
+            _SpanQueueItem(event_type=SpanEventType.START, span=_make_span("a"), processors=[proc]),
+            _SpanQueueItem(event_type=SpanEventType.END, span=_make_span("b"), processors=[proc]),
+        ]
+
+        try:
+            await AsyncSpanQueue._process_items(mixed)
+        except AssertionError:
+            return
+        else:
+            raise AssertionError("Expected AssertionError for mixed event types")
+
+
 class TestAsyncSpanQueueBatchedDispatch:
     """The queue should dispatch a whole drain batch to each processor via the
     batched methods (on_spans_start / on_spans_end) in one call per processor,

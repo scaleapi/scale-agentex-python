@@ -105,6 +105,10 @@ class AsyncSpanQueue:
             return
 
         event_type = items[0].event_type
+        assert all(i.event_type == event_type for i in items), (
+            "_process_items requires all items to share the same event_type; "
+            "callers must split START and END batches before dispatching."
+        )
         by_processor: dict[AsyncTracingProcessor, list[Span]] = {}
         for item in items:
             for p in item.processors:
