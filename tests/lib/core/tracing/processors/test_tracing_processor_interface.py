@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import uuid
 import logging
-from datetime import UTC, datetime
 from typing import override
+from datetime import UTC, datetime
 
 from agentex.types.span import Span
 from agentex.lib.types.tracing import TracingProcessorConfig
