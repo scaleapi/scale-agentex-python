@@ -188,3 +188,42 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         assert len(processor._spans) == 0
         # The end upsert should have been called
         assert processor.sgp_async_client.spans.upsert_batch.call_count == 2  # start + end
+
+    async def test_on_spans_start_sends_single_upsert_for_batch(self):
+        """Given N spans at once, on_spans_start should make ONE upsert_batch HTTP call."""
+        processor, _ = self._make_processor()
+
+        n = 10
+        spans = [_make_span() for _ in range(n)]
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            await processor.on_spans_start(spans)
+
+        assert processor.sgp_async_client.spans.upsert_batch.call_count == 1, (
+            "Batched on_spans_start must make exactly one upsert_batch HTTP call"
+        )
+        items = processor.sgp_async_client.spans.upsert_batch.call_args.kwargs["items"]
+        assert len(items) == n
+        # All spans should be tracked for the subsequent end call
+        assert len(processor._spans) == n
+
+    async def test_on_spans_end_sends_single_upsert_for_batch(self):
+        """Given N spans at once, on_spans_end should make ONE upsert_batch HTTP call."""
+        processor, _ = self._make_processor()
+
+        n = 10
+        spans = [_make_span() for _ in range(n)]
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            await processor.on_spans_start(spans)
+
+        processor.sgp_async_client.spans.upsert_batch.reset_mock()
+
+        for span in spans:
+            span.end_time = datetime.now(UTC)
+        await processor.on_spans_end(spans)
+
+        assert processor.sgp_async_client.spans.upsert_batch.call_count == 1, (
+            "Batched on_spans_end must make exactly one upsert_batch HTTP call"
+        )
+        items = processor.sgp_async_client.spans.upsert_batch.call_args.kwargs["items"]
+        assert len(items) == n
+        assert len(processor._spans) == 0
