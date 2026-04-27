@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.0 (2026-04-27)
+
+Full Changelog: [v0.10.2...v0.11.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.2...v0.11.0)
+
+### Features
+
+* **api:** api update ([cd7c9b7](https://github.com/scaleapi/scale-agentex-python/commit/cd7c9b76a28f61d95c1c9f5477048c85f7e9f277))
+
+
+### Chores
+
+* **internal:** more robust bootstrap script ([dd59283](https://github.com/scaleapi/scale-agentex-python/commit/dd592831d5d0304cf2c585b8a995ac4a8c407773))
+
 ## 0.10.2 (2026-04-21)
 
 Full Changelog: [v0.10.1...v0.10.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.1...v0.10.2)
