@@ -165,6 +165,17 @@ class AgentEnvironmentsConfig(UtilsBaseModel):
                 account_id: 6887f093600ecd59bbbd3095
             helm_overrides:
 
+        The principal must contain exactly one of `user_id` or `service_account_id`.
+        Use `service_account_id` to register an agent under a service account
+        instead of a personal user identity:
+        dev:
+            kubernetes:
+            namespace: "sgp-000-hello-acp"
+            auth:
+            principal:
+                service_account_id: a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d
+                account_id: 6887f093600ecd59bbbd3095
+
         if the environment field is not explicitly set, we assume its the same as
         the name of the environment
         Args:
