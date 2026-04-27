@@ -236,11 +236,12 @@ def generate_helpful_error_message(error: Exception, context: str = "") -> str:
                 "1. Check file location: should be next to manifest.yaml\n"
                 "2. Verify file permissions"
             )
-    elif "user_id" in base_msg.lower():
+    elif "user_id" in base_msg.lower() or "service_account_id" in base_msg.lower():
         base_msg += (
             "\n\n💡 Auth Principal Tips:\n"
-            "- user_id should be unique per environment\n"
-            "- Include environment name (e.g., 'dev_my_agent')\n"
+            "- Set exactly one of 'user_id' or 'service_account_id'\n"
+            "- The id should be unique per environment\n"
+            "- For user_id, include environment name (e.g., 'dev_my_agent')\n"
             "- Use consistent naming convention across agents"
         )
     elif "namespace" in base_msg.lower():
