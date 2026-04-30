@@ -5,10 +5,6 @@ import uuid
 import logging
 from typing import Any, List, Union, Optional, override
 
-# Re-export the canonical StreamingMode literal from the streaming service so
-# all layers share a single definition.
-from agentex.lib.core.services.adk.streaming import StreamingMode as StreamingMode
-
 from agents import (
     Tool,
     Model,
@@ -32,6 +28,10 @@ from agents.tool import (
     ImageGenerationTool,
 )
 from agents.computer import Computer, AsyncComputer
+
+# Re-export the canonical StreamingMode literal from the streaming service so
+# all layers share a single definition.
+from agentex.lib.core.services.adk.streaming import StreamingMode as StreamingMode
 
 try:
     from agents.tool import ShellTool  # type: ignore[attr-defined]
