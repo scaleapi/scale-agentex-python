@@ -38,3 +38,6 @@ class SpanCreateParams(TypedDict, total=False):
 
     parent_id: Optional[str]
     """ID of the parent span if this is a child span in a trace"""
+
+    task_id: Optional[str]
+    """ID of the task this span belongs to"""
