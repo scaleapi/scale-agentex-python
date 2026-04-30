@@ -5,6 +5,10 @@ import uuid
 import logging
 from typing import Any, List, Union, Optional, override
 
+# Re-export the canonical StreamingMode literal from the streaming service so
+# all layers share a single definition.
+from agentex.lib.core.services.adk.streaming import StreamingMode as StreamingMode
+
 from agents import (
     Tool,
     Model,
@@ -113,6 +117,7 @@ class TemporalStreamingModel(Model):
         model_name: str = "gpt-4o",
         _use_responses_api: bool = True,
         openai_client: Optional[AsyncOpenAI] = None,
+        streaming_mode: StreamingMode = "coalesced",
     ):
         """Initialize the streaming model with OpenAI client and model name.
 
@@ -121,18 +126,25 @@ class TemporalStreamingModel(Model):
             _use_responses_api: Internal flag for responses API (deprecated, always True)
             openai_client: Optional custom AsyncOpenAI client. If not provided, a default
                           client with max_retries=0 will be created (since Temporal handles retries)
+            streaming_mode: How per-delta updates flow to consumers. Defaults to
+                          "coalesced" (50ms / 128-char windowed batches with an
+                          immediate first-delta flush) for low latency without
+                          giving up streaming UX. Use "per_token" for legacy
+                          publish-every-delta behavior, or "off" to suppress
+                          per-delta publishes entirely.
         """
         # Use provided client or create default (Temporal handles retries)
         self.client = openai_client if openai_client is not None else AsyncOpenAI(max_retries=0)
         self.model_name = model_name
         # Always use Responses API for all models
         self.use_responses_api = True
+        self.streaming_mode: StreamingMode = streaming_mode
 
         # Initialize tracer as a class variable
         agentex_client = create_async_agentex_client()
         self.tracer = AsyncTracer(agentex_client)
 
-        logger.info(f"[TemporalStreamingModel] Initialized model={self.model_name}, use_responses_api={self.use_responses_api}, custom_client={openai_client is not None}, tracer=initialized")
+        logger.info(f"[TemporalStreamingModel] Initialized model={self.model_name}, use_responses_api={self.use_responses_api}, custom_client={openai_client is not None}, streaming_mode={self.streaming_mode}, tracer=initialized")
 
     def _non_null_or_not_given(self, value: Any) -> Any:
         """Convert None to NOT_GIVEN sentinel, matching OpenAI SDK pattern."""
@@ -634,6 +646,7 @@ class TemporalStreamingModel(Model):
                                         type="reasoning",
                                         style="active",
                                     ),
+                                    streaming_mode=self.streaming_mode,
                                 ).__aenter__()
                         elif item and getattr(item, 'type', None) == 'function_call':
                             # Track the function call being streamed
@@ -654,6 +667,7 @@ class TemporalStreamingModel(Model):
                                     content="",
                                     format="markdown",
                                 ),
+                                streaming_mode=self.streaming_mode,
                             ).__aenter__()
 
                     elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):
@@ -732,7 +746,8 @@ class TemporalStreamingModel(Model):
                                     delta=delta_obj,
                                     type="delta",
                                 )
-                                await streaming_context.stream_update(update) if streaming_context else None
+                                if streaming_context:
+                                    await streaming_context.stream_update(update)
                             except Exception as e:
                                 logger.warning(f"Failed to send text delta: {e}")
 
@@ -935,16 +950,24 @@ class TemporalStreamingModel(Model):
 class TemporalStreamingModelProvider(ModelProvider):
     """Custom model provider that returns a streaming-capable model."""
 
-    def __init__(self, openai_client: Optional[AsyncOpenAI] = None):
+    def __init__(
+        self,
+        openai_client: Optional[AsyncOpenAI] = None,
+        streaming_mode: StreamingMode = "coalesced",
+    ):
         """Initialize the provider.
 
         Args:
             openai_client: Optional custom AsyncOpenAI client to use for all models.
                           If not provided, each model will create its own default client.
+            streaming_mode: Default streaming mode applied to every model returned by
+                          this provider. See ``StreamingMode`` for the meaning of
+                          each value. Defaults to "coalesced" — fast but still streamy.
         """
         super().__init__()
         self.openai_client = openai_client
-        logger.info(f"[TemporalStreamingModelProvider] Initialized, custom_client={openai_client is not None}")
+        self.streaming_mode: StreamingMode = streaming_mode
+        logger.info(f"[TemporalStreamingModelProvider] Initialized, custom_client={openai_client is not None}, streaming_mode={self.streaming_mode}")
 
     @override
     def get_model(self, model_name: Union[str, None]) -> Model:
@@ -959,5 +982,9 @@ class TemporalStreamingModelProvider(ModelProvider):
         # Use the provided model_name or default to gpt-4o
         actual_model = model_name if model_name else "gpt-4o"
         logger.info(f"[TemporalStreamingModelProvider] Creating TemporalStreamingModel for model_name: {actual_model}")
-        model = TemporalStreamingModel(model_name=actual_model, openai_client=self.openai_client)
+        model = TemporalStreamingModel(
+            model_name=actual_model,
+            openai_client=self.openai_client,
+            streaming_mode=self.streaming_mode,
+        )
         return model
