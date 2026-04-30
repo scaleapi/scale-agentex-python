@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import uuid
-import logging
 from typing import Any, List, Union, Optional, override
 
 from agents import (
@@ -58,6 +57,7 @@ from openai.types.responses import (
 
 # AgentEx SDK imports
 from agentex.lib import adk
+from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task_message_delta import TextDelta, ReasoningContentDelta, ReasoningSummaryDelta
 from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
@@ -69,8 +69,12 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
     streaming_parent_span_id,
 )
 
-# Create logger for this module
-logger = logging.getLogger("agentex.temporal.streaming")
+# Use the SDK's make_logger so this module's INFO/DEBUG output is actually
+# visible (raw ``logging.getLogger`` returns a logger with no handler/level
+# configured, which silently drops anything below WARNING). Keep the explicit
+# name "agentex.temporal.streaming" so any external logging config targeting
+# that name keeps working.
+logger = make_logger("agentex.temporal.streaming")
 
 
 def _serialize_item(item: Any) -> dict[str, Any]:
