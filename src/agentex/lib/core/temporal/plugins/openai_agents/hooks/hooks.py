@@ -131,7 +131,7 @@ class TemporalStreamingHooks(RunHooks):
                 logger.warning(f"Failed to parse tool arguments: {tool_context.tool_arguments}")
                 tool_arguments = {}
 
-        await workflow.execute_activity_method(
+        await workflow.execute_activity(
             stream_lifecycle_content,
             args=[
                 self.task_id,
@@ -167,7 +167,7 @@ class TemporalStreamingHooks(RunHooks):
             else f"call_{id(tool)}"
         )
 
-        await workflow.execute_activity_method(
+        await workflow.execute_activity(
             stream_lifecycle_content,
             args=[
                 self.task_id,
@@ -195,7 +195,7 @@ class TemporalStreamingHooks(RunHooks):
             from_agent: The agent transferring control
             to_agent: The agent receiving control
         """
-        await workflow.execute_activity_method(
+        await workflow.execute_activity(
             stream_lifecycle_content,
             args=[
                 self.task_id,

@@ -42,6 +42,7 @@ class TestSpans:
             input={"foo": "bar"},
             output={"foo": "bar"},
             parent_id="parent_id",
+            task_id="task_id",
         )
         assert_matches_type(Span, span, path=["response"])
 
@@ -137,6 +138,7 @@ class TestSpans:
             output={"foo": "bar"},
             parent_id="parent_id",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
+            task_id="task_id",
             trace_id="trace_id",
         )
         assert_matches_type(Span, span, path=["response"])
@@ -244,6 +246,7 @@ class TestAsyncSpans:
             input={"foo": "bar"},
             output={"foo": "bar"},
             parent_id="parent_id",
+            task_id="task_id",
         )
         assert_matches_type(Span, span, path=["response"])
 
@@ -339,6 +342,7 @@ class TestAsyncSpans:
             output={"foo": "bar"},
             parent_id="parent_id",
             start_time=parse_datetime("2019-12-27T18:11:19.117Z"),
+            task_id="task_id",
             trace_id="trace_id",
         )
         assert_matches_type(Span, span, path=["response"])
