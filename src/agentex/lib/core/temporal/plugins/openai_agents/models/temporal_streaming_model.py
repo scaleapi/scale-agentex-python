@@ -51,6 +51,7 @@ from openai.types.responses import (
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseFunctionCallArgumentsDeltaEvent,
 )
+from openai.types.responses.response_prompt_param import ResponsePromptParam
 
 # AgentEx SDK imports
 from agentex.lib import adk
@@ -465,12 +466,25 @@ class TemporalStreamingModel(Model):
         output_schema: Optional[AgentOutputSchemaBase],
         handoffs: list[Handoff],
         tracing: ModelTracing,  # noqa: ARG002
-        **kwargs,  # noqa: ARG002
+        *,
+        previous_response_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,  # noqa: ARG002
+        prompt: Optional[ResponsePromptParam] = None,  # noqa: ARG002
     ) -> ModelResponse:
         """Get a non-streaming response from the model with streaming to Redis.
 
         This method is used by Temporal activities and needs to return a complete
         response, but we stream the response to Redis while generating it.
+
+        ``previous_response_id`` enables stateful multi-turn chaining on the
+        Responses API: when set, the server retains the prior response's
+        chain-of-thought and only the new input items need to be sent. Forwarded
+        only when explicitly set — not all OpenAI-compatible backends support
+        this parameter, so the default is omitted from the request body via
+        ``NOT_GIVEN``.
+
+        ``conversation_id`` and ``prompt`` are accepted to satisfy the
+        ``Model.get_response`` abstract contract but not currently forwarded.
         """
         
         task_id = streaming_task_id.get()
@@ -595,6 +609,7 @@ class TemporalStreamingModel(Model):
                     extra_query=model_settings.extra_query,
                     extra_body=model_settings.extra_body,
                     prompt_cache_key=prompt_cache_key,
+                    previous_response_id=self._non_null_or_not_given(previous_response_id),
                     # Any additional parameters from extra_args
                     **extra_args,
                 )

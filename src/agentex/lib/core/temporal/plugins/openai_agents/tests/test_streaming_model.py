@@ -43,7 +43,6 @@ class TestStreamingModelSettings:
                 output_schema=None,
                 handoffs=[],
                 tracing=None,
-                task_id=sample_task_id
             )
 
             # Verify temperature was passed correctly
@@ -73,7 +72,6 @@ class TestStreamingModelSettings:
                 output_schema=None,
                 handoffs=[],
                 tracing=None,
-                task_id=sample_task_id
             )
 
             create_call = streaming_model.client.responses.create.call_args
@@ -101,7 +99,6 @@ class TestStreamingModelSettings:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -131,7 +128,6 @@ class TestStreamingModelSettings:
                 output_schema=None,
                 handoffs=[],
                 tracing=None,
-                task_id=sample_task_id
             )
 
             create_call = streaming_model.client.responses.create.call_args
@@ -161,7 +157,6 @@ class TestStreamingModelSettings:
                 output_schema=None,
                 handoffs=[],
                 tracing=None,
-                task_id=sample_task_id
             )
 
             create_call = streaming_model.client.responses.create.call_args
@@ -199,7 +194,6 @@ class TestStreamingModelSettings:
                 output_schema=None,
                 handoffs=[],
                 tracing=None,
-                task_id=sample_task_id
             )
 
             create_call = streaming_model.client.responses.create.call_args
@@ -227,7 +221,6 @@ class TestStreamingModelSettings:
                 output_schema=None,
                 handoffs=[],
                 tracing=None,
-                task_id=sample_task_id
             )
 
             create_call = streaming_model.client.responses.create.call_args
@@ -255,7 +248,6 @@ class TestStreamingModelSettings:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -284,7 +276,6 @@ class TestStreamingModelSettings:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -314,7 +305,6 @@ class TestStreamingModelSettings:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -347,7 +337,6 @@ class TestStreamingModelSettings:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -383,7 +372,6 @@ class TestStreamingModelSettings:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -412,7 +400,6 @@ class TestStreamingModelSettings:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -445,7 +432,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -475,7 +461,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -502,7 +487,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -531,7 +515,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -563,7 +546,6 @@ class TestStreamingModelTools:
                 output_schema=None,
                 handoffs=[],
                 tracing=None,
-                task_id=sample_task_id
             )
 
     @pytest.mark.asyncio
@@ -585,7 +567,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -613,7 +594,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -640,7 +620,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -667,7 +646,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -695,7 +673,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[sample_handoff],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -725,7 +702,6 @@ class TestStreamingModelTools:
             output_schema=None,
             handoffs=[sample_handoff],
             tracing=None,
-            task_id=sample_task_id
         )
 
         create_call = streaming_model.client.responses.create.call_args
@@ -770,7 +746,6 @@ class TestStreamingModelBasics:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         # Verify streaming context was created
@@ -845,7 +820,6 @@ class TestStreamingModelBasics:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            task_id=sample_task_id
         )
 
         # Should create at least one context for reasoning
@@ -1114,3 +1088,89 @@ class TestStreamingModelUsageResponseIdAndCacheKey:
         assert kwargs["prompt_cache_key"] == "my-key"
         # Must be popped from extra_args so the SDK doesn't see it twice.
         assert list(kwargs).count("prompt_cache_key") == 1
+
+    @pytest.mark.asyncio
+    async def test_previous_response_id_not_sent_by_default(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """Without an opt-in, previous_response_id resolves to NOT_GIVEN.
+
+        Critical for non-Responses-API-native backends (e.g. Claude-via-LiteLLM)
+        where unknown fields on the request body could be rejected. NOT_GIVEN
+        is filtered before serialization, so the field is omitted entirely.
+        """
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event()
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        kwargs = model.client.responses.create.call_args.kwargs
+        assert kwargs["previous_response_id"] is NOT_GIVEN
+
+    @pytest.mark.asyncio
+    async def test_previous_response_id_forwarded_via_sdk_kwarg(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """The SDK threads previous_response_id as a keyword arg per Model.get_response
+        abstract contract. Verify it reaches responses.create instead of being silently
+        swallowed (which was the prior behavior under **kwargs)."""
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event()
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+            previous_response_id="resp_prior_turn",
+        )
+
+        kwargs = model.client.responses.create.call_args.kwargs
+        assert kwargs["previous_response_id"] == "resp_prior_turn"
+
+    @pytest.mark.asyncio
+    async def test_conversation_id_and_prompt_accepted_but_not_forwarded(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """conversation_id and prompt are accepted to satisfy the SDK abstract
+        contract but not currently forwarded to responses.create."""
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event()
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        # Should not raise — both kwargs are accepted by the signature.
+        await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+            conversation_id="conv_test",
+            prompt=None,
+        )
+
+        kwargs = model.client.responses.create.call_args.kwargs
+        # Neither should appear in the outgoing request kwargs.
+        assert "conversation_id" not in kwargs
+        assert "prompt" not in kwargs
