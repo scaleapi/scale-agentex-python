@@ -602,6 +602,7 @@ class TemporalStreamingModel(Model):
                 # Process the stream of events from Responses API
                 output_items = []
                 captured_usage = None
+                captured_response_id = None
                 current_text = ""
                 streaming_context = None
                 reasoning_context = None
@@ -815,6 +816,7 @@ class TemporalStreamingModel(Model):
                                 output_items = response.output
                                 logger.debug(f"[TemporalStreamingModel] Found {len(output_items)} output items in final response")
                             captured_usage = getattr(response, 'usage', None)
+                            captured_response_id = getattr(response, 'id', None)
 
                 # End of event processing loop - close any open contexts
                 if reasoning_context:
@@ -945,11 +947,17 @@ class TemporalStreamingModel(Model):
 
                     span.output = output_data
 
-                # Return the response
+                # Return the response. response_id is the server-issued id from
+                # ResponseCompletedEvent.response.id, or None when the stream ended
+                # without a completed event (error path) — matching the documented
+                # `str | None` contract on `ModelResponse.response_id`. Returning
+                # None lets callers use it safely as `previous_response_id` for
+                # multi-turn chaining; a fabricated UUID would 400 against any real
+                # server.
                 return ModelResponse(
                     output=response_output,
                     usage=usage,
-                    response_id=f"resp_{uuid.uuid4().hex[:8]}",
+                    response_id=captured_response_id,
                 )
 
             except Exception as e:
