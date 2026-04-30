@@ -1,4 +1,4 @@
 configured_endpoints: 45
-openapi_spec_url: https://storage.googleapis.com/stainless-sdk-openapi-specs/sgp/agentex-sdk-c108a179582f0e0c6d479ea4b3bc6310a83693987073967c2b6203df23718eb2.yml
-openapi_spec_hash: 53b8e5866709af71bef94816b8ede38b
+openapi_spec_url: https://storage.googleapis.com/stainless-sdk-openapi-specs/sgp/agentex-sdk-77d6129c9334f3e5fafbbfe9e6e31b5328a90042d36a83b7ebdf5ac803c84fad.yml
+openapi_spec_hash: 29b1c8e19be86501217b5a6c1858f73a
 config_hash: fb079ef7936611b032568661b8165f19
