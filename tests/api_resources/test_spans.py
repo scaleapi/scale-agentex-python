@@ -191,6 +191,7 @@ class TestSpans:
             order_by="order_by",
             order_direction="order_direction",
             page_number=1,
+            task_id="task_id",
             trace_id="trace_id",
         )
         assert_matches_type(SpanListResponse, span, path=["response"])
@@ -395,6 +396,7 @@ class TestAsyncSpans:
             order_by="order_by",
             order_direction="order_direction",
             page_number=1,
+            task_id="task_id",
             trace_id="trace_id",
         )
         assert_matches_type(SpanListResponse, span, path=["response"])
