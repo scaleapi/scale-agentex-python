@@ -2,6 +2,7 @@
 Comprehensive tests for StreamingModel with all configurations and tool types.
 """
 
+from typing import Optional
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -20,7 +21,7 @@ class TestStreamingModelSettings:
     """Test that all ModelSettings parameters work with Responses API"""
 
     @pytest.mark.asyncio
-    async def test_temperature_setting(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_temperature_setting(self, streaming_model, _streaming_context_vars):
         """Test that temperature parameter is properly passed to Responses API"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -50,7 +51,7 @@ class TestStreamingModelSettings:
             assert create_call.kwargs['temperature'] == temp
 
     @pytest.mark.asyncio
-    async def test_top_p_setting(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_top_p_setting(self, streaming_model, _streaming_context_vars):
         """Test that top_p parameter is properly passed to Responses API"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -79,7 +80,7 @@ class TestStreamingModelSettings:
             assert create_call.kwargs['top_p'] == expected
 
     @pytest.mark.asyncio
-    async def test_max_tokens_setting(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_max_tokens_setting(self, streaming_model, _streaming_context_vars):
         """Test that max_tokens is properly mapped to max_output_tokens"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -105,7 +106,7 @@ class TestStreamingModelSettings:
         assert create_call.kwargs['max_output_tokens'] == 2000
 
     @pytest.mark.asyncio
-    async def test_reasoning_effort_settings(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_reasoning_effort_settings(self, streaming_model, _streaming_context_vars):
         """Test reasoning effort levels (low/medium/high)"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -134,7 +135,7 @@ class TestStreamingModelSettings:
             assert create_call.kwargs['reasoning'] == {"effort": effort}
 
     @pytest.mark.asyncio
-    async def test_reasoning_summary_settings(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_reasoning_summary_settings(self, streaming_model, _streaming_context_vars):
         """Test reasoning summary settings (auto/none)"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -163,7 +164,7 @@ class TestStreamingModelSettings:
             assert create_call.kwargs['reasoning'] == {"effort": "medium", "summary": summary}
 
     @pytest.mark.asyncio
-    async def test_tool_choice_variations(self, streaming_model, _streaming_context_vars, sample_task_id, sample_function_tool):
+    async def test_tool_choice_variations(self, streaming_model, _streaming_context_vars, sample_function_tool):
         """Test various tool_choice settings"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -200,7 +201,7 @@ class TestStreamingModelSettings:
             assert create_call.kwargs['tool_choice'] == expected
 
     @pytest.mark.asyncio
-    async def test_parallel_tool_calls(self, streaming_model, _streaming_context_vars, sample_task_id, sample_function_tool):
+    async def test_parallel_tool_calls(self, streaming_model, _streaming_context_vars, sample_function_tool):
         """Test parallel tool calls setting"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -227,7 +228,7 @@ class TestStreamingModelSettings:
             assert create_call.kwargs['parallel_tool_calls'] == parallel
 
     @pytest.mark.asyncio
-    async def test_truncation_strategy(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_truncation_strategy(self, streaming_model, _streaming_context_vars):
         """Test truncation parameter"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -254,7 +255,7 @@ class TestStreamingModelSettings:
         assert create_call.kwargs['truncation'] == "auto"
 
     @pytest.mark.asyncio
-    async def test_response_include(self, streaming_model, _streaming_context_vars, sample_task_id, sample_file_search_tool):
+    async def test_response_include(self, streaming_model, _streaming_context_vars, sample_file_search_tool):
         """Test response include parameter"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -285,7 +286,7 @@ class TestStreamingModelSettings:
         assert "file_search_call.results" in include_list  # Added by file search tool
 
     @pytest.mark.asyncio
-    async def test_verbosity(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_verbosity(self, streaming_model, _streaming_context_vars):
         """Test verbosity settings"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -311,7 +312,7 @@ class TestStreamingModelSettings:
         assert create_call.kwargs['text'] == {"verbosity": "high"}
 
     @pytest.mark.asyncio
-    async def test_metadata_and_store(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_metadata_and_store(self, streaming_model, _streaming_context_vars):
         """Test metadata and store parameters"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -344,7 +345,7 @@ class TestStreamingModelSettings:
         assert create_call.kwargs['store'] == store
 
     @pytest.mark.asyncio
-    async def test_extra_headers_and_body(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_extra_headers_and_body(self, streaming_model, _streaming_context_vars):
         """Test extra customization parameters"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -380,7 +381,7 @@ class TestStreamingModelSettings:
         assert create_call.kwargs['extra_query'] == extra_query
 
     @pytest.mark.asyncio
-    async def test_top_logprobs(self, streaming_model, _streaming_context_vars, sample_task_id):
+    async def test_top_logprobs(self, streaming_model, _streaming_context_vars):
         """Test top_logprobs parameter"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -414,7 +415,7 @@ class TestStreamingModelTools:
     """Test that all tool types work with streaming"""
 
     @pytest.mark.asyncio
-    async def test_function_tool(self, streaming_model, _streaming_context_vars, sample_task_id, sample_function_tool):
+    async def test_function_tool(self, streaming_model, _streaming_context_vars, sample_function_tool):
         """Test FunctionTool conversion and streaming"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -443,7 +444,7 @@ class TestStreamingModelTools:
         assert 'parameters' in tools[0]
 
     @pytest.mark.asyncio
-    async def test_web_search_tool(self, streaming_model, _streaming_context_vars, sample_task_id, sample_web_search_tool):
+    async def test_web_search_tool(self, streaming_model, _streaming_context_vars, sample_web_search_tool):
         """Test WebSearchTool conversion"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -469,7 +470,7 @@ class TestStreamingModelTools:
         assert tools[0]['type'] == 'web_search'
 
     @pytest.mark.asyncio
-    async def test_file_search_tool(self, streaming_model, _streaming_context_vars, sample_task_id, sample_file_search_tool):
+    async def test_file_search_tool(self, streaming_model, _streaming_context_vars, sample_file_search_tool):
         """Test FileSearchTool conversion"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -497,7 +498,7 @@ class TestStreamingModelTools:
         assert tools[0]['max_num_results'] == 10
 
     @pytest.mark.asyncio
-    async def test_computer_tool(self, streaming_model, _streaming_context_vars, sample_task_id, sample_computer_tool):
+    async def test_computer_tool(self, streaming_model, _streaming_context_vars, sample_computer_tool):
         """Test ComputerTool conversion"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -526,7 +527,7 @@ class TestStreamingModelTools:
         assert tools[0]['display_height'] == 1080
 
     @pytest.mark.asyncio
-    async def test_multiple_computer_tools_error(self, streaming_model, _streaming_context_vars, sample_task_id, sample_computer_tool):
+    async def test_multiple_computer_tools_error(self, streaming_model, _streaming_context_vars, sample_computer_tool):
         """Test that multiple computer tools raise an error"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -549,7 +550,7 @@ class TestStreamingModelTools:
             )
 
     @pytest.mark.asyncio
-    async def test_hosted_mcp_tool(self, streaming_model, _streaming_context_vars, sample_task_id, sample_hosted_mcp_tool):
+    async def test_hosted_mcp_tool(self, streaming_model, _streaming_context_vars, sample_hosted_mcp_tool):
         """Test HostedMCPTool conversion"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -576,7 +577,7 @@ class TestStreamingModelTools:
         assert tools[0]['server_label'] == 'test_server'
 
     @pytest.mark.asyncio
-    async def test_image_generation_tool(self, streaming_model, _streaming_context_vars, sample_task_id, sample_image_generation_tool):
+    async def test_image_generation_tool(self, streaming_model, _streaming_context_vars, sample_image_generation_tool):
         """Test ImageGenerationTool conversion"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -602,7 +603,7 @@ class TestStreamingModelTools:
         assert tools[0]['type'] == 'image_generation'
 
     @pytest.mark.asyncio
-    async def test_code_interpreter_tool(self, streaming_model, _streaming_context_vars, sample_task_id, sample_code_interpreter_tool):
+    async def test_code_interpreter_tool(self, streaming_model, _streaming_context_vars, sample_code_interpreter_tool):
         """Test CodeInterpreterTool conversion"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -628,7 +629,7 @@ class TestStreamingModelTools:
         assert tools[0]['type'] == 'code_interpreter'
 
     @pytest.mark.asyncio
-    async def test_local_shell_tool(self, streaming_model, _streaming_context_vars, sample_task_id, sample_local_shell_tool):
+    async def test_local_shell_tool(self, streaming_model, _streaming_context_vars, sample_local_shell_tool):
         """Test LocalShellTool conversion"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -655,7 +656,7 @@ class TestStreamingModelTools:
         # working_directory no longer in API - LocalShellTool uses executor internally
 
     @pytest.mark.asyncio
-    async def test_handoffs(self, streaming_model, _streaming_context_vars, sample_task_id, sample_handoff):
+    async def test_handoffs(self, streaming_model, _streaming_context_vars, sample_handoff):
         """Test Handoff conversion to function tools"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -683,7 +684,7 @@ class TestStreamingModelTools:
         assert tools[0]['description'] == 'Transfer to support agent'
 
     @pytest.mark.asyncio
-    async def test_mixed_tools(self, streaming_model, _streaming_context_vars, sample_task_id,
+    async def test_mixed_tools(self, streaming_model, _streaming_context_vars,
                               sample_function_tool, sample_web_search_tool, sample_handoff):
         """Test multiple tools together"""
         streaming_model.client.responses.create = AsyncMock()
@@ -794,7 +795,7 @@ class TestStreamingModelBasics:
         assert call_args.kwargs['task_id'] == expected_task_id
 
     @pytest.mark.asyncio
-    async def test_redis_context_creation(self, streaming_model, mock_adk_streaming, _streaming_context_vars, sample_task_id):
+    async def test_redis_context_creation(self, streaming_model, mock_adk_streaming, _streaming_context_vars):
         """Test that Redis streaming contexts are created properly"""
         streaming_model.client.responses.create = AsyncMock()
 
@@ -867,7 +868,7 @@ class TestStreamingModelUsageResponseIdAndCacheKey:
         cached_tokens: int = 0,
         reasoning_tokens: int = 0,
         with_usage: bool = True,
-        response_id: str | None = "resp_real_server_id",
+        response_id: Optional[str] = "resp_real_server_id",
     ):
         usage = MagicMock()
         usage.input_tokens = input_tokens
