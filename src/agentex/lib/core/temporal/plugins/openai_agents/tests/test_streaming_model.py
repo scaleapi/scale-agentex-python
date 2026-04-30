@@ -1146,18 +1146,21 @@ class TestStreamingModelUsageResponseIdAndCacheKey:
         assert kwargs["previous_response_id"] == "resp_prior_turn"
 
     @pytest.mark.asyncio
-    async def test_conversation_id_and_prompt_accepted_but_not_forwarded(
+    async def test_conversation_and_prompt_not_sent_by_default(
         self,
         streaming_model_with_mock_tracer,
         _streaming_context_vars,  # noqa: ARG002
     ):
-        """conversation_id and prompt are accepted to satisfy the SDK abstract
-        contract but not currently forwarded to responses.create."""
+        """Without an opt-in, conversation/prompt resolve to NOT_GIVEN.
+
+        Same opt-in pattern as previous_response_id and prompt_cache_key — the
+        wire request is unchanged for callers (and non-OpenAI backends) that
+        don't supply these.
+        """
         model = streaming_model_with_mock_tracer
         completed = self._make_response_completed_event()
         model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
 
-        # Should not raise — both kwargs are accepted by the signature.
         await model.get_response(
             system_instructions=None,
             input="hi",
@@ -1166,11 +1169,62 @@ class TestStreamingModelUsageResponseIdAndCacheKey:
             output_schema=None,
             handoffs=[],
             tracing=None,
-            conversation_id="conv_test",
-            prompt=None,
         )
 
         kwargs = model.client.responses.create.call_args.kwargs
-        # Neither should appear in the outgoing request kwargs.
-        assert "conversation_id" not in kwargs
-        assert "prompt" not in kwargs
+        assert kwargs["conversation"] is NOT_GIVEN
+        assert kwargs["prompt"] is NOT_GIVEN
+
+    @pytest.mark.asyncio
+    async def test_conversation_id_forwarded_via_sdk_kwarg(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """The SDK abstract names this `conversation_id`; the Responses API
+        endpoint kwarg is `conversation`. Caller passes a string id; we forward
+        it as-is (the Conversation type accepts str)."""
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event()
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+            conversation_id="conv_abc123",
+        )
+
+        kwargs = model.client.responses.create.call_args.kwargs
+        assert kwargs["conversation"] == "conv_abc123"
+
+    @pytest.mark.asyncio
+    async def test_prompt_forwarded_via_sdk_kwarg(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """ResponsePromptParam (a TypedDict for pre-built prompts) is forwarded
+        as-is to responses.create."""
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event()
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        prompt_param = {"id": "prompt_test_id", "version": "1"}
+        await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+            prompt=prompt_param,  # type: ignore[arg-type]
+        )
+
+        kwargs = model.client.responses.create.call_args.kwargs
+        assert kwargs["prompt"] == prompt_param

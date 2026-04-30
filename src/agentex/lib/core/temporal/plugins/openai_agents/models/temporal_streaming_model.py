@@ -468,23 +468,21 @@ class TemporalStreamingModel(Model):
         tracing: ModelTracing,  # noqa: ARG002
         *,
         previous_response_id: Optional[str] = None,
-        conversation_id: Optional[str] = None,  # noqa: ARG002
-        prompt: Optional[ResponsePromptParam] = None,  # noqa: ARG002
+        conversation_id: Optional[str] = None,
+        prompt: Optional[ResponsePromptParam] = None,
     ) -> ModelResponse:
         """Get a non-streaming response from the model with streaming to Redis.
 
         This method is used by Temporal activities and needs to return a complete
         response, but we stream the response to Redis while generating it.
 
-        ``previous_response_id`` enables stateful multi-turn chaining on the
-        Responses API: when set, the server retains the prior response's
-        chain-of-thought and only the new input items need to be sent. Forwarded
-        only when explicitly set — not all OpenAI-compatible backends support
-        this parameter, so the default is omitted from the request body via
-        ``NOT_GIVEN``.
-
-        ``conversation_id`` and ``prompt`` are accepted to satisfy the
-        ``Model.get_response`` abstract contract but not currently forwarded.
+        ``previous_response_id``, ``conversation_id``, and ``prompt`` are all
+        Responses API server-state parameters threaded through by the OpenAI
+        Agents SDK. Each is forwarded to ``responses.create`` only when
+        explicitly set — defaults resolve to ``NOT_GIVEN`` and are omitted from
+        the request body. Not all OpenAI-compatible backends recognize these
+        fields, so callers on alternative providers see no wire-level change
+        unless they opt in.
         """
         
         task_id = streaming_task_id.get()
@@ -610,6 +608,10 @@ class TemporalStreamingModel(Model):
                     extra_body=model_settings.extra_body,
                     prompt_cache_key=prompt_cache_key,
                     previous_response_id=self._non_null_or_not_given(previous_response_id),
+                    # SDK abstract names this conversation_id; the Responses API
+                    # endpoint kwarg is `conversation` (accepts a str id directly).
+                    conversation=self._non_null_or_not_given(conversation_id),
+                    prompt=self._non_null_or_not_given(prompt),
                     # Any additional parameters from extra_args
                     **extra_args,
                 )
