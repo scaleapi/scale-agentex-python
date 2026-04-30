@@ -757,7 +757,7 @@ class TestStreamingModelBasics:
         text_delta_2 = MagicMock(spec=ResponseTextDeltaEvent)
         text_delta_2.delta = "world!"
         completed = MagicMock(spec=ResponseCompletedEvent)
-        completed.response = MagicMock(output=[], usage=MagicMock())
+        completed.response = MagicMock(output=[], usage=MagicMock(), id=None)
         mock_stream = AsyncMock()
         mock_stream.__aiter__.return_value = iter([item_added, text_delta_1, text_delta_2, completed])
         streaming_model.client.responses.create.return_value = mock_stream
@@ -796,7 +796,7 @@ class TestStreamingModelBasics:
         item_added.item = MagicMock(type="message")
         item_added.output_index = 0
         completed = MagicMock(spec=ResponseCompletedEvent)
-        completed.response = MagicMock(output=[], usage=MagicMock())
+        completed.response = MagicMock(output=[], usage=MagicMock(), id=None)
         mock_stream = AsyncMock()
         mock_stream.__aiter__.return_value = iter([item_added, completed])
         streaming_model.client.responses.create.return_value = mock_stream
@@ -832,7 +832,7 @@ class TestStreamingModelBasics:
         reasoning_delta.delta = "Thinking..."
         reasoning_delta.summary_index = 0
         completed = MagicMock(spec=ResponseCompletedEvent)
-        completed.response = MagicMock(output=[], usage=MagicMock())
+        completed.response = MagicMock(output=[], usage=MagicMock(), id=None)
         mock_stream = AsyncMock()
         mock_stream.__aiter__.return_value = iter([item_added, reasoning_delta, completed])
         streaming_model.client.responses.create.return_value = mock_stream
@@ -872,3 +872,245 @@ class TestStreamingModelBasics:
                 handoffs=[],
                 tracing=None,
             )
+
+
+class TestStreamingModelUsageResponseIdAndCacheKey:
+    """Cover real-Usage capture, real response_id, span emission, and opt-in prompt_cache_key."""
+
+    @staticmethod
+    def _async_iter(events):
+        async def _gen():
+            for event in events:
+                yield event
+        return _gen()
+
+    @staticmethod
+    def _make_response_completed_event(
+        *,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        total_tokens: int = 0,
+        cached_tokens: int = 0,
+        reasoning_tokens: int = 0,
+        with_usage: bool = True,
+        response_id: str | None = "resp_real_server_id",
+    ):
+        usage = MagicMock()
+        usage.input_tokens = input_tokens
+        usage.output_tokens = output_tokens
+        usage.total_tokens = total_tokens
+        usage.input_tokens_details = MagicMock(cached_tokens=cached_tokens)
+        usage.output_tokens_details = MagicMock(reasoning_tokens=reasoning_tokens)
+
+        response = MagicMock()
+        response.output = []
+        response.usage = usage if with_usage else None
+        response.id = response_id
+
+        event = MagicMock(spec=ResponseCompletedEvent)
+        event.response = response
+        return event
+
+    @pytest.fixture
+    def mock_span(self):
+        return MagicMock()
+
+    @pytest.fixture
+    def streaming_model_with_mock_tracer(self, streaming_model, mock_span):
+        """A streaming_model whose tracer.trace().span(...) yields a captured mock span."""
+        async_cm = MagicMock()
+        async_cm.__aenter__ = AsyncMock(return_value=mock_span)
+        async_cm.__aexit__ = AsyncMock(return_value=False)
+        trace_obj = MagicMock()
+        trace_obj.span = MagicMock(return_value=async_cm)
+        streaming_model.tracer = MagicMock()
+        streaming_model.tracer.trace = MagicMock(return_value=trace_obj)
+        return streaming_model
+
+    @pytest.mark.asyncio
+    async def test_usage_captured_from_completed_event(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event(
+            input_tokens=1234, output_tokens=56, total_tokens=1290,
+            cached_tokens=987, reasoning_tokens=42,
+        )
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        response = await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        assert response.usage.input_tokens == 1234
+        assert response.usage.output_tokens == 56
+        assert response.usage.total_tokens == 1290
+        assert response.usage.input_tokens_details.cached_tokens == 987
+        assert response.usage.output_tokens_details.reasoning_tokens == 42
+
+    @pytest.mark.asyncio
+    async def test_usage_falls_back_when_no_completed_event(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """Stream ending without a ResponseCompletedEvent (error path) → zero Usage."""
+        model = streaming_model_with_mock_tracer
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([]))
+
+        response = await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        assert response.usage.input_tokens == 0
+        assert response.usage.output_tokens == 0
+        assert response.usage.total_tokens == 0
+        assert response.usage.input_tokens_details.cached_tokens == 0
+        assert response.usage.output_tokens_details.reasoning_tokens == 0
+
+    @pytest.mark.asyncio
+    async def test_usage_emitted_in_span_output(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+        mock_span,
+    ):
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event(
+            input_tokens=100, output_tokens=10, total_tokens=110,
+            cached_tokens=80, reasoning_tokens=5,
+        )
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        assert isinstance(mock_span.output, dict)
+        usage_block = mock_span.output["usage"]
+        assert usage_block == {
+            "input_tokens": 100,
+            "output_tokens": 10,
+            "total_tokens": 110,
+            "cached_input_tokens": 80,
+            "reasoning_tokens": 5,
+        }
+
+    @pytest.mark.asyncio
+    async def test_response_id_captured_from_completed_event(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """Real server-issued id flows back on ModelResponse.response_id."""
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event(response_id="resp_abcdef123456")
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        response = await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        assert response.response_id == "resp_abcdef123456"
+
+    @pytest.mark.asyncio
+    async def test_response_id_is_none_when_no_completed_event(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """Stream ending without ResponseCompletedEvent → response_id is None.
+
+        Critical: must NOT fabricate a UUID. Returning a fake id would cause
+        downstream `previous_response_id` chaining to 400 against the server.
+        """
+        model = streaming_model_with_mock_tracer
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([]))
+
+        response = await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        assert response.response_id is None
+
+    @pytest.mark.asyncio
+    async def test_prompt_cache_key_not_sent_by_default(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """Without an opt-in, prompt_cache_key resolves to NOT_GIVEN (omitted from request)."""
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event()
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        kwargs = model.client.responses.create.call_args.kwargs
+        assert kwargs["prompt_cache_key"] is NOT_GIVEN
+
+    @pytest.mark.asyncio
+    async def test_prompt_cache_key_forwarded_when_opted_in(
+        self,
+        streaming_model_with_mock_tracer,
+        _streaming_context_vars,  # noqa: ARG002
+    ):
+        """Caller opt-in via model_settings.extra_args is forwarded to responses.create."""
+        model = streaming_model_with_mock_tracer
+        completed = self._make_response_completed_event()
+        model.client.responses.create = AsyncMock(return_value=self._async_iter([completed]))
+
+        await model.get_response(
+            system_instructions=None,
+            input="hi",
+            model_settings=ModelSettings(extra_args={"prompt_cache_key": "my-key"}),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        kwargs = model.client.responses.create.call_args.kwargs
+        assert kwargs["prompt_cache_key"] == "my-key"
+        # Must be popped from extra_args so the SDK doesn't see it twice.
+        assert list(kwargs).count("prompt_cache_key") == 1
