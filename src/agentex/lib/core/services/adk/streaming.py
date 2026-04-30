@@ -122,7 +122,10 @@ def _merge_pair(a: TaskMessageDelta, b: TaskMessageDelta) -> TaskMessageDelta:
             name=a.name,
             content_delta=(a.content_delta or "") + (b.content_delta or ""),
         )
-    return b
+    raise AssertionError(
+        f"_can_merge approved {type(a).__name__} pair but _merge_pair has no handler — "
+        "a new TaskMessageDelta variant was added without updating both functions"
+    )
 
 
 def _merge_consecutive(updates: list[StreamTaskMessageDelta]) -> list[StreamTaskMessageDelta]:
@@ -189,9 +192,17 @@ class CoalescingBuffer:
                 async with self._lock:
                     self._flush_signal.clear()
                     drained = self._drain_locked()
-                for u in drained:
+                for idx, u in enumerate(drained):
                     try:
                         await self._on_flush(u)
+                    except asyncio.CancelledError:
+                        # Re-enqueue the item being flushed plus any remaining so
+                        # close()'s final drain can recover them. May cause a
+                        # duplicate publish of the in-flight item, which is
+                        # preferable to silent loss for a streaming UX.
+                        async with self._lock:
+                            self._buf = drained[idx:] + self._buf
+                        raise
                     except Exception as e:
                         logger.exception(f"CoalescingBuffer flush failed: {e}")
         except asyncio.CancelledError:
