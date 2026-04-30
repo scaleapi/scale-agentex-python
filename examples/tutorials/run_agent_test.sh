@@ -260,6 +260,18 @@ run_test() {
 
 
     # Run the tests with retry mechanism
+    local -a pytest_cmd=("uv" "run" "pytest")
+    if [ "$BUILD_CLI" = true ]; then
+        local wheel_file
+        wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+        if [[ -z "$wheel_file" ]]; then
+            wheel_file=$(ls "${SCRIPT_DIR}/../../dist/agentex_sdk-*.whl" 2>/dev/null | head -n1)
+        fi
+        if [[ -n "$wheel_file" ]]; then
+            pytest_cmd=("uv" "run" "--with" "$wheel_file" "pytest")
+        fi
+    fi
+
     local max_retries=5
     local retry_count=0
     local exit_code=1
@@ -270,7 +282,7 @@ run_test() {
         fi
 
         # Stream pytest output directly in real-time
-        uv run pytest tests/test_agent.py -v -s
+        "${pytest_cmd[@]}" tests/test_agent.py -v -s
         exit_code=$?
 
         if [ $exit_code -eq 0 ]; then
