@@ -21,6 +21,7 @@ from agents.tool import (
     CodeInterpreterTool,
     ImageGenerationTool,
 )
+from agents.computer import Computer
 from agents.model_settings import Reasoning  # type: ignore[attr-defined]
 from openai.types.responses import (
     ResponseCompletedEvent,
@@ -45,6 +46,34 @@ def mock_openai_client():
 def sample_task_id():
     """Generate a sample task ID"""
     return f"task_{uuid.uuid4().hex[:8]}"
+
+
+@pytest.fixture
+def _streaming_context_vars(sample_task_id):
+    """Populate the streaming ContextVars that ContextInterceptor sets from
+    request headers in real Temporal flows. TemporalStreamingModel.get_response()
+    validates that all three are set before doing any work, so any test that
+    calls get_response() must request this fixture.
+
+    Named with a leading underscore so tests can request it purely for its
+    setup/teardown side effects without ruff flagging it as an unused argument
+    (ARG002). The yielded value is the task_id set on the ContextVar, available
+    for tests that need to assert against it.
+    """
+    from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
+        streaming_task_id,
+        streaming_trace_id,
+        streaming_parent_span_id,
+    )
+    task_token = streaming_task_id.set(sample_task_id)
+    trace_token = streaming_trace_id.set("test-trace-id")
+    span_token = streaming_parent_span_id.set("test-parent-span-id")
+    try:
+        yield sample_task_id
+    finally:
+        streaming_task_id.reset(task_token)
+        streaming_trace_id.reset(trace_token)
+        streaming_parent_span_id.reset(span_token)
 
 
 @pytest.fixture
@@ -115,8 +144,13 @@ def sample_file_search_tool():
 
 @pytest.fixture
 def sample_computer_tool():
-    """Sample ComputerTool for testing"""
-    computer = MagicMock()
+    """Sample ComputerTool for testing.
+
+    Production validates ``isinstance(computer, (Computer, AsyncComputer))`` for
+    Responses API serialization, so the mock must be ``spec``-bound to
+    ``Computer`` for the isinstance check to pass.
+    """
+    computer = MagicMock(spec=Computer)
     computer.environment = "desktop"
     computer.dimensions = [1920, 1080]
     return ComputerTool(computer=computer)
