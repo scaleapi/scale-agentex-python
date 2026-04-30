@@ -7,6 +7,7 @@ from agentex import AsyncAgentex  # noqa: F401
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
 from agentex.lib.core.services.adk.streaming import (
+    StreamingMode,
     StreamingService,
     StreamingTaskMessageContext,
 )
@@ -50,6 +51,7 @@ class StreamingModule:
         self,
         task_id: str,
         initial_content: TaskMessageContent,
+        streaming_mode: StreamingMode = "coalesced",
     ) -> StreamingTaskMessageContext:
         """
         Create a streaming context for managing TaskMessage lifecycle.
@@ -60,7 +62,11 @@ class StreamingModule:
         Args:
             task_id: The ID of the task
             initial_content: The initial content for the TaskMessage
-            agentex_client: The agentex client for creating/updating messages
+            streaming_mode: How per-delta updates are published. Defaults to
+                "coalesced" (50ms / 128-char windowed batches with an immediate
+                first-delta flush). Pass "per_token" for the legacy publish-every-
+                delta behavior, or "off" to suppress per-delta publishes entirely
+                while still recording the full message body on close.
 
         Returns:
             StreamingTaskMessageContext: Context manager for streaming operations
@@ -76,4 +82,5 @@ class StreamingModule:
         return self._streaming_service.streaming_task_message_context(
             task_id=task_id,
             initial_content=initial_content,
+            streaming_mode=streaming_mode,
         )
