@@ -26,6 +26,7 @@ class AgentexSyncTracingProcessor(SyncTracingProcessor):
             input=span.input,
             output=span.output,
             parent_id=span.parent_id,
+            task_id=span.task_id,
         )
 
     @override
@@ -94,6 +95,7 @@ class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
             input=span.input,
             output=span.output,
             data=span.data,
+            task_id=span.task_id,
         )
 
     @override

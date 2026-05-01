@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.10.3 (2026-04-30)
+
+Full Changelog: [v0.10.2...v0.10.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.2...v0.10.3)
+
+### Features
+
+* **api:** api update ([16ab771](https://github.com/scaleapi/scale-agentex-python/commit/16ab771ab1396b94c768ec5185c2f8ed07eff556))
+* **api:** api update ([fe77732](https://github.com/scaleapi/scale-agentex-python/commit/fe77732da48c872739bc6296d2932d4d9c810a35))
+* support setting headers via env ([a73fd73](https://github.com/scaleapi/scale-agentex-python/commit/a73fd73ea036fc195c124636337acdc0552f18f1))
+
+
+### Bug Fixes
+
+* **adk:** Always inject headers on execute activity ([#337](https://github.com/scaleapi/scale-agentex-python/issues/337)) ([9d80e0b](https://github.com/scaleapi/scale-agentex-python/commit/9d80e0b797a9ed7a0838003294dc7a595ab18de5))
+* allow litellm security patch ([#336](https://github.com/scaleapi/scale-agentex-python/issues/336)) ([c980948](https://github.com/scaleapi/scale-agentex-python/commit/c9809482d5e6095063115d1851f0b92a5e5a3755))
+* **tests:** repair test_streaming_model so all 28 tests run and pass ([#334](https://github.com/scaleapi/scale-agentex-python/issues/334)) ([7e5e69c](https://github.com/scaleapi/scale-agentex-python/commit/7e5e69c132c89d054516e1a762e0437375859663))
+* use correct field name format for multipart file arrays ([bd6d362](https://github.com/scaleapi/scale-agentex-python/commit/bd6d362aee81873b7969b0367488029e2bb0314b))
+
+
+### Performance Improvements
+
+* **streaming:** coalesce per-token publishes to Redis (50ms / 128-char window) ([#333](https://github.com/scaleapi/scale-agentex-python/issues/333)) ([e6f11c4](https://github.com/scaleapi/scale-agentex-python/commit/e6f11c45e6dc3186770088688ad45cc251387e4a))
+
+
+### Chores
+
+* **internal:** more robust bootstrap script ([f004301](https://github.com/scaleapi/scale-agentex-python/commit/f0043013a44ddcd9f356a8e0a548e4a295cb1b1d))
+
 ## 0.10.2 (2026-04-21)
 
 Full Changelog: [v0.10.1...v0.10.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.1...v0.10.2)

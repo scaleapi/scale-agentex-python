@@ -749,11 +749,13 @@ class TestStreamingModelBasics:
             tracing=None,
         )
 
-        # Verify streaming context was created
-        mock_adk_streaming.streaming_task_message_context.assert_called_with(
-            task_id=sample_task_id,
-            initial_content=mock_adk_streaming.streaming_task_message_context.call_args.kwargs['initial_content']
-        )
+        # Verify streaming context was created with the right task_id. We
+        # don't strict-match the full kwargs because production also passes
+        # ``streaming_mode``, which is an implementation detail this test
+        # doesn't care about.
+        mock_adk_streaming.streaming_task_message_context.assert_called()
+        call_kwargs = mock_adk_streaming.streaming_task_message_context.call_args.kwargs
+        assert call_kwargs['task_id'] == sample_task_id
 
         # Verify result is returned as ModelResponse
         from agents import ModelResponse
