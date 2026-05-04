@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.4 (2026-05-04)
+
+Full Changelog: [v0.10.3...v0.10.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.3...v0.10.4)
+
+### Features
+
+* add service account id option for registering agentex agents ([8365771](https://github.com/scaleapi/scale-agentex-python/commit/83657710ddb95d61bb5173ca881fe602344ff495))
+
 ## 0.10.3 (2026-04-30)
 
 Full Changelog: [v0.10.2...v0.10.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.2...v0.10.3)
