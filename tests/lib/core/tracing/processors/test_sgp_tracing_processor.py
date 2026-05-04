@@ -48,11 +48,9 @@ class TestSGPSyncTracingProcessorMemoryLeak:
         mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
         mock_create_span = MagicMock(side_effect=lambda **kwargs: _make_mock_sgp_span())
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), \
-             patch(f"{MODULE}.SGPClient"), \
-             patch(f"{MODULE}.tracing"), \
-             patch(f"{MODULE}.flush_queue"), \
-             patch(f"{MODULE}.create_span", mock_create_span):
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.SGPClient"), patch(
+            f"{MODULE}.tracing"
+        ), patch(f"{MODULE}.flush_queue"), patch(f"{MODULE}.create_span", mock_create_span):
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
                 SGPSyncTracingProcessor,
             )
@@ -113,9 +111,9 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         mock_async_client = MagicMock()
         mock_async_client.spans.upsert_batch = AsyncMock()
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), \
-             patch(f"{MODULE}.create_span", mock_create_span), \
-             patch(f"{MODULE}.AsyncSGPClient", return_value=mock_async_client):
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.create_span", mock_create_span), patch(
+            f"{MODULE}.AsyncSGPClient", return_value=mock_async_client
+        ):
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
                 SGPAsyncTracingProcessor,
             )
@@ -164,7 +162,9 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         assert len(processor._spans) == 0
 
     async def test_sgp_span_input_updated_on_end(self):
-        """on_span_end should update sgp_span.input from the incoming span."""
+        """on_span_end should mutate the tracked SGP span and enqueue it.
+        With batched flushing, the upsert happens once on shutdown, with the
+        final state of the span after both start and end have run."""
         processor, _ = self._make_processor()
 
         with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
@@ -175,10 +175,12 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         assert len(processor._spans) == 1
 
         # Simulate modified input at end time
-        updated_input: dict[str, object] = {"messages": [
-            {"role": "user", "content": "hello"},
-            {"role": "assistant", "content": "hi"},
-        ]}
+        updated_input: dict[str, object] = {
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "hi"},
+            ]
+        }
         span.input = updated_input
         span.output = {"response": "hi"}
         span.end_time = datetime.now(UTC)
@@ -186,5 +188,74 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
 
         # Span should be removed after end
         assert len(processor._spans) == 0
-        # The end upsert should have been called
-        assert processor.sgp_async_client.spans.upsert_batch.call_count == 2  # start + end
+
+        # No upsert on the hot path; the worker batches and flushes asynchronously.
+        assert processor.sgp_async_client.spans.upsert_batch.call_count == 0
+
+        # Shutdown drains the queue and produces a single batched upsert.
+        await processor.shutdown()
+        assert processor.sgp_async_client.spans.upsert_batch.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Async processor batching tests
+#
+# Before this change, on_span_start and on_span_end each issued an awaited
+# upsert_batch(items=[one]) call on the agent's hot path. The processor now
+# buffers events and flushes them in batches from a background asyncio.Task,
+# mirroring the SDK's TraceQueueManager.
+# ---------------------------------------------------------------------------
+
+
+class TestSGPAsyncTracingProcessorBatching:
+    @staticmethod
+    def _make_processor():
+        mock_env = MagicMock()
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+
+        mock_async_client = MagicMock()
+        mock_async_client.spans.upsert_batch = AsyncMock()
+
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(
+            f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()
+        ), patch(f"{MODULE}.AsyncSGPClient", return_value=mock_async_client):
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+
+        processor.sgp_async_client = mock_async_client
+        return processor, mock_async_client
+
+    async def test_span_event_does_not_trigger_immediate_upsert(self):
+        """Regression: a single span event must not result in an upsert call
+        on the hot path. Events must be enqueued and flushed by the worker."""
+        processor, client = self._make_processor()
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            span = _make_span()
+            await processor.on_span_start(span)
+
+        assert client.spans.upsert_batch.call_count == 0, "on_span_start should enqueue, not trigger a network call"
+
+    async def test_shutdown_flushes_queued_spans_in_one_batch(self):
+        """Many span events should be coalesced into a single upsert_batch
+        call when the buffer fits under MAX_BATCH_SIZE (50)."""
+        processor, client = self._make_processor()
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            for _ in range(5):
+                span = _make_span()
+                await processor.on_span_start(span)
+                span.end_time = datetime.now(UTC)
+                await processor.on_span_end(span)
+
+        await processor.shutdown()
+
+        assert client.spans.upsert_batch.call_count == 1, (
+            f"Expected a single batched upsert, got {client.spans.upsert_batch.call_count}"
+        )
+        items = client.spans.upsert_batch.call_args.kwargs["items"]
+        # 5 starts + 5 ends = 10 enqueued items, well under MAX_BATCH_SIZE.
+        assert len(items) == 10, f"Expected 10 items in the batch, got {len(items)}"
