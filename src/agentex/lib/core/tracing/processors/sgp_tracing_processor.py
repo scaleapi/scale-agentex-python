@@ -149,6 +149,13 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         self._shutdown_event: Optional[asyncio.Event] = None
         self._flush_event: Optional[asyncio.Event] = None
 
+        if self.disabled:
+            # Log once at init rather than on every span event, which would
+            # flood logs at agent throughput.
+            logger.warning(
+                "SGP tracing is disabled (sgp_api_key or sgp_account_id missing); span events will be ignored"
+            )
+
     def _add_source_to_span(self, span: Span) -> None:
         if span.data is None:
             span.data = {}

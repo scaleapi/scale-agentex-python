@@ -321,3 +321,113 @@ class TestSGPAsyncTracingProcessorBatching:
             f"Worker should have made a second upsert attempt after the first failed; "
             f"got {client.spans.upsert_batch.call_count}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Edge-case correctness tests
+# ---------------------------------------------------------------------------
+
+
+class TestSGPAsyncTracingProcessorEdgeCases:
+    async def test_disabled_processor_never_enqueues_or_calls_upsert(self):
+        """When the config has no api_key / account_id, the processor must
+        be a no-op: no client constructed, no worker spun up, no upsert
+        calls. Only span tracking in `_spans` is preserved (matches the
+        sync processor's contract)."""
+        env_mock = MagicMock(refresh=MagicMock(return_value=MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)))
+        with patch(f"{MODULE}.EnvironmentVariables", env_mock), patch(
+            f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()
+        ), patch(f"{MODULE}.AsyncSGPClient") as mock_client_cls:
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            disabled_config = SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id="")
+            processor = SGPAsyncTracingProcessor(disabled_config)
+
+            assert processor.disabled is True
+            assert processor.sgp_async_client is None, "Disabled processor must not construct a client"
+            mock_client_cls.assert_not_called()
+
+            span = _make_span()
+            await processor.on_span_start(span)
+            span.end_time = datetime.now(UTC)
+            await processor.on_span_end(span)
+
+            # No worker, no queue.
+            assert processor._worker is None
+            assert processor._queue is None
+
+            # Shutdown is also a no-op.
+            await processor.shutdown()
+
+    async def test_shutdown_is_safe_when_called_multiple_times(self):
+        """Shutdown must be idempotent: a second call after the worker has
+        already exited cleanly should not raise, double-flush, or hang."""
+        processor, client = TestSGPAsyncTracingProcessorBatching._make_processor()
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            span = _make_span()
+            await processor.on_span_start(span)
+            span.end_time = datetime.now(UTC)
+            await processor.on_span_end(span)
+
+        await processor.shutdown()
+        first_call_count = client.spans.upsert_batch.call_count
+        assert first_call_count == 1
+
+        # Second shutdown: worker is already done; should not raise or
+        # produce additional upserts since _spans is already cleared and
+        # the queue has been drained.
+        await processor.shutdown()
+        assert client.spans.upsert_batch.call_count == first_call_count, (
+            "Calling shutdown twice must not produce extra upserts"
+        )
+
+    async def test_shutdown_before_any_event_is_noop(self):
+        """If shutdown runs before any span event, the worker was never
+        started; it must early-return without spinning anything up just to
+        tear it down."""
+        env_mock = MagicMock(refresh=MagicMock(return_value=MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)))
+        with patch(f"{MODULE}.EnvironmentVariables", env_mock), patch(f"{MODULE}.AsyncSGPClient") as mock_client_cls:
+            mock_client_cls.return_value = MagicMock(spans=MagicMock(upsert_batch=AsyncMock()))
+
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+            assert processor._worker is None
+
+            await processor.shutdown()
+
+            assert processor._worker is None, "Shutdown must not spin up a worker just to tear it down"
+
+    async def test_apierror_triggers_retry_then_drops_batch_on_exhaustion(self):
+        """`APIError` must be retried up to DEFAULT_RETRIES times. After
+        exhaustion, the batch is dropped and the worker continues."""
+        from scale_gp_beta._exceptions import APIError
+
+        processor, client = TestSGPAsyncTracingProcessorBatching._make_processor()
+
+        # Make every attempt raise APIError so we exhaust the retry budget.
+        api_error = APIError(message="boom", request=MagicMock(), body=None)
+        client.spans.upsert_batch.side_effect = api_error
+
+        # Patch sleep so retries don't block the test on real backoff timing.
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()), patch(
+            "asyncio.sleep", new=AsyncMock()
+        ):
+            span = _make_span()
+            await processor.on_span_start(span)
+            span.end_time = datetime.now(UTC)
+            await processor.on_span_end(span)
+
+        await processor.shutdown()
+
+        # 4 attempts, all failed. Batch dropped. Importantly, no fifth call.
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import DEFAULT_RETRIES
+
+        assert client.spans.upsert_batch.call_count == DEFAULT_RETRIES, (
+            f"Expected exactly {DEFAULT_RETRIES} attempts before dropping; got {client.spans.upsert_batch.call_count}"
+        )
