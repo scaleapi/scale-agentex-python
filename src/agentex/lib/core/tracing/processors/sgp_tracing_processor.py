@@ -134,6 +134,10 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         # being replaced — a common pattern in sync-ACP / per-request loops.
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self.sgp_async_client: Optional[AsyncSGPClient] = None
+        # Loop the *processor-owned* client was constructed on. Remains
+        # None when the client was injected externally (e.g. by a test);
+        # in that case we never replace it.
+        self._client_owned_at_loop: Optional[asyncio.AbstractEventLoop] = None
         self._queue: Optional[asyncio.Queue[SGPSpan]] = None
         self._worker: Optional[asyncio.Task[None]] = None
         self._shutdown_event: Optional[asyncio.Event] = None
@@ -164,16 +168,27 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             return
 
         self._loop = loop
-        # Construct a default client only if one wasn't injected (e.g. by a
-        # test). httpx defaults give us connection pooling and keepalive,
-        # which is the whole point of moving the client off the per-request
-        # hot path.
+        # We construct an httpx-backed client lazily on the running loop so
+        # connection pooling and keepalive can be left at httpx defaults
+        # without hitting "bound to a different event loop" errors when the
+        # processor outlives its original loop. An externally injected
+        # client (e.g. a test mock) is left alone — _client_owned_at_loop
+        # stays None for those.
         if self.sgp_async_client is None:
             self.sgp_async_client = AsyncSGPClient(
                 api_key=self._config.sgp_api_key,
                 account_id=self._config.sgp_account_id,
                 base_url=self._config.sgp_base_url,
             )
+            self._client_owned_at_loop = loop
+        elif self._client_owned_at_loop is not None and self._client_owned_at_loop is not loop:
+            # We previously created a client on a now-stale loop. Replace it.
+            self.sgp_async_client = AsyncSGPClient(
+                api_key=self._config.sgp_api_key,
+                account_id=self._config.sgp_account_id,
+                base_url=self._config.sgp_base_url,
+            )
+            self._client_owned_at_loop = loop
         self._queue = asyncio.Queue(maxsize=DEFAULT_MAX_QUEUE_SIZE)
         self._shutdown_event = asyncio.Event()
         self._flush_event = asyncio.Event()
@@ -222,17 +237,22 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
 
     @override
     async def shutdown(self) -> None:
-        # Anything still tracked has not had on_span_end called. Enqueue
-        # whatever state it has so it isn't silently lost.
-        if not self.disabled:
-            self._ensure_started()
-            for sgp_span in list(self._spans.values()):
-                self._enqueue(sgp_span)
-        self._spans.clear()
-
-        if self._shutdown_event is None or self._worker is None:
+        # Fast path when the processor was never started (disabled, or
+        # shutdown called before any span event). Avoid spinning up a
+        # worker just to tear it down.
+        if self._worker is None:
+            self._spans.clear()
             return
 
+        # Re-enqueue any spans whose end was never recorded so they aren't
+        # silently lost. They were already enqueued at start, but on_span_end
+        # is what mutates output / metadata / end_timestamp; without a
+        # second enqueue, the server only sees the start payload for them.
+        for sgp_span in list(self._spans.values()):
+            self._enqueue(sgp_span)
+        self._spans.clear()
+
+        assert self._shutdown_event is not None
         self._shutdown_event.set()
         if self._flush_event is not None:
             self._flush_event.set()
@@ -264,10 +284,21 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
                 except asyncio.TimeoutError:
                     pass
                 self._flush_event.clear()
-                await self._drain()
+                # Per-iteration guard: an unexpected error during one drain
+                # must not kill the worker, otherwise queued items stay
+                # unflushed until shutdown.
+                try:
+                    await self._drain()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    logger.exception("Tracing worker iteration failed; continuing")
 
             # Final drain on shutdown.
-            await self._drain()
+            try:
+                await self._drain()
+            except Exception:
+                logger.exception("Final tracing drain failed; some spans may be lost")
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -306,3 +337,12 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
                 logger.warning(f"Span export failed ({exc.message}); retrying in {backoff:.1f}s")
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, MAX_BACKOFF)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Unexpected error (not APIError, not cancellation): log and
+                # drop the batch. We deliberately do not retry because we
+                # don't know whether the request reached the server, and
+                # the SDK already surfaces transport failures as APIError.
+                logger.exception(f"Unexpected error exporting {len(batch)} spans; dropping batch")
+                return

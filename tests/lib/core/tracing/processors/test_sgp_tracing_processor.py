@@ -225,6 +225,67 @@ class TestSGPAsyncTracingProcessorBatching:
         # 5 starts + 5 ends = 10 enqueued items, well under MAX_BATCH_SIZE.
         assert len(items) == 10, f"Expected 10 items in the batch, got {len(items)}"
 
+    async def test_owned_client_recreated_after_loop_swap(self):
+        """When the running loop changes (sync-ACP / per-request loops),
+        the processor's owned client must be recreated so it isn't bound to
+        a dead loop. This is the reason the original implementation disabled
+        keepalive — re-creating the client on the new loop lets us keep
+        keepalive on instead.
+        """
+        env_mock = MagicMock(refresh=MagicMock(return_value=MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)))
+        with patch(f"{MODULE}.EnvironmentVariables", env_mock), patch(
+            f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()
+        ), patch(f"{MODULE}.AsyncSGPClient") as mock_client_cls:
+            first = MagicMock(spans=MagicMock(upsert_batch=AsyncMock()))
+            second = MagicMock(spans=MagicMock(upsert_batch=AsyncMock()))
+            mock_client_cls.side_effect = [first, second]
+
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+
+            await processor.on_span_start(_make_span())
+            assert processor.sgp_async_client is first
+            assert mock_client_cls.call_count == 1
+
+            # Simulate a loop swap: processor's tracked loop is stale and
+            # the worker is gone. Re-initialization must recreate the
+            # owned client (since `_client_owned_at_loop` no longer matches
+            # the running loop).
+            stale_loop = MagicMock()
+            processor._loop = stale_loop
+            processor._client_owned_at_loop = stale_loop
+            processor._worker = None
+
+            await processor.on_span_start(_make_span())
+            assert processor.sgp_async_client is second, "Owned client must be recreated after loop swap"
+            assert mock_client_cls.call_count == 2
+
+            await processor.shutdown()
+
+    async def test_injected_client_preserved_across_reinit(self):
+        """A client assigned externally (e.g. a test mock or a caller-built
+        client) must not be replaced by the processor, even on simulated
+        loop swaps."""
+        processor, original_client = self._make_processor()
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            await processor.on_span_start(_make_span())
+        assert processor.sgp_async_client is original_client
+
+        # Simulate a loop swap. Because the client was injected
+        # (`_client_owned_at_loop` stays None), it must be preserved.
+        processor._loop = MagicMock()
+        processor._worker = None
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            await processor.on_span_start(_make_span())
+        assert processor.sgp_async_client is original_client, "Injected client must not be replaced"
+
+        await processor.shutdown()
+
     async def test_async_client_constructed_without_disabling_keepalive(self):
         """Regression: the previous implementation built AsyncSGPClient with
         httpx.Limits(max_keepalive_connections=0) to dodge cross-loop errors,
