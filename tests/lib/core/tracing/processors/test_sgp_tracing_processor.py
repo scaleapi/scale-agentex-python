@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import asyncio
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -259,3 +260,64 @@ class TestSGPAsyncTracingProcessorBatching:
         items = client.spans.upsert_batch.call_args.kwargs["items"]
         # 5 starts + 5 ends = 10 enqueued items, well under MAX_BATCH_SIZE.
         assert len(items) == 10, f"Expected 10 items in the batch, got {len(items)}"
+
+    async def test_drain_splits_into_multiple_batches_above_max_batch_size(self):
+        """Spans beyond MAX_BATCH_SIZE (50) must be split across multiple
+        upsert_batch calls so a single call never exceeds the cap."""
+        processor, client = self._make_processor()
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            for _ in range(40):
+                span = _make_span()
+                await processor.on_span_start(span)
+                span.end_time = datetime.now(UTC)
+                await processor.on_span_end(span)
+
+        # 40 starts + 40 ends = 80 enqueued items. With MAX_BATCH_SIZE=50,
+        # that's at least 2 upsert calls.
+        await processor.shutdown()
+
+        assert client.spans.upsert_batch.call_count >= 2, (
+            f"Expected ≥2 batched upserts for 80 events, got {client.spans.upsert_batch.call_count}"
+        )
+        for call in client.spans.upsert_batch.call_args_list:
+            items = call.kwargs["items"]
+            assert len(items) <= 50, f"Batch of {len(items)} exceeds MAX_BATCH_SIZE=50"
+        total_items = sum(len(call.kwargs["items"]) for call in client.spans.upsert_batch.call_args_list)
+        assert total_items == 80, f"Expected 80 items across all batches, got {total_items}"
+
+    async def test_worker_continues_after_unexpected_exception_in_one_batch(self):
+        """A single upsert raising an unexpected (non-APIError) exception
+        must drop that batch and let the worker keep flushing subsequent
+        ones. Regression test for the per-iteration try/except in `_run`."""
+        processor, client = self._make_processor()
+
+        # First call raises (unexpected exception → batch dropped),
+        # subsequent calls succeed.
+        client.spans.upsert_batch.side_effect = [RuntimeError("boom"), None]
+
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            # First flush — will raise inside _upsert_with_retry, batch dropped.
+            span_a = _make_span()
+            await processor.on_span_start(span_a)
+            span_a.end_time = datetime.now(UTC)
+            await processor.on_span_end(span_a)
+            assert processor._flush_event is not None
+            processor._flush_event.set()
+            # Yield so the worker runs the failing flush.
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+
+            # Worker must still be alive and able to handle a second batch.
+            span_b = _make_span()
+            await processor.on_span_start(span_b)
+            span_b.end_time = datetime.now(UTC)
+            await processor.on_span_end(span_b)
+
+        await processor.shutdown()
+
+        # First call raised, second succeeded → 2 calls total.
+        assert client.spans.upsert_batch.call_count == 2, (
+            f"Worker should have made a second upsert attempt after the first failed; "
+            f"got {client.spans.upsert_batch.call_count}"
+        )

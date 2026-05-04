@@ -164,8 +164,10 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
     def _ensure_started(self) -> None:
         """Initialize per-loop queue + worker on first use, or after a loop swap.
 
-        Must be called from inside an async method so `get_running_loop()`
-        is safe.
+        Must be called from inside an async method so `get_running_loop()` is
+        safe. Idempotent on the same loop while the worker is healthy; on a
+        loop change or worker death, it rebuilds the queue and worker (items
+        in the previous queue are lost — they were tied to a now-dead loop).
         """
         if self.disabled:
             return
@@ -246,6 +248,8 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             self._worker.cancel()
 
     def _enqueue(self, sgp_span: SGPSpan) -> None:
+        """Push a span onto the queue and signal an early flush if the queue
+        has crossed `DEFAULT_TRIGGER_QUEUE_SIZE`. Drops the span on overflow."""
         if self._queue is None:
             return
         try:
@@ -256,37 +260,51 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         if self._flush_event is not None and self._queue.qsize() >= DEFAULT_TRIGGER_QUEUE_SIZE:
             self._flush_event.set()
 
-    async def _run(self) -> None:
-        try:
-            while not (self._shutdown_event and self._shutdown_event.is_set()):
-                # Wake on either an early-flush signal or the cadence timer.
-                assert self._flush_event is not None
-                try:
-                    await asyncio.wait_for(self._flush_event.wait(), timeout=DEFAULT_TRIGGER_CADENCE)
-                except asyncio.TimeoutError:
-                    pass
-                self._flush_event.clear()
-                # Per-iteration guard: an unexpected error during one drain
-                # must not kill the worker, otherwise queued items stay
-                # unflushed until shutdown.
-                try:
-                    await self._drain()
-                except asyncio.CancelledError:
-                    raise
-                except Exception:
-                    logger.exception("Tracing worker iteration failed; continuing")
+    def _is_shutting_down(self) -> bool:
+        return self._shutdown_event is not None and self._shutdown_event.is_set()
 
-            # Final drain on shutdown.
-            try:
-                await self._drain()
-            except Exception:
-                logger.exception("Final tracing drain failed; some spans may be lost")
+    async def _wait_for_flush_signal(self) -> None:
+        """Block until either an early-flush signal arrives or the cadence
+        timer fires. Returns either way; the caller is responsible for
+        draining."""
+        assert self._flush_event is not None
+        try:
+            await asyncio.wait_for(self._flush_event.wait(), timeout=DEFAULT_TRIGGER_CADENCE)
+        except asyncio.TimeoutError:
+            pass
+        self._flush_event.clear()
+
+    async def _safe_drain(self, log_label: str) -> None:
+        """Run `_drain`, catching unexpected errors so one bad iteration
+        doesn't kill the worker. CancelledError is always re-raised."""
+        try:
+            await self._drain()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(log_label)
+
+    async def _run(self) -> None:
+        """Background worker. Sleeps until a flush trigger fires, drains the
+        queue, and repeats. On shutdown signal, does one final drain so
+        nothing pending is dropped. The outermost try / except keeps a worker
+        crash from being silent."""
+        try:
+            while not self._is_shutting_down():
+                await self._wait_for_flush_signal()
+                await self._safe_drain("Tracing worker iteration failed; continuing")
+            await self._safe_drain("Final tracing drain failed; some spans may be lost")
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Async tracing worker crashed")
 
     async def _drain(self) -> None:
+        """Pull spans from the queue and upsert them in batches of up to
+        `DEFAULT_MAX_BATCH_SIZE`. Stops when the queue is empty.
+
+        A span whose `to_request_params()` raises is dropped (logged); the
+        rest of the batch still goes out. This matches the SDK's exporter."""
         if self._queue is None or self.sgp_async_client is None:
             return
         while not self._queue.empty():
@@ -305,6 +323,13 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             await self._upsert_with_retry(batch)
 
     async def _upsert_with_retry(self, batch: list[dict]) -> None:
+        """POST a single batch with the SDK's retry policy: 4 attempts with
+        exponential backoff (`INITIAL_BACKOFF` -> `MAX_BACKOFF` capped).
+
+        - `APIError` triggers retry up to `DEFAULT_RETRIES` attempts.
+        - Anything else is logged and the batch is dropped (we don't know
+          whether the server saw the request, and the SDK already wraps
+          transport-level failures as `APIError`)."""
         if self.sgp_async_client is None:
             return
         backoff = INITIAL_BACKOFF
