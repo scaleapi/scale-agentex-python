@@ -4,8 +4,7 @@ import asyncio
 from typing import Optional, override
 
 import scale_gp_beta.lib.tracing as tracing
-from scale_gp_beta import SGPClient, AsyncSGPClient
-from scale_gp_beta._exceptions import APIError
+from scale_gp_beta import APIError, SGPClient, AsyncSGPClient
 from scale_gp_beta.lib.tracing import create_span, flush_queue
 from scale_gp_beta.lib.tracing.span import Span as SGPSpan
 

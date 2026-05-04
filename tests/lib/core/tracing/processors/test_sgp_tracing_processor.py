@@ -406,7 +406,7 @@ class TestSGPAsyncTracingProcessorEdgeCases:
     async def test_apierror_triggers_retry_then_drops_batch_on_exhaustion(self):
         """`APIError` must be retried up to DEFAULT_RETRIES times. After
         exhaustion, the batch is dropped and the worker continues."""
-        from scale_gp_beta._exceptions import APIError
+        from scale_gp_beta import APIError
 
         processor, client = TestSGPAsyncTracingProcessorBatching._make_processor()
 
