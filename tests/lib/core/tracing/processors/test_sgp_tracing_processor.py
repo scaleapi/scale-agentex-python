@@ -48,11 +48,9 @@ class TestSGPSyncTracingProcessorMemoryLeak:
         mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
         mock_create_span = MagicMock(side_effect=lambda **kwargs: _make_mock_sgp_span())
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), \
-             patch(f"{MODULE}.SGPClient"), \
-             patch(f"{MODULE}.tracing"), \
-             patch(f"{MODULE}.flush_queue"), \
-             patch(f"{MODULE}.create_span", mock_create_span):
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.SGPClient"), patch(
+            f"{MODULE}.tracing"
+        ), patch(f"{MODULE}.flush_queue"), patch(f"{MODULE}.create_span", mock_create_span):
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
                 SGPSyncTracingProcessor,
             )
@@ -113,19 +111,18 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         mock_async_client = MagicMock()
         mock_async_client.spans.upsert_batch = AsyncMock()
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), \
-             patch(f"{MODULE}.create_span", mock_create_span), \
-             patch(f"{MODULE}.AsyncSGPClient", return_value=mock_async_client):
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.create_span", mock_create_span), patch(
+            f"{MODULE}.AsyncSGPClient", return_value=mock_async_client
+        ):
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
                 SGPAsyncTracingProcessor,
             )
 
             processor = SGPAsyncTracingProcessor(_make_config())
 
-        # Wire up the mock client after construction (constructor stores it)
+        # Wire up the mock client after construction. The processor lazy-inits
+        # its own client on first async call; pre-setting it bypasses that path.
         processor.sgp_async_client = mock_async_client
-
-        # Keep create_span mock active for on_span_start calls
         return processor, mock_create_span
 
     async def test_spans_not_leaked_after_completed_lifecycle(self):
@@ -162,3 +159,95 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         await processor.on_span_end(span)
 
         assert len(processor._spans) == 0
+
+
+# ---------------------------------------------------------------------------
+# Async client lifecycle tests
+#
+# These cover the lazy / per-loop client construction and the dropped
+# `max_keepalive_connections=0` workaround (PR A of the OVE-2 split).
+# ---------------------------------------------------------------------------
+
+
+class TestSGPAsyncTracingProcessorClientLifecycle:
+    async def test_client_constructed_without_disabling_keepalive(self):
+        """The previous implementation built `AsyncSGPClient` with
+        `httpx.Limits(max_keepalive_connections=0)` to dodge cross-loop
+        errors, paying a TCP+TLS handshake on every span event. The lazy
+        per-loop pattern lets keepalive stay on."""
+        env_mock = MagicMock(refresh=MagicMock(return_value=MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)))
+        with patch(f"{MODULE}.EnvironmentVariables", env_mock), patch(
+            f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()
+        ), patch(f"{MODULE}.AsyncSGPClient") as mock_client_cls:
+            mock_client_cls.return_value = MagicMock(spans=MagicMock(upsert_batch=AsyncMock()))
+
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+            await processor.on_span_start(_make_span())
+
+            mock_client_cls.assert_called_once()
+            kwargs = mock_client_cls.call_args.kwargs
+            assert "http_client" not in kwargs, (
+                "AsyncSGPClient must not receive a custom http_client that disables keepalive"
+            )
+
+    async def test_owned_client_recreated_after_loop_swap(self):
+        """When the running loop changes (sync-ACP / per-request loops),
+        the processor's owned client must be recreated so it isn't bound to
+        a dead loop. This is what lets us drop the keepalive workaround."""
+        env_mock = MagicMock(refresh=MagicMock(return_value=MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)))
+        with patch(f"{MODULE}.EnvironmentVariables", env_mock), patch(
+            f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()
+        ), patch(f"{MODULE}.AsyncSGPClient") as mock_client_cls:
+            first = MagicMock(spans=MagicMock(upsert_batch=AsyncMock()))
+            second = MagicMock(spans=MagicMock(upsert_batch=AsyncMock()))
+            mock_client_cls.side_effect = [first, second]
+
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+
+            await processor.on_span_start(_make_span())
+            assert processor.sgp_async_client is first
+            assert mock_client_cls.call_count == 1
+
+            # Simulate a loop swap: the processor's tracked loop is stale.
+            # The next call must recreate the client.
+            processor._client_owned_at_loop = MagicMock()
+
+            await processor.on_span_start(_make_span())
+            assert processor.sgp_async_client is second, "Owned client must be recreated after loop swap"
+            assert mock_client_cls.call_count == 2
+
+    async def test_injected_client_preserved(self):
+        """A client assigned externally (test mock or caller-built) must
+        never be replaced by the processor. Contract:
+        `_client_owned_at_loop=None` marks externally-managed clients and
+        skips both the create-on-None branch and the replace-on-loop-change
+        branch, so the injected client is preserved across any number of
+        calls."""
+        env_mock = MagicMock(refresh=MagicMock(return_value=MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)))
+        injected = MagicMock(spans=MagicMock(upsert_batch=AsyncMock()))
+
+        with patch(f"{MODULE}.EnvironmentVariables", env_mock), patch(
+            f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()
+        ), patch(f"{MODULE}.AsyncSGPClient") as mock_client_cls:
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+            processor.sgp_async_client = injected
+
+            for _ in range(3):
+                await processor.on_span_start(_make_span())
+
+            assert processor.sgp_async_client is injected
+            assert mock_client_cls.call_count == 0, (
+                "Injected client must not be replaced (no AsyncSGPClient construction)"
+            )
