@@ -15,18 +15,26 @@ from agentex.lib.core.adapters.streams.port import StreamRepository
 logger = make_logger(__name__)
 
 
+_DEFAULT_STREAM_MAXLEN = 10000
+
+
 class RedisStreamRepository(StreamRepository):
     """
     A simplified Redis implementation of the EventStreamRepository interface.
     Optimized for text/JSON streaming with SSE.
     """
 
-    def __init__(self, redis_url: str | None = None):
+    def __init__(self, redis_url: str | None = None, stream_maxlen: int | None = None):
         # Get Redis URL from environment if not provided
         self.redis_url = redis_url or os.environ.get(
             "REDIS_URL", "redis://localhost:6379"
         )
         self.redis = redis.from_url(self.redis_url)
+        self.stream_maxlen = (
+            stream_maxlen
+            if stream_maxlen is not None
+            else int(os.environ.get("REDIS_STREAM_MAXLEN", _DEFAULT_STREAM_MAXLEN))
+        )
 
     @override
     async def send_event(self, topic: str, event: dict[str, Any]) -> str:
@@ -47,10 +55,11 @@ class RedisStreamRepository(StreamRepository):
             # # Uncomment to debug
             # logger.info(f"Sending event to Redis stream {topic}: {event_json}")
 
-            # Add to Redis stream with a reasonable max length
             message_id = await self.redis.xadd(
                 name=topic,
                 fields={"data": event_json},
+                maxlen=self.stream_maxlen,
+                approximate=True,
             )
 
             return message_id
