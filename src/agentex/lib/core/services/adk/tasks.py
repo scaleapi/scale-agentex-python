@@ -7,10 +7,15 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task_retrieve_response import TaskRetrieveResponse
+from agentex.lib.core.adapters.streams.port import StreamRepository
 from agentex.types.task_query_workflow_response import TaskQueryWorkflowResponse
 from agentex.types.task_retrieve_by_name_response import TaskRetrieveByNameResponse
 
 logger = make_logger(__name__)
+
+
+def _stream_topic(task_id: str) -> str:
+    return f"task:{task_id}"
 
 
 class TasksService:
@@ -18,9 +23,25 @@ class TasksService:
         self,
         agentex_client: AsyncAgentex,
         tracer: AsyncTracer,
+        stream_repository: StreamRepository | None = None,
     ):
         self._agentex_client = agentex_client
         self._tracer = tracer
+        self._stream_repository = stream_repository
+
+    async def _cleanup_task_stream(self, task_id: str) -> None:
+        """Best-effort delete of the task's Redis stream.
+
+        Called after a terminal status transition (cancel/complete/fail/
+        terminate/timeout/delete). Failures are logged and swallowed so
+        cleanup issues never break the lifecycle call.
+        """
+        if self._stream_repository is None:
+            return
+        try:
+            await self._stream_repository.cleanup_stream(_stream_topic(task_id))
+        except Exception as e:
+            logger.warning(f"Failed to cleanup task stream {task_id}: {e}")
 
     async def get_task(
         self,
@@ -75,6 +96,8 @@ class TasksService:
                 task_model = await self._agentex_client.tasks.delete_by_name(task_name=task_name)
             else:
                 raise ValueError("Either task_id or task_name must be provided.")
+            if task_model.id:
+                await self._cleanup_task_stream(task_model.id)
             if span:
                 span.output = task_model.model_dump()
             return task_model
@@ -94,6 +117,7 @@ class TasksService:
         ) as span:
             heartbeat_if_in_workflow("cancel task")
             task_model = await self._agentex_client.tasks.cancel(task_id=task_id, reason=reason)
+            await self._cleanup_task_stream(task_id)
             if span:
                 span.output = task_model.model_dump()
             return task_model
@@ -113,6 +137,7 @@ class TasksService:
         ) as span:
             heartbeat_if_in_workflow("complete task")
             task_model = await self._agentex_client.tasks.complete(task_id=task_id, reason=reason)
+            await self._cleanup_task_stream(task_id)
             if span:
                 span.output = task_model.model_dump()
             return task_model
@@ -132,6 +157,7 @@ class TasksService:
         ) as span:
             heartbeat_if_in_workflow("fail task")
             task_model = await self._agentex_client.tasks.fail(task_id=task_id, reason=reason)
+            await self._cleanup_task_stream(task_id)
             if span:
                 span.output = task_model.model_dump()
             return task_model
@@ -151,6 +177,7 @@ class TasksService:
         ) as span:
             heartbeat_if_in_workflow("terminate task")
             task_model = await self._agentex_client.tasks.terminate(task_id=task_id, reason=reason)
+            await self._cleanup_task_stream(task_id)
             if span:
                 span.output = task_model.model_dump()
             return task_model
@@ -170,6 +197,7 @@ class TasksService:
         ) as span:
             heartbeat_if_in_workflow("timeout task")
             task_model = await self._agentex_client.tasks.timeout(task_id=task_id, reason=reason)
+            await self._cleanup_task_stream(task_id)
             if span:
                 span.output = task_model.model_dump()
             return task_model

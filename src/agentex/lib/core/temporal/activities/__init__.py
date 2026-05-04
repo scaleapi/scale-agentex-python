@@ -92,6 +92,7 @@ def get_all_activities(sgp_client=None):
     tasks_service = TasksService(
         agentex_client=agentex_client,
         tracer=tracer,
+        stream_repository=stream_repository,
     )
     tracing_service = TracingService(
         tracer=tracer,

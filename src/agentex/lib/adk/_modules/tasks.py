@@ -7,6 +7,7 @@ from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex  # noqa: F401
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.adapters.streams.adapter_redis import RedisStreamRepository
 from agentex.lib.core.services.adk.tasks import TasksService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
 from agentex.lib.core.temporal.activities.adk.tasks_activities import (
@@ -42,8 +43,11 @@ class TasksModule:
         if tasks_service is None:
             agentex_client = create_async_agentex_client()
             tracer = AsyncTracer(agentex_client)
+            stream_repository = RedisStreamRepository()
             self._tasks_service = TasksService(
-                agentex_client=agentex_client, tracer=tracer
+                agentex_client=agentex_client,
+                tracer=tracer,
+                stream_repository=stream_repository,
             )
         else:
             self._tasks_service = tasks_service
