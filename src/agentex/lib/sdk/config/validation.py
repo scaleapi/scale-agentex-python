@@ -103,11 +103,14 @@ def _validate_single_environment_config(env_name: str, env_config: AgentEnvironm
 
     # Validate auth principal
     principal = env_config.auth.principal
-    if not principal.get("user_id"):
-        raise ValueError("Auth principal must contain non-empty 'user_id'")
+    user_id = principal.get("user_id")
+    service_account_id = principal.get("service_account_id")
+    if not user_id and not service_account_id:
+        raise ValueError("Auth principal must contain non-empty 'user_id' or 'service_account_id'")
+    if user_id and service_account_id:
+        raise ValueError("Auth principal must contain only one of 'user_id' or 'service_account_id', not both")
 
     # Check for environment-specific user_id patterns
-    user_id = principal["user_id"]
     if isinstance(user_id, str):
         if not any(env_name.lower() in user_id.lower() for env_name in ["dev", "prod", "staging", env_name]):
             logger.warning(
@@ -233,11 +236,12 @@ def generate_helpful_error_message(error: Exception, context: str = "") -> str:
                 "1. Check file location: should be next to manifest.yaml\n"
                 "2. Verify file permissions"
             )
-    elif "user_id" in base_msg.lower():
+    elif "user_id" in base_msg.lower() or "service_account_id" in base_msg.lower():
         base_msg += (
             "\n\n💡 Auth Principal Tips:\n"
-            "- user_id should be unique per environment\n"
-            "- Include environment name (e.g., 'dev_my_agent')\n"
+            "- Set exactly one of 'user_id' or 'service_account_id'\n"
+            "- The id should be unique per environment\n"
+            "- For user_id, include environment name (e.g., 'dev_my_agent')\n"
             "- Use consistent naming convention across agents"
         )
     elif "namespace" in base_msg.lower():
