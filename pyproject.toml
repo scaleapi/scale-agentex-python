@@ -11,10 +11,10 @@ authors = [
 dependencies = [
     "httpx>=0.28.1,<0.29",
     "pydantic>=2.0.0, <3",
-  "typing-extensions>=4.14, <5",
-  "anyio>=3.5.0, <5",
-  "distro>=1.7.0, <2",
-  "sniffio",
+    "typing-extensions>=4.14, <5",
+    "anyio>=3.5.0, <5",
+    "distro>=1.7.0, <2",
+    "sniffio",
     "typer>=0.16,<0.17",
     "questionary>=2.0.1,<3",
     "rich>=13.9.2,<14",
@@ -41,7 +41,7 @@ dependencies = [
     "pytest>=8.4.0",
     "json_log_formatter>=1.1.1",
     "pytest-asyncio>=1.0.0",
-    "scale-gp-beta>=0.1.0a20",
+    "scale-gp-beta>=0.2.0",
     "ipykernel>=6.29.5",
     "openai>=2.2,<3", # Required by openai-agents; litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
     "cloudpickle>=3.1.1",
