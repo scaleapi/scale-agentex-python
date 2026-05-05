@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.10.5 (2026-05-05)
+
+Full Changelog: [v0.10.4...v0.10.5](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.4...v0.10.5)
+
+### Features
+
+* **api:** api update ([ffaecd5](https://github.com/scaleapi/scale-agentex-python/commit/ffaecd5a94b4082f9ef38d5c89286eabf3811759))
+* **openai_agents:** expose real `usage`, `response_id`, plumb `previous_response_id`, opt-in `prompt_cache_key` for stateful responses and prompt caching ([#335](https://github.com/scaleapi/scale-agentex-python/issues/335)) ([ba5d64b](https://github.com/scaleapi/scale-agentex-python/commit/ba5d64be1f959ff1a35b30e647a0a5ead21a8402))
+
+
+### Chores
+
+* **internal:** reformat pyproject.toml ([ba06702](https://github.com/scaleapi/scale-agentex-python/commit/ba06702fd362656d594f73852ad2c690383892a8))
+* **internal:** reformat pyproject.toml ([3faf5d5](https://github.com/scaleapi/scale-agentex-python/commit/3faf5d5927abdc3036862d4d06e085cda0eb6cd4))
+* **internal:** version bump ([168cc44](https://github.com/scaleapi/scale-agentex-python/commit/168cc44f8199015e232cd2bddf1669a08ee90778))
+* **internal:** version bump ([5715828](https://github.com/scaleapi/scale-agentex-python/commit/5715828a358c20b1cc895a696d0c8d803ec71932))
+
 ## 0.10.4 (2026-05-04)
 
 Full Changelog: [v0.10.3...v0.10.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.3...v0.10.4)

@@ -109,6 +109,9 @@ class TasksResource(SyncAPIResource):
         order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         relationships: List[Literal["agents"]] | Omit = omit,
+        status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]]
+        | Omit = omit,
+        task_metadata: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -116,10 +119,17 @@ class TasksResource(SyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskListResponse:
-        """
-        List all tasks.
+        """List all tasks.
 
         Args:
+          status: Filter tasks by status (e.g.
+
+        RUNNING, COMPLETED).
+
+          task_metadata:
+              JSON-encoded object used to filter tasks via JSONB containment. Example:
+              {"created_by_user_id": "abc-123"}.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -144,6 +154,8 @@ class TasksResource(SyncAPIResource):
                         "order_direction": order_direction,
                         "page_number": page_number,
                         "relationships": relationships,
+                        "status": status,
+                        "task_metadata": task_metadata,
                     },
                     task_list_params.TaskListParams,
                 ),
@@ -679,6 +691,9 @@ class AsyncTasksResource(AsyncAPIResource):
         order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         relationships: List[Literal["agents"]] | Omit = omit,
+        status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]]
+        | Omit = omit,
+        task_metadata: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -686,10 +701,17 @@ class AsyncTasksResource(AsyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskListResponse:
-        """
-        List all tasks.
+        """List all tasks.
 
         Args:
+          status: Filter tasks by status (e.g.
+
+        RUNNING, COMPLETED).
+
+          task_metadata:
+              JSON-encoded object used to filter tasks via JSONB containment. Example:
+              {"created_by_user_id": "abc-123"}.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -714,6 +736,8 @@ class AsyncTasksResource(AsyncAPIResource):
                         "order_direction": order_direction,
                         "page_number": page_number,
                         "relationships": relationships,
+                        "status": status,
+                        "task_metadata": task_metadata,
                     },
                     task_list_params.TaskListParams,
                 ),
