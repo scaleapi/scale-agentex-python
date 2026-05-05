@@ -92,6 +92,8 @@ class TestTasks:
             order_direction="order_direction",
             page_number=0,
             relationships=["agents"],
+            status="CANCELED",
+            task_metadata="task_metadata",
         )
         assert_matches_type(TaskListResponse, task, path=["response"])
 
@@ -817,6 +819,8 @@ class TestAsyncTasks:
             order_direction="order_direction",
             page_number=0,
             relationships=["agents"],
+            status="CANCELED",
+            task_metadata="task_metadata",
         )
         assert_matches_type(TaskListResponse, task, path=["response"])
 

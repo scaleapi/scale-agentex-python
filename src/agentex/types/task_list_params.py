@@ -22,3 +22,12 @@ class TaskListParams(TypedDict, total=False):
     page_number: int
 
     relationships: List[Literal["agents"]]
+
+    status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]]
+    """Filter tasks by status (e.g. RUNNING, COMPLETED)."""
+
+    task_metadata: Optional[str]
+    """JSON-encoded object used to filter tasks via JSONB containment.
+
+    Example: {"created_by_user_id": "abc-123"}.
+    """
