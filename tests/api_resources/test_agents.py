@@ -250,6 +250,7 @@ class TestAgents:
             params={
                 "name": "name",
                 "params": {"foo": "bar"},
+                "task_metadata": {"foo": "bar"},
             },
             id=0,
             jsonrpc="2.0",
@@ -315,6 +316,7 @@ class TestAgents:
             params={
                 "name": "name",
                 "params": {"foo": "bar"},
+                "task_metadata": {"foo": "bar"},
             },
             id=0,
             jsonrpc="2.0",
@@ -594,6 +596,7 @@ class TestAsyncAgents:
             params={
                 "name": "name",
                 "params": {"foo": "bar"},
+                "task_metadata": {"foo": "bar"},
             },
             id=0,
             jsonrpc="2.0",
@@ -659,6 +662,7 @@ class TestAsyncAgents:
             params={
                 "name": "name",
                 "params": {"foo": "bar"},
+                "task_metadata": {"foo": "bar"},
             },
             id=0,
             jsonrpc="2.0",

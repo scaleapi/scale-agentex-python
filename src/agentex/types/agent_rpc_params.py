@@ -35,6 +35,13 @@ class ParamsCreateTaskRequest(TypedDict, total=False):
     params: Optional[Dict[str, object]]
     """The parameters for the task"""
 
+    task_metadata: Optional[Dict[str, object]]
+    """Caller-provided metadata to persist on the task row.
+
+    Only applied at task creation; ignored if a task with this name already exists.
+    Forwarded to the agent inside the ACP payload for backward compatibility.
+    """
+
 
 class ParamsCancelTaskRequest(TypedDict, total=False):
     task_id: Optional[str]
