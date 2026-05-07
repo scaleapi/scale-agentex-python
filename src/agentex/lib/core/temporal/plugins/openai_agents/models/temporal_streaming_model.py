@@ -725,6 +725,20 @@ class TemporalStreamingModel(Model):
                     # Log event type
                     logger.debug(f"[TemporalStreamingModel] Event {event_count}: {type(event).__name__}")
 
+                    # Bookmark first/last token-producing events for ttft and tps.
+                    # Includes function-call argument deltas so the generation window
+                    # covers every event type whose tokens land in usage.output_tokens.
+                    if isinstance(event, (
+                        ResponseTextDeltaEvent,
+                        ResponseReasoningTextDeltaEvent,
+                        ResponseReasoningSummaryTextDeltaEvent,
+                        ResponseFunctionCallArgumentsDeltaEvent,
+                    )):
+                        now_perf = time.perf_counter()
+                        if first_token_at is None:
+                            first_token_at = now_perf
+                        last_token_at = now_perf
+
                     # Handle different event types using isinstance for type safety
                     if isinstance(event, ResponseOutputItemAddedEvent):
                         # New output item (reasoning, function call, or message)
@@ -789,15 +803,6 @@ class TemporalStreamingModel(Model):
                     elif isinstance(event, (ResponseReasoningTextDeltaEvent, ResponseReasoningSummaryTextDeltaEvent, ResponseTextDeltaEvent)):
                         # Handle text streaming
                         delta = getattr(event, 'delta', '')
-
-                        # Bookmark first/last content-bearing events for ttft and tps.
-                        # last_token_at is updated on every delta so tps measures only
-                        # the model-generation window, not subsequent tool-call /
-                        # event-handler time.
-                        now_perf = time.perf_counter()
-                        if first_token_at is None:
-                            first_token_at = now_perf
-                        last_token_at = now_perf
 
                         if isinstance(event, ResponseReasoningSummaryTextDeltaEvent) and reasoning_context:
                             # Stream reasoning summary deltas - these are the actual reasoning tokens!
@@ -1075,6 +1080,9 @@ class TemporalStreamingModel(Model):
                     m.ttft_ms.record((first_token_at - stream_start_perf) * 1000, metric_attrs)
                 # tps denominator is the generation window (first→last delta), not
                 # total stream wall time — see _StreamingMetrics for rationale.
+                # Note: single-token responses (where first_token_at == last_token_at,
+                # e.g. a one-token tool-result acknowledgement) collapse the window
+                # to 0 and are intentionally skipped — TPS is undefined in that case.
                 if (
                     first_token_at is not None
                     and last_token_at is not None
