@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0 (2026-05-07)
+
+Full Changelog: [v0.10.5...v0.11.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.5...v0.11.0)
+
+### Features
+
+* make workflow execution timeout configurable via env var ([#348](https://github.com/scaleapi/scale-agentex-python/issues/348)) ([4094708](https://github.com/scaleapi/scale-agentex-python/commit/4094708a84026aafe19eae19d022118bb26e1a72))
+
 ## 0.10.5 (2026-05-05)
 
 Full Changelog: [v0.10.4...v0.10.5](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.4...v0.10.5)
