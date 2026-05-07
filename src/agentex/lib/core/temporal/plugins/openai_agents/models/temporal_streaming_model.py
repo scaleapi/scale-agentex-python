@@ -27,12 +27,12 @@ from agents.tool import (
     CodeInterpreterTool,
     ImageGenerationTool,
 )
-from opentelemetry import metrics
 from agents.computer import Computer, AsyncComputer
 
 # Re-export the canonical StreamingMode literal from the streaming service so
 # all layers share a single definition.
 from agentex.lib.core.services.adk.streaming import StreamingMode as StreamingMode
+from agentex.lib.core.observability.llm_metrics import classify_status, get_llm_metrics
 
 try:
     from agents.tool import ShellTool  # type: ignore[attr-defined]
@@ -80,61 +80,9 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 logger = make_logger("agentex.temporal.streaming")
 
 
-# OTel metrics for LLM streaming behavior. Instruments are created lazily on
-# first use so the meter resolves to whatever MeterProvider the application
-# eventually configures, even if that happens after this module is imported.
-# All metrics carry only a ``model`` attribute to keep cardinality bounded;
-# resource attributes (service.name, k8s.*, etc.) come from the application's
-# OTel resource configuration.
-class _StreamingMetrics:
-    """Lazily-created OTel instruments for streaming LLM telemetry."""
-
-    def __init__(self) -> None:
-        meter = metrics.get_meter("agentex.openai_agents.streaming")
-        self.ttft_ms = meter.create_histogram(
-            name="agentex.llm.ttft",
-            unit="ms",
-            description="Time from request submission to first content token (ms)",
-        )
-        # Note: TPS denominator is the model-generation window
-        # (last_token_time - first_token_time), not total stream wall time.
-        # This isolates raw model throughput from event-loop / tool-call latency.
-        self.tps = meter.create_histogram(
-            name="agentex.llm.tps",
-            unit="tokens/s",
-            description="Output tokens per second over the generation window",
-        )
-        self.input_tokens = meter.create_counter(
-            name="agentex.llm.input_tokens",
-            unit="tokens",
-            description="Total input tokens sent to the LLM",
-        )
-        self.output_tokens = meter.create_counter(
-            name="agentex.llm.output_tokens",
-            unit="tokens",
-            description="Total output tokens returned by the LLM",
-        )
-        self.cached_input_tokens = meter.create_counter(
-            name="agentex.llm.cached_input_tokens",
-            unit="tokens",
-            description="Subset of input tokens served from prompt cache",
-        )
-        self.reasoning_tokens = meter.create_counter(
-            name="agentex.llm.reasoning_tokens",
-            unit="tokens",
-            description="Output tokens spent on reasoning (subset of output_tokens)",
-        )
-
-
-_streaming_metrics: Optional[_StreamingMetrics] = None
-
-
-def _get_streaming_metrics() -> _StreamingMetrics:
-    """Return the streaming metrics singleton, creating it on first use."""
-    global _streaming_metrics
-    if _streaming_metrics is None:
-        _streaming_metrics = _StreamingMetrics()
-    return _streaming_metrics
+# LLM metrics live in agentex.lib.core.observability.llm_metrics so other
+# code paths (sync ACP, Claude SDK plugin, future provider integrations)
+# can share the same instrument definitions without redefining names.
 
 
 def _serialize_item(item: Any) -> dict[str, Any]:
@@ -1070,8 +1018,9 @@ class TemporalStreamingModel(Model):
                 # no-op if the application hasn't configured a MeterProvider, so this
                 # is safe to do unconditionally. We only emit ttft / tps when their
                 # input data is actually meaningful (got a content delta, got tokens).
-                m = _get_streaming_metrics()
+                m = get_llm_metrics()
                 metric_attrs = {"model": self.model_name}
+                m.requests.add(1, {**metric_attrs, "status": "success"})
                 m.input_tokens.add(usage.input_tokens or 0, metric_attrs)
                 m.output_tokens.add(usage.output_tokens or 0, metric_attrs)
                 m.cached_input_tokens.add(usage.input_tokens_details.cached_tokens or 0, metric_attrs)
@@ -1079,10 +1028,10 @@ class TemporalStreamingModel(Model):
                 if first_token_at is not None:
                     m.ttft_ms.record((first_token_at - stream_start_perf) * 1000, metric_attrs)
                 # tps denominator is the generation window (first→last delta), not
-                # total stream wall time — see _StreamingMetrics for rationale.
-                # Note: single-token responses (where first_token_at == last_token_at,
-                # e.g. a one-token tool-result acknowledgement) collapse the window
-                # to 0 and are intentionally skipped — TPS is undefined in that case.
+                # total stream wall time — see LLMMetrics for rationale. Single-token
+                # responses (where first_token_at == last_token_at, e.g. a one-token
+                # tool-result acknowledgement) collapse the window to 0 and are
+                # intentionally skipped — TPS is undefined in that case.
                 if (
                     first_token_at is not None
                     and last_token_at is not None
@@ -1107,6 +1056,12 @@ class TemporalStreamingModel(Model):
 
             except Exception as e:
                 logger.error(f"Error using Responses API: {e}")
+                # Emit a request-counter event so 429s, 5xxs, timeouts, etc. are
+                # observable on the SDK side. Status histograms / token counters
+                # only fire on successful completion above.
+                get_llm_metrics().requests.add(
+                    1, {"model": self.model_name, "status": classify_status(e)}
+                )
                 raise
 
     # The _get_response_with_responses_api method has been merged into get_response above
