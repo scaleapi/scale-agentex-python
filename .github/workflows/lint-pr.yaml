@@ -28,8 +28,11 @@ jobs:
             exit 0
           fi
 
+          # The ::error workflow command must be written to stdout for GitHub Actions
+          # to pick it up as an annotation. The supplementary detail goes to stderr so
+          # it shows up in the log but not as an annotation.
+          echo "::error title=Invalid PR title::PR title must follow Conventional Commits format. Got: $PR_TITLE"
           {
-            echo "::error title=Invalid PR title::PR title must follow Conventional Commits format."
             echo "  Got:      $PR_TITLE"
             echo "  Expected: <type>(<optional-scope>)(!): <subject>"
             echo "  Types:    feat, fix, docs, style, refactor, test, chore, ci, build, perf, revert"
