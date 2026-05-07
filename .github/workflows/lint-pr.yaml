@@ -18,9 +18,20 @@ jobs:
       - name: Check Conventional Commits format
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
+          # Exempt automated PRs (Stainless codegen, release-please, dependabot, etc.).
+          # These bots may not always emit Conventional-Commits-formatted titles
+          # (dependabot's default "Bump foo from 1.0 to 1.1" doesn't match) and we
+          # don't want their PRs blocked by this check. Mirrors validate-pr-base.
+          case "$PR_AUTHOR" in
+            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\])
+              echo "PR is from automation ($PR_AUTHOR); skipping title check."
+              exit 0
+              ;;
+          esac
+
           # Conventional Commits: <type>(<optional-scope>)(!): <subject>
-          # Allowed types match the project's release-please changelog sections.
           PATTERN='^(feat|fix|docs|style|refactor|test|chore|ci|build|perf|revert)(\([^)]+\))?!?: .+'
 
           if printf '%s' "$PR_TITLE" | grep -qE "$PATTERN"; then
@@ -28,9 +39,7 @@ jobs:
             exit 0
           fi
 
-          # The ::error workflow command must be written to stdout for GitHub Actions
-          # to pick it up as an annotation. The supplementary detail goes to stderr so
-          # it shows up in the log but not as an annotation.
+          # ::error must be on stdout for GitHub Actions to surface it as an annotation.
           echo "::error title=Invalid PR title::PR title must follow Conventional Commits format. Got: $PR_TITLE"
           {
             echo "  Got:      $PR_TITLE"
@@ -61,9 +70,13 @@ jobs:
         run: |
           MARKER='<!-- lint-pr-validate-base -->'
 
-          # Find any existing marker comment so we can update or delete it.
-          existing_id=$(gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
-            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" | head -n1)
+          # Look up an existing marker comment so we can update/delete it.
+          # --paginate handles PRs with >30 comments. If the lookup fails
+          # (transient API error, fork PR token without read scope), continue
+          # with no existing_id so we still emit the failure annotation.
+          existing_id=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" 2>/dev/null \
+            | head -n1) || existing_id=""
 
           delete_comment() {
             if [ -n "$existing_id" ]; then
@@ -78,7 +91,7 @@ jobs:
             exit 0
           fi
 
-          # Exempt automated PRs (Stainless codegen, release-please, dependabot, etc.).
+          # Exempt automated PRs (must mirror validate-pr-title's list).
           case "$PR_AUTHOR" in
             stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\])
               delete_comment
@@ -94,7 +107,10 @@ jobs:
             exit 0
           fi
 
-          # Failure: post or update an explanatory PR comment, then fail the check.
+          # Failure path: try to post or update an explanatory comment.
+          # The write may fail on fork PRs (GITHUB_TOKEN has read-only scope
+          # upstream) or due to transient API errors. Guard each gh call so
+          # the ::error annotation and exit 1 still run regardless.
           body_file=$(mktemp)
           {
             echo "$MARKER"
@@ -109,14 +125,20 @@ jobs:
             echo "See \`CONTRIBUTING.md\` for the full branch model."
           } > "$body_file"
 
+          comment_status="ok"
           if [ -n "$existing_id" ]; then
             gh api -X PATCH "repos/$REPO/issues/comments/$existing_id" \
-              -F body=@"$body_file" >/dev/null
-            echo "Updated existing PR comment ($existing_id)."
+              -F body=@"$body_file" >/dev/null 2>&1 || comment_status="failed"
+            [ "$comment_status" = "ok" ] && echo "Updated existing PR comment ($existing_id)."
           else
-            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$body_file" >/dev/null
-            echo "Posted new PR comment."
+            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$body_file" >/dev/null 2>&1 || comment_status="failed"
+            [ "$comment_status" = "ok" ] && echo "Posted new PR comment."
           fi
 
-          echo "::error title=PR should target 'next'::See the PR comment for resolution steps. Re-target to 'next' or add the 'target-main' label."
+          if [ "$comment_status" = "failed" ]; then
+            echo "::warning title=Could not write PR comment::Likely a fork PR (no upstream write scope) or a transient API error. The check still fails — see the next annotation for resolution steps."
+          fi
+
+          # ::error must be on stdout to surface as an annotation.
+          echo "::error title=PR should target 'next'::Re-target to 'next' or add the 'target-main' label. See the PR comment for full details."
           exit 1
