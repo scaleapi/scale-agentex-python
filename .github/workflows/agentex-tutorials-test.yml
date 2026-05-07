@@ -2,7 +2,7 @@ name: Test Tutorial Agents
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, next]
   push:
     branches: [main]
   workflow_dispatch:
