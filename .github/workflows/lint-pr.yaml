@@ -58,7 +58,7 @@ jobs:
         run: |
           # Exempt automated PRs (Stainless codegen, release-please, dependabot, etc.)
           case "$PR_AUTHOR" in
-            stainless-app|stainless-app[bot]|release-please[bot]|github-actions[bot]|dependabot[bot])
+            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\])
               echo "PR is from automation ($PR_AUTHOR); allowing PR targeting main."
               exit 0
               ;;
