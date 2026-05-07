@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Contribution workflow
+
+- This repository is a Stainless-generated SDK. Open PRs against the `next` branch (not `main`).
+  Stainless watches `next` and release-please opens release PRs from `next` → `main`.
+- PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/) — the
+  `Validate PR title (Conventional Commits)` CI check enforces this on every PR.
+- The `Validate PR base branch` CI check fails on PRs targeting `main` from non-automation accounts
+  and posts a comment with resolution steps. Add the `target-main` label only for genuine
+  exceptions (e.g. an urgent hotfix).
+- See `CONTRIBUTING.md` for the full workflow.
+
 ## Development Commands
 
 ### Package Management in the top level repo

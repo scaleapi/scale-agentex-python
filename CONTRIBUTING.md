@@ -32,6 +32,39 @@ Alternatively if you don't want to install `Rye`, you can stick with the standar
 $ pip install -r requirements-dev.lock
 ```
 
+## Contribution workflow
+
+This repository is generated and released by [Stainless](https://www.stainless.com/). To keep the
+release pipeline working, contributions need to follow the branch model and commit conventions below.
+
+### Branch model
+
+- Always open PRs against the `next` branch — not `main`. Stainless watches `next` to produce SDK
+  builds and the automated version-bump PR.
+- Typical flow:
+  1. Pull the latest `next` locally and branch off it.
+  2. Make and push your changes, then open a PR targeting `next`.
+  3. Get the PR reviewed and merged into `next`.
+  4. Stainless will open (or update) a release PR bumping the version — review and merge that PR
+     to ship to `main`/PyPI. A new release PR will not be cut while a previous one is still open,
+     so unblock pending release PRs before expecting a new one.
+- Do not merge generated code directly into `next` via PR. Let the generator produce those changes.
+- The `Validate PR base branch` CI check fails on PRs targeting `main` from non-automation accounts
+  and posts a comment with resolution steps. If you genuinely need to PR directly to `main` (e.g. an
+  urgent hotfix), add the `target-main` label to bypass the check.
+
+### Conventional commits
+
+Commit messages and PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/),
+because the changelog and release notes are derived from them. The `Validate PR title (Conventional Commits)`
+CI check enforces this on every PR. Common prefixes:
+
+- `feat(api): ...` — new functionality
+- `fix(types): ...` — bug fixes
+- `docs(readme): ...` — documentation-only changes (required for manual README/docs overrides to be
+  picked up by the generator)
+- `chore(internal): ...` — internal changes that don't affect users
+
 ## Modifying/Adding code
 
 Most of the SDK is generated code. Modifications to code will be persisted between generations, but may
