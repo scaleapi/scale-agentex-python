@@ -6,6 +6,7 @@ from enum import Enum
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pydantic import Field
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
@@ -32,6 +33,7 @@ class EnvVarKeys(str, Enum):
     # Workflow Configuration
     WORKFLOW_NAME = "WORKFLOW_NAME"
     WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
+    WORKFLOW_EXECUTION_TIMEOUT_SECONDS = "WORKFLOW_EXECUTION_TIMEOUT_SECONDS"
     # Temporal Worker Configuration
     HEALTH_CHECK_PORT = "HEALTH_CHECK_PORT"
     # Auth Configuration
@@ -74,6 +76,11 @@ class EnvironmentVariables(BaseModel):
     # Workflow Configuration
     WORKFLOW_TASK_QUEUE: str | None = None
     WORKFLOW_NAME: str | None = None
+    # Maximum total time (in seconds) a workflow execution can run, including
+    # retries and continue-as-new. Defaults to 24h to bound runaway workflows;
+    # agents with longer-running tasks should override this. Must be > 0 — a
+    # zero or negative timedelta would cause every submitted workflow to fail.
+    WORKFLOW_EXECUTION_TIMEOUT_SECONDS: int = Field(default=86400, gt=0)
     # Temporal Worker Configuration
     HEALTH_CHECK_PORT: int = 80
     # Auth Configuration

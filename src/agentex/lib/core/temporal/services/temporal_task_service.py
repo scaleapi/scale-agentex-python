@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import timedelta
 
 from agentex.types.task import Task
 from agentex.types.agent import Agent
@@ -41,6 +42,7 @@ class TemporalTaskService:
             ),
             id=task.id,
             task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
+            execution_timeout=timedelta(seconds=self._env_vars.WORKFLOW_EXECUTION_TIMEOUT_SECONDS),
         )
 
     async def get_state(self, task_id: str) -> WorkflowState:
