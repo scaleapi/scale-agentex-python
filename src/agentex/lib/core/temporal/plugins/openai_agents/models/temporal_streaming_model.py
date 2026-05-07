@@ -80,42 +80,61 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 logger = make_logger("agentex.temporal.streaming")
 
 
-# OTel metrics for LLM streaming behavior. The meter resolves to whatever
-# MeterProvider the application has configured (no-op if none). All metrics
-# carry only a ``model`` attribute to keep cardinality bounded; resource
-# attributes (service.name, k8s.*, etc.) are added by the application's OTel
-# resource configuration.
-_meter = metrics.get_meter("agentex.openai_agents.streaming")
-_ttft_ms = _meter.create_histogram(
-    name="agentex.llm.ttft",
-    unit="ms",
-    description="Time from streaming-request start to first content token (ms)",
-)
-_tps = _meter.create_histogram(
-    name="agentex.llm.tps",
-    unit="tokens/s",
-    description="Output tokens per second across the streaming response",
-)
-_input_tokens = _meter.create_counter(
-    name="agentex.llm.input_tokens",
-    unit="tokens",
-    description="Total input tokens sent to the LLM",
-)
-_output_tokens = _meter.create_counter(
-    name="agentex.llm.output_tokens",
-    unit="tokens",
-    description="Total output tokens returned by the LLM",
-)
-_cached_input_tokens = _meter.create_counter(
-    name="agentex.llm.cached_input_tokens",
-    unit="tokens",
-    description="Subset of input tokens served from prompt cache",
-)
-_reasoning_tokens = _meter.create_counter(
-    name="agentex.llm.reasoning_tokens",
-    unit="tokens",
-    description="Output tokens spent on reasoning (subset of output_tokens)",
-)
+# OTel metrics for LLM streaming behavior. Instruments are created lazily on
+# first use so the meter resolves to whatever MeterProvider the application
+# eventually configures, even if that happens after this module is imported.
+# All metrics carry only a ``model`` attribute to keep cardinality bounded;
+# resource attributes (service.name, k8s.*, etc.) come from the application's
+# OTel resource configuration.
+class _StreamingMetrics:
+    """Lazily-created OTel instruments for streaming LLM telemetry."""
+
+    def __init__(self) -> None:
+        meter = metrics.get_meter("agentex.openai_agents.streaming")
+        self.ttft_ms = meter.create_histogram(
+            name="agentex.llm.ttft",
+            unit="ms",
+            description="Time from request submission to first content token (ms)",
+        )
+        # Note: TPS denominator is the model-generation window
+        # (last_token_time - first_token_time), not total stream wall time.
+        # This isolates raw model throughput from event-loop / tool-call latency.
+        self.tps = meter.create_histogram(
+            name="agentex.llm.tps",
+            unit="tokens/s",
+            description="Output tokens per second over the generation window",
+        )
+        self.input_tokens = meter.create_counter(
+            name="agentex.llm.input_tokens",
+            unit="tokens",
+            description="Total input tokens sent to the LLM",
+        )
+        self.output_tokens = meter.create_counter(
+            name="agentex.llm.output_tokens",
+            unit="tokens",
+            description="Total output tokens returned by the LLM",
+        )
+        self.cached_input_tokens = meter.create_counter(
+            name="agentex.llm.cached_input_tokens",
+            unit="tokens",
+            description="Subset of input tokens served from prompt cache",
+        )
+        self.reasoning_tokens = meter.create_counter(
+            name="agentex.llm.reasoning_tokens",
+            unit="tokens",
+            description="Output tokens spent on reasoning (subset of output_tokens)",
+        )
+
+
+_streaming_metrics: Optional[_StreamingMetrics] = None
+
+
+def _get_streaming_metrics() -> _StreamingMetrics:
+    """Return the streaming metrics singleton, creating it on first use."""
+    global _streaming_metrics
+    if _streaming_metrics is None:
+        _streaming_metrics = _StreamingMetrics()
+    return _streaming_metrics
 
 
 def _serialize_item(item: Any) -> dict[str, Any]:
@@ -632,7 +651,11 @@ class TemporalStreamingModel(Model):
                 # endpoints recognize this parameter, so we don't auto-inject a default.
                 prompt_cache_key = extra_args.pop("prompt_cache_key", NOT_GIVEN)
 
-                # Create the response stream using Responses API
+                # Create the response stream using Responses API.
+                # Bookmark request start *before* the await so ttft captures the full
+                # user-perceived latency (HTTP round-trip + model TTFB), not just the
+                # post-connect event-loop delay.
+                stream_start_perf = time.perf_counter()
                 logger.debug(f"[TemporalStreamingModel] Creating response stream with Responses API")
                 stream = await self.client.responses.create(  # type: ignore[call-overload]
 
@@ -682,12 +705,12 @@ class TemporalStreamingModel(Model):
                 reasoning_summaries = []
                 reasoning_contents = []
                 event_count = 0
-                # Wall-clock instrumentation for ttft / tps / tpot. ``stream_start_perf``
-                # bookmarks just before the event loop so the timer captures only the
-                # streaming portion, not request setup. ``first_token_at`` is set on
-                # the first content delta (text or reasoning summary).
-                stream_start_perf = time.perf_counter()
+                # ttft / tps instrumentation. ``stream_start_perf`` is set above,
+                # before the responses.create() await, so it captures the full
+                # request-to-first-token latency. ``first_token_at`` and
+                # ``last_token_at`` bracket the model-generation window for tps.
                 first_token_at: Optional[float] = None
+                last_token_at: Optional[float] = None
 
                 # We expect task_id to always be provided for streaming
                 if not task_id:
@@ -767,9 +790,14 @@ class TemporalStreamingModel(Model):
                         # Handle text streaming
                         delta = getattr(event, 'delta', '')
 
-                        # First content-bearing event in this stream — bookmark for ttft.
+                        # Bookmark first/last content-bearing events for ttft and tps.
+                        # last_token_at is updated on every delta so tps measures only
+                        # the model-generation window, not subsequent tool-call /
+                        # event-handler time.
+                        now_perf = time.perf_counter()
                         if first_token_at is None:
-                            first_token_at = time.perf_counter()
+                            first_token_at = now_perf
+                        last_token_at = now_perf
 
                         if isinstance(event, ResponseReasoningSummaryTextDeltaEvent) and reasoning_context:
                             # Stream reasoning summary deltas - these are the actual reasoning tokens!
@@ -1037,16 +1065,24 @@ class TemporalStreamingModel(Model):
                 # no-op if the application hasn't configured a MeterProvider, so this
                 # is safe to do unconditionally. We only emit ttft / tps when their
                 # input data is actually meaningful (got a content delta, got tokens).
+                m = _get_streaming_metrics()
                 metric_attrs = {"model": self.model_name}
-                stream_duration_s = time.perf_counter() - stream_start_perf
-                _input_tokens.add(usage.input_tokens or 0, metric_attrs)
-                _output_tokens.add(usage.output_tokens or 0, metric_attrs)
-                _cached_input_tokens.add(usage.input_tokens_details.cached_tokens or 0, metric_attrs)
-                _reasoning_tokens.add(usage.output_tokens_details.reasoning_tokens or 0, metric_attrs)
+                m.input_tokens.add(usage.input_tokens or 0, metric_attrs)
+                m.output_tokens.add(usage.output_tokens or 0, metric_attrs)
+                m.cached_input_tokens.add(usage.input_tokens_details.cached_tokens or 0, metric_attrs)
+                m.reasoning_tokens.add(usage.output_tokens_details.reasoning_tokens or 0, metric_attrs)
                 if first_token_at is not None:
-                    _ttft_ms.record((first_token_at - stream_start_perf) * 1000, metric_attrs)
-                if (usage.output_tokens or 0) > 0 and stream_duration_s > 0:
-                    _tps.record(usage.output_tokens / stream_duration_s, metric_attrs)
+                    m.ttft_ms.record((first_token_at - stream_start_perf) * 1000, metric_attrs)
+                # tps denominator is the generation window (first→last delta), not
+                # total stream wall time — see _StreamingMetrics for rationale.
+                if (
+                    first_token_at is not None
+                    and last_token_at is not None
+                    and last_token_at > first_token_at
+                    and (usage.output_tokens or 0) > 0
+                ):
+                    generation_window_s = last_token_at - first_token_at
+                    m.tps.record(usage.output_tokens / generation_window_s, metric_attrs)
 
                 # Return the response. response_id is the server-issued id from
                 # ResponseCompletedEvent.response.id, or None when the stream ended
