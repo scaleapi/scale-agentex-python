@@ -1,0 +1,68 @@
+name: Lint PR
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+
+jobs:
+  validate-pr-title:
+    name: Validate PR title (Conventional Commits)
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            test
+            chore
+            ci
+            build
+            perf
+            revert
+          requireScope: false
+          # Allow skipping this check with a label (e.g. for automated/bot PRs)
+          ignoreLabels: |
+            skip-conventional-commit-check
+
+  validate-pr-base:
+    name: Validate PR base branch
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.base.ref == 'main'
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check base branch
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'target-main') }}
+        run: |
+          # Exempt automated PRs (Stainless codegen, release-please, dependabot, etc.)
+          case "$PR_AUTHOR" in
+            stainless-app|stainless-app[bot]|release-please[bot]|github-actions[bot]|dependabot[bot])
+              echo "PR is from automation ($PR_AUTHOR); allowing PR targeting main."
+              exit 0
+              ;;
+          esac
+
+          if [ "$HAS_LABEL" = "true" ]; then
+            echo "Found 'target-main' label; allowing PR targeting main."
+            exit 0
+          fi
+
+          echo "::error title=PR should target 'next'::PRs should target the 'next' branch by default. The 'main' branch is reserved for release-please and Stainless automation. If this PR is an intentional hotfix or automation exception, add the 'target-main' label to bypass this check, or re-target the PR base to 'next'."
+          exit 1
