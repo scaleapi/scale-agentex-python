@@ -1072,10 +1072,16 @@ class TemporalStreamingModel(Model):
                 logger.error(f"Error using Responses API: {e}")
                 # Emit a request-counter event so 429s, 5xxs, timeouts, etc. are
                 # observable on the SDK side. Status histograms / token counters
-                # only fire on successful completion above.
-                get_llm_metrics().requests.add(
-                    1, {"model": self.model_name, "status": classify_status(e)}
-                )
+                # only fire on successful completion above. Wrapped in a bare
+                # try/except so a misbehaving exporter can't shadow the original
+                # LLM exception — callers (retry logic, circuit breakers) need
+                # to see the typed RateLimitError / APITimeoutError / etc.
+                try:
+                    get_llm_metrics().requests.add(
+                        1, {"model": self.model_name, "status": classify_status(e)}
+                    )
+                except Exception:
+                    pass
                 raise
 
     # The _get_response_with_responses_api method has been merged into get_response above
