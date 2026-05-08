@@ -27,9 +27,18 @@ class LLMMetricsHooks(RunHooks):
         del context  # part of the RunHooks contract; unused here
         m = get_llm_metrics()
         attrs = {"model": str(agent.model) if agent.model else "unknown"}
+        # Request counter only depends on agent.model, so emit it first and
+        # outside the usage-extraction try block. Token counters reach into
+        # nested optional fields and are best-effort: a non-OpenAI provider
+        # (litellm-routed Anthropic, etc.) may return a Usage shape missing
+        # input_tokens_details / output_tokens_details — we emit zeros where
+        # we can and skip the rest rather than crash the caller.
+        try:
+            m.requests.add(1, {**attrs, "status": "success"})
+        except Exception:
+            pass
         try:
             usage = response.usage
-            m.requests.add(1, {**attrs, "status": "success"})
             m.input_tokens.add(usage.input_tokens or 0, attrs)
             m.output_tokens.add(usage.output_tokens or 0, attrs)
             m.cached_input_tokens.add(usage.input_tokens_details.cached_tokens or 0, attrs)

@@ -113,6 +113,86 @@ class TestLLMMetricsHooksOnLLMEnd:
             response=_mock_response(),
         )
 
+    @pytest.mark.asyncio
+    async def test_missing_usage_still_emits_request_counter(self, monkeypatch):
+        """Provider returns a response without `usage` — caller shouldn't crash,
+        and we should still record the success request counter."""
+        m = MagicMock()
+        monkeypatch.setattr(hooks_module, "get_llm_metrics", lambda: m)
+
+        class _Response:
+            @property
+            def usage(self):
+                raise AttributeError("no usage")
+
+        await LLMMetricsHooks().on_llm_end(
+            context=MagicMock(),
+            agent=_mock_agent(),
+            response=_Response(),  # type: ignore[arg-type]
+        )
+
+        m.requests.add.assert_called_once_with(1, {"model": "gpt-5", "status": "success"})
+        m.input_tokens.add.assert_not_called()
+        m.output_tokens.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_missing_token_details_skips_those_counters(self, monkeypatch):
+        """Provider returns Usage without input_tokens_details (e.g. some
+        litellm wrappers / non-OpenAI providers): top-level token counts
+        still emit; the nested cached/reasoning counters are skipped."""
+        m = MagicMock()
+        monkeypatch.setattr(hooks_module, "get_llm_metrics", lambda: m)
+
+        class _Usage:
+            input_tokens = 100
+            output_tokens = 50
+
+            @property
+            def input_tokens_details(self):
+                raise AttributeError("no details")
+
+        class _Response:
+            usage = _Usage()
+
+        await LLMMetricsHooks().on_llm_end(
+            context=MagicMock(),
+            agent=_mock_agent(),
+            response=_Response(),  # type: ignore[arg-type]
+        )
+
+        # Request counter still fires (it's outside the usage-extraction try).
+        m.requests.add.assert_called_once_with(1, {"model": "gpt-5", "status": "success"})
+        # input_tokens.add fires before the nested attribute access.
+        m.input_tokens.add.assert_called_once_with(100, {"model": "gpt-5"})
+        # cached_input_tokens / reasoning_tokens skipped — the AttributeError
+        # bailed before they could be called.
+        m.cached_input_tokens.add.assert_not_called()
+        m.reasoning_tokens.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_none_token_values_emit_as_zero(self, monkeypatch):
+        """Some providers report None instead of 0 for fields they don't track."""
+        m = MagicMock()
+        monkeypatch.setattr(hooks_module, "get_llm_metrics", lambda: m)
+
+        response = MagicMock()
+        response.usage.input_tokens = None
+        response.usage.output_tokens = None
+        response.usage.input_tokens_details.cached_tokens = None
+        response.usage.output_tokens_details.reasoning_tokens = None
+
+        await LLMMetricsHooks().on_llm_end(
+            context=MagicMock(),
+            agent=_mock_agent(),
+            response=response,
+        )
+
+        attrs = {"model": "gpt-5"}
+        m.input_tokens.add.assert_called_once_with(0, attrs)
+        m.output_tokens.add.assert_called_once_with(0, attrs)
+        m.cached_input_tokens.add.assert_called_once_with(0, attrs)
+        m.reasoning_tokens.add.assert_called_once_with(0, attrs)
+
 
 class TestRecordLLMFailure:
     def test_emits_classified_status(self, monkeypatch):
