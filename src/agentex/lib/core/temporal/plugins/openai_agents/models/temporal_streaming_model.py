@@ -32,7 +32,8 @@ from agents.computer import Computer, AsyncComputer
 # Re-export the canonical StreamingMode literal from the streaming service so
 # all layers share a single definition.
 from agentex.lib.core.services.adk.streaming import StreamingMode as StreamingMode
-from agentex.lib.core.observability.llm_metrics import classify_status, get_llm_metrics
+from agentex.lib.core.observability.llm_metrics import get_llm_metrics
+from agentex.lib.core.observability.llm_metrics_hooks import record_llm_failure
 
 try:
     from agents.tool import ShellTool  # type: ignore[attr-defined]
@@ -1026,34 +1027,24 @@ class TemporalStreamingModel(Model):
 
                     span.output = output_data
 
-                # Emit LLM metrics derived from the captured stream. The meter is a
-                # no-op if the application hasn't configured a MeterProvider, so this
-                # is safe to do unconditionally. We only emit ttft / tps when their
-                # input data is actually meaningful (got a content delta, got tokens).
+                # Streaming-only metrics. Token counters and the success request
+                # counter are emitted by LLMMetricsHooks.on_llm_end so they fire
+                # consistently across streaming and non-streaming paths.
                 m = get_llm_metrics()
                 metric_attrs = {"model": self.model_name}
-                m.requests.add(1, {**metric_attrs, "status": "success"})
-                m.input_tokens.add(usage.input_tokens or 0, metric_attrs)
-                m.output_tokens.add(usage.output_tokens or 0, metric_attrs)
-                m.cached_input_tokens.add(usage.input_tokens_details.cached_tokens or 0, metric_attrs)
-                m.reasoning_tokens.add(usage.output_tokens_details.reasoning_tokens or 0, metric_attrs)
                 if first_token_at is not None:
                     m.ttft_ms.record((first_token_at - stream_start_perf) * 1000, metric_attrs)
                 if first_answer_at is not None:
                     m.ttat_ms.record((first_answer_at - stream_start_perf) * 1000, metric_attrs)
-                # tps denominator is the generation window (first→last delta), not
-                # total stream wall time — see LLMMetrics for rationale. Single-token
-                # responses (where first_token_at == last_token_at, e.g. a one-token
-                # tool-result acknowledgement) collapse the window to 0 and are
-                # intentionally skipped — TPS is undefined in that case.
+                # Single-token responses collapse the generation window to 0; tps
+                # is undefined and skipped.
                 if (
                     first_token_at is not None
                     and last_token_at is not None
                     and last_token_at > first_token_at
                     and (usage.output_tokens or 0) > 0
                 ):
-                    generation_window_s = last_token_at - first_token_at
-                    m.tps.record(usage.output_tokens / generation_window_s, metric_attrs)
+                    m.tps.record(usage.output_tokens / (last_token_at - first_token_at), metric_attrs)
 
                 # Return the response. response_id is the server-issued id from
                 # ResponseCompletedEvent.response.id, or None when the stream ended
@@ -1070,18 +1061,10 @@ class TemporalStreamingModel(Model):
 
             except Exception as e:
                 logger.error(f"Error using Responses API: {e}")
-                # Emit a request-counter event so 429s, 5xxs, timeouts, etc. are
-                # observable on the SDK side. Status histograms / token counters
-                # only fire on successful completion above. Wrapped in a bare
-                # try/except so a misbehaving exporter can't shadow the original
-                # LLM exception — callers (retry logic, circuit breakers) need
-                # to see the typed RateLimitError / APITimeoutError / etc.
-                try:
-                    get_llm_metrics().requests.add(
-                        1, {"model": self.model_name, "status": classify_status(e)}
-                    )
-                except Exception:
-                    pass
+                # LLMMetricsHooks.on_llm_end doesn't fire on error, so emit the
+                # failure counter here. Best-effort so the typed LLM exception
+                # always propagates intact for retry / circuit-breaker logic.
+                record_llm_failure(self.model_name, e)
                 raise
 
     # The _get_response_with_responses_api method has been merged into get_response above
