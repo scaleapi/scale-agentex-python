@@ -653,12 +653,16 @@ class TemporalStreamingModel(Model):
                 reasoning_summaries = []
                 reasoning_contents = []
                 event_count = 0
-                # ttft / tps instrumentation. ``stream_start_perf`` is set above,
-                # before the responses.create() await, so it captures the full
+                # ttft / ttat / tps instrumentation. ``stream_start_perf`` is set
+                # above, before the responses.create() await, so it captures the full
                 # request-to-first-token latency. ``first_token_at`` and
                 # ``last_token_at`` bracket the model-generation window for tps.
+                # ``first_answer_at`` is set on the first user-visible answer token
+                # (text or tool-call delta) and excludes reasoning chunks, so ttat
+                # measures the latency users actually perceive on reasoning models.
                 first_token_at: Optional[float] = None
                 last_token_at: Optional[float] = None
+                first_answer_at: Optional[float] = None
 
                 # We expect task_id to always be provided for streaming
                 if not task_id:
@@ -686,6 +690,14 @@ class TemporalStreamingModel(Model):
                         if first_token_at is None:
                             first_token_at = now_perf
                         last_token_at = now_perf
+                        # ttat: first user-visible answer token (text or tool call),
+                        # excluding reasoning chunks. Equal to ttft for non-reasoning
+                        # models; differs by reasoning duration for reasoning models.
+                        if first_answer_at is None and isinstance(event, (
+                            ResponseTextDeltaEvent,
+                            ResponseFunctionCallArgumentsDeltaEvent,
+                        )):
+                            first_answer_at = now_perf
 
                     # Handle different event types using isinstance for type safety
                     if isinstance(event, ResponseOutputItemAddedEvent):
@@ -1027,6 +1039,8 @@ class TemporalStreamingModel(Model):
                 m.reasoning_tokens.add(usage.output_tokens_details.reasoning_tokens or 0, metric_attrs)
                 if first_token_at is not None:
                     m.ttft_ms.record((first_token_at - stream_start_perf) * 1000, metric_attrs)
+                if first_answer_at is not None:
+                    m.ttat_ms.record((first_answer_at - stream_start_perf) * 1000, metric_attrs)
                 # tps denominator is the generation window (first→last delta), not
                 # total stream wall time — see LLMMetrics for rationale. Single-token
                 # responses (where first_token_at == last_token_at, e.g. a one-token

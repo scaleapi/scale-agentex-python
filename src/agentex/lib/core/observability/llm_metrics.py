@@ -47,6 +47,15 @@ class LLMMetrics:
             unit="ms",
             description="Time from request submission to first content token (ms)",
         )
+        # ttat (time-to-first-answering-token) is distinct from ttft for reasoning
+        # models: ttft fires on the first reasoning chunk (which arrives quickly),
+        # while ttat fires on the first user-visible answer token (text or tool
+        # call). For non-reasoning models the two are equal.
+        self.ttat_ms = meter.create_histogram(
+            name="agentex.llm.ttat",
+            unit="ms",
+            description="Time from request submission to first answering token (text or tool-call delta) — excludes reasoning chunks",
+        )
         # Note: TPS denominator is the model-generation window
         # (last_token_time - first_token_time), not total stream wall time.
         # This isolates raw model throughput from event-loop / tool-call latency.
