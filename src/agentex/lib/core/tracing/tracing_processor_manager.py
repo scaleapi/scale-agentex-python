@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from threading import Lock
 
-from agentex.lib.types.tracing import TracingProcessorConfig, AgentexTracingProcessorConfig
+from agentex.lib.types.tracing import TracingProcessorConfig
 from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
     SGPSyncTracingProcessor,
     SGPAsyncTracingProcessor,
@@ -73,22 +73,8 @@ GLOBAL_TRACING_PROCESSOR_MANAGER = TracingProcessorManager()
 add_tracing_processor_config = GLOBAL_TRACING_PROCESSOR_MANAGER.add_processor_config
 set_tracing_processor_configs = GLOBAL_TRACING_PROCESSOR_MANAGER.set_processor_configs
 
-# Lazy initialization to avoid circular imports
-_default_initialized = False
-
-def _ensure_default_initialized():
-    """Ensure default processor is initialized (lazy to avoid circular imports)."""
-    global _default_initialized
-    if not _default_initialized:
-        add_tracing_processor_config(AgentexTracingProcessorConfig())
-        _default_initialized = True
-
 def get_sync_tracing_processors():
-    """Get sync processors, initializing defaults if needed."""
-    _ensure_default_initialized()
     return GLOBAL_TRACING_PROCESSOR_MANAGER.get_sync_processors()
 
 def get_async_tracing_processors():
-    """Get async processors, initializing defaults if needed."""
-    _ensure_default_initialized()
     return GLOBAL_TRACING_PROCESSOR_MANAGER.get_async_processors()
