@@ -75,6 +75,7 @@ def create_project_structure(
     # Create root files
     root_templates = {
         ".dockerignore.j2": ".dockerignore",
+        ".env.example.j2": ".env.example",
         "manifest.yaml.j2": "manifest.yaml",
         "README.md.j2": "README.md",
         "environments.yaml.j2": "environments.yaml",
