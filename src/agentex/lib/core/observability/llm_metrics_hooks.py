@@ -9,6 +9,7 @@ streaming model itself, not here — hooks don't see individual chunks.
 from __future__ import annotations
 
 from typing import Any
+from typing_extensions import override
 
 from agents import Agent, RunHooks, ModelResponse, RunContextWrapper
 
@@ -18,6 +19,7 @@ from agentex.lib.core.observability.llm_metrics import classify_status, get_llm_
 class LLMMetricsHooks(RunHooks):
     """Emits ``agentex.llm.requests`` + token counters on every LLM call."""
 
+    @override
     async def on_llm_end(
         self,
         context: RunContextWrapper[Any],
