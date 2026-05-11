@@ -180,7 +180,8 @@ class TestSGPAsyncTracingProcessor:
             captured.append(sgp_span)
             return sgp_span
 
-        with patch(f"{MODULE}.create_span", side_effect=capture_create_span):
+        mock_create_span = MagicMock(side_effect=capture_create_span)
+        with patch(f"{MODULE}.create_span", mock_create_span):
             span = _make_span()
             span.input = {"messages": [{"role": "user", "content": "hello"}]}
             await processor.on_span_start(span)
@@ -199,6 +200,10 @@ class TestSGPAsyncTracingProcessor:
         # The end-time SGPSpan should have end_time populated.
         end_span = captured[-1]
         assert end_span.end_time is not None
+        # Verify the updated input/output reached create_span on the end call.
+        end_call_kwargs = mock_create_span.call_args_list[-1].kwargs
+        assert end_call_kwargs["input"]["messages"][-1]["role"] == "assistant"
+        assert end_call_kwargs["output"] == {"response": "hi"}
 
     async def test_on_spans_start_sends_single_upsert_for_batch(self):
         """Given N spans at once, on_spans_start should make ONE upsert_batch HTTP call."""

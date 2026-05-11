@@ -27,6 +27,39 @@ def _get_span_type(span: Span) -> str:
     return "STANDALONE"
 
 
+def _add_source_to_span(span: Span, env_vars: EnvironmentVariables) -> None:
+    if span.data is None:
+        span.data = {}
+    if isinstance(span.data, dict):
+        span.data["__source__"] = "agentex"
+        if env_vars.ACP_TYPE is not None:
+            span.data["__acp_type__"] = env_vars.ACP_TYPE
+        if env_vars.AGENT_NAME is not None:
+            span.data["__agent_name__"] = env_vars.AGENT_NAME
+        if env_vars.AGENT_ID is not None:
+            span.data["__agent_id__"] = env_vars.AGENT_ID
+
+
+def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:
+    """Build an SGPSpan from an agentex Span. Idempotent on span_id at the SGP backend."""
+    _add_source_to_span(span, env_vars)
+    sgp_span = cast(
+        SGPSpan,
+        create_span(
+            name=span.name,
+            span_type=_get_span_type(span),
+            span_id=span.id,
+            parent_id=span.parent_id,
+            trace_id=span.trace_id,
+            input=span.input,
+            output=span.output,
+            metadata=span.data,
+        ),
+    )
+    sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
+    return sgp_span
+
+
 class SGPSyncTracingProcessor(SyncTracingProcessor):
     def __init__(self, config: SGPTracingProcessorConfig):
         disabled = config.sgp_api_key == "" or config.sgp_account_id == ""
@@ -40,45 +73,14 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
         )
         self.env_vars = EnvironmentVariables.refresh()
 
-    def _add_source_to_span(self, span: Span) -> None:
-        if span.data is None:
-            span.data = {}
-        if isinstance(span.data, dict):
-            span.data["__source__"] = "agentex"
-            if self.env_vars.ACP_TYPE is not None:
-                span.data["__acp_type__"] = self.env_vars.ACP_TYPE
-            if self.env_vars.AGENT_NAME is not None:
-                span.data["__agent_name__"] = self.env_vars.AGENT_NAME
-            if self.env_vars.AGENT_ID is not None:
-                span.data["__agent_id__"] = self.env_vars.AGENT_ID
-
-    def _build_sgp_span(self, span: Span) -> SGPSpan:
-        """Build an SGPSpan from an agentex Span. Idempotent on span_id at the SGP backend."""
-        self._add_source_to_span(span)
-        sgp_span = cast(
-            SGPSpan,
-            create_span(
-                name=span.name,
-                span_type=_get_span_type(span),
-                span_id=span.id,
-                parent_id=span.parent_id,
-                trace_id=span.trace_id,
-                input=span.input,
-                output=span.output,
-                metadata=span.data,
-            ),
-        )
-        sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
-        return sgp_span
-
     @override
     def on_span_start(self, span: Span) -> None:
-        sgp_span = self._build_sgp_span(span)
+        sgp_span = _build_sgp_span(span, self.env_vars)
         sgp_span.flush(blocking=False)
 
     @override
     def on_span_end(self, span: Span) -> None:
-        sgp_span = self._build_sgp_span(span)
+        sgp_span = _build_sgp_span(span, self.env_vars)
         sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
         sgp_span.flush(blocking=False)
 
@@ -108,37 +110,6 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         )
         self.env_vars = EnvironmentVariables.refresh()
 
-    def _add_source_to_span(self, span: Span) -> None:
-        if span.data is None:
-            span.data = {}
-        if isinstance(span.data, dict):
-            span.data["__source__"] = "agentex"
-            if self.env_vars.ACP_TYPE is not None:
-                span.data["__acp_type__"] = self.env_vars.ACP_TYPE
-            if self.env_vars.AGENT_NAME is not None:
-                span.data["__agent_name__"] = self.env_vars.AGENT_NAME
-            if self.env_vars.AGENT_ID is not None:
-                span.data["__agent_id__"] = self.env_vars.AGENT_ID
-
-    def _build_sgp_span(self, span: Span) -> SGPSpan:
-        """Build an SGPSpan from an agentex Span. Idempotent on span_id at the SGP backend."""
-        self._add_source_to_span(span)
-        sgp_span = cast(
-            SGPSpan,
-            create_span(
-                name=span.name,
-                span_type=_get_span_type(span),
-                span_id=span.id,
-                parent_id=span.parent_id,
-                trace_id=span.trace_id,
-                input=span.input,
-                output=span.output,
-                metadata=span.data,
-            ),
-        )
-        sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
-        return sgp_span
-
     @override
     async def on_span_start(self, span: Span) -> None:
         await self.on_spans_start([span])
@@ -152,7 +123,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         if not spans:
             return
 
-        sgp_spans = [self._build_sgp_span(span) for span in spans]
+        sgp_spans = [_build_sgp_span(span, self.env_vars) for span in spans]
 
         if self.disabled:
             logger.warning("SGP is disabled, skipping span upsert")
@@ -168,7 +139,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
 
         sgp_spans: list[SGPSpan] = []
         for span in spans:
-            sgp_span = self._build_sgp_span(span)
+            sgp_span = _build_sgp_span(span, self.env_vars)
             sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
             sgp_spans.append(sgp_span)
 
