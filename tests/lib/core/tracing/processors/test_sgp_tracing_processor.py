@@ -41,18 +41,16 @@ def _make_mock_sgp_span() -> MagicMock:
 # ---------------------------------------------------------------------------
 
 
-class TestSGPSyncTracingProcessorMemoryLeak:
+class TestSGPSyncTracingProcessor:
     @staticmethod
     def _make_processor():
         mock_env = MagicMock()
         mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
         mock_create_span = MagicMock(side_effect=lambda **kwargs: _make_mock_sgp_span())
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), \
-             patch(f"{MODULE}.SGPClient"), \
-             patch(f"{MODULE}.tracing"), \
-             patch(f"{MODULE}.flush_queue"), \
-             patch(f"{MODULE}.create_span", mock_create_span):
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.SGPClient"), patch(
+            f"{MODULE}.tracing"
+        ), patch(f"{MODULE}.flush_queue"), patch(f"{MODULE}.create_span", mock_create_span):
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
                 SGPSyncTracingProcessor,
             )
@@ -61,41 +59,50 @@ class TestSGPSyncTracingProcessorMemoryLeak:
 
         return processor, mock_create_span
 
-    def test_spans_not_leaked_after_completed_lifecycle(self):
+    def test_processor_holds_no_per_span_state(self):
+        """Stateless processor must not retain any per-span dict between lifecycle events."""
+        processor, _ = self._make_processor()
+        assert not hasattr(processor, "_spans")
+
+    def test_span_lifecycle_produces_two_flushes(self):
+        """Each span produces one flush on start and one on end."""
         processor, _ = self._make_processor()
 
-        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()) as mock_cs:
             for _ in range(100):
                 span = _make_span()
                 processor.on_span_start(span)
                 span.end_time = datetime.now(UTC)
                 processor.on_span_end(span)
 
-        assert len(processor._spans) == 0, (
-            f"Expected 0 spans after 100 complete lifecycles, got {len(processor._spans)} — memory leak!"
-        )
+        # 100 spans × (1 start + 1 end) = 200 build calls.
+        assert mock_cs.call_count == 200
 
-    def test_spans_present_during_active_lifecycle(self):
+    def test_span_end_without_prior_start_still_flushes(self):
+        """Cross-pod Temporal case: END activity lands on a pod that never saw START.
+
+        Today this used to be a silent no-op. After the stateless refactor it
+        must still flush a complete span (start_time + end_time + payload).
+        """
         processor, _ = self._make_processor()
 
-        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+        captured_spans: list[MagicMock] = []
+
+        def capture_create_span(**kwargs):
+            sgp_span = _make_mock_sgp_span()
+            captured_spans.append(sgp_span)
+            return sgp_span
+
+        with patch(f"{MODULE}.create_span", side_effect=capture_create_span):
             span = _make_span()
-            processor.on_span_start(span)
-            assert len(processor._spans) == 1, "Span should be tracked while active"
-
             span.end_time = datetime.now(UTC)
+            # No on_span_start — END lands here for the first time.
             processor.on_span_end(span)
-            assert len(processor._spans) == 0, "Span should be removed after end"
 
-    def test_span_end_for_unknown_span_is_noop(self):
-        processor, _ = self._make_processor()
-
-        span = _make_span()
-        # End a span that was never started — should not raise
-        span.end_time = datetime.now(UTC)
-        processor.on_span_end(span)
-
-        assert len(processor._spans) == 0
+        assert len(captured_spans) == 1
+        assert captured_spans[0].flush.called
+        assert captured_spans[0].start_time is not None
+        assert captured_spans[0].end_time is not None
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +110,7 @@ class TestSGPSyncTracingProcessorMemoryLeak:
 # ---------------------------------------------------------------------------
 
 
-class TestSGPAsyncTracingProcessorMemoryLeak:
+class TestSGPAsyncTracingProcessor:
     @staticmethod
     def _make_processor():
         mock_env = MagicMock()
@@ -113,9 +120,9 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         mock_async_client = MagicMock()
         mock_async_client.spans.upsert_batch = AsyncMock()
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), \
-             patch(f"{MODULE}.create_span", mock_create_span), \
-             patch(f"{MODULE}.AsyncSGPClient", return_value=mock_async_client):
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.create_span", mock_create_span), patch(
+            f"{MODULE}.AsyncSGPClient", return_value=mock_async_client
+        ):
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
                 SGPAsyncTracingProcessor,
             )
@@ -125,69 +132,73 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         # Wire up the mock client after construction (constructor stores it)
         processor.sgp_async_client = mock_async_client
 
-        # Keep create_span mock active for on_span_start calls
         return processor, mock_create_span
 
-    async def test_spans_not_leaked_after_completed_lifecycle(self):
+    def test_processor_holds_no_per_span_state(self):
+        """Stateless processor must not retain any per-span dict between lifecycle events."""
         processor, _ = self._make_processor()
+        assert not hasattr(processor, "_spans")
 
-        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
-            for _ in range(100):
-                span = _make_span()
-                await processor.on_span_start(span)
-                span.end_time = datetime.now(UTC)
-                await processor.on_span_end(span)
-
-        assert len(processor._spans) == 0, (
-            f"Expected 0 spans after 100 complete lifecycles, got {len(processor._spans)} — memory leak!"
-        )
-
-    async def test_spans_present_during_active_lifecycle(self):
+    async def test_span_lifecycle_produces_two_upserts(self):
+        """Each span produces one upsert_batch call on start and one on end."""
         processor, _ = self._make_processor()
 
         with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
             span = _make_span()
             await processor.on_span_start(span)
-            assert len(processor._spans) == 1, "Span should be tracked while active"
-
             span.end_time = datetime.now(UTC)
             await processor.on_span_end(span)
-            assert len(processor._spans) == 0, "Span should be removed after end"
 
-    async def test_span_end_for_unknown_span_is_noop(self):
-        processor, _ = self._make_processor()
+        assert processor.sgp_async_client.spans.upsert_batch.call_count == 2
 
-        span = _make_span()
-        span.end_time = datetime.now(UTC)
-        await processor.on_span_end(span)
+    async def test_span_end_without_prior_start_still_upserts(self):
+        """Cross-pod Temporal case: END activity lands on a pod that never saw START.
 
-        assert len(processor._spans) == 0
-
-    async def test_sgp_span_input_updated_on_end(self):
-        """on_span_end should update sgp_span.input from the incoming span."""
+        Today this used to be a silent no-op. After the stateless refactor it
+        must still upsert a complete span via upsert_batch.
+        """
         processor, _ = self._make_processor()
 
         with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
+            span = _make_span()
+            span.end_time = datetime.now(UTC)
+            # No on_span_start — END lands here for the first time.
+            await processor.on_span_end(span)
+
+        assert processor.sgp_async_client.spans.upsert_batch.call_count == 1
+        items = processor.sgp_async_client.spans.upsert_batch.call_args.kwargs["items"]
+        assert len(items) == 1
+
+    async def test_sgp_span_input_and_output_propagated_on_end(self):
+        """on_span_end should send the span's current input and output via upsert_batch."""
+        processor, _ = self._make_processor()
+
+        captured: list[MagicMock] = []
+
+        def capture_create_span(**kwargs):
+            sgp_span = _make_mock_sgp_span()
+            captured.append(sgp_span)
+            return sgp_span
+
+        with patch(f"{MODULE}.create_span", side_effect=capture_create_span):
             span = _make_span()
             span.input = {"messages": [{"role": "user", "content": "hello"}]}
             await processor.on_span_start(span)
 
-        assert len(processor._spans) == 1
+            span.input = {
+                "messages": [
+                    {"role": "user", "content": "hello"},
+                    {"role": "assistant", "content": "hi"},
+                ]
+            }
+            span.output = {"response": "hi"}
+            span.end_time = datetime.now(UTC)
+            await processor.on_span_end(span)
 
-        # Simulate modified input at end time
-        updated_input: dict[str, object] = {"messages": [
-            {"role": "user", "content": "hello"},
-            {"role": "assistant", "content": "hi"},
-        ]}
-        span.input = updated_input
-        span.output = {"response": "hi"}
-        span.end_time = datetime.now(UTC)
-        await processor.on_span_end(span)
-
-        # Span should be removed after end
-        assert len(processor._spans) == 0
-        # The end upsert should have been called
         assert processor.sgp_async_client.spans.upsert_batch.call_count == 2  # start + end
+        # The end-time SGPSpan should have end_time populated.
+        end_span = captured[-1]
+        assert end_span.end_time is not None
 
     async def test_on_spans_start_sends_single_upsert_for_batch(self):
         """Given N spans at once, on_spans_start should make ONE upsert_batch HTTP call."""
@@ -203,8 +214,6 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         )
         items = processor.sgp_async_client.spans.upsert_batch.call_args.kwargs["items"]
         assert len(items) == n
-        # All spans should be tracked for the subsequent end call
-        assert len(processor._spans) == n
 
     async def test_on_spans_end_sends_single_upsert_for_batch(self):
         """Given N spans at once, on_spans_end should make ONE upsert_batch HTTP call."""
@@ -226,4 +235,3 @@ class TestSGPAsyncTracingProcessorMemoryLeak:
         )
         items = processor.sgp_async_client.spans.upsert_batch.call_args.kwargs["items"]
         assert len(items) == n
-        assert len(processor._spans) == 0

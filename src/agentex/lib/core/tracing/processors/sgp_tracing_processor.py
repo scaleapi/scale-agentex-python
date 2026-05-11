@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import override
+from typing import cast, override
 
 import scale_gp_beta.lib.tracing as tracing
 from scale_gp_beta import SGPClient, AsyncSGPClient
@@ -38,7 +38,6 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             ),
             disabled=disabled,
         )
-        self._spans: dict[str, SGPSpan] = {}
         self.env_vars = EnvironmentVariables.refresh()
 
     def _add_source_to_span(self, span: Span) -> None:
@@ -53,48 +52,44 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             if self.env_vars.AGENT_ID is not None:
                 span.data["__agent_id__"] = self.env_vars.AGENT_ID
 
-    @override
-    def on_span_start(self, span: Span) -> None:
+    def _build_sgp_span(self, span: Span) -> SGPSpan:
+        """Build an SGPSpan from an agentex Span. Idempotent on span_id at the SGP backend."""
         self._add_source_to_span(span)
-
-        sgp_span = create_span(
-            name=span.name,
-            span_type=_get_span_type(span),
-            span_id=span.id,
-            parent_id=span.parent_id,
-            trace_id=span.trace_id,
-            input=span.input,
-            output=span.output,
-            metadata=span.data,
+        sgp_span = cast(
+            SGPSpan,
+            create_span(
+                name=span.name,
+                span_type=_get_span_type(span),
+                span_id=span.id,
+                parent_id=span.parent_id,
+                trace_id=span.trace_id,
+                input=span.input,
+                output=span.output,
+                metadata=span.data,
+            ),
         )
         sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
-        sgp_span.flush(blocking=False)
+        return sgp_span
 
-        self._spans[span.id] = sgp_span
+    @override
+    def on_span_start(self, span: Span) -> None:
+        sgp_span = self._build_sgp_span(span)
+        sgp_span.flush(blocking=False)
 
     @override
     def on_span_end(self, span: Span) -> None:
-        sgp_span = self._spans.pop(span.id, None)
-        if sgp_span is None:
-            logger.warning(f"Span {span.id} not found in stored spans, skipping span end")
-            return
-
-        self._add_source_to_span(span)
-        sgp_span.output = span.output  # type: ignore[assignment]
-        sgp_span.metadata = span.data  # type: ignore[assignment]
+        sgp_span = self._build_sgp_span(span)
         sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
         sgp_span.flush(blocking=False)
 
     @override
     def shutdown(self) -> None:
-        self._spans.clear()
         flush_queue()
 
 
 class SGPAsyncTracingProcessor(AsyncTracingProcessor):
     def __init__(self, config: SGPTracingProcessorConfig):
         self.disabled = config.sgp_api_key == "" or config.sgp_account_id == ""
-        self._spans: dict[str, SGPSpan] = {}
         import httpx
 
         # Disable keepalive so each HTTP call gets a fresh TCP connection,
@@ -125,6 +120,25 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             if self.env_vars.AGENT_ID is not None:
                 span.data["__agent_id__"] = self.env_vars.AGENT_ID
 
+    def _build_sgp_span(self, span: Span) -> SGPSpan:
+        """Build an SGPSpan from an agentex Span. Idempotent on span_id at the SGP backend."""
+        self._add_source_to_span(span)
+        sgp_span = cast(
+            SGPSpan,
+            create_span(
+                name=span.name,
+                span_type=_get_span_type(span),
+                span_id=span.id,
+                parent_id=span.parent_id,
+                trace_id=span.trace_id,
+                input=span.input,
+                output=span.output,
+                metadata=span.data,
+            ),
+        )
+        sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
+        return sgp_span
+
     @override
     async def on_span_start(self, span: Span) -> None:
         await self.on_spans_start([span])
@@ -138,22 +152,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         if not spans:
             return
 
-        sgp_spans: list[SGPSpan] = []
-        for span in spans:
-            self._add_source_to_span(span)
-            sgp_span = create_span(
-                name=span.name,
-                span_type=_get_span_type(span),
-                span_id=span.id,
-                parent_id=span.parent_id,
-                trace_id=span.trace_id,
-                input=span.input,
-                output=span.output,
-                metadata=span.data,
-            )
-            sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
-            self._spans[span.id] = sgp_span
-            sgp_spans.append(sgp_span)
+        sgp_spans = [self._build_sgp_span(span) for span in spans]
 
         if self.disabled:
             logger.warning("SGP is disabled, skipping span upsert")
@@ -167,29 +166,18 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         if not spans:
             return
 
-        to_upsert: list[SGPSpan] = []
+        sgp_spans: list[SGPSpan] = []
         for span in spans:
-            sgp_span = self._spans.pop(span.id, None)
-            if sgp_span is None:
-                logger.warning(f"Span {span.id} not found in stored spans, skipping span end")
-                continue
-
-            self._add_source_to_span(span)
-            sgp_span.input = span.input  # type: ignore[assignment]
-            sgp_span.output = span.output  # type: ignore[assignment]
-            sgp_span.metadata = span.data  # type: ignore[assignment]
+            sgp_span = self._build_sgp_span(span)
             sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
-            to_upsert.append(sgp_span)
+            sgp_spans.append(sgp_span)
 
-        if self.disabled or not to_upsert:
+        if self.disabled:
             return
         await self.sgp_async_client.spans.upsert_batch(  # type: ignore[union-attr]
-            items=[s.to_request_params() for s in to_upsert]
+            items=[s.to_request_params() for s in sgp_spans]
         )
 
     @override
     async def shutdown(self) -> None:
-        await self.sgp_async_client.spans.upsert_batch(  # type: ignore[union-attr]
-            items=[sgp_span.to_request_params() for sgp_span in self._spans.values()]
-        )
-        self._spans.clear()
+        pass
