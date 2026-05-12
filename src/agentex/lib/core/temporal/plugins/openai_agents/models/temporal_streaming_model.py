@@ -874,7 +874,8 @@ class TemporalStreamingModel(Model):
                                         parsed_args = json.loads(raw_args) if raw_args else {}
                                     except json.JSONDecodeError:
                                         logger.warning(
-                                            f"Failed to parse tool call arguments for {call_data['name']}: {raw_args[:200]}"
+                                            f"Failed to parse tool call arguments for {call_data['name']} "
+                                            f"(raw_args_bytes={len(raw_args)})"
                                         )
                                         parsed_args = {}
                                     try:
