@@ -11,8 +11,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 import agentex.lib.adk._modules.messages as _messages_mod
 from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
@@ -38,7 +36,6 @@ def _make_module() -> tuple[AsyncMock, MessagesModule]:
 
 
 class TestMessagesModuleCreate:
-    @pytest.mark.asyncio
     async def test_outside_workflow_does_not_inject_created_at(self) -> None:
         mock_service, module = _make_module()
         mock_service.create_message.return_value = _make_task_message()
@@ -52,7 +49,6 @@ class TestMessagesModuleCreate:
         kwargs = mock_service.create_message.call_args.kwargs
         assert kwargs["created_at"] is None
 
-    @pytest.mark.asyncio
     async def test_inside_workflow_auto_injects_workflow_now(self) -> None:
         mock_service, module = _make_module()
         mock_service.create_message.return_value = _make_task_message()
@@ -80,7 +76,6 @@ class TestMessagesModuleCreate:
         params = captured["request"]
         assert params.created_at == _FIXED_NOW
 
-    @pytest.mark.asyncio
     async def test_caller_supplied_created_at_is_respected(self) -> None:
         mock_service, module = _make_module()
         mock_service.create_message.return_value = _make_task_message()
@@ -99,7 +94,6 @@ class TestMessagesModuleCreate:
 
 
 class TestMessagesModuleCreateBatch:
-    @pytest.mark.asyncio
     async def test_inside_workflow_auto_injects_workflow_now(self) -> None:
         mock_service, module = _make_module()
         mock_service.create_messages_batch.return_value = [_make_task_message()]

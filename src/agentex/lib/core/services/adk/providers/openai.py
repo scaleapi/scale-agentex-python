@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any, Literal
 from datetime import datetime
 from contextlib import AsyncExitStack, asynccontextmanager
+from collections.abc import Callable
 
 from mcp import StdioServerParameters
 from agents import Agent, Runner, RunResult, RunResultStreaming
@@ -72,6 +73,22 @@ async def mcp_server_context(
         for server in servers:
             await stack.enter_async_context(server)
         yield servers
+
+
+def _make_created_at_dispenser(initial: datetime | None) -> Callable[[], datetime | None]:
+    # Returns a closure that yields the workflow-supplied created_at exactly
+    # once (on the first call), then None forever after. Used to stamp the
+    # first agent message of a turn with workflow.now() while letting
+    # subsequent messages fall back to server wall-clock — see the call sites
+    # in run_agent_auto_send / run_agent_streamed_auto_send for context.
+    pending: list[datetime | None] = [initial]
+
+    def take() -> datetime | None:
+        value = pending[0]
+        pending[0] = None
+        return value
+
+    return take
 
 
 class OpenAIService:
@@ -377,15 +394,7 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent auto send")
 
-            # See run_agent_streamed_auto_send for the rationale: only the
-            # first message opened in this turn carries the workflow-supplied
-            # created_at; the rest fall back to server wall clock.
-            _pending_created_at: list[datetime | None] = [created_at]
-
-            def _take_created_at() -> datetime | None:
-                value = _pending_created_at[0]
-                _pending_created_at[0] = None
-                return value
+            _take_created_at = _make_created_at_dispenser(created_at)
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = (
@@ -758,12 +767,7 @@ class OpenAIService:
             # user-echo at the server. Subsequent messages in the same turn are
             # separated by network/processing latency and rely on the server's
             # wall clock.
-            _pending_created_at: list[datetime | None] = [created_at]
-
-            def _take_created_at() -> datetime | None:
-                value = _pending_created_at[0]
-                _pending_created_at[0] = None
-                return value
+            _take_created_at = _make_created_at_dispenser(created_at)
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
                 tools = (

@@ -85,7 +85,7 @@ class MessagesModule:
         """
         # Default created_at to workflow.now() so two awaited adk.messages.create
         # calls from the same workflow are guaranteed monotonic at the server.
-        if created_at is None and in_temporal_workflow():
+        if created_at is None:
             created_at = workflow_now_if_in_workflow()
         params = CreateMessageParams(
             trace_id=trace_id,
@@ -185,7 +185,7 @@ class MessagesModule:
         Returns:
             List[TaskMessageEntity]: The created messages.
         """
-        if created_at is None and in_temporal_workflow():
+        if created_at is None:
             created_at = workflow_now_if_in_workflow()
         params = CreateMessagesBatchParams(
             task_id=task_id,
