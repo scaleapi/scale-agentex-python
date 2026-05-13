@@ -13,6 +13,7 @@ from agentex.types import (
     MessageListResponse,
     MessageListPaginatedResponse,
 )
+from agentex._utils import parse_datetime
 
 from ..utils import assert_matches_type
 
@@ -55,6 +56,7 @@ class TestMessages:
                 "type": "text",
             },
             task_id="task_id",
+            created_at=parse_datetime("2019-12-27T18:11:19.117Z"),
             streaming_status="IN_PROGRESS",
         )
         assert_matches_type(TaskMessage, message, path=["response"])
@@ -360,6 +362,7 @@ class TestAsyncMessages:
                 "type": "text",
             },
             task_id="task_id",
+            created_at=parse_datetime("2019-12-27T18:11:19.117Z"),
             streaming_status="IN_PROGRESS",
         )
         assert_matches_type(TaskMessage, message, path=["response"])

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Dict, Iterable
+from typing import Dict, Union, Iterable
+from datetime import datetime
 
 import httpx
 
-from ..._types import Body, Query, Headers, NotGiven, not_given
+from ..._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
 from ..._utils import maybe_transform, async_maybe_transform
 from ..._compat import cached_property
 from ..._resource import SyncAPIResource, AsyncAPIResource
@@ -50,6 +51,7 @@ class BatchResource(SyncAPIResource):
         *,
         contents: Iterable[TaskMessageContentParam],
         task_id: str,
+        created_at: Union[str, datetime, None] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -57,10 +59,15 @@ class BatchResource(SyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> BatchCreateResponse:
-        """
-        Batch Create Messages
+        """Batch Create Messages
 
         Args:
+          created_at: Optional base timestamp.
+
+        Each message in the batch is stamped with base + i
+              milliseconds to guarantee unique, monotonic ordering. If omitted, the server
+              stamps datetime.now(UTC) at insert time.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -75,6 +82,7 @@ class BatchResource(SyncAPIResource):
                 {
                     "contents": contents,
                     "task_id": task_id,
+                    "created_at": created_at,
                 },
                 batch_create_params.BatchCreateParams,
             ),
@@ -149,6 +157,7 @@ class AsyncBatchResource(AsyncAPIResource):
         *,
         contents: Iterable[TaskMessageContentParam],
         task_id: str,
+        created_at: Union[str, datetime, None] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -156,10 +165,15 @@ class AsyncBatchResource(AsyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> BatchCreateResponse:
-        """
-        Batch Create Messages
+        """Batch Create Messages
 
         Args:
+          created_at: Optional base timestamp.
+
+        Each message in the batch is stamped with base + i
+              milliseconds to guarantee unique, monotonic ordering. If omitted, the server
+              stamps datetime.now(UTC) at insert time.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -174,6 +188,7 @@ class AsyncBatchResource(AsyncAPIResource):
                 {
                     "contents": contents,
                     "task_id": task_id,
+                    "created_at": created_at,
                 },
                 batch_create_params.BatchCreateParams,
             ),
