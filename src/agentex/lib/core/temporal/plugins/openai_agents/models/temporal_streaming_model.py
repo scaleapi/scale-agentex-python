@@ -1,6 +1,7 @@
 """Custom Temporal Model Provider with streaming support for OpenAI agents."""
 from __future__ import annotations
 
+import time
 import uuid
 from typing import Any, List, Union, Optional, override
 
@@ -31,6 +32,8 @@ from agents.computer import Computer, AsyncComputer
 # Re-export the canonical StreamingMode literal from the streaming service so
 # all layers share a single definition.
 from agentex.lib.core.services.adk.streaming import StreamingMode as StreamingMode
+from agentex.lib.core.observability.llm_metrics import get_llm_metrics
+from agentex.lib.core.observability.llm_metrics_hooks import record_llm_failure
 
 try:
     from agents.tool import ShellTool  # type: ignore[attr-defined]
@@ -76,6 +79,11 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 # name "agentex.temporal.streaming" so any external logging config targeting
 # that name keeps working.
 logger = make_logger("agentex.temporal.streaming")
+
+
+# LLM metrics live in agentex.lib.core.observability.llm_metrics so other
+# code paths (sync ACP, Claude SDK plugin, future provider integrations)
+# can share the same instrument definitions without redefining names.
 
 
 def _serialize_item(item: Any) -> dict[str, Any]:
@@ -592,7 +600,11 @@ class TemporalStreamingModel(Model):
                 # endpoints recognize this parameter, so we don't auto-inject a default.
                 prompt_cache_key = extra_args.pop("prompt_cache_key", NOT_GIVEN)
 
-                # Create the response stream using Responses API
+                # Create the response stream using Responses API.
+                # Bookmark request start *before* the await so ttft captures the full
+                # user-perceived latency (HTTP round-trip + model TTFB), not just the
+                # post-connect event-loop delay.
+                stream_start_perf = time.perf_counter()
                 logger.debug(f"[TemporalStreamingModel] Creating response stream with Responses API")
                 stream = await self.client.responses.create(  # type: ignore[call-overload]
 
@@ -642,6 +654,16 @@ class TemporalStreamingModel(Model):
                 reasoning_summaries = []
                 reasoning_contents = []
                 event_count = 0
+                # ttft / ttat / tps instrumentation. ``stream_start_perf`` is set
+                # above, before the responses.create() await, so it captures the full
+                # request-to-first-token latency. ``first_token_at`` and
+                # ``last_token_at`` bracket the model-generation window for tps.
+                # ``first_answer_at`` is set on the first user-visible answer token
+                # (text or tool-call delta) and excludes reasoning chunks, so ttat
+                # measures the latency users actually perceive on reasoning models.
+                first_token_at: Optional[float] = None
+                last_token_at: Optional[float] = None
+                first_answer_at: Optional[float] = None
 
                 # We expect task_id to always be provided for streaming
                 if not task_id:
@@ -655,6 +677,28 @@ class TemporalStreamingModel(Model):
 
                     # Log event type
                     logger.debug(f"[TemporalStreamingModel] Event {event_count}: {type(event).__name__}")
+
+                    # Bookmark first/last token-producing events for ttft and tps.
+                    # Includes function-call argument deltas so the generation window
+                    # covers every event type whose tokens land in usage.output_tokens.
+                    if isinstance(event, (
+                        ResponseTextDeltaEvent,
+                        ResponseReasoningTextDeltaEvent,
+                        ResponseReasoningSummaryTextDeltaEvent,
+                        ResponseFunctionCallArgumentsDeltaEvent,
+                    )):
+                        now_perf = time.perf_counter()
+                        if first_token_at is None:
+                            first_token_at = now_perf
+                        last_token_at = now_perf
+                        # ttat: first user-visible answer token (text or tool call),
+                        # excluding reasoning chunks. Equal to ttft for non-reasoning
+                        # models; differs by reasoning duration for reasoning models.
+                        if first_answer_at is None and isinstance(event, (
+                            ResponseTextDeltaEvent,
+                            ResponseFunctionCallArgumentsDeltaEvent,
+                        )):
+                            first_answer_at = now_perf
 
                     # Handle different event types using isinstance for type safety
                     if isinstance(event, ResponseOutputItemAddedEvent):
@@ -983,6 +1027,25 @@ class TemporalStreamingModel(Model):
 
                     span.output = output_data
 
+                # Streaming-only metrics. Token counters and the success request
+                # counter are emitted by LLMMetricsHooks.on_llm_end so they fire
+                # consistently across streaming and non-streaming paths.
+                m = get_llm_metrics()
+                metric_attrs = {"model": self.model_name}
+                if first_token_at is not None:
+                    m.ttft_ms.record((first_token_at - stream_start_perf) * 1000, metric_attrs)
+                if first_answer_at is not None:
+                    m.ttat_ms.record((first_answer_at - stream_start_perf) * 1000, metric_attrs)
+                # Single-token responses collapse the generation window to 0; tps
+                # is undefined and skipped.
+                if (
+                    first_token_at is not None
+                    and last_token_at is not None
+                    and last_token_at > first_token_at
+                    and (usage.output_tokens or 0) > 0
+                ):
+                    m.tps.record(usage.output_tokens / (last_token_at - first_token_at), metric_attrs)
+
                 # Return the response. response_id is the server-issued id from
                 # ResponseCompletedEvent.response.id, or None when the stream ended
                 # without a completed event (error path) — matching the documented
@@ -998,6 +1061,10 @@ class TemporalStreamingModel(Model):
 
             except Exception as e:
                 logger.error(f"Error using Responses API: {e}")
+                # LLMMetricsHooks.on_llm_end doesn't fire on error, so emit the
+                # failure counter here. Best-effort so the typed LLM exception
+                # always propagates intact for retry / circuit-breaker logic.
+                record_llm_failure(self.model_name, e)
                 raise
 
     # The _get_response_with_responses_api method has been merged into get_response above
