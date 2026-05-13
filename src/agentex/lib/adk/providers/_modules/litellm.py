@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator
 from temporalio.common import RetryPolicy
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.lib.utils.temporal import in_temporal_workflow, workflow_now_if_in_workflow
 from agentex.types.task_message import TaskMessage
 from agentex.lib.types.llm_messages import LLMConfig, Completion
 from agentex.lib.core.tracing.tracer import AsyncTracer
@@ -88,9 +88,7 @@ class LiteLLMModule:
             Completion: An OpenAI compatible Completion object
         """
         if in_temporal_workflow():
-            params = ChatCompletionParams(
-                trace_id=trace_id, parent_span_id=parent_span_id, llm_config=llm_config
-            )
+            params = ChatCompletionParams(trace_id=trace_id, parent_span_id=parent_span_id, llm_config=llm_config)
             return await ActivityHelpers.execute_activity(
                 activity_name=LiteLLMActivityName.CHAT_COMPLETION,
                 request=params,
@@ -138,6 +136,7 @@ class LiteLLMModule:
                 parent_span_id=parent_span_id,
                 task_id=task_id,
                 llm_config=llm_config,
+                created_at=workflow_now_if_in_workflow(),
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=LiteLLMActivityName.CHAT_COMPLETION_AUTO_SEND,
@@ -222,6 +221,7 @@ class LiteLLMModule:
                 parent_span_id=parent_span_id,
                 task_id=task_id,
                 llm_config=llm_config,
+                created_at=workflow_now_if_in_workflow(),
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=LiteLLMActivityName.CHAT_COMPLETION_STREAM_AUTO_SEND,

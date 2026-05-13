@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 from enum import Enum
 from typing import Any, Literal, Optional
+from datetime import datetime
 from contextlib import AsyncExitStack, asynccontextmanager
 from collections.abc import Callable
 
@@ -455,12 +456,14 @@ class RunAgentAutoSendParams(RunAgentParams):
     """Parameters for running an agent with automatic TaskMessage creation."""
 
     task_id: str
+    created_at: datetime | None = None
 
 
 class RunAgentStreamedAutoSendParams(RunAgentParams):
     """Parameters for running an agent with streaming and automatic TaskMessage creation."""
 
     task_id: str
+    created_at: datetime | None = None
 
 
 @asynccontextmanager
@@ -555,6 +558,7 @@ class OpenAIActivities:
                 mcp_timeout_seconds=params.mcp_timeout_seconds,
                 max_turns=params.max_turns,
                 previous_response_id=params.previous_response_id,
+                created_at=params.created_at,
             )
             return self._to_serializable_run_result(result)
         except InputGuardrailTripwireTriggered as e:
@@ -628,6 +632,7 @@ class OpenAIActivities:
                 mcp_timeout_seconds=params.mcp_timeout_seconds,
                 max_turns=params.max_turns,
                 previous_response_id=params.previous_response_id,
+                created_at=params.created_at,
             )
             return self._to_serializable_run_result_streaming(result)
         except InputGuardrailTripwireTriggered as e:

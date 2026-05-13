@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from collections.abc import AsyncGenerator
 
 from agentex import AsyncAgentex
@@ -63,6 +64,7 @@ class LiteLLMService:
         llm_config: LLMConfig,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
+        created_at: datetime | None = None,
     ) -> TaskMessage | None:
         """
         Chat completion with automatic TaskMessage creation. This does not stream the completion. To stream use chat_completion_stream_auto_send.
@@ -98,13 +100,10 @@ class LiteLLMService:
                     content="",
                     format="markdown",
                 ),
+                created_at=created_at,
             ) as streaming_context:
                 completion = await self.llm_gateway.acompletion(**llm_config.model_dump())
-                if (
-                    completion.choices
-                    and len(completion.choices) > 0
-                    and completion.choices[0].message
-                ):
+                if completion.choices and len(completion.choices) > 0 and completion.choices[0].message:
                     final_content = TextContent(
                         author="agent",
                         content=completion.choices[0].message.content or "",
@@ -159,9 +158,7 @@ class LiteLLMService:
         ) as span:
             # Direct streaming outside temporal - yield each chunk as it comes
             chunks: list[Completion] = []
-            async for chunk in self.llm_gateway.acompletion_stream(
-                **llm_config.model_dump()
-            ):
+            async for chunk in self.llm_gateway.acompletion_stream(**llm_config.model_dump()):
                 chunks.append(chunk)
                 yield chunk
             if span:
@@ -173,6 +170,7 @@ class LiteLLMService:
         llm_config: LLMConfig,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
+        created_at: datetime | None = None,
     ) -> TaskMessage | None:
         """
         Stream chat completion with automatic TaskMessage creation and streaming.
@@ -206,18 +204,13 @@ class LiteLLMService:
                     content="",
                     format="markdown",
                 ),
+                created_at=created_at,
             ) as streaming_context:
                 # Get the streaming response
                 chunks = []
-                async for response in self.llm_gateway.acompletion_stream(
-                    **llm_config.model_dump()
-                ):
+                async for response in self.llm_gateway.acompletion_stream(**llm_config.model_dump()):
                     heartbeat_if_in_workflow("chat completion streaming")
-                    if (
-                        response.choices
-                        and len(response.choices) > 0
-                        and response.choices[0].delta
-                    ):
+                    if response.choices and len(response.choices) > 0 and response.choices[0].delta:
                         delta = response.choices[0].delta.content
                         if delta:
                             # Stream the chunk via the context manager
@@ -235,11 +228,7 @@ class LiteLLMService:
 
                 # Update the final message content
                 complete_message = concat_completion_chunks(chunks)
-                if (
-                    complete_message
-                    and complete_message.choices
-                    and complete_message.choices[0].message
-                ):
+                if complete_message and complete_message.choices and complete_message.choices[0].message:
                     final_content = TextContent(
                         author="agent",
                         content=complete_message.choices[0].message.content or "",

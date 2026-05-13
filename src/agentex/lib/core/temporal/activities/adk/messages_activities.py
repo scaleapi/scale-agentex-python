@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from datetime import datetime
 
 from temporalio import activity
 
@@ -25,6 +26,7 @@ class CreateMessageParams(BaseModelWithTraceParams):
     task_id: str
     content: TaskMessageContent
     emit_updates: bool = True
+    created_at: datetime | None = None
 
 
 class UpdateMessageParams(BaseModelWithTraceParams):
@@ -37,6 +39,7 @@ class CreateMessagesBatchParams(BaseModelWithTraceParams):
     task_id: str
     contents: list[TaskMessageContent]
     emit_updates: bool = True
+    created_at: datetime | None = None
 
 
 class UpdateMessagesBatchParams(BaseModelWithTraceParams):
@@ -59,6 +62,7 @@ class MessagesActivities:
             task_id=params.task_id,
             content=params.content,
             emit_updates=params.emit_updates,
+            created_at=params.created_at,
         )
 
     @activity.defn(name=MessagesActivityName.UPDATE_MESSAGE)
@@ -70,19 +74,16 @@ class MessagesActivities:
         )
 
     @activity.defn(name=MessagesActivityName.CREATE_MESSAGES_BATCH)
-    async def create_messages_batch(
-        self, params: CreateMessagesBatchParams
-    ) -> list[TaskMessage]:
+    async def create_messages_batch(self, params: CreateMessagesBatchParams) -> list[TaskMessage]:
         return await self._messages_service.create_messages_batch(
             task_id=params.task_id,
             contents=params.contents,
             emit_updates=params.emit_updates,
+            created_at=params.created_at,
         )
 
     @activity.defn(name=MessagesActivityName.UPDATE_MESSAGES_BATCH)
-    async def update_messages_batch(
-        self, params: UpdateMessagesBatchParams
-    ) -> list[TaskMessage]:
+    async def update_messages_batch(self, params: UpdateMessagesBatchParams) -> list[TaskMessage]:
         return await self._messages_service.update_messages_batch(
             task_id=params.task_id,
             updates=params.updates,

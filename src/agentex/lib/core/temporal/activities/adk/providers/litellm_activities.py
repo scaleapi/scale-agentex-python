@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from datetime import datetime
 
 from temporalio import activity
 
@@ -27,11 +28,13 @@ class ChatCompletionParams(BaseModelWithTraceParams):
 class ChatCompletionAutoSendParams(BaseModelWithTraceParams):
     task_id: str
     llm_config: LLMConfig
+    created_at: datetime | None = None
 
 
 class ChatCompletionStreamAutoSendParams(BaseModelWithTraceParams):
     task_id: str
     llm_config: LLMConfig
+    created_at: datetime | None = None
 
 
 class LiteLLMActivities:
@@ -56,12 +59,11 @@ class LiteLLMActivities:
             llm_config=params.llm_config,
             trace_id=params.trace_id,
             parent_span_id=params.parent_span_id,
+            created_at=params.created_at,
         )
 
     @activity.defn(name=LiteLLMActivityName.CHAT_COMPLETION_STREAM_AUTO_SEND)
-    async def chat_completion_stream_auto_send(
-        self, params: ChatCompletionStreamAutoSendParams
-    ) -> TaskMessage | None:
+    async def chat_completion_stream_auto_send(self, params: ChatCompletionStreamAutoSendParams) -> TaskMessage | None:
         """
         Activity for streaming chat completion with automatic TaskMessage creation.
         """
@@ -70,4 +72,5 @@ class LiteLLMActivities:
             llm_config=params.llm_config,
             trace_id=params.trace_id,
             parent_span_id=params.parent_span_id,
+            created_at=params.created_at,
         )
