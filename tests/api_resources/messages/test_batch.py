@@ -9,6 +9,7 @@ import pytest
 
 from agentex import Agentex, AsyncAgentex
 from tests.utils import assert_matches_type
+from agentex._utils import parse_datetime
 from agentex.types.messages import BatchCreateResponse, BatchUpdateResponse
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
@@ -29,6 +30,32 @@ class TestBatch:
                 }
             ],
             task_id="task_id",
+        )
+        assert_matches_type(BatchCreateResponse, batch, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_method_create_with_all_params(self, client: Agentex) -> None:
+        batch = client.messages.batch.create(
+            contents=[
+                {
+                    "author": "user",
+                    "content": "content",
+                    "attachments": [
+                        {
+                            "file_id": "file_id",
+                            "name": "name",
+                            "size": 0,
+                            "type": "type",
+                        }
+                    ],
+                    "format": "markdown",
+                    "style": "static",
+                    "type": "text",
+                }
+            ],
+            task_id="task_id",
+            created_at=parse_datetime("2019-12-27T18:11:19.117Z"),
         )
         assert_matches_type(BatchCreateResponse, batch, path=["response"])
 
@@ -145,6 +172,32 @@ class TestAsyncBatch:
                 }
             ],
             task_id="task_id",
+        )
+        assert_matches_type(BatchCreateResponse, batch, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_create_with_all_params(self, async_client: AsyncAgentex) -> None:
+        batch = await async_client.messages.batch.create(
+            contents=[
+                {
+                    "author": "user",
+                    "content": "content",
+                    "attachments": [
+                        {
+                            "file_id": "file_id",
+                            "name": "name",
+                            "size": 0,
+                            "type": "type",
+                        }
+                    ],
+                    "format": "markdown",
+                    "style": "static",
+                    "type": "text",
+                }
+            ],
+            task_id="task_id",
+            created_at=parse_datetime("2019-12-27T18:11:19.117Z"),
         )
         assert_matches_type(BatchCreateResponse, batch, path=["response"])
 

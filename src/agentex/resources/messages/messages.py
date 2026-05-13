@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Union, Optional
+from datetime import datetime
 from typing_extensions import Literal
 
 import httpx
@@ -69,6 +70,7 @@ class MessagesResource(SyncAPIResource):
         *,
         content: TaskMessageContentParam,
         task_id: str,
+        created_at: Union[str, datetime, None] | Omit = omit,
         streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -77,10 +79,17 @@ class MessagesResource(SyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskMessage:
-        """
-        Create Message
+        """Create Message
 
         Args:
+          created_at: Optional timestamp for the message.
+
+        Workflow callers should pass workflow.now()
+              (Temporal's deterministic monotonic clock) so that two awaited messages.create
+              calls from the same workflow are guaranteed to have monotonic timestamps
+              regardless of HTTP scheduling at the server. If omitted, the server's wall clock
+              at insert time is used.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -95,6 +104,7 @@ class MessagesResource(SyncAPIResource):
                 {
                     "content": content,
                     "task_id": task_id,
+                    "created_at": created_at,
                     "streaming_status": streaming_status,
                 },
                 message_create_params.MessageCreateParams,
@@ -1333,6 +1343,7 @@ class AsyncMessagesResource(AsyncAPIResource):
         *,
         content: TaskMessageContentParam,
         task_id: str,
+        created_at: Union[str, datetime, None] | Omit = omit,
         streaming_status: Optional[Literal["IN_PROGRESS", "DONE"]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -1341,10 +1352,17 @@ class AsyncMessagesResource(AsyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskMessage:
-        """
-        Create Message
+        """Create Message
 
         Args:
+          created_at: Optional timestamp for the message.
+
+        Workflow callers should pass workflow.now()
+              (Temporal's deterministic monotonic clock) so that two awaited messages.create
+              calls from the same workflow are guaranteed to have monotonic timestamps
+              regardless of HTTP scheduling at the server. If omitted, the server's wall clock
+              at insert time is used.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -1359,6 +1377,7 @@ class AsyncMessagesResource(AsyncAPIResource):
                 {
                     "content": content,
                     "task_id": task_id,
+                    "created_at": created_at,
                     "streaming_status": streaming_status,
                 },
                 message_create_params.MessageCreateParams,
