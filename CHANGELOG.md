@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.11.1 (2026-05-13)
+
+Full Changelog: [v0.11.0...v0.11.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.0...v0.11.1)
+
+### ⚠ BREAKING CHANGES
+
+* remove AgentexTracingProcessor from default tracing processors ([#349](https://github.com/scaleapi/scale-agentex-python/issues/349))
+
+### Features
+
+* **api:** add models for event requests, surface created_at for messages ([1998d73](https://github.com/scaleapi/scale-agentex-python/commit/1998d73741ed32f6e527d847a7c951a6f880cab9))
+* **api:** api update ([da06505](https://github.com/scaleapi/scale-agentex-python/commit/da065051e22cd49f7d47facd33db5bbb50d61f6d))
+* **api:** revert model additions ([a02c15b](https://github.com/scaleapi/scale-agentex-python/commit/a02c15bfe1169a84d59647d409755d7bfcc029d0))
+* **internal/types:** support eagerly validating pydantic iterators ([2c528c6](https://github.com/scaleapi/scale-agentex-python/commit/2c528c6db24cb64b7fffadafe3e8c46f316f0d56))
+* remove AgentexTracingProcessor from default tracing processors ([#349](https://github.com/scaleapi/scale-agentex-python/issues/349)) ([73eca7a](https://github.com/scaleapi/scale-agentex-python/commit/73eca7ad620a7e0a8bd0180b9dee02a7dde12dbb))
+* **streaming:** emit OTel metrics for ttft, tps, token counts ([#347](https://github.com/scaleapi/scale-agentex-python/issues/347)) ([3bf7d1f](https://github.com/scaleapi/scale-agentex-python/commit/3bf7d1f32f95e1346cdc823e3d1f4f027635e2dd))
+
+
+### Bug Fixes
+
+* **client:** add missing f-string prefix in file type error message ([dcb1cb4](https://github.com/scaleapi/scale-agentex-python/commit/dcb1cb489bc565828c16c327c5ab6b678b13c0fa))
+* render .env.example template in agentex init ([#351](https://github.com/scaleapi/scale-agentex-python/issues/351)) ([6092595](https://github.com/scaleapi/scale-agentex-python/commit/6092595fa8a267b2c305baba09e2682c04d593b3))
+* **tracing:** make SGP processor stateless to stop dropping span closes ([#354](https://github.com/scaleapi/scale-agentex-python/issues/354)) ([5e9f28d](https://github.com/scaleapi/scale-agentex-python/commit/5e9f28d2f1453b3b6faf993acf9f67a6fd098952))
+* wire SGP_CLIENT_BASE_URL and silence openai-agents tracer in templates ([#352](https://github.com/scaleapi/scale-agentex-python/issues/352)) ([870324e](https://github.com/scaleapi/scale-agentex-python/commit/870324e7bb87cefc20a79dc344d8603a836ca9b5))
+
 ## 0.11.0 (2026-05-07)
 
 Full Changelog: [v0.10.5...v0.11.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.10.5...v0.11.0)
