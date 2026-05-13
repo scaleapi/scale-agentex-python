@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Literal
+from datetime import datetime
 from contextlib import AsyncExitStack, asynccontextmanager
 
 from mcp import StdioServerParameters
@@ -233,10 +234,14 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [
-                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
-                    for tool in tools
-                ] if tools else []
+                tools = (
+                    [
+                        tool.to_oai_function_tool() if hasattr(tool, "to_oai_function_tool") else tool  # type: ignore[attr-defined]
+                        for tool in tools
+                    ]
+                    if tools
+                    else []
+                )
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
 
                 agent_kwargs = {
@@ -252,7 +257,8 @@ class OpenAIService:
                 }
                 if model_settings is not None:
                     agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
+                        model_settings.to_oai_model_settings()  # type: ignore[attr-defined]
+                        if hasattr(model_settings, "to_oai_model_settings")
                         else model_settings
                     )
                 if input_guardrails is not None:
@@ -313,6 +319,7 @@ class OpenAIService:
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
         previous_response_id: str | None = None,  # noqa: ARG002
+        created_at: datetime | None = None,
     ) -> RunResult:
         """
         Run an agent with automatic TaskMessage creation.
@@ -370,11 +377,25 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent auto send")
 
+            # See run_agent_streamed_auto_send for the rationale: only the
+            # first message opened in this turn carries the workflow-supplied
+            # created_at; the rest fall back to server wall clock.
+            _pending_created_at: list[datetime | None] = [created_at]
+
+            def _take_created_at() -> datetime | None:
+                value = _pending_created_at[0]
+                _pending_created_at[0] = None
+                return value
+
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [
-                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
-                    for tool in tools
-                ] if tools else []
+                tools = (
+                    [
+                        tool.to_oai_function_tool() if hasattr(tool, "to_oai_function_tool") else tool  # type: ignore[attr-defined]
+                        for tool in tools
+                    ]
+                    if tools
+                    else []
+                )
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
@@ -389,7 +410,8 @@ class OpenAIService:
                 }
                 if model_settings is not None:
                     agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
+                        model_settings.to_oai_model_settings()  # type: ignore[attr-defined]
+                        if hasattr(model_settings, "to_oai_model_settings")
                         else model_settings
                     )
                 if input_guardrails is not None:
@@ -437,6 +459,7 @@ class OpenAIService:
                         async with self.streaming_service.streaming_task_message_context(
                             task_id=task_id,
                             initial_content=text_content,
+                            created_at=_take_created_at(),
                         ) as streaming_context:
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageFull(
@@ -464,6 +487,7 @@ class OpenAIService:
                         async with self.streaming_service.streaming_task_message_context(
                             task_id=task_id,
                             initial_content=tool_request_content,
+                            created_at=_take_created_at(),
                         ) as streaming_context:
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageFull(
@@ -487,7 +511,9 @@ class OpenAIService:
                         )
                         # Create tool response using streaming context
                         async with self.streaming_service.streaming_task_message_context(
-                            task_id=task_id, initial_content=tool_response_content
+                            task_id=task_id,
+                            initial_content=tool_response_content,
+                            created_at=_take_created_at(),
                         ) as streaming_context:
                             await streaming_context.stream_update(
                                 update=StreamTaskMessageFull(
@@ -577,10 +603,14 @@ class OpenAIService:
             heartbeat_if_in_workflow("run agent streamed")
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [
-                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
-                    for tool in tools
-                ] if tools else []
+                tools = (
+                    [
+                        tool.to_oai_function_tool() if hasattr(tool, "to_oai_function_tool") else tool  # type: ignore[attr-defined]
+                        for tool in tools
+                    ]
+                    if tools
+                    else []
+                )
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
@@ -595,7 +625,8 @@ class OpenAIService:
                 }
                 if model_settings is not None:
                     agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
+                        model_settings.to_oai_model_settings()  # type: ignore[attr-defined]
+                        if hasattr(model_settings, "to_oai_model_settings")
                         else model_settings
                     )
                 if input_guardrails is not None:
@@ -656,6 +687,7 @@ class OpenAIService:
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
         previous_response_id: str | None = None,  # noqa: ARG002
+        created_at: datetime | None = None,
     ) -> RunResultStreaming:
         """
         Run an agent with streaming enabled and automatic TaskMessage creation.
@@ -720,11 +752,28 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent streamed auto send")
 
+            # Consume the workflow-supplied created_at on the FIRST message
+            # opened by this activity (whichever streaming context opens first
+            # for this turn). That's the message that races the workflow's
+            # user-echo at the server. Subsequent messages in the same turn are
+            # separated by network/processing latency and rely on the server's
+            # wall clock.
+            _pending_created_at: list[datetime | None] = [created_at]
+
+            def _take_created_at() -> datetime | None:
+                value = _pending_created_at[0]
+                _pending_created_at[0] = None
+                return value
+
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
-                tools = [
-                    tool.to_oai_function_tool() if hasattr(tool, 'to_oai_function_tool') else tool  # type: ignore[attr-defined]
-                    for tool in tools
-                ] if tools else []
+                tools = (
+                    [
+                        tool.to_oai_function_tool() if hasattr(tool, "to_oai_function_tool") else tool  # type: ignore[attr-defined]
+                        for tool in tools
+                    ]
+                    if tools
+                    else []
+                )
                 handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
                 agent_kwargs = {
                     "name": agent_name,
@@ -739,7 +788,8 @@ class OpenAIService:
                 }
                 if model_settings is not None:
                     agent_kwargs["model_settings"] = (
-                        model_settings.to_oai_model_settings() if hasattr(model_settings, 'to_oai_model_settings')  # type: ignore[attr-defined]
+                        model_settings.to_oai_model_settings()  # type: ignore[attr-defined]
+                        if hasattr(model_settings, "to_oai_model_settings")
                         else model_settings
                     )
                 if input_guardrails is not None:
@@ -784,6 +834,7 @@ class OpenAIService:
                                 async with self.streaming_service.streaming_task_message_context(
                                     task_id=task_id,
                                     initial_content=tool_request_content,
+                                    created_at=_take_created_at(),
                                 ) as streaming_context:
                                     # The message has already been persisted, but we still need to send an upda
                                     await streaming_context.stream_update(
@@ -811,7 +862,9 @@ class OpenAIService:
 
                                 # Create tool response using streaming context (immediate completion)
                                 async with self.streaming_service.streaming_task_message_context(
-                                    task_id=task_id, initial_content=tool_response_content
+                                    task_id=task_id,
+                                    initial_content=tool_response_content,
+                                    created_at=_take_created_at(),
                                 ) as streaming_context:
                                     # The message has already been persisted, but we still need to send an update
                                     await streaming_context.stream_update(
@@ -836,6 +889,7 @@ class OpenAIService:
                                             author="agent",
                                             content="",
                                         ),
+                                        created_at=_take_created_at(),
                                     )
                                     # Open the streaming context
                                     item_id_to_streaming_context[item_id] = await streaming_context.open()
@@ -855,10 +909,10 @@ class OpenAIService:
                             elif isinstance(event.data, ResponseReasoningSummaryPartAddedEvent):
                                 # We need to create a new streaming context for this reasoning item
                                 item_id = event.data.item_id
-                                
+
                                 # Reset the reasoning summary string
                                 current_reasoning_summary = ""
-                                
+
                                 streaming_context = self.streaming_service.streaming_task_message_context(
                                     task_id=task_id,
                                     initial_content=ReasoningContent(
@@ -868,13 +922,14 @@ class OpenAIService:
                                         type="reasoning",
                                         style="active",
                                     ),
+                                    created_at=_take_created_at(),
                                 )
 
                                 # Replace the existing streaming context (if it exists)
                                 # Why do we replace? Cause all the reasoning parts use the same item_id!
                                 item_id_to_streaming_context[item_id] = await streaming_context.open()
                                 unclosed_item_ids.add(item_id)
-                            
+
                             # Reasoning step two: handling summary text delta
                             elif isinstance(event.data, ResponseReasoningSummaryTextDeltaEvent):
                                 # Accumulate the delta into the string
@@ -898,7 +953,7 @@ class OpenAIService:
                             elif isinstance(event.data, ResponseReasoningSummaryPartDoneEvent):
                                 # Handle reasoning summary text completion
                                 streaming_context = item_id_to_streaming_context[item_id]
-                                
+
                                 # Create the complete reasoning content with the accumulated summary
                                 complete_reasoning_content = ReasoningContent(
                                     author="agent",
@@ -907,7 +962,7 @@ class OpenAIService:
                                     type="reasoning",
                                     style="static",
                                 )
-                                
+
                                 # Send a full message update with the complete reasoning content
                                 await streaming_context.stream_update(
                                     update=StreamTaskMessageFull(
@@ -916,10 +971,9 @@ class OpenAIService:
                                         type="full",
                                     ),
                                 )
-                                
+
                                 await streaming_context.close()
                                 unclosed_item_ids.discard(item_id)
-                                
 
                             elif isinstance(event.data, ResponseOutputItemDoneEvent):
                                 # Handle item completion
@@ -966,6 +1020,7 @@ class OpenAIService:
                             author="agent",
                             content=rejection_message,
                         ),
+                        created_at=_take_created_at(),
                     ) as streaming_context:
                         # Send the full message
                         await streaming_context.stream_update(
@@ -1004,6 +1059,7 @@ class OpenAIService:
                             author="agent",
                             content=rejection_message,
                         ),
+                        created_at=_take_created_at(),
                     ) as streaming_context:
                         # Send the full message
                         await streaming_context.stream_update(

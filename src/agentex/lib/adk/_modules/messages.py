@@ -1,7 +1,7 @@
 # ruff: noqa: I001
 # Import order matters - AsyncTracer must come after client import to avoid circular imports
 from __future__ import annotations
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from temporalio.common import RetryPolicy
 
@@ -22,7 +22,7 @@ from agentex.lib.core.temporal.activities.adk.messages_activities import (
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task_message import TaskMessage, TaskMessageContent
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.lib.utils.temporal import in_temporal_workflow, workflow_now_if_in_workflow
 
 logger = make_logger(__name__)
 
@@ -66,6 +66,7 @@ class MessagesModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+        created_at: datetime | None = None,
     ) -> TaskMessage:
         """
         Create a new message for a task.
@@ -82,12 +83,17 @@ class MessagesModule:
         Returns:
             TaskMessageEntity: The created message.
         """
+        # Default created_at to workflow.now() so two awaited adk.messages.create
+        # calls from the same workflow are guaranteed monotonic at the server.
+        if created_at is None and in_temporal_workflow():
+            created_at = workflow_now_if_in_workflow()
         params = CreateMessageParams(
             trace_id=trace_id,
             parent_span_id=parent_span_id,
             task_id=task_id,
             content=content,
             emit_updates=emit_updates,
+            created_at=created_at,
         )
         if in_temporal_workflow():
             return await ActivityHelpers.execute_activity(
@@ -103,6 +109,7 @@ class MessagesModule:
                 task_id=task_id,
                 content=content,
                 emit_updates=emit_updates,
+                created_at=created_at,
             )
 
     async def update(
@@ -163,6 +170,7 @@ class MessagesModule:
         start_to_close_timeout: timedelta = timedelta(seconds=5),
         heartbeat_timeout: timedelta = timedelta(seconds=5),
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+        created_at: datetime | None = None,
     ) -> list[TaskMessage]:
         """
         Create a batch of messages for a task.
@@ -177,12 +185,15 @@ class MessagesModule:
         Returns:
             List[TaskMessageEntity]: The created messages.
         """
+        if created_at is None and in_temporal_workflow():
+            created_at = workflow_now_if_in_workflow()
         params = CreateMessagesBatchParams(
             task_id=task_id,
             contents=contents,
             emit_updates=emit_updates,
             trace_id=trace_id,
             parent_span_id=parent_span_id,
+            created_at=created_at,
         )
         if in_temporal_workflow():
             return await ActivityHelpers.execute_activity(
@@ -198,6 +209,7 @@ class MessagesModule:
                 task_id=task_id,
                 contents=contents,
                 emit_updates=emit_updates,
+                created_at=created_at,
             )
 
     async def update_batch(

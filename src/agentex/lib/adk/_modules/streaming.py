@@ -1,6 +1,7 @@
 # ruff: noqa: I001
 # Import order matters - AsyncTracer must come after client import to avoid circular imports
 from __future__ import annotations
+from datetime import datetime
 from temporalio.common import RetryPolicy
 
 from agentex import AsyncAgentex  # noqa: F401
@@ -52,6 +53,7 @@ class StreamingModule:
         task_id: str,
         initial_content: TaskMessageContent,
         streaming_mode: StreamingMode = "coalesced",
+        created_at: datetime | None = None,
     ) -> StreamingTaskMessageContext:
         """
         Create a streaming context for managing TaskMessage lifecycle.
@@ -83,4 +85,5 @@ class StreamingModule:
             task_id=task_id,
             initial_content=initial_content,
             streaming_mode=streaming_mode,
+            created_at=created_at,
         )
