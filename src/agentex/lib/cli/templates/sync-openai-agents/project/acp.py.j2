@@ -13,7 +13,12 @@ from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessa
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.types.text_content import TextContent
 from agentex.lib.utils.logging import make_logger
-from agents import Agent, Runner, RunConfig, function_tool
+from agents import Agent, Runner, RunConfig, function_tool, set_tracing_disabled
+
+# Disable the openai-agents SDK's native tracer so it doesn't ship traces to
+# api.openai.com using OPENAI_API_KEY (which may be a LiteLLM proxy key).
+# SGP tracing below still runs via the Agentex tracing manager.
+set_tracing_disabled(True)
 
 
 logger = make_logger(__name__)
@@ -25,12 +30,14 @@ if _litellm_key:
 
 SGP_API_KEY = os.environ.get("SGP_API_KEY", "")
 SGP_ACCOUNT_ID = os.environ.get("SGP_ACCOUNT_ID", "")
+SGP_CLIENT_BASE_URL = os.environ.get("SGP_CLIENT_BASE_URL", "")
 
 if SGP_API_KEY and SGP_ACCOUNT_ID:
     add_tracing_processor_config(
         SGPTracingProcessorConfig(
             sgp_api_key=SGP_API_KEY,
             sgp_account_id=SGP_ACCOUNT_ID,
+            sgp_base_url=SGP_CLIENT_BASE_URL,
         )
     )
 

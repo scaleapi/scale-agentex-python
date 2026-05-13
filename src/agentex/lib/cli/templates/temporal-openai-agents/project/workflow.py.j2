@@ -10,7 +10,13 @@ from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.environment_variables import EnvironmentVariables
-from agents import Agent, Runner
+from agents import Agent, Runner, set_tracing_disabled
+
+# Disable the openai-agents SDK's native tracer so it doesn't ship traces to
+# api.openai.com using OPENAI_API_KEY (which may be a LiteLLM proxy key).
+# SGP tracing below still runs via the Agentex tracing manager.
+set_tracing_disabled(True)
+
 from agentex.lib.core.temporal.plugins.openai_agents.hooks.hooks import TemporalStreamingHooks
 from pydantic import BaseModel
 from typing import List, Dict, Any
@@ -39,6 +45,7 @@ add_tracing_processor_config(
     SGPTracingProcessorConfig(
         sgp_api_key=os.environ.get("SGP_API_KEY", ""),
         sgp_account_id=os.environ.get("SGP_ACCOUNT_ID", ""),
+        sgp_base_url=os.environ.get("SGP_CLIENT_BASE_URL", ""),
     )
 )
 
