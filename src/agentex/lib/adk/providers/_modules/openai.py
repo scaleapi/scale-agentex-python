@@ -20,7 +20,7 @@ else:
     from typing_extensions import deprecated
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.temporal import in_temporal_workflow
+from agentex.lib.utils.temporal import in_temporal_workflow, workflow_now_if_in_workflow
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.types.agent_results import (
     SerializableRunResult,
@@ -265,6 +265,7 @@ class OpenAIModule:
                 output_guardrails=output_guardrails,  # type: ignore[arg-type]
                 max_turns=max_turns,
                 previous_response_id=previous_response_id,
+                created_at=workflow_now_if_in_workflow(),
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=OpenAIActivityName.RUN_AGENT_AUTO_SEND,
@@ -479,6 +480,7 @@ class OpenAIModule:
                 input_guardrails=input_guardrails,
                 output_guardrails=output_guardrails,
                 max_turns=max_turns,
+                created_at=workflow_now_if_in_workflow(),
             )
             return await ActivityHelpers.execute_activity(
                 activity_name=OpenAIActivityName.RUN_AGENT_STREAMED_AUTO_SEND,

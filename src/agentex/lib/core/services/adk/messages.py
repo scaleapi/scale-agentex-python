@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any, Coroutine
+from datetime import datetime
 
 from agentex import AsyncAgentex
+from agentex._types import omit
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
 from agentex.types.task_message import TaskMessage, TaskMessageContent
@@ -32,6 +34,7 @@ class MessagesService:
         emit_updates: bool = True,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
+        created_at: datetime | None = None,
     ) -> TaskMessage:
         trace = self._tracer.trace(trace_id)
         async with trace.span(
@@ -43,6 +46,7 @@ class MessagesService:
             task_message = await self._agentex_client.messages.create(
                 task_id=task_id,
                 content=content.model_dump(),
+                created_at=created_at if created_at is not None else omit,
             )
             if emit_updates:
                 await self._emit_updates([task_message])
@@ -85,6 +89,7 @@ class MessagesService:
         emit_updates: bool = True,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
+        created_at: datetime | None = None,
     ) -> list[TaskMessage]:
         trace = self._tracer.trace(trace_id)
         async with trace.span(
@@ -96,6 +101,7 @@ class MessagesService:
             task_messages = await self._agentex_client.messages.batch.create(
                 task_id=task_id,
                 contents=[content.model_dump() for content in contents],
+                created_at=created_at if created_at is not None else omit,
             )
             if emit_updates:
                 await self._emit_updates(task_messages)
@@ -119,10 +125,7 @@ class MessagesService:
             heartbeat_if_in_workflow("update messages batch")
             task_messages = await self._agentex_client.messages.batch.update(
                 task_id=task_id,
-                updates={
-                    message_id: content.model_dump()
-                    for message_id, content in updates.items()
-                },
+                updates={message_id: content.model_dump() for message_id, content in updates.items()},
             )
             if span:
                 span.output = [task_message.model_dump() for task_message in task_messages]

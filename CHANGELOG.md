@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.2 (2026-05-13)
+
+Full Changelog: [v0.11.1...v0.11.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.1...v0.11.2)
+
+### Bug Fixes
+
+* **messages:** stamp agent messages with workflow.now() for monotonic ordering ([#356](https://github.com/scaleapi/scale-agentex-python/issues/356)) ([afe5265](https://github.com/scaleapi/scale-agentex-python/commit/afe526509393d7f51e4edc261211792992ffee58))
+
 ## 0.11.1 (2026-05-13)
 
 Full Changelog: [v0.11.0...v0.11.1](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.0...v0.11.1)
