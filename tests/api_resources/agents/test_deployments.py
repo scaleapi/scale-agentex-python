@@ -8,7 +8,6 @@ from typing import Any, cast
 import pytest
 
 from agentex import Agentex, AsyncAgentex
-from tests.utils import assert_matches_type
 from agentex.types import AgentRpcResponse
 from agentex.types.agents import (
     DeploymentListResponse,
@@ -17,6 +16,8 @@ from agentex.types.agents import (
     DeploymentRetrieveResponse,
 )
 from agentex.types.shared import DeleteResponse
+
+from ...utils import assert_matches_type
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 

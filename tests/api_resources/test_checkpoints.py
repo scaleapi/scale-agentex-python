@@ -8,12 +8,13 @@ from typing import Any, Optional, cast
 import pytest
 
 from agentex import Agentex, AsyncAgentex
-from tests.utils import assert_matches_type
 from agentex.types import (
     CheckpointPutResponse,
     CheckpointListResponse,
     CheckpointGetTupleResponse,
 )
+
+from ..utils import assert_matches_type
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 
