@@ -40,9 +40,9 @@ from ...types.agent import Agent
 from ..._base_client import make_request_options
 from ...types.agent_rpc_response import (
     AgentRpcResponse,
+    SendEventResponse,
     CancelTaskResponse,
     CreateTaskResponse,
-    SendEventResponse,
     SendMessageResponse,
     SendMessageStreamResponse,
 )
