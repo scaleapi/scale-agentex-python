@@ -56,6 +56,14 @@ from .messages import (
     MessagesResourceWithStreamingResponse,
     AsyncMessagesResourceWithStreamingResponse,
 )
+from .checkpoints import (
+    CheckpointsResource,
+    AsyncCheckpointsResource,
+    CheckpointsResourceWithRawResponse,
+    AsyncCheckpointsResourceWithRawResponse,
+    CheckpointsResourceWithStreamingResponse,
+    AsyncCheckpointsResourceWithStreamingResponse,
+)
 from .deployment_history import (
     DeploymentHistoryResource,
     AsyncDeploymentHistoryResource,
@@ -114,4 +122,10 @@ __all__ = [
     "AsyncDeploymentHistoryResourceWithRawResponse",
     "DeploymentHistoryResourceWithStreamingResponse",
     "AsyncDeploymentHistoryResourceWithStreamingResponse",
+    "CheckpointsResource",
+    "AsyncCheckpointsResource",
+    "CheckpointsResourceWithRawResponse",
+    "AsyncCheckpointsResourceWithRawResponse",
+    "CheckpointsResourceWithStreamingResponse",
+    "AsyncCheckpointsResourceWithStreamingResponse",
 ]
