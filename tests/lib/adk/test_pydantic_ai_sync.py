@@ -23,6 +23,7 @@ from pydantic_ai.messages import (
     FunctionToolResultEvent,
 )
 
+from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.tool_request_delta import ToolRequestDelta
 from agentex.types.task_message_update import (
@@ -118,6 +119,12 @@ class TestThinkingStreaming:
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
 
         assert isinstance(out[0], StreamTaskMessageStart)
+        # Thinking content opens a ReasoningContent start, not a TextContent one,
+        # so the Start's content_type matches the ReasoningContentDelta updates
+        # that follow. Mismatched types here would render thinking as a plain
+        # text bubble (or break server-side accumulators) instead of a
+        # collapsible reasoning block.
+        assert isinstance(out[0].content, ReasoningContent)
         assert isinstance(out[1], StreamTaskMessageDelta)
         assert isinstance(out[1].delta, ReasoningContentDelta)
         assert out[1].delta.content_delta == "step 1..."

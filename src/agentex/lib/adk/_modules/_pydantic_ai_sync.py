@@ -46,6 +46,7 @@ from pydantic_ai.messages import (
 )
 
 from agentex.lib.utils.logging import make_logger
+from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.tool_request_delta import ToolRequestDelta
 from agentex.types.task_message_update import (
@@ -109,7 +110,7 @@ async def convert_pydantic_ai_to_agentex_events(
 
     Mapping:
         PartStartEvent(TextPart)       -> StreamTaskMessageStart(TextContent)
-        PartStartEvent(ThinkingPart)   -> StreamTaskMessageStart(TextContent)         [reasoning channel]
+        PartStartEvent(ThinkingPart)   -> StreamTaskMessageStart(ReasoningContent)
         PartStartEvent(ToolCallPart)   -> StreamTaskMessageStart(ToolRequestContent)
         PartDeltaEvent(TextPartDelta)  -> StreamTaskMessageDelta(TextDelta)
         PartDeltaEvent(ThinkingPart..) -> StreamTaskMessageDelta(ReasoningContentDelta)
@@ -171,10 +172,12 @@ async def convert_pydantic_ai_to_agentex_events(
                 yield StreamTaskMessageStart(
                     type="start",
                     index=message_index,
-                    content=TextContent(
-                        type="text",
+                    content=ReasoningContent(
+                        type="reasoning",
                         author="agent",
-                        content="",
+                        summary=[],
+                        content=[],
+                        style="active",
                     ),
                 )
                 if event.part.content:
