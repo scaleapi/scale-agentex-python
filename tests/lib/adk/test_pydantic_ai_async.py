@@ -532,6 +532,287 @@ class TestDeltaForOrphanIndexIgnored:
         assert final == ""
 
 
+class TestTracingHandler:
+    """Tracing handler hooks fire alongside streaming for each tool call."""
+
+    @dataclass
+    class _RecordingHandler:
+        starts: list[dict[str, Any]] = field(default_factory=list)
+        ends: list[dict[str, Any]] = field(default_factory=list)
+
+        async def on_tool_start(self, tool_call_id: str, tool_name: str, arguments: Any) -> None:
+            self.starts.append({"tool_call_id": tool_call_id, "tool_name": tool_name, "arguments": arguments})
+
+        async def on_tool_end(self, tool_call_id: str, result: Any) -> None:
+            self.ends.append({"tool_call_id": tool_call_id, "result": result})
+
+    async def test_handler_records_start_and_end_for_each_tool_call(
+        self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
+    ) -> None:
+        _, messages = fake_adk
+        handler = self._RecordingHandler()
+        events = [
+            PartStartEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1"),
+            ),
+            PartEndEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args='{"city":"Paris"}', tool_call_id="c1"),
+            ),
+            FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny", tool_call_id="c1"),
+            ),
+        ]
+        await stream_pydantic_ai_events(
+            _aiter(events),
+            TASK_ID,
+            tracing_handler=handler,  # type: ignore[arg-type]
+        )
+
+        # Streaming side-effects still happen — tracing is additive.
+        assert [type(m["content"]).__name__ for m in messages.created] == [
+            "ToolRequestContent",
+            "ToolResponseContent",
+        ]
+        # And both lifecycle hooks fired exactly once with the right payload.
+        assert handler.starts == [
+            {
+                "tool_call_id": "c1",
+                "tool_name": "get_weather",
+                "arguments": {"city": "Paris"},
+            }
+        ]
+        assert handler.ends == [{"tool_call_id": "c1", "result": "Sunny"}]
+
+    async def test_handler_not_called_when_no_tool_calls_in_stream(
+        self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
+    ) -> None:
+        handler = self._RecordingHandler()
+        events = [
+            PartStartEvent(index=0, part=TextPart(content="")),
+            PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="Hello")),
+            PartEndEvent(index=0, part=TextPart(content="Hello")),
+        ]
+        await stream_pydantic_ai_events(
+            _aiter(events),
+            TASK_ID,
+            tracing_handler=handler,  # type: ignore[arg-type]
+        )
+        assert handler.starts == []
+        assert handler.ends == []
+
+    async def test_handler_records_each_tool_in_multi_tool_run(
+        self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
+    ) -> None:
+        """A turn with two tool calls must produce two start/end pairs in order."""
+        handler = self._RecordingHandler()
+        events = [
+            PartStartEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1"),
+            ),
+            PartEndEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args="{}", tool_call_id="c1"),
+            ),
+            FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny", tool_call_id="c1"),
+            ),
+            PartStartEvent(
+                index=0,
+                part=ToolCallPart(tool_name="lookup_city", args=None, tool_call_id="c2"),
+            ),
+            PartEndEvent(
+                index=0,
+                part=ToolCallPart(tool_name="lookup_city", args="{}", tool_call_id="c2"),
+            ),
+            FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="lookup_city", content="Paris, FR", tool_call_id="c2"),
+            ),
+        ]
+        await stream_pydantic_ai_events(
+            _aiter(events),
+            TASK_ID,
+            tracing_handler=handler,  # type: ignore[arg-type]
+        )
+
+        assert [s["tool_call_id"] for s in handler.starts] == ["c1", "c2"]
+        assert [e["tool_call_id"] for e in handler.ends] == ["c1", "c2"]
+        assert handler.starts[0]["tool_name"] == "get_weather"
+        assert handler.starts[1]["tool_name"] == "lookup_city"
+
+    async def test_omitting_handler_is_a_no_op_for_existing_behavior(
+        self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
+    ) -> None:
+        """Regression: passing no tracing handler preserves the pre-tracing behavior."""
+        _, messages = fake_adk
+        events = [
+            PartStartEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1"),
+            ),
+            PartEndEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args="{}", tool_call_id="c1"),
+            ),
+            FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny", tool_call_id="c1"),
+            ),
+        ]
+        await stream_pydantic_ai_events(_aiter(events), TASK_ID)
+        # Exact same shape as before tracing existed.
+        assert [type(m["content"]).__name__ for m in messages.created] == [
+            "ToolRequestContent",
+            "ToolResponseContent",
+        ]
+
+
+class TestPydanticAITracingHandlerDeterministicIds:
+    """Regression coverage for ``AgentexPydanticAITracingHandler``.
+
+    pydantic-ai's ``TemporalAgent`` splits a single agent run across several
+    Temporal activities. The event_stream_handler is invoked once per
+    activity, with a fresh handler instance each time. So ``on_tool_start``
+    (during the model activity that issued the tool call) and ``on_tool_end``
+    (during the next model activity, after the tool ran) end up in DIFFERENT
+    handler instances — an in-memory dict can't pair them.
+
+    The fix is deterministic span IDs derived from ``(trace_id, tool_call_id)``.
+    These tests lock that in.
+    """
+
+    class _RecordingClient:
+        """Stand-in for ``AsyncAgentex`` capturing spans.create / spans.update calls."""
+
+        def __init__(self) -> None:
+            self.creates: list[dict[str, Any]] = []
+            self.updates: list[tuple[str, dict[str, Any]]] = []
+            self.spans = self  # so .spans.create / .spans.update resolve back here
+
+        async def create(self, **kwargs: Any) -> Any:
+            self.creates.append(kwargs)
+            return None
+
+        async def update(self, span_id: str, **kwargs: Any) -> Any:
+            self.updates.append((span_id, kwargs))
+            return None
+
+    async def test_same_tool_call_id_yields_same_span_id_across_handler_instances(
+        self,
+    ) -> None:
+        """The whole point of the design: two handler instances with the same
+        trace_id and tool_call_id resolve to the same span ID — otherwise
+        ``on_tool_end`` patches a different (non-existent) record and the span
+        in the DB never gets ``end_time`` / ``output``."""
+        from agentex.lib.adk._modules._pydantic_ai_tracing import (
+            AgentexPydanticAITracingHandler,
+        )
+
+        client_a = self._RecordingClient()
+        client_b = self._RecordingClient()
+
+        # Two independent handler instances — simulates the cross-activity
+        # invocation pattern in TemporalAgent.
+        handler_a = AgentexPydanticAITracingHandler(
+            trace_id="trace-1",
+            parent_span_id="parent-1",
+            task_id="task-1",
+            client=client_a,  # type: ignore[arg-type]
+        )
+        handler_b = AgentexPydanticAITracingHandler(
+            trace_id="trace-1",
+            parent_span_id="parent-1",
+            task_id="task-1",
+            client=client_b,  # type: ignore[arg-type]
+        )
+
+        await handler_a.on_tool_start(tool_call_id="call_abc", tool_name="get_weather", arguments={"city": "Paris"})
+        await handler_b.on_tool_end(tool_call_id="call_abc", result="Sunny, 72F")
+
+        assert len(client_a.creates) == 1
+        assert len(client_b.updates) == 1
+
+        created_span_id = client_a.creates[0]["id"]
+        updated_span_id = client_b.updates[0][0]
+        assert created_span_id == updated_span_id, (
+            "on_tool_start and on_tool_end must address the same span across handler "
+            "instances; mismatch means tool spans will be left open and the AgentEx UI "
+            "will hide their trace."
+        )
+
+    async def test_different_tool_call_ids_yield_different_span_ids(self) -> None:
+        from agentex.lib.adk._modules._pydantic_ai_tracing import (
+            AgentexPydanticAITracingHandler,
+        )
+
+        client = self._RecordingClient()
+        handler = AgentexPydanticAITracingHandler(
+            trace_id="trace-1",
+            client=client,  # type: ignore[arg-type]
+        )
+
+        await handler.on_tool_start("call_a", "get_weather", {"city": "Paris"})
+        await handler.on_tool_start("call_b", "get_weather", {"city": "Tokyo"})
+
+        ids = {c["id"] for c in client.creates}
+        assert len(ids) == 2, "Distinct tool_call_ids must map to distinct span IDs"
+
+    async def test_same_tool_call_id_in_different_traces_yields_different_span_ids(
+        self,
+    ) -> None:
+        """Span IDs are namespaced by trace_id so two unrelated runs with the
+        same provider-issued tool_call_id don't collide."""
+        from agentex.lib.adk._modules._pydantic_ai_tracing import (
+            AgentexPydanticAITracingHandler,
+        )
+
+        client = self._RecordingClient()
+        handler_t1 = AgentexPydanticAITracingHandler(trace_id="trace-1", client=client)  # type: ignore[arg-type]
+        handler_t2 = AgentexPydanticAITracingHandler(trace_id="trace-2", client=client)  # type: ignore[arg-type]
+
+        await handler_t1.on_tool_start("call_abc", "t", None)
+        await handler_t2.on_tool_start("call_abc", "t", None)
+
+        ids = {c["id"] for c in client.creates}
+        assert len(ids) == 2
+
+    async def test_on_tool_end_patches_only_end_time_and_output(self) -> None:
+        """Don't overwrite start_time, name, parent_id, etc. on close — only patch
+        the fields we have new values for. Sending start_time again could clobber
+        what was set at create time."""
+        from agentex.lib.adk._modules._pydantic_ai_tracing import (
+            AgentexPydanticAITracingHandler,
+        )
+
+        client = self._RecordingClient()
+        handler = AgentexPydanticAITracingHandler(trace_id="trace-1", client=client)  # type: ignore[arg-type]
+
+        await handler.on_tool_end("call_abc", "Sunny")
+
+        assert len(client.updates) == 1
+        _, patch_kwargs = client.updates[0]
+        assert set(patch_kwargs.keys()) == {"end_time", "output"}, (
+            f"Unexpected fields in tool span PATCH: {set(patch_kwargs.keys())}"
+        )
+        assert patch_kwargs["output"] == {"result": "Sunny"}
+
+    async def test_on_tool_error_patches_error_output(self) -> None:
+        from agentex.lib.adk._modules._pydantic_ai_tracing import (
+            AgentexPydanticAITracingHandler,
+        )
+
+        client = self._RecordingClient()
+        handler = AgentexPydanticAITracingHandler(trace_id="trace-1", client=client)  # type: ignore[arg-type]
+
+        await handler.on_tool_error("call_abc", RuntimeError("boom"))
+
+        assert len(client.updates) == 1
+        _, patch_kwargs = client.updates[0]
+        assert "error" in patch_kwargs["output"]
+        assert "boom" in patch_kwargs["output"]["error"]
+
+
 class TestCleanupOnException:
     async def test_open_contexts_are_closed_on_iterator_failure(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]

@@ -26,7 +26,10 @@ from pydantic_ai.messages import AgentStreamEvent
 from pydantic_ai.durable_exec.temporal import TemporalAgent
 
 from project.tools import get_weather
-from agentex.lib.adk import stream_pydantic_ai_events
+from agentex.lib.adk import (
+    stream_pydantic_ai_events,
+    create_pydantic_ai_tracing_handler,
+)
 
 MODEL_NAME = "openai:gpt-4o-mini"
 SYSTEM_PROMPT = """You are a helpful AI assistant with access to tools.
@@ -50,6 +53,9 @@ class TaskDeps(BaseModel):
     """
 
     task_id: str
+    # When set, the event handler nests per-tool-call spans under this
+    # span. Typically the ID of the per-turn span opened by the workflow.
+    parent_span_id: str | None = None
 
 
 def _build_base_agent() -> Agent[TaskDeps, str]:
@@ -76,9 +82,19 @@ async def event_handler(
     Pydantic AI calls this with the live event stream as soon as the model
     activity begins emitting parts. Because the handler runs inside the
     activity (not the workflow), it can freely make non-deterministic
-    Redis writes.
+    Redis writes — including the tracing HTTP calls that record per-tool-call
+    spans under the workflow's per-turn span (when ``parent_span_id`` is set).
     """
-    await stream_pydantic_ai_events(events, run_context.deps.task_id)
+    tracing_handler = create_pydantic_ai_tracing_handler(
+        trace_id=run_context.deps.task_id,
+        parent_span_id=run_context.deps.parent_span_id,
+        task_id=run_context.deps.task_id,
+    )
+    await stream_pydantic_ai_events(
+        events,
+        run_context.deps.task_id,
+        tracing_handler=tracing_handler,
+    )
 
 
 # Construct the durable agent at module load time so that the

@@ -15,7 +15,10 @@ load_dotenv()
 
 import agentex.lib.adk as adk
 from project.agent import create_agent
-from agentex.lib.adk import stream_pydantic_ai_events
+from agentex.lib.adk import (
+    stream_pydantic_ai_events,
+    create_pydantic_ai_tracing_handler,
+)
 from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
@@ -62,12 +65,18 @@ async def handle_task_event_send(params: SendEventParams):
 
     async with adk.tracing.span(
         trace_id=task_id,
+        task_id=task_id,
         name="message",
         input={"message": user_message},
         data={"__span_type__": "AGENT_WORKFLOW"},
     ) as turn_span:
+        tracing_handler = create_pydantic_ai_tracing_handler(
+            trace_id=task_id,
+            parent_span_id=turn_span.id if turn_span else None,
+            task_id=task_id,
+        )
         async with agent.run_stream_events(user_message) as stream:
-            final_output = await stream_pydantic_ai_events(stream, task_id)
+            final_output = await stream_pydantic_ai_events(stream, task_id, tracing_handler=tracing_handler)
 
         if turn_span:
             turn_span.output = {"final_output": final_output}

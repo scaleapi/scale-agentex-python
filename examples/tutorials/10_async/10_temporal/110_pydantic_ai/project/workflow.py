@@ -74,6 +74,7 @@ class At110PydanticAiWorkflow(BaseWorkflow):
 
         async with adk.tracing.span(
             trace_id=params.task.id,
+            task_id=params.task.id,
             name=f"Turn {self._turn_number}",
             input={"message": params.event.content.content},
         ) as span:
@@ -86,7 +87,10 @@ class At110PydanticAiWorkflow(BaseWorkflow):
             # temporal_agent pushes deltas to Redis so the UI sees tokens.
             result = await temporal_agent.run(
                 params.event.content.content,
-                deps=TaskDeps(task_id=params.task.id),
+                deps=TaskDeps(
+                    task_id=params.task.id,
+                    parent_span_id=span.id if span else None,
+                ),
             )
             if span:
                 span.output = {"final_output": result.output}

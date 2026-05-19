@@ -11,15 +11,37 @@ contexts. Tool requests and tool results are emitted as full
 helper's convention). To stream tool-call argument tokens, see the sync
 converter at ``agentex.lib.adk._modules._pydantic_ai_sync`` which yields
 ``ToolRequestDelta`` events.
+
+Tracing is opt-in via a ``tracing_handler`` parameter — see
+``create_pydantic_ai_tracing_handler`` in
+``agentex.lib.adk._modules._pydantic_ai_tracing``.
 """
 
+from __future__ import annotations
 
-async def stream_pydantic_ai_events(stream, task_id: str) -> str:
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agentex.lib.adk._modules._pydantic_ai_tracing import (
+        AgentexPydanticAITracingHandler,
+    )
+
+
+async def stream_pydantic_ai_events(
+    stream,
+    task_id: str,
+    tracing_handler: "AgentexPydanticAITracingHandler | None" = None,
+) -> str:
     """Stream Pydantic AI events to Agentex via Redis.
 
     Args:
         stream: Async iterator yielded by ``agent.run_stream_events(...)``.
         task_id: The Agentex task ID to stream messages to.
+        tracing_handler: Optional handler from
+            ``create_pydantic_ai_tracing_handler(...)``. When provided, each
+            tool call in the run is also recorded as an Agentex child span
+            beneath the handler's configured ``parent_span_id``. Streaming
+            behavior is unchanged when omitted.
 
     Returns:
         The accumulated text content of the **last** text part in the run.
@@ -197,6 +219,12 @@ async def stream_pydantic_ai_events(stream, task_id: str) -> str:
                             author="agent",
                         ),
                     )
+                    if tracing_handler is not None and tool_call_id:
+                        await tracing_handler.on_tool_start(
+                            tool_call_id=tool_call_id,
+                            tool_name=tool_name,
+                            arguments=args,
+                        )
 
             elif isinstance(event, FunctionToolResultEvent):
                 await _close_text()
@@ -221,6 +249,11 @@ async def stream_pydantic_ai_events(stream, task_id: str) -> str:
                         author="agent",
                     ),
                 )
+                if tracing_handler is not None and tool_call_id:
+                    await tracing_handler.on_tool_end(
+                        tool_call_id=tool_call_id,
+                        result=content_str,
+                    )
 
             # FunctionToolCallEvent / FinalResultEvent / AgentRunResultEvent
             # are intentionally ignored — same as the sync converter.

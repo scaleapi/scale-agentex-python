@@ -281,6 +281,90 @@ class TestToolCallStreaming:
         assert out[0].content.content == "bad arguments"
 
 
+class TestTracingHandlerSync:
+    """The sync converter has the same opt-in tracing-handler contract as the
+    async streamer: pass a handler and the converter calls ``on_tool_start`` /
+    ``on_tool_end`` for each tool call. Streaming yields are unchanged when
+    omitted."""
+
+    class _RecordingHandler:
+        def __init__(self) -> None:
+            self.starts: list[dict[str, Any]] = []
+            self.ends: list[dict[str, Any]] = []
+
+        async def on_tool_start(self, tool_call_id: str, tool_name: str, arguments: Any) -> None:
+            self.starts.append({"tool_call_id": tool_call_id, "tool_name": tool_name, "arguments": arguments})
+
+        async def on_tool_end(self, tool_call_id: str, result: Any) -> None:
+            self.ends.append({"tool_call_id": tool_call_id, "result": result})
+
+    async def test_handler_records_start_and_end_for_a_tool_call(self):
+        handler = self._RecordingHandler()
+        events = [
+            PartStartEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1"),
+            ),
+            PartEndEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args='{"city":"Paris"}', tool_call_id="c1"),
+            ),
+            FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny", tool_call_id="c1"),
+            ),
+        ]
+        out = await _collect(
+            convert_pydantic_ai_to_agentex_events(_aiter(events), tracing_handler=handler)  # type: ignore[arg-type]
+        )
+
+        # Streaming output is unchanged.
+        assert any(isinstance(e, StreamTaskMessageStart) for e in out)
+        assert any(isinstance(e, StreamTaskMessageFull) for e in out)
+
+        assert handler.starts == [
+            {
+                "tool_call_id": "c1",
+                "tool_name": "get_weather",
+                "arguments": {"city": "Paris"},
+            }
+        ]
+        assert handler.ends == [{"tool_call_id": "c1", "result": "Sunny"}]
+
+    async def test_handler_not_called_when_no_tool_calls(self):
+        handler = self._RecordingHandler()
+        events = [
+            PartStartEvent(index=0, part=TextPart(content="")),
+            PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="hi")),
+            PartEndEvent(index=0, part=TextPart(content="hi")),
+        ]
+        await _collect(
+            convert_pydantic_ai_to_agentex_events(_aiter(events), tracing_handler=handler)  # type: ignore[arg-type]
+        )
+        assert handler.starts == []
+        assert handler.ends == []
+
+    async def test_omitting_handler_preserves_pre_tracing_behavior(self):
+        events = [
+            PartStartEvent(
+                index=0,
+                part=ToolCallPart(tool_name="t", args=None, tool_call_id="c"),
+            ),
+            PartEndEvent(
+                index=0,
+                part=ToolCallPart(tool_name="t", args="{}", tool_call_id="c"),
+            ),
+            FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="t", content="ok", tool_call_id="c"),
+            ),
+        ]
+        out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
+        # Same emit shape as before: Start, Done, Full
+        types = [type(e).__name__ for e in out]
+        assert "StreamTaskMessageStart" in types
+        assert "StreamTaskMessageDone" in types
+        assert "StreamTaskMessageFull" in types
+
+
 class TestMultiStepRun:
     async def test_text_then_tool_then_text_assigns_distinct_indices(self):
         """A multi-step run: model emits text + tool call → tool runs → model emits more text.
