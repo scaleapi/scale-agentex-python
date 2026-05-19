@@ -19,8 +19,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from pydantic_ai.messages import ModelMessagesTypeAdapter
 from pydantic_ai.run import AgentRunResultEvent
+from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 import agentex.lib.adk as adk
 from project.agent import create_agent
@@ -140,9 +140,7 @@ async def handle_task_event_send(params: SendEventParams):
                     captured_messages[:] = list(event.result.all_messages())
                 yield event
 
-        async with agent.run_stream_events(
-            user_message, message_history=previous_messages
-        ) as stream:
+        async with agent.run_stream_events(user_message, message_history=previous_messages) as stream:
             final_output = await stream_pydantic_ai_events(
                 tee_messages(stream), task_id, tracing_handler=tracing_handler
             )
