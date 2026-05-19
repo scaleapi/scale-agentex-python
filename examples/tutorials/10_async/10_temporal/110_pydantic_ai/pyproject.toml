@@ -26,9 +26,6 @@ dev = [
     "debugpy>=1.8.15",
 ]
 
-[tool.uv.sources]
-agentex-sdk = { path = "../../../../..", editable = true }
-
 [tool.hatch.build.targets.wheel]
 packages = ["project"]
 

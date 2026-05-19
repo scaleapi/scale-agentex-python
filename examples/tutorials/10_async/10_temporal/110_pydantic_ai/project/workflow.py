@@ -5,12 +5,19 @@ delegates the actual agent run to ``temporal_agent.run(...)`` — which
 internally schedules model and tool activities, each independently
 durable. The ``event_stream_handler`` registered on ``temporal_agent``
 pushes streaming deltas to Redis while the model activity runs.
+
+Multi-turn memory is kept on the workflow instance itself
+(``self._message_history``). Temporal's workflow state is already durable
+and replay-safe, so unlike the async-base tutorial we don't need an
+external ``adk.state`` round-trip — the message list survives crashes
+because Temporal replays activity results that produced it.
 """
 
 from __future__ import annotations
 
 import os
 import json
+from typing import TYPE_CHECKING
 
 from temporalio import workflow
 
@@ -26,6 +33,9 @@ from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from agentex.lib.core.tracing.tracing_processor_manager import (
     add_tracing_processor_config,
 )
+
+if TYPE_CHECKING:
+    from pydantic_ai.messages import ModelMessage
 
 add_tracing_processor_config(
     SGPTracingProcessorConfig(
@@ -62,6 +72,11 @@ class At110PydanticAiWorkflow(BaseWorkflow):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
         self._turn_number = 0
+        # Conversation history accumulated across turns. Each entry is a
+        # pydantic-ai ``ModelMessage``. Temporal replays the activity that
+        # produced these messages, so the list is rebuilt deterministically
+        # if the workflow ever recovers from a crash.
+        self._message_history: list["ModelMessage"] = []
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
@@ -85,13 +100,21 @@ class At110PydanticAiWorkflow(BaseWorkflow):
             #   3. Each activity is retried, observable, and durable
             # While the model activity runs, the event_stream_handler on
             # temporal_agent pushes deltas to Redis so the UI sees tokens.
+            #
+            # Passing ``message_history`` makes the run remember prior turns:
+            # without it the agent would respond to each user message as if
+            # it had never seen the conversation before.
             result = await temporal_agent.run(
                 params.event.content.content,
+                message_history=self._message_history,
                 deps=TaskDeps(
                     task_id=params.task.id,
                     parent_span_id=span.id if span else None,
                 ),
             )
+            # Persist the new full history (user + assistant + any tool
+            # rounds) so the next turn picks up from here.
+            self._message_history = list(result.all_messages())
             if span:
                 span.output = {"final_output": result.output}
 

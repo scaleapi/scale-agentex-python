@@ -366,9 +366,17 @@ class TestToolResult:
         assert content.content == "Sunny, 72F"
         assert content.author == "agent"
 
-    async def test_tool_return_with_non_string_content_stringifies(
+    async def test_tool_return_with_dict_content_preserves_structure(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
+        """Regression: structured tool results (dict / list / pydantic model) must
+        be preserved as structured data on ``ToolResponseContent.content``.
+
+        The earlier ``str(content)`` path produced Python repr like
+        ``"{'temp': 72, 'sky': 'clear'}"`` — invalid JSON, unreadable in the UI,
+        and divergent from the sync converter which uses ``_tool_return_content``
+        to return dicts as-is.
+        """
         _, messages = fake_adk
         events = [
             FunctionToolResultEvent(
@@ -377,10 +385,37 @@ class TestToolResult:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        # The content is stringified; we just check the structured payload is
-        # still readable from the result.
         out = messages.created[0]["content"].content
-        assert "72" in out and "clear" in out
+        assert out == {"temp": 72, "sky": "clear"}, (
+            f"Expected the dict to survive verbatim; got {out!r}. "
+            "If this is a Python repr string, the helper regressed to str(content)."
+        )
+
+    async def test_tool_return_with_pydantic_model_content_uses_model_dump(
+        self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
+    ) -> None:
+        """Pydantic model tool results must be serialized via ``model_dump()``,
+        not ``str(model)``."""
+        from pydantic import BaseModel
+
+        class WeatherResult(BaseModel):
+            temp: int
+            sky: str
+
+        _, messages = fake_adk
+        events = [
+            FunctionToolResultEvent(
+                part=ToolReturnPart(
+                    tool_name="t",
+                    content=WeatherResult(temp=72, sky="clear"),
+                    tool_call_id="c",
+                ),
+            ),
+        ]
+        await stream_pydantic_ai_events(_aiter(events), TASK_ID)
+
+        out = messages.created[0]["content"].content
+        assert out == {"temp": 72, "sky": "clear"}
 
     async def test_retry_prompt_part_surfaces_as_tool_response(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]

@@ -19,7 +19,7 @@ Tracing is opt-in via a ``tracing_handler`` parameter — see
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from agentex.lib.adk._modules._pydantic_ai_tracing import (
@@ -233,26 +233,37 @@ async def stream_pydantic_ai_events(
                 result = event.part
                 tool_call_id = result.tool_call_id
                 tool_name = getattr(result, "tool_name", "") or ""
+                # Preserve structure for dicts / lists / Pydantic models so the
+                # UI can render them as JSON, not as Python repr. Matches the
+                # sync converter's ``_tool_return_content`` helper exactly —
+                # ``str(content)`` on a dict produces ``"{'k': 'v'}"`` which is
+                # invalid JSON and unreadable in the UI.
                 content = getattr(result, "content", None)
+                content_payload: Any
                 if content is None:
-                    content_str = str(result)
-                elif isinstance(content, str):
-                    content_str = content
+                    content_payload = str(result)
+                elif isinstance(content, (str, int, float, bool, list, dict)):
+                    content_payload = content
+                elif hasattr(content, "model_dump"):
+                    try:
+                        content_payload = content.model_dump()
+                    except Exception:
+                        content_payload = str(content)
                 else:
-                    content_str = str(content)
+                    content_payload = str(content)
                 await adk.messages.create(
                     task_id=task_id,
                     content=ToolResponseContent(
                         tool_call_id=tool_call_id,
                         name=tool_name,
-                        content=content_str,
+                        content=content_payload,
                         author="agent",
                     ),
                 )
                 if tracing_handler is not None and tool_call_id:
                     await tracing_handler.on_tool_end(
                         tool_call_id=tool_call_id,
-                        result=content_str,
+                        result=content_payload,
                     )
 
             # FunctionToolCallEvent / FinalResultEvent / AgentRunResultEvent
