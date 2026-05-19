@@ -402,7 +402,7 @@ class TestToolResult:
         assert isinstance(content, ToolResponseContent)
         assert content.tool_call_id == "c1"
         # RetryPromptPart.content stringifies to the error description
-        assert "bad arguments" in content.content
+        assert "bad arguments" in str(content.content)
 
 
 class TestContextLifecycle:

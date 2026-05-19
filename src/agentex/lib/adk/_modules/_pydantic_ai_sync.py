@@ -184,7 +184,10 @@ async def convert_pydantic_ai_to_agentex_events(
                 # for deltas.
                 initial_args: dict[str, Any] = {}
                 if isinstance(event.part.args, dict):
-                    initial_args = event.part.args
+                    # dict(...) materializes a fresh dict[str, Any]; pydantic-ai's
+                    # ToolCallPart.args includes TypedDict-style variants that
+                    # pyright doesn't narrow to plain dict[str, Any] via isinstance.
+                    initial_args = dict(event.part.args)
                 yield StreamTaskMessageStart(
                     type="start",
                     index=message_index,

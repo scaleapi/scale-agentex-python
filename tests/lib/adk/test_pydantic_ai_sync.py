@@ -100,6 +100,7 @@ class TestTextStreaming:
         ]
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
         assert isinstance(out[0], StreamTaskMessageStart)
+        assert isinstance(out[0].content, TextContent)
         assert out[0].content.content == ""
         assert isinstance(out[1], StreamTaskMessageDelta)
         assert isinstance(out[1].delta, TextDelta)
@@ -132,6 +133,7 @@ class TestThinkingStreaming:
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
         assert isinstance(out[0], StreamTaskMessageStart)
         assert isinstance(out[1], StreamTaskMessageDelta)
+        assert isinstance(out[1].delta, ReasoningContentDelta)
         assert out[1].delta.content_delta == "seed reasoning"
 
     async def test_thinking_delta_skipped_when_empty(self):
@@ -197,6 +199,7 @@ class TestToolCallStreaming:
         ]
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
         assert isinstance(out[0], StreamTaskMessageStart)
+        assert isinstance(out[0].content, ToolRequestContent)
         assert out[0].content.arguments == {"query": "weather"}
         # No deltas emitted — args were already complete.
         assert len(out) == 2
@@ -216,8 +219,10 @@ class TestToolCallStreaming:
         ]
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
         assert isinstance(out[0], StreamTaskMessageStart)
+        assert isinstance(out[0].content, ToolRequestContent)
         assert out[0].content.arguments == {}
         assert isinstance(out[1], StreamTaskMessageDelta)
+        assert isinstance(out[1].delta, ToolRequestDelta)
         assert out[1].delta.arguments_delta == '{"query":"weather"}'
 
     async def test_tool_call_dict_args_delta_serialized(self):
@@ -319,7 +324,9 @@ class TestMultiStepRun:
             if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, TextDelta) and e.index == text2_start.index
         ]
         assert len(text2_deltas) == 1
-        assert text2_deltas[0].delta.text_delta == "It's sunny."
+        text2_delta = text2_deltas[0].delta
+        assert isinstance(text2_delta, TextDelta)
+        assert text2_delta.text_delta == "It's sunny."
 
 
 class TestIgnoredEvents:
