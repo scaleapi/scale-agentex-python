@@ -10,34 +10,33 @@ the AgentEx server.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
+from dataclasses import field, dataclass
 
 import pytest
 from pydantic_ai.messages import (
-    FunctionToolResultEvent,
-    PartDeltaEvent,
-    PartEndEvent,
-    PartStartEvent,
-    RetryPromptPart,
     TextPart,
-    TextPartDelta,
+    PartEndEvent,
     ThinkingPart,
-    ThinkingPartDelta,
     ToolCallPart,
+    TextPartDelta,
+    PartDeltaEvent,
+    PartStartEvent,
     ToolReturnPart,
+    RetryPromptPart,
+    ThinkingPartDelta,
+    FunctionToolResultEvent,
 )
 
-from agentex.lib.adk._modules._pydantic_ai_async import stream_pydantic_ai_events
-from agentex.types.reasoning_content import ReasoningContent
-from agentex.types.reasoning_content_delta import ReasoningContentDelta
 from agentex.types.task_message import TaskMessage
+from agentex.types.text_content import TextContent
+from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import StreamTaskMessageDelta
-from agentex.types.text_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
-
+from agentex.types.reasoning_content_delta import ReasoningContentDelta
+from agentex.lib.adk._modules._pydantic_ai_async import stream_pydantic_ai_events
 
 TASK_ID = "task_test"
 
@@ -70,9 +69,7 @@ class FakeContext:
 
     async def stream_update(self, update: StreamTaskMessageDelta) -> None:
         if self.closed:
-            raise AssertionError(
-                "stream_update called after close — helper closed the wrong context"
-            )
+            raise AssertionError("stream_update called after close — helper closed the wrong context")
         self.updates.append(update)
 
     async def close(self) -> None:
@@ -85,9 +82,7 @@ class FakeStreamingModule:
     def __init__(self) -> None:
         self.contexts: list[FakeContext] = []
 
-    def streaming_task_message_context(
-        self, *, task_id: str, initial_content: Any
-    ) -> FakeContext:
+    def streaming_task_message_context(self, *, task_id: str, initial_content: Any) -> FakeContext:
         tm = TaskMessage(
             id=f"m{len(self.contexts) + 1}",
             task_id=task_id,
@@ -255,9 +250,7 @@ class TestThinkingStreaming:
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
         ctx = streaming.contexts[0]
-        assert _reasoning_deltas(ctx) == [], (
-            "Empty ThinkingPartDelta must not publish a zero-length reasoning delta"
-        )
+        assert _reasoning_deltas(ctx) == [], "Empty ThinkingPartDelta must not publish a zero-length reasoning delta"
         assert ctx.closed is True
 
 
@@ -274,9 +267,7 @@ class TestToolCallEmission:
             ),
             PartEndEvent(
                 index=1,
-                part=ToolCallPart(
-                    tool_name="get_weather", args='{"city":"Paris"}', tool_call_id="c1"
-                ),
+                part=ToolCallPart(tool_name="get_weather", args='{"city":"Paris"}', tool_call_id="c1"),
             ),
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
@@ -299,15 +290,11 @@ class TestToolCallEmission:
         events = [
             PartStartEvent(
                 index=0,
-                part=ToolCallPart(
-                    tool_name="search", args={"q": "weather"}, tool_call_id="c"
-                ),
+                part=ToolCallPart(tool_name="search", args={"q": "weather"}, tool_call_id="c"),
             ),
             PartEndEvent(
                 index=0,
-                part=ToolCallPart(
-                    tool_name="search", args={"q": "weather"}, tool_call_id="c"
-                ),
+                part=ToolCallPart(tool_name="search", args={"q": "weather"}, tool_call_id="c"),
             ),
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
@@ -366,9 +353,7 @@ class TestToolResult:
         _, messages = fake_adk
         events = [
             FunctionToolResultEvent(
-                part=ToolReturnPart(
-                    tool_name="get_weather", content="Sunny, 72F", tool_call_id="c1"
-                ),
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny, 72F", tool_call_id="c1"),
             ),
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
@@ -387,9 +372,7 @@ class TestToolResult:
         _, messages = fake_adk
         events = [
             FunctionToolResultEvent(
-                part=ToolReturnPart(
-                    tool_name="t", content={"temp": 72, "sky": "clear"}, tool_call_id="c"
-                ),
+                part=ToolReturnPart(tool_name="t", content={"temp": 72, "sky": "clear"}, tool_call_id="c"),
             ),
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
@@ -447,9 +430,7 @@ class TestContextLifecycle:
                 part=ToolCallPart(tool_name="get_weather", args="{}", tool_call_id="c1"),
             ),
             FunctionToolResultEvent(
-                part=ToolReturnPart(
-                    tool_name="get_weather", content="Sunny", tool_call_id="c1"
-                ),
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny", tool_call_id="c1"),
             ),
             # Second model response: more text.
             PartStartEvent(index=0, part=TextPart(content="")),
@@ -458,9 +439,7 @@ class TestContextLifecycle:
         ]
         final = await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        assert len(streaming.contexts) == 2, (
-            "One context per text part — tool calls don't open streaming contexts"
-        )
+        assert len(streaming.contexts) == 2, "One context per text part — tool calls don't open streaming contexts"
         assert all(ctx.closed for ctx in streaming.contexts)
         assert _text_deltas(streaming.contexts[0]) == ["Looking up..."]
         assert _text_deltas(streaming.contexts[1]) == ["It's sunny."]

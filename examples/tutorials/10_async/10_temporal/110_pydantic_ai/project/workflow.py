@@ -9,12 +9,13 @@ pushes streaming deltas to Redis while the model activity runs.
 
 from __future__ import annotations
 
-import json
 import os
+import json
 
 from temporalio import workflow
 
 from agentex.lib import adk
+from project.agent import TaskDeps, temporal_agent
 from agentex.lib.types.acp import SendEventParams, CreateTaskParams
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
@@ -25,8 +26,6 @@ from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from agentex.lib.core.tracing.tracing_processor_manager import (
     add_tracing_processor_config,
 )
-
-from project.agent import TaskDeps, temporal_agent
 
 add_tracing_processor_config(
     SGPTracingProcessorConfig(

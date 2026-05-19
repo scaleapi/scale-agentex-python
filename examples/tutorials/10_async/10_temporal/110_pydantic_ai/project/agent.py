@@ -17,13 +17,13 @@ helper. The ``task_id`` is threaded into the handler via ``deps``.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterable
 from datetime import datetime
+from collections.abc import AsyncIterable
 
 from pydantic import BaseModel
 from pydantic_ai import Agent, RunContext
-from pydantic_ai.durable_exec.temporal import TemporalAgent
 from pydantic_ai.messages import AgentStreamEvent
+from pydantic_ai.durable_exec.temporal import TemporalAgent
 
 from project.tools import get_weather
 from agentex.lib.adk import stream_pydantic_ai_events
@@ -61,9 +61,7 @@ def _build_base_agent() -> Agent[TaskDeps, str]:
     agent: Agent[TaskDeps, str] = Agent(
         MODEL_NAME,
         deps_type=TaskDeps,
-        system_prompt=SYSTEM_PROMPT.format(
-            timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ),
+        system_prompt=SYSTEM_PROMPT.format(timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
     )
     agent.tool_plain(get_weather)
     return agent

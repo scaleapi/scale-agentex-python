@@ -7,38 +7,38 @@ from typing import Any, AsyncIterator
 
 import pytest
 from pydantic_ai.messages import (
+    TextPart,
+    PartEndEvent,
+    ThinkingPart,
+    ToolCallPart,
+    TextPartDelta,
+    PartDeltaEvent,
+    PartStartEvent,
+    ToolReturnPart,
+    RetryPromptPart,
     FinalResultEvent,
+    ThinkingPartDelta,
+    ToolCallPartDelta,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
-    PartDeltaEvent,
-    PartEndEvent,
-    PartStartEvent,
-    RetryPromptPart,
-    TextPart,
-    TextPartDelta,
-    ThinkingPart,
-    ThinkingPartDelta,
-    ToolCallPart,
-    ToolCallPartDelta,
-    ToolReturnPart,
 )
 
+from agentex.types.task_message_delta import TextDelta
+from agentex.types.tool_request_delta import ToolRequestDelta
+from agentex.types.task_message_update import (
+    StreamTaskMessageDone,
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+    StreamTaskMessageStart,
+)
+from agentex.types.task_message_content import TextContent
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_response_content import ToolResponseContent
+from agentex.types.reasoning_content_delta import ReasoningContentDelta
 from agentex.lib.adk._modules._pydantic_ai_sync import (
     _args_delta_to_str,
     convert_pydantic_ai_to_agentex_events,
 )
-from agentex.types.reasoning_content_delta import ReasoningContentDelta
-from agentex.types.task_message_content import TextContent
-from agentex.types.task_message_delta import TextDelta
-from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
-    StreamTaskMessageDone,
-    StreamTaskMessageFull,
-    StreamTaskMessageStart,
-)
-from agentex.types.tool_request_content import ToolRequestContent
-from agentex.types.tool_request_delta import ToolRequestDelta
-from agentex.types.tool_response_content import ToolResponseContent
 
 
 async def _aiter(events: list[Any]) -> AsyncIterator[Any]:
@@ -159,9 +159,7 @@ class TestToolCallStreaming:
             PartDeltaEvent(index=1, delta=ToolCallPartDelta(args_delta='"Paris"}')),
             PartEndEvent(
                 index=1,
-                part=ToolCallPart(
-                    tool_name="get_weather", args='{"city":"Paris"}', tool_call_id="call_abc"
-                ),
+                part=ToolCallPart(tool_name="get_weather", args='{"city":"Paris"}', tool_call_id="call_abc"),
             ),
         ]
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
@@ -190,15 +188,11 @@ class TestToolCallStreaming:
         events = [
             PartStartEvent(
                 index=0,
-                part=ToolCallPart(
-                    tool_name="search", args={"query": "weather"}, tool_call_id="call_xyz"
-                ),
+                part=ToolCallPart(tool_name="search", args={"query": "weather"}, tool_call_id="call_xyz"),
             ),
             PartEndEvent(
                 index=0,
-                part=ToolCallPart(
-                    tool_name="search", args={"query": "weather"}, tool_call_id="call_xyz"
-                ),
+                part=ToolCallPart(tool_name="search", args={"query": "weather"}, tool_call_id="call_xyz"),
             ),
         ]
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
@@ -213,15 +207,11 @@ class TestToolCallStreaming:
         events = [
             PartStartEvent(
                 index=0,
-                part=ToolCallPart(
-                    tool_name="search", args='{"query":"weather"}', tool_call_id="call_z"
-                ),
+                part=ToolCallPart(tool_name="search", args='{"query":"weather"}', tool_call_id="call_z"),
             ),
             PartEndEvent(
                 index=0,
-                part=ToolCallPart(
-                    tool_name="search", args='{"query":"weather"}', tool_call_id="call_z"
-                ),
+                part=ToolCallPart(tool_name="search", args='{"query":"weather"}', tool_call_id="call_z"),
             ),
         ]
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
@@ -255,9 +245,7 @@ class TestToolCallStreaming:
                 part=ToolCallPart(tool_name="get_weather", args="{}", tool_call_id="call_abc"),
             ),
             FunctionToolResultEvent(
-                part=ToolReturnPart(
-                    tool_name="get_weather", content="Sunny, 72F", tool_call_id="call_abc"
-                ),
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny, 72F", tool_call_id="call_abc"),
             ),
         ]
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
@@ -305,9 +293,7 @@ class TestMultiStepRun:
                 part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1"),
             ),
             PartDeltaEvent(index=1, delta=ToolCallPartDelta(args_delta="{}")),
-            PartEndEvent(
-                index=1, part=ToolCallPart(tool_name="get_weather", args="{}", tool_call_id="c1")
-            ),
+            PartEndEvent(index=1, part=ToolCallPart(tool_name="get_weather", args="{}", tool_call_id="c1")),
             FunctionToolResultEvent(
                 part=ToolReturnPart(tool_name="get_weather", content="Sunny", tool_call_id="c1"),
             ),
@@ -319,13 +305,10 @@ class TestMultiStepRun:
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
 
         # Pull every Start/Full event and check their assigned message indices
-        anchors = [
-            e for e in out if isinstance(e, (StreamTaskMessageStart, StreamTaskMessageFull))
-        ]
+        anchors = [e for e in out if isinstance(e, (StreamTaskMessageStart, StreamTaskMessageFull))]
         indices = [e.index for e in anchors]
         assert indices == [0, 1, 2, 3], (
-            f"Expected 4 distinct, monotonic message indices for: text1, tool_call, "
-            f"tool_result, text2 — got {indices}"
+            f"Expected 4 distinct, monotonic message indices for: text1, tool_call, tool_result, text2 — got {indices}"
         )
 
         # And the second text's deltas should target the second text's message index.
@@ -333,9 +316,7 @@ class TestMultiStepRun:
         text2_deltas = [
             e
             for e in out
-            if isinstance(e, StreamTaskMessageDelta)
-            and isinstance(e.delta, TextDelta)
-            and e.index == text2_start.index
+            if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, TextDelta) and e.index == text2_start.index
         ]
         assert len(text2_deltas) == 1
         assert text2_deltas[0].delta.text_delta == "It's sunny."
@@ -352,9 +333,7 @@ class TestIgnoredEvents:
             FunctionToolCallEvent(
                 part=ToolCallPart(tool_name="t", args="{}", tool_call_id="c"),
             ),
-            PartEndEvent(
-                index=0, part=ToolCallPart(tool_name="t", args="{}", tool_call_id="c")
-            ),
+            PartEndEvent(index=0, part=ToolCallPart(tool_name="t", args="{}", tool_call_id="c")),
         ]
         out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
         # Start + Done only — no event from FunctionToolCallEvent

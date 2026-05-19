@@ -23,36 +23,36 @@ from __future__ import annotations
 import json
 from typing import Any, AsyncIterator
 
+from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.messages import (
+    TextPart,
+    PartEndEvent,
+    ThinkingPart,
+    ToolCallPart,
+    TextPartDelta,
+    PartDeltaEvent,
+    PartStartEvent,
+    ToolReturnPart,
     FinalResultEvent,
+    ThinkingPartDelta,
+    ToolCallPartDelta,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
-    PartDeltaEvent,
-    PartEndEvent,
-    PartStartEvent,
-    TextPart,
-    TextPartDelta,
-    ThinkingPart,
-    ThinkingPartDelta,
-    ToolCallPart,
-    ToolCallPartDelta,
-    ToolReturnPart,
 )
-from pydantic_ai.run import AgentRunResultEvent
 
 from agentex.lib.utils.logging import make_logger
-from agentex.types.reasoning_content_delta import ReasoningContentDelta
-from agentex.types.task_message_content import TextContent
 from agentex.types.task_message_delta import TextDelta
+from agentex.types.tool_request_delta import ToolRequestDelta
 from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
     StreamTaskMessageDone,
     StreamTaskMessageFull,
+    StreamTaskMessageDelta,
     StreamTaskMessageStart,
 )
+from agentex.types.task_message_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
-from agentex.types.tool_request_delta import ToolRequestDelta
 from agentex.types.tool_response_content import ToolResponseContent
+from agentex.types.reasoning_content_delta import ReasoningContentDelta
 
 logger = make_logger(__name__)
 
@@ -98,9 +98,7 @@ def _tool_return_content(result: ToolReturnPart | Any) -> Any:
 
 async def convert_pydantic_ai_to_agentex_events(
     stream_response: AsyncIterator[Any],
-) -> AsyncIterator[
-    StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone
-]:
+) -> AsyncIterator[StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone]:
     """Convert a Pydantic AI agent event stream into Agentex stream events.
 
     Mapping:

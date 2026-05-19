@@ -31,15 +31,15 @@ async def stream_pydantic_ai_events(stream, task_id: str) -> str:
     import json
 
     from pydantic_ai.messages import (
-        FunctionToolResultEvent,
-        PartDeltaEvent,
-        PartEndEvent,
-        PartStartEvent,
         TextPart,
-        TextPartDelta,
+        PartEndEvent,
         ThinkingPart,
-        ThinkingPartDelta,
         ToolCallPart,
+        TextPartDelta,
+        PartDeltaEvent,
+        PartStartEvent,
+        ThinkingPartDelta,
+        FunctionToolResultEvent,
     )
 
     from agentex.lib import adk
