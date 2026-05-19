@@ -4,8 +4,10 @@ import json
 import asyncio
 import contextlib
 from typing import Literal, Callable, Awaitable
+from datetime import datetime
 
 from agentex import AsyncAgentex
+from agentex._types import omit
 from agentex.lib.utils.logging import make_logger
 from agentex.types.data_content import DataContent
 from agentex.types.task_message import (
@@ -259,13 +261,9 @@ class DeltaAccumulator:
             # For reasoning, we allow both summary and content deltas
             if self._delta_type == "reasoning":
                 if delta.type not in ["reasoning_summary", "reasoning_content"]:
-                    raise ValueError(
-                        f"Expected reasoning delta but got: {delta.type}"
-                    )
+                    raise ValueError(f"Expected reasoning delta but got: {delta.type}")
             elif self._delta_type != delta.type:
-                raise ValueError(
-                    f"Delta type mismatch: {self._delta_type} != {delta.type}"
-                )
+                raise ValueError(f"Delta type mismatch: {self._delta_type} != {delta.type}")
 
         # Handle reasoning deltas specially
         if delta.type == "reasoning_summary":
@@ -285,9 +283,7 @@ class DeltaAccumulator:
         if self._delta_type == "text":
             # Type assertion: we know all deltas are TextDelta when _delta_type is TEXT
             text_deltas = [delta for delta in self._accumulated_deltas if isinstance(delta, TextDelta)]
-            text_content_str = "".join(
-                [delta.text_delta or "" for delta in text_deltas]
-            )
+            text_content_str = "".join([delta.text_delta or "" for delta in text_deltas])
             return TextContent(
                 author="agent",
                 content=text_content_str,
@@ -295,15 +291,11 @@ class DeltaAccumulator:
         elif self._delta_type == "data":
             # Type assertion: we know all deltas are DataDelta when _delta_type is DATA
             data_deltas = [delta for delta in self._accumulated_deltas if isinstance(delta, DataDelta)]
-            data_content_str = "".join(
-                [delta.data_delta or "" for delta in data_deltas]
-            )
+            data_content_str = "".join([delta.data_delta or "" for delta in data_deltas])
             try:
                 data = json.loads(data_content_str)
             except json.JSONDecodeError as e:
-                raise ValueError(
-                    f"Accumulated data content is not valid JSON: {data_content_str}"
-                ) from e
+                raise ValueError(f"Accumulated data content is not valid JSON: {data_content_str}") from e
             return DataContent(
                 author="agent",
                 data=data,
@@ -311,9 +303,7 @@ class DeltaAccumulator:
         elif self._delta_type == "tool_request":
             # Type assertion: we know all deltas are ToolRequestDelta when _delta_type is TOOL_REQUEST
             tool_request_deltas = [delta for delta in self._accumulated_deltas if isinstance(delta, ToolRequestDelta)]
-            arguments_content_str = "".join(
-                [delta.arguments_delta or "" for delta in tool_request_deltas]
-            )
+            arguments_content_str = "".join([delta.arguments_delta or "" for delta in tool_request_deltas])
             try:
                 arguments = json.loads(arguments_content_str)
             except json.JSONDecodeError as e:
@@ -329,9 +319,7 @@ class DeltaAccumulator:
         elif self._delta_type == "tool_response":
             # Type assertion: we know all deltas are ToolResponseDelta when _delta_type is TOOL_RESPONSE
             tool_response_deltas = [delta for delta in self._accumulated_deltas if isinstance(delta, ToolResponseDelta)]
-            tool_response_content_str = "".join(
-                [delta.content_delta or "" for delta in tool_response_deltas]
-            )
+            tool_response_content_str = "".join([delta.content_delta or "" for delta in tool_response_deltas])
             return ToolResponseContent(
                 author="agent",
                 tool_call_id=tool_response_deltas[0].tool_call_id,
@@ -341,9 +329,17 @@ class DeltaAccumulator:
         elif self._delta_type == "reasoning":
             # Convert accumulated reasoning deltas to ReasoningContent
             # Sort by index to maintain order
-            summary_list = [self._reasoning_summaries[i] for i in sorted(self._reasoning_summaries.keys()) if self._reasoning_summaries[i]]
-            content_list = [self._reasoning_contents[i] for i in sorted(self._reasoning_contents.keys()) if self._reasoning_contents[i]]
-            
+            summary_list = [
+                self._reasoning_summaries[i]
+                for i in sorted(self._reasoning_summaries.keys())
+                if self._reasoning_summaries[i]
+            ]
+            content_list = [
+                self._reasoning_contents[i]
+                for i in sorted(self._reasoning_contents.keys())
+                if self._reasoning_contents[i]
+            ]
+
             # Only return reasoning content if we have non-empty summaries or content
             if summary_list or content_list:
                 return ReasoningContent(
@@ -371,6 +367,7 @@ class StreamingTaskMessageContext:
         agentex_client: AsyncAgentex,
         streaming_service: "StreamingService",
         streaming_mode: StreamingMode = "coalesced",
+        created_at: datetime | None = None,
     ):
         self.task_id = task_id
         self.initial_content = initial_content
@@ -381,6 +378,7 @@ class StreamingTaskMessageContext:
         self._delta_accumulator = DeltaAccumulator()
         self._streaming_mode: StreamingMode = streaming_mode
         self._buffer: CoalescingBuffer | None = None
+        self._created_at = created_at
 
     async def __aenter__(self) -> "StreamingTaskMessageContext":
         return await self.open()
@@ -395,6 +393,7 @@ class StreamingTaskMessageContext:
             task_id=self.task_id,
             content=self.initial_content.model_dump(),
             streaming_status="IN_PROGRESS",
+            created_at=self._created_at if self._created_at is not None else omit,
         )
 
         # Send the START event
@@ -434,9 +433,9 @@ class StreamingTaskMessageContext:
 
         # Update the task message with the final content
         has_deltas = (
-            self._delta_accumulator._accumulated_deltas or
-            self._delta_accumulator._reasoning_summaries or
-            self._delta_accumulator._reasoning_contents
+            self._delta_accumulator._accumulated_deltas
+            or self._delta_accumulator._reasoning_summaries
+            or self._delta_accumulator._reasoning_contents
         )
         if has_deltas:
             self.task_message.content = self._delta_accumulator.convert_to_content()
@@ -452,9 +451,7 @@ class StreamingTaskMessageContext:
         self._is_closed = True
         return self.task_message
 
-    async def stream_update(
-        self, update: TaskMessageUpdate
-    ) -> TaskMessageUpdate | None:
+    async def stream_update(self, update: TaskMessageUpdate) -> TaskMessageUpdate | None:
         """Stream an update to the repository.
 
         Behavior depends on the context's ``streaming_mode``:
@@ -514,6 +511,7 @@ class StreamingService:
         task_id: str,
         initial_content: TaskMessageContent,
         streaming_mode: StreamingMode = "coalesced",
+        created_at: datetime | None = None,
     ) -> StreamingTaskMessageContext:
         return StreamingTaskMessageContext(
             task_id=task_id,
@@ -521,11 +519,10 @@ class StreamingService:
             agentex_client=self._agentex_client,
             streaming_service=self,
             streaming_mode=streaming_mode,
+            created_at=created_at,
         )
 
-    async def stream_update(
-        self, update: TaskMessageUpdate
-    ) -> TaskMessageUpdate | None:
+    async def stream_update(self, update: TaskMessageUpdate) -> TaskMessageUpdate | None:
         """
         Stream an update to the repository.
 
@@ -539,7 +536,8 @@ class StreamingService:
 
         try:
             await self._stream_repository.send_event(
-                topic=stream_topic, event=update.model_dump(mode="json")  # type: ignore
+                topic=stream_topic,
+                event=update.model_dump(mode="json"),  # type: ignore
             )
             return update
         except Exception as e:

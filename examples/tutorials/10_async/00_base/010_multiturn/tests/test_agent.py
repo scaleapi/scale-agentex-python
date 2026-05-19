@@ -145,6 +145,7 @@ class TestStreamingEvents:
         task = task_response.result
         assert task is not None
 
+        await asyncio.sleep(1)  # wait for state to be initialized
         # Check initial state
         states = await client.states.list(agent_id=agent_id, task_id=task.id)
         assert len(states) == 1
