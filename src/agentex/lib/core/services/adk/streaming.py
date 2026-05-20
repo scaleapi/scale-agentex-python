@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import asyncio
-import contextlib
 from typing import Literal, Callable, Awaitable
 from datetime import datetime
 
@@ -186,7 +185,7 @@ class CoalescingBuffer:
 
     async def _run(self) -> None:
         try:
-            while not self._closed:
+            while True:
                 try:
                     await asyncio.wait_for(self._flush_signal.wait(), timeout=self.FLUSH_INTERVAL_S)
                 except asyncio.TimeoutError:
@@ -194,29 +193,35 @@ class CoalescingBuffer:
                 async with self._lock:
                     self._flush_signal.clear()
                     drained = self._drain_locked()
-                for idx, u in enumerate(drained):
+                for u in drained:
                     try:
                         await self._on_flush(u)
-                    except asyncio.CancelledError:
-                        # Re-enqueue the item being flushed plus any remaining so
-                        # close()'s final drain can recover them. May cause a
-                        # duplicate publish of the in-flight item, which is
-                        # preferable to silent loss for a streaming UX.
-                        async with self._lock:
-                            self._buf = drained[idx:] + self._buf
-                        raise
                     except Exception as e:
                         logger.exception(f"CoalescingBuffer flush failed: {e}")
+                # Check _closed *after* draining so close() always gets a final
+                # in-loop flush pass. Exiting here (instead of being cancelled
+                # mid-flush) guarantees each in-flight item is published exactly
+                # once — close()'s final drain then only picks up items added
+                # after the last lock release.
+                if self._closed:
+                    return
         except asyncio.CancelledError:
             pass
 
     async def close(self) -> None:
+        # Signal the ticker to stop and let it exit naturally after its next
+        # drain. Cancelling mid-flush would risk re-publishing a delta whose
+        # Redis write already completed but whose await had not yet returned,
+        # producing the duplicate-tail symptom seen on the UI stream.
         self._closed = True
         if self._task is not None:
             self._flush_signal.set()
-            self._task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
+            try:
                 await self._task
+            except asyncio.CancelledError:
+                # Propagate if our caller is being cancelled; the task itself
+                # swallows CancelledError so this only fires on outer cancel.
+                raise
             self._task = None
         async with self._lock:
             drained = self._drain_locked()

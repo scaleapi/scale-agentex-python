@@ -1,0 +1,77 @@
+# {{ agent_name }} - AgentEx Async ACP + Pydantic AI
+
+This template builds an **asynchronous** [Pydantic AI](https://ai.pydantic.dev/)
+agent on AgentEx with:
+- Task-based event handling, with deltas streamed back over Redis
+- Tool calling (typed, declarative — pydantic-ai owns the tool-call loop)
+- **Multi-turn conversation memory** persisted in `adk.state`
+- Per-turn tracing spans, with per-tool-call child spans
+
+## Sync vs Async
+
+| Aspect | Sync | Async (This Template) |
+|---|---|---|
+| **ACP Type** | `sync` | `async` |
+| **Handler** | `@acp.on_message_send` | `@acp.on_task_event_send` |
+| **Response** | HTTP streaming (yields) | Redis streaming |
+| **Streaming Helper** | `convert_pydantic_ai_to_agentex_events()` | `stream_pydantic_ai_events()` |
+| **Tracing** | wraps a single HTTP request | wraps each task event |
+
+### When to use Async?
+- Long-running tasks that may exceed HTTP timeout
+- Agents that need to push updates after the request returns
+- Production agents that need reliable message delivery via Redis
+
+## Running the Agent
+
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/
+│   ├── __init__.py
+│   ├── acp.py           # ACP server, tracing wiring, multi-turn state
+│   ├── agent.py         # Pydantic AI Agent + tool registration
+│   └── tools.py         # Tool function implementations
+├── Dockerfile
+├── manifest.yaml
+├── dev.ipynb
+{% if use_uv %}
+└── pyproject.toml
+{% else %}
+└── requirements.txt
+{% endif %}
+```
+
+## Development
+
+### 1. Add Your Own Tools
+Edit `project/tools.py` to add tool functions and register them in `project/agent.py`:
+
+```python
+# project/tools.py
+def search_docs(query: str) -> str:
+    """Look up internal docs."""
+    return "..."
+
+# project/agent.py — inside create_agent()
+agent.tool_plain(search_docs)
+```
+
+### 2. Customize the Agent
+Edit `project/agent.py` to swap the model (`MODEL_NAME`) or system prompt.
+
+### 3. Configure Credentials
+Set your LLM API key:
+1. In `manifest.yaml` under `env.LITELLM_API_KEY`
+2. Or export: `export LITELLM_API_KEY=...`
+3. Or create a `.env` file in the project directory
+
+### 4. Run Locally
+```bash
+export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
+```
