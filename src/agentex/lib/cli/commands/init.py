@@ -24,8 +24,10 @@ TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 class TemplateType(str, Enum):
     TEMPORAL = "temporal"
     TEMPORAL_OPENAI_AGENTS = "temporal-openai-agents"
+    TEMPORAL_PYDANTIC_AI = "temporal-pydantic-ai"
     DEFAULT = "default"
     DEFAULT_LANGGRAPH = "default-langgraph"
+    DEFAULT_PYDANTIC_AI = "default-pydantic-ai"
     SYNC = "sync"
     SYNC_OPENAI_AGENTS = "sync-openai-agents"
     SYNC_LANGGRAPH = "sync-langgraph"
@@ -60,8 +62,10 @@ def create_project_structure(
     project_files = {
         TemplateType.TEMPORAL: ["acp.py", "workflow.py", "run_worker.py"],
         TemplateType.TEMPORAL_OPENAI_AGENTS: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
+        TemplateType.TEMPORAL_PYDANTIC_AI: ["acp.py", "workflow.py", "run_worker.py", "agent.py", "tools.py"],
         TemplateType.DEFAULT: ["acp.py"],
         TemplateType.DEFAULT_LANGGRAPH: ["acp.py", "graph.py", "tools.py"],
+        TemplateType.DEFAULT_PYDANTIC_AI: ["acp.py", "agent.py", "tools.py"],
         TemplateType.SYNC: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS: ["acp.py"],
         TemplateType.SYNC_LANGGRAPH: ["acp.py", "graph.py", "tools.py"],
@@ -177,6 +181,7 @@ def init():
             choices=[
                 {"name": "Basic Async ACP", "value": TemplateType.DEFAULT},
                 {"name": "Async ACP + LangGraph", "value": TemplateType.DEFAULT_LANGGRAPH},
+                {"name": "Async ACP + Pydantic AI", "value": TemplateType.DEFAULT_PYDANTIC_AI},
             ],
         ).ask()
         if not template_type:
@@ -187,6 +192,7 @@ def init():
             choices=[
                 {"name": "Basic Temporal", "value": TemplateType.TEMPORAL},
                 {"name": "Temporal + OpenAI Agents SDK (Recommended)", "value": TemplateType.TEMPORAL_OPENAI_AGENTS},
+                {"name": "Temporal + Pydantic AI", "value": TemplateType.TEMPORAL_PYDANTIC_AI},
             ],
         ).ask()
         if not template_type:
