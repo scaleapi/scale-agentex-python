@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import asyncio
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -290,6 +291,44 @@ class TestSGPAsyncTracingProcessor:
         assert max_keepalive is not None and max_keepalive > 0, (
             f"SGP async client should have keepalive enabled, got "
             f"max_keepalive_connections={max_keepalive}"
+        )
+
+    def test_cache_is_weakkeydict_and_evicts_dead_loops(self):
+        """Regression guard for the id()-reuse bug: the per-loop cache must
+        be a WeakKeyDictionary so a GC'd loop's entry is evicted.  Otherwise
+        a new loop landing at the same memory address would reuse the dead
+        loop's client, reintroducing the "bound to a different event loop"
+        error the per-loop cache was built to prevent.
+        """
+        import gc
+        import weakref
+
+        mock_env = MagicMock()
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.AsyncSGPClient"):
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+
+        # Storage type itself: WeakKeyDictionary, not plain dict.
+        assert isinstance(processor._clients_by_loop, weakref.WeakKeyDictionary)
+
+        # End-to-end check: insert under a loop, drop the loop, the entry
+        # must vanish after GC.
+        loop = asyncio.new_event_loop()
+        try:
+            processor._clients_by_loop[loop] = MagicMock()
+            assert len(processor._clients_by_loop) == 1
+        finally:
+            loop.close()
+        del loop
+        gc.collect()
+        assert len(processor._clients_by_loop) == 0, (
+            "WeakKeyDictionary should have evicted the dead loop's entry; "
+            "remaining keys would cause stale-client reuse on id() recycling."
         )
 
     async def test_disabled_processor_returns_none_client(self):

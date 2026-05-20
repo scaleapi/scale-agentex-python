@@ -1,4 +1,5 @@
 import asyncio
+import weakref
 from typing import TYPE_CHECKING, Any, Dict, override
 
 from agentex import Agentex
@@ -74,8 +75,13 @@ class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
         # Per-event-loop client cache.  httpx.AsyncClient is bound to the
         # loop that created it, so in sync-ACP / streaming contexts (where
         # the active loop can change between requests) we keep one client
-        # per loop instead of disabling keepalive entirely.
-        self._clients_by_loop_id: dict[int, "AsyncAgentex"] = {}
+        # per loop instead of disabling keepalive entirely.  The cache is a
+        # WeakKeyDictionary so a GC'd loop and its client are evicted
+        # automatically — using id() as a key would reuse entries when
+        # CPython recycles a freed loop's memory address.
+        self._clients_by_loop: weakref.WeakKeyDictionary[
+            asyncio.AbstractEventLoop, "AsyncAgentex"
+        ] = weakref.WeakKeyDictionary()
 
     def _build_client(self) -> "AsyncAgentex":
         import httpx
@@ -91,13 +97,13 @@ class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
     @property
     def client(self) -> "AsyncAgentex":
         try:
-            loop_id = id(asyncio.get_running_loop())
+            loop = asyncio.get_running_loop()
         except RuntimeError:
             return self._build_client()
-        client = self._clients_by_loop_id.get(loop_id)
+        client = self._clients_by_loop.get(loop)
         if client is None:
             client = self._build_client()
-            self._clients_by_loop_id[loop_id] = client
+            self._clients_by_loop[loop] = client
         return client
 
     # TODO(AGX1-199): Add batch create/update endpoints to Agentex API and use

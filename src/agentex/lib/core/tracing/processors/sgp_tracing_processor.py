@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import weakref
 from typing import cast, override
 
 import scale_gp_beta.lib.tracing as tracing
@@ -96,11 +97,14 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         self._config = config
         # Per-event-loop client cache.  httpx.AsyncClient ties its connection
         # pool to the loop it was created on; in sync-ACP / streaming contexts
-        # the active loop can change between requests.  Keying by loop id lets
+        # the active loop can change between requests.  Caching per loop lets
         # us keep keepalive on within each loop while staying safe across
-        # loops.  The construction can also happen at module import time when
-        # no loop is running, so we have to defer it until the first call.
-        self._clients_by_loop_id: dict[int, AsyncSGPClient] = {}
+        # loops.  The cache is a WeakKeyDictionary so a GC'd loop and its
+        # client are evicted automatically — using id() as a key would reuse
+        # entries when CPython recycles a freed loop's memory address.
+        self._clients_by_loop: weakref.WeakKeyDictionary[
+            asyncio.AbstractEventLoop, AsyncSGPClient
+        ] = weakref.WeakKeyDictionary()
         self.env_vars = EnvironmentVariables.refresh()
 
     def _build_client(self) -> AsyncSGPClient:
@@ -124,15 +128,15 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         if self.disabled:
             return None
         try:
-            loop_id = id(asyncio.get_running_loop())
+            loop = asyncio.get_running_loop()
         except RuntimeError:
             # Called from outside an event loop — should not happen on the
             # hot path, but build a one-off client rather than crashing.
             return self._build_client()
-        client = self._clients_by_loop_id.get(loop_id)
+        client = self._clients_by_loop.get(loop)
         if client is None:
             client = self._build_client()
-            self._clients_by_loop_id[loop_id] = client
+            self._clients_by_loop[loop] = client
         return client
 
     @override
