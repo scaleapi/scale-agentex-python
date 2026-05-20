@@ -35,13 +35,14 @@ from ._base_client import (
 )
 
 if TYPE_CHECKING:
-    from .resources import spans, tasks, agents, events, states, tracker, messages, deployment_history
+    from .resources import spans, tasks, agents, events, states, tracker, messages, checkpoints, deployment_history
     from .resources.spans import SpansResource, AsyncSpansResource
     from .resources.tasks import TasksResource, AsyncTasksResource
-    from .resources.agents import AgentsResource, AsyncAgentsResource
     from .resources.events import EventsResource, AsyncEventsResource
     from .resources.states import StatesResource, AsyncStatesResource
     from .resources.tracker import TrackerResource, AsyncTrackerResource
+    from .resources.checkpoints import CheckpointsResource, AsyncCheckpointsResource
+    from .resources.agents.agents import AgentsResource, AsyncAgentsResource
     from .resources.messages.messages import MessagesResource, AsyncMessagesResource
     from .resources.deployment_history import DeploymentHistoryResource, AsyncDeploymentHistoryResource
 
@@ -194,6 +195,12 @@ class Agentex(SyncAPIClient):
         from .resources.deployment_history import DeploymentHistoryResource
 
         return DeploymentHistoryResource(self)
+
+    @cached_property
+    def checkpoints(self) -> CheckpointsResource:
+        from .resources.checkpoints import CheckpointsResource
+
+        return CheckpointsResource(self)
 
     @cached_property
     def with_raw_response(self) -> AgentexWithRawResponse:
@@ -445,6 +452,12 @@ class AsyncAgentex(AsyncAPIClient):
         return AsyncDeploymentHistoryResource(self)
 
     @cached_property
+    def checkpoints(self) -> AsyncCheckpointsResource:
+        from .resources.checkpoints import AsyncCheckpointsResource
+
+        return AsyncCheckpointsResource(self)
+
+    @cached_property
     def with_raw_response(self) -> AsyncAgentexWithRawResponse:
         return AsyncAgentexWithRawResponse(self)
 
@@ -615,6 +628,12 @@ class AgentexWithRawResponse:
 
         return DeploymentHistoryResourceWithRawResponse(self._client.deployment_history)
 
+    @cached_property
+    def checkpoints(self) -> checkpoints.CheckpointsResourceWithRawResponse:
+        from .resources.checkpoints import CheckpointsResourceWithRawResponse
+
+        return CheckpointsResourceWithRawResponse(self._client.checkpoints)
+
 
 class AsyncAgentexWithRawResponse:
     _client: AsyncAgentex
@@ -669,6 +688,12 @@ class AsyncAgentexWithRawResponse:
         from .resources.deployment_history import AsyncDeploymentHistoryResourceWithRawResponse
 
         return AsyncDeploymentHistoryResourceWithRawResponse(self._client.deployment_history)
+
+    @cached_property
+    def checkpoints(self) -> checkpoints.AsyncCheckpointsResourceWithRawResponse:
+        from .resources.checkpoints import AsyncCheckpointsResourceWithRawResponse
+
+        return AsyncCheckpointsResourceWithRawResponse(self._client.checkpoints)
 
 
 class AgentexWithStreamedResponse:
@@ -725,6 +750,12 @@ class AgentexWithStreamedResponse:
 
         return DeploymentHistoryResourceWithStreamingResponse(self._client.deployment_history)
 
+    @cached_property
+    def checkpoints(self) -> checkpoints.CheckpointsResourceWithStreamingResponse:
+        from .resources.checkpoints import CheckpointsResourceWithStreamingResponse
+
+        return CheckpointsResourceWithStreamingResponse(self._client.checkpoints)
+
 
 class AsyncAgentexWithStreamedResponse:
     _client: AsyncAgentex
@@ -779,6 +810,12 @@ class AsyncAgentexWithStreamedResponse:
         from .resources.deployment_history import AsyncDeploymentHistoryResourceWithStreamingResponse
 
         return AsyncDeploymentHistoryResourceWithStreamingResponse(self._client.deployment_history)
+
+    @cached_property
+    def checkpoints(self) -> checkpoints.AsyncCheckpointsResourceWithStreamingResponse:
+        from .resources.checkpoints import AsyncCheckpointsResourceWithStreamingResponse
+
+        return AsyncCheckpointsResourceWithStreamingResponse(self._client.checkpoints)
 
 
 Client = Agentex

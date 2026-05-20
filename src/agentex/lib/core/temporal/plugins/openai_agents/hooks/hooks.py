@@ -8,18 +8,19 @@ import logging
 from typing import Any, override
 from datetime import timedelta
 
-from agents import Tool, Agent, RunHooks, RunContextWrapper
+from agents import Tool, Agent, RunContextWrapper
 from temporalio import workflow
 from agents.tool_context import ToolContext
 
 from agentex.types.text_content import TextContent
 from agentex.types.task_message_content import ToolRequestContent, ToolResponseContent
+from agentex.lib.core.observability.llm_metrics_hooks import LLMMetricsHooks
 from agentex.lib.core.temporal.plugins.openai_agents.hooks.activities import stream_lifecycle_content
 
 logger = logging.getLogger(__name__)
 
 
-class TemporalStreamingHooks(RunHooks):
+class TemporalStreamingHooks(LLMMetricsHooks):
     """Convenience hooks class for streaming OpenAI Agent lifecycle events to the AgentEx UI.
 
     This class automatically streams agent lifecycle events (tool calls, handoffs) to the

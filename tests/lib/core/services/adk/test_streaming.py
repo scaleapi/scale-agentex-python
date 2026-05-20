@@ -5,6 +5,7 @@ These exercise the in-process behavior of the streaming layer without hitting
 Redis or any AgentEx HTTP endpoints — everything below the
 ``StreamingService.stream_update`` boundary is mocked.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -53,9 +54,7 @@ def _text(tm: TaskMessage, s: str) -> StreamTaskMessageDelta:
 def _reasoning_summary(tm: TaskMessage, idx: int, s: str) -> StreamTaskMessageDelta:
     return StreamTaskMessageDelta(
         parent_task_message=tm,
-        delta=ReasoningSummaryDelta(
-            type="reasoning_summary", summary_index=idx, summary_delta=s
-        ),
+        delta=ReasoningSummaryDelta(type="reasoning_summary", summary_index=idx, summary_delta=s),
         type="delta",
     )
 
@@ -89,12 +88,7 @@ class TestDeltaCharLen:
 
     def test_reasoning_summary_delta(self) -> None:
         assert (
-            _delta_char_len(
-                ReasoningSummaryDelta(
-                    type="reasoning_summary", summary_index=0, summary_delta="abc"
-                )
-            )
-            == 3
+            _delta_char_len(ReasoningSummaryDelta(type="reasoning_summary", summary_index=0, summary_delta="abc")) == 3
         )
 
     def test_none_delta_is_zero(self) -> None:
@@ -147,12 +141,8 @@ class TestMergePair:
 
     def test_reasoning_summary_concatenates_and_keeps_index(self) -> None:
         merged = _merge_pair(
-            ReasoningSummaryDelta(
-                type="reasoning_summary", summary_index=2, summary_delta="hello "
-            ),
-            ReasoningSummaryDelta(
-                type="reasoning_summary", summary_index=2, summary_delta="world"
-            ),
+            ReasoningSummaryDelta(type="reasoning_summary", summary_index=2, summary_delta="hello "),
+            ReasoningSummaryDelta(type="reasoning_summary", summary_index=2, summary_delta="world"),
         )
         assert isinstance(merged, ReasoningSummaryDelta)
         assert merged.summary_index == 2
@@ -160,12 +150,8 @@ class TestMergePair:
 
     def test_tool_response_concatenates_and_keeps_call_id(self) -> None:
         merged = _merge_pair(
-            ToolResponseDelta(
-                type="tool_response", tool_call_id="c1", name="t", content_delta="part1 "
-            ),
-            ToolResponseDelta(
-                type="tool_response", tool_call_id="c1", name="t", content_delta="part2"
-            ),
+            ToolResponseDelta(type="tool_response", tool_call_id="c1", name="t", content_delta="part1 "),
+            ToolResponseDelta(type="tool_response", tool_call_id="c1", name="t", content_delta="part2"),
         )
         assert isinstance(merged, ToolResponseDelta)
         assert merged.tool_call_id == "c1"
@@ -199,9 +185,7 @@ class TestMergeConsecutive:
         assert len(merged) == 1
         assert merged[0] is deltas[0]  # same object, no merge happened
 
-    def test_cross_channel_order_preserved_for_reasoning(
-        self, task_message: TaskMessage
-    ) -> None:
+    def test_cross_channel_order_preserved_for_reasoning(self, task_message: TaskMessage) -> None:
         """Consecutive same-(type, index) merges; distinct channels never reorder."""
         deltas = [
             _reasoning_summary(task_message, 0, "Let me "),
@@ -213,15 +197,9 @@ class TestMergeConsecutive:
         merged = _merge_consecutive(deltas)
         # Three groups: idx=0 run, idx=1 single, idx=0 run again — order preserved.
         assert len(merged) == 3
-        assert merged[0].delta is not None and isinstance(
-            merged[0].delta, ReasoningSummaryDelta
-        )
-        assert merged[1].delta is not None and isinstance(
-            merged[1].delta, ReasoningSummaryDelta
-        )
-        assert merged[2].delta is not None and isinstance(
-            merged[2].delta, ReasoningSummaryDelta
-        )
+        assert merged[0].delta is not None and isinstance(merged[0].delta, ReasoningSummaryDelta)
+        assert merged[1].delta is not None and isinstance(merged[1].delta, ReasoningSummaryDelta)
+        assert merged[2].delta is not None and isinstance(merged[2].delta, ReasoningSummaryDelta)
         assert merged[0].delta.summary_index == 0
         assert merged[0].delta.summary_delta == "Let me think..."
         assert merged[1].delta.summary_index == 1
@@ -229,9 +207,7 @@ class TestMergeConsecutive:
         assert merged[2].delta.summary_index == 0
         assert merged[2].delta.summary_delta == " Actually, yes."
 
-    def test_per_channel_concat_matches_per_token_semantics(
-        self, task_message: TaskMessage
-    ) -> None:
+    def test_per_channel_concat_matches_per_token_semantics(self, task_message: TaskMessage) -> None:
         """Reconstructing per-channel content from the merged stream must match
         what a per-token consumer would have seen."""
         deltas = [
@@ -246,18 +222,14 @@ class TestMergeConsecutive:
         for u in merged:
             d = u.delta
             assert isinstance(d, ReasoningSummaryDelta)
-            per_index[d.summary_index] = per_index.get(d.summary_index, "") + (
-                d.summary_delta or ""
-            )
+            per_index[d.summary_index] = per_index.get(d.summary_index, "") + (d.summary_delta or "")
 
         assert per_index == {0: "Hello!", 1: "World"}
 
 
 class TestCoalescingBufferTimeWindow:
     @pytest.mark.asyncio
-    async def test_first_delta_flushes_immediately(
-        self, task_message: TaskMessage
-    ) -> None:
+    async def test_first_delta_flushes_immediately(self, task_message: TaskMessage) -> None:
         """The first-delta-immediate optimization should trip a flush in <=20ms,
         well below the 50ms time window, so consumers see ``something started``."""
         flushed: list[StreamTaskMessageDelta] = []
@@ -272,17 +244,13 @@ class TestCoalescingBufferTimeWindow:
             # Give the ticker a single tick to drain the signal.
             await asyncio.sleep(0.020)
             assert len(flushed) == 1
-            assert flushed[0].delta is not None and isinstance(
-                flushed[0].delta, TextDelta
-            )
+            assert flushed[0].delta is not None and isinstance(flushed[0].delta, TextDelta)
             assert flushed[0].delta.text_delta == "hi"
         finally:
             await buf.close()
 
     @pytest.mark.asyncio
-    async def test_size_threshold_triggers_early_flush(
-        self, task_message: TaskMessage
-    ) -> None:
+    async def test_size_threshold_triggers_early_flush(self, task_message: TaskMessage) -> None:
         """Adding more than MAX_BUFFERED_CHARS in one shot should flush within
         a single asyncio tick, well before the 50ms timer would fire."""
         flushed: list[StreamTaskMessageDelta] = []
@@ -302,17 +270,13 @@ class TestCoalescingBufferTimeWindow:
             await buf.add(_text(task_message, "A" * 200))
             await asyncio.sleep(0.010)  # half the timer interval; only size can fire here
             assert len(flushed) == 1
-            assert flushed[0].delta is not None and isinstance(
-                flushed[0].delta, TextDelta
-            )
+            assert flushed[0].delta is not None and isinstance(flushed[0].delta, TextDelta)
             assert flushed[0].delta.text_delta == "A" * 200
         finally:
             await buf.close()
 
     @pytest.mark.asyncio
-    async def test_subsequent_deltas_coalesce_within_window(
-        self, task_message: TaskMessage
-    ) -> None:
+    async def test_subsequent_deltas_coalesce_within_window(self, task_message: TaskMessage) -> None:
         """Three small deltas added inside one timer window should publish as
         one merged delta (after the initial first-flush burns)."""
         flushed: list[StreamTaskMessageDelta] = []
@@ -333,9 +297,7 @@ class TestCoalescingBufferTimeWindow:
             await asyncio.sleep(0.080)
             # All three small deltas merge into a single publish.
             assert len(flushed) == 1
-            assert flushed[0].delta is not None and isinstance(
-                flushed[0].delta, TextDelta
-            )
+            assert flushed[0].delta is not None and isinstance(flushed[0].delta, TextDelta)
             assert flushed[0].delta.text_delta == "abcdef"
         finally:
             await buf.close()
@@ -343,9 +305,7 @@ class TestCoalescingBufferTimeWindow:
 
 class TestCoalescingBufferClose:
     @pytest.mark.asyncio
-    async def test_close_drains_remaining_buffered_items(
-        self, task_message: TaskMessage
-    ) -> None:
+    async def test_close_drains_remaining_buffered_items(self, task_message: TaskMessage) -> None:
         """Items added after the last timer tick must still flush before close()
         completes — the persisted message body and the stream contract both
         require it."""
@@ -457,9 +417,7 @@ class TestStreamingTaskMessageContextModes:
             await ctx.stream_update(_text(tm, chunk))
         # Plenty of time for any background ticker — none should exist.
         await asyncio.sleep(0.080)
-        assert svc.stream_update.call_count == 0, (
-            "off mode must publish zero per-delta updates"
-        )
+        assert svc.stream_update.call_count == 0, "off mode must publish zero per-delta updates"
 
         await ctx.close()
         # The persisted message body must still contain the full assembled text,
@@ -497,6 +455,68 @@ class TestStreamingTaskMessageContextModes:
             if isinstance(call.args[0] if call.args else None, StreamTaskMessageDelta)
         ]
         assert len(delta_publishes) >= 1, "coalesced mode should publish at least one delta"
-        assert len(delta_publishes) < 4, (
-            "coalesced mode should batch at least some of the four chunks"
+        assert len(delta_publishes) < 4, "coalesced mode should batch at least some of the four chunks"
+
+
+class TestStreamingTaskMessageContextCreatedAt:
+    """Verifies the workflow-supplied created_at is forwarded to messages.create
+    on open(), and omitted (server default) when no timestamp is supplied."""
+
+    @pytest.mark.asyncio
+    async def test_open_forwards_created_at(self) -> None:
+        from datetime import datetime, timezone
+
+        from agentex._types import omit
+
+        ts = datetime(2026, 5, 13, 18, 30, 0, tzinfo=timezone.utc)
+        tm = TaskMessage(
+            id="m1",
+            task_id="t1",
+            content=TextContent(author="agent", content="", format="markdown"),
+            streaming_status="IN_PROGRESS",
         )
+        svc = MagicMock()
+        svc.stream_update = AsyncMock()
+        client = MagicMock()
+        client.messages.create = AsyncMock(return_value=tm)
+        client.messages.update = AsyncMock()
+        ctx = StreamingTaskMessageContext(
+            task_id="t1",
+            initial_content=TextContent(author="agent", content="", format="markdown"),
+            agentex_client=client,
+            streaming_service=svc,
+            streaming_mode="off",
+            created_at=ts,
+        )
+        await ctx.open()
+
+        kwargs = client.messages.create.call_args.kwargs
+        assert kwargs["created_at"] == ts
+        assert kwargs["created_at"] is not omit
+
+    @pytest.mark.asyncio
+    async def test_open_without_created_at_passes_omit(self) -> None:
+        from agentex._types import omit
+
+        tm = TaskMessage(
+            id="m1",
+            task_id="t1",
+            content=TextContent(author="agent", content="", format="markdown"),
+            streaming_status="IN_PROGRESS",
+        )
+        svc = MagicMock()
+        svc.stream_update = AsyncMock()
+        client = MagicMock()
+        client.messages.create = AsyncMock(return_value=tm)
+        client.messages.update = AsyncMock()
+        ctx = StreamingTaskMessageContext(
+            task_id="t1",
+            initial_content=TextContent(author="agent", content="", format="markdown"),
+            agentex_client=client,
+            streaming_service=svc,
+            streaming_mode="off",
+        )
+        await ctx.open()
+
+        kwargs = client.messages.create.call_args.kwargs
+        assert kwargs["created_at"] is omit
