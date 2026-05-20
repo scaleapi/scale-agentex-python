@@ -129,19 +129,20 @@ class TestSGPAsyncTracingProcessor:
 
             processor = SGPAsyncTracingProcessor(_make_config())
 
-        # Wire up the mock client after construction (constructor stores it)
-        processor.sgp_async_client = mock_async_client
+        # Force the per-loop cache to return the mock for whatever loop the
+        # test runs on, by stubbing _get_client directly.
+        processor._get_client = lambda: mock_async_client  # type: ignore[method-assign]
 
-        return processor, mock_create_span
+        return processor, mock_create_span, mock_async_client
 
     def test_processor_holds_no_per_span_state(self):
         """Stateless processor must not retain any per-span dict between lifecycle events."""
-        processor, _ = self._make_processor()
+        processor, _, _ = self._make_processor()
         assert not hasattr(processor, "_spans")
 
     async def test_span_lifecycle_produces_two_upserts(self):
         """Each span produces one upsert_batch call on start and one on end."""
-        processor, _ = self._make_processor()
+        processor, _, mock_client = self._make_processor()
 
         with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
             span = _make_span()
@@ -149,7 +150,7 @@ class TestSGPAsyncTracingProcessor:
             span.end_time = datetime.now(UTC)
             await processor.on_span_end(span)
 
-        assert processor.sgp_async_client.spans.upsert_batch.call_count == 2
+        assert mock_client.spans.upsert_batch.call_count == 2
 
     async def test_span_end_without_prior_start_still_upserts(self):
         """Cross-pod Temporal case: END activity lands on a pod that never saw START.
@@ -157,7 +158,7 @@ class TestSGPAsyncTracingProcessor:
         Today this used to be a silent no-op. After the stateless refactor it
         must still upsert a complete span via upsert_batch.
         """
-        processor, _ = self._make_processor()
+        processor, _, mock_client = self._make_processor()
 
         with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
             span = _make_span()
@@ -165,13 +166,13 @@ class TestSGPAsyncTracingProcessor:
             # No on_span_start — END lands here for the first time.
             await processor.on_span_end(span)
 
-        assert processor.sgp_async_client.spans.upsert_batch.call_count == 1
-        items = processor.sgp_async_client.spans.upsert_batch.call_args.kwargs["items"]
+        assert mock_client.spans.upsert_batch.call_count == 1
+        items = mock_client.spans.upsert_batch.call_args.kwargs["items"]
         assert len(items) == 1
 
     async def test_sgp_span_input_and_output_propagated_on_end(self):
         """on_span_end should send the span's current input and output via upsert_batch."""
-        processor, _ = self._make_processor()
+        processor, _, mock_client = self._make_processor()
 
         captured: list[MagicMock] = []
 
@@ -196,7 +197,7 @@ class TestSGPAsyncTracingProcessor:
             span.end_time = datetime.now(UTC)
             await processor.on_span_end(span)
 
-        assert processor.sgp_async_client.spans.upsert_batch.call_count == 2  # start + end
+        assert mock_client.spans.upsert_batch.call_count == 2  # start + end
         # The end-time SGPSpan should have end_time populated.
         end_span = captured[-1]
         assert end_span.end_time is not None
@@ -207,36 +208,129 @@ class TestSGPAsyncTracingProcessor:
 
     async def test_on_spans_start_sends_single_upsert_for_batch(self):
         """Given N spans at once, on_spans_start should make ONE upsert_batch HTTP call."""
-        processor, _ = self._make_processor()
+        processor, _, mock_client = self._make_processor()
 
         n = 10
         spans = [_make_span() for _ in range(n)]
         with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
             await processor.on_spans_start(spans)
 
-        assert processor.sgp_async_client.spans.upsert_batch.call_count == 1, (
+        assert mock_client.spans.upsert_batch.call_count == 1, (
             "Batched on_spans_start must make exactly one upsert_batch HTTP call"
         )
-        items = processor.sgp_async_client.spans.upsert_batch.call_args.kwargs["items"]
+        items = mock_client.spans.upsert_batch.call_args.kwargs["items"]
         assert len(items) == n
+
+    async def test_get_client_caches_per_event_loop(self):
+        """The processor must keep one client per event loop, and reuse it
+        across calls within the same loop.  This is what enables connection
+        keepalive instead of paying a TLS handshake per span.
+        """
+        mock_env = MagicMock()
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(
+            f"{MODULE}.AsyncSGPClient"
+        ) as mock_sgp_cls:
+            mock_sgp_cls.side_effect = lambda **kwargs: MagicMock()
+
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+
+            # Construction should NOT eagerly build the client (no running
+            # loop guarantee at import time).
+            assert mock_sgp_cls.call_count == 0
+
+            c1 = processor._get_client()
+            c2 = processor._get_client()
+            c3 = processor._get_client()
+
+            # First call builds the client; subsequent calls in the same
+            # loop return the cached one.
+            assert mock_sgp_cls.call_count == 1, (
+                f"Expected client to be built once per loop, but AsyncSGPClient "
+                f"was called {mock_sgp_cls.call_count} times"
+            )
+            assert c1 is c2 is c3
+
+    async def test_get_client_keepalive_is_enabled(self):
+        """Regression guard: the per-loop client must use keepalive (the whole
+        point of the per-loop cache).  Verify max_keepalive_connections > 0.
+        """
+        import httpx as _httpx
+
+        captured_limits: list[_httpx.Limits] = []
+
+        original_async_client = _httpx.AsyncClient
+
+        def capture_limits(*args, **kwargs):
+            limits = kwargs.get("limits")
+            if limits is not None:
+                captured_limits.append(limits)
+            return original_async_client(*args, **kwargs)
+
+        mock_env = MagicMock()
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(
+            f"{MODULE}.AsyncSGPClient"
+        ), patch("httpx.AsyncClient", side_effect=capture_limits):
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(_make_config())
+            processor._get_client()
+
+        assert len(captured_limits) == 1
+        max_keepalive = captured_limits[0].max_keepalive_connections
+        assert max_keepalive is not None and max_keepalive > 0, (
+            f"SGP async client should have keepalive enabled, got "
+            f"max_keepalive_connections={max_keepalive}"
+        )
+
+    async def test_disabled_processor_returns_none_client(self):
+        """When config is missing api_key/account_id, _get_client must return
+        None and no HTTP client must be constructed."""
+        from agentex.lib.types.tracing import SGPTracingProcessorConfig
+
+        mock_env = MagicMock()
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(
+            f"{MODULE}.AsyncSGPClient"
+        ) as mock_sgp_cls:
+            from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+                SGPAsyncTracingProcessor,
+            )
+
+            processor = SGPAsyncTracingProcessor(
+                SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id="")
+            )
+
+            assert processor._get_client() is None
+            assert mock_sgp_cls.call_count == 0
 
     async def test_on_spans_end_sends_single_upsert_for_batch(self):
         """Given N spans at once, on_spans_end should make ONE upsert_batch HTTP call."""
-        processor, _ = self._make_processor()
+        processor, _, mock_client = self._make_processor()
 
         n = 10
         spans = [_make_span() for _ in range(n)]
         with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()):
             await processor.on_spans_start(spans)
 
-        processor.sgp_async_client.spans.upsert_batch.reset_mock()
+        mock_client.spans.upsert_batch.reset_mock()
 
         for span in spans:
             span.end_time = datetime.now(UTC)
         await processor.on_spans_end(spans)
 
-        assert processor.sgp_async_client.spans.upsert_batch.call_count == 1, (
+        assert mock_client.spans.upsert_batch.call_count == 1, (
             "Batched on_spans_end must make exactly one upsert_batch HTTP call"
         )
-        items = processor.sgp_async_client.spans.upsert_batch.call_args.kwargs["items"]
+        items = mock_client.spans.upsert_batch.call_args.kwargs["items"]
         assert len(items) == n

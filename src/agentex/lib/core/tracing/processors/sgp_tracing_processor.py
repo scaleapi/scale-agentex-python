@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import cast, override
 
 import scale_gp_beta.lib.tracing as tracing
@@ -92,23 +93,47 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
 class SGPAsyncTracingProcessor(AsyncTracingProcessor):
     def __init__(self, config: SGPTracingProcessorConfig):
         self.disabled = config.sgp_api_key == "" or config.sgp_account_id == ""
+        self._config = config
+        # Per-event-loop client cache.  httpx.AsyncClient ties its connection
+        # pool to the loop it was created on; in sync-ACP / streaming contexts
+        # the active loop can change between requests.  Keying by loop id lets
+        # us keep keepalive on within each loop while staying safe across
+        # loops.  The construction can also happen at module import time when
+        # no loop is running, so we have to defer it until the first call.
+        self._clients_by_loop_id: dict[int, AsyncSGPClient] = {}
+        self.env_vars = EnvironmentVariables.refresh()
+
+    def _build_client(self) -> AsyncSGPClient:
         import httpx
 
-        # Disable keepalive so each HTTP call gets a fresh TCP connection,
-        # avoiding "bound to a different event loop" errors in sync-ACP.
-        self.sgp_async_client = (
-            AsyncSGPClient(
-                api_key=config.sgp_api_key,
-                account_id=config.sgp_account_id,
-                base_url=config.sgp_base_url,
-                http_client=httpx.AsyncClient(
-                    limits=httpx.Limits(max_keepalive_connections=0),
-                ),
-            )
-            if not self.disabled
-            else None
+        return AsyncSGPClient(
+            api_key=self._config.sgp_api_key,
+            account_id=self._config.sgp_account_id,
+            base_url=self._config.sgp_base_url,
+            # Keepalive ON: connections are reused within a single event loop,
+            # which removes the TLS-handshake-per-span penalty observed under
+            # load.  Cross-loop safety is preserved by the per-loop cache.
+            http_client=httpx.AsyncClient(
+                limits=httpx.Limits(max_keepalive_connections=20),
+            ),
         )
-        self.env_vars = EnvironmentVariables.refresh()
+
+    def _get_client(self) -> AsyncSGPClient | None:
+        """Return the AsyncSGPClient bound to the current event loop, creating
+        one on first use.  Returns None when the processor is disabled."""
+        if self.disabled:
+            return None
+        try:
+            loop_id = id(asyncio.get_running_loop())
+        except RuntimeError:
+            # Called from outside an event loop — should not happen on the
+            # hot path, but build a one-off client rather than crashing.
+            return self._build_client()
+        client = self._clients_by_loop_id.get(loop_id)
+        if client is None:
+            client = self._build_client()
+            self._clients_by_loop_id[loop_id] = client
+        return client
 
     @override
     async def on_span_start(self, span: Span) -> None:
@@ -123,18 +148,21 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         if not spans:
             return
 
-        sgp_spans = [_build_sgp_span(span, self.env_vars) for span in spans]
-
-        if self.disabled:
+        client = self._get_client()
+        if client is None:
             logger.warning("SGP is disabled, skipping span upsert")
             return
-        await self.sgp_async_client.spans.upsert_batch(  # type: ignore[union-attr]
-            items=[s.to_request_params() for s in sgp_spans]
-        )
+
+        sgp_spans = [_build_sgp_span(span, self.env_vars) for span in spans]
+        await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
 
     @override
     async def on_spans_end(self, spans: list[Span]) -> None:
         if not spans:
+            return
+
+        client = self._get_client()
+        if client is None:
             return
 
         sgp_spans: list[SGPSpan] = []
@@ -142,12 +170,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             sgp_span = _build_sgp_span(span, self.env_vars)
             sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
             sgp_spans.append(sgp_span)
-
-        if self.disabled:
-            return
-        await self.sgp_async_client.spans.upsert_batch(  # type: ignore[union-attr]
-            items=[s.to_request_params() for s in sgp_spans]
-        )
+        await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
 
     @override
     async def shutdown(self) -> None:

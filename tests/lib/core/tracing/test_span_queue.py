@@ -315,6 +315,97 @@ class TestAsyncSpanQueueBatchedDispatch:
         assert received == [ids]
 
 
+class TestAsyncSpanQueueLinger:
+    """The drain loop should linger briefly after the first item arrives so
+    that concurrently-emitted spans coalesce into one batch, instead of each
+    span producing its own size-1 drain cycle.
+    """
+
+    async def test_linger_coalesces_staggered_enqueues_into_one_batch(self):
+        """Spans enqueued a few ms apart should land in the SAME drain batch
+        when the linger window is wider than the gap between them.
+        """
+        received: list[list[str]] = []
+
+        async def capture_starts(spans: list[Span]) -> None:
+            received.append([s.id for s in spans])
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=capture_starts)
+        proc.on_spans_end = AsyncMock()
+
+        # Linger of 100ms; we enqueue 3 items 20ms apart, well inside the window.
+        queue = AsyncSpanQueue(linger_ms=100)
+
+        for i in range(3):
+            queue.enqueue(SpanEventType.START, _make_span(f"span-{i}"), [proc])
+            await asyncio.sleep(0.02)
+
+        await queue.shutdown()
+
+        # All three should arrive in one batched call thanks to the linger.
+        assert proc.on_spans_start.call_count == 1, (
+            f"Expected one batch from linger-coalesced enqueues, got "
+            f"{proc.on_spans_start.call_count} batches: {received}"
+        )
+        assert received == [["span-0", "span-1", "span-2"]]
+
+    async def test_linger_zero_drains_immediately(self):
+        """With linger_ms=0, the drain loop should NOT wait — staggered
+        enqueues produce separate batches (back-compat with prior behavior).
+        """
+        received: list[list[str]] = []
+
+        async def capture_starts(spans: list[Span]) -> None:
+            received.append([s.id for s in spans])
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=capture_starts)
+        proc.on_spans_end = AsyncMock()
+
+        queue = AsyncSpanQueue(linger_ms=0)
+
+        for i in range(3):
+            queue.enqueue(SpanEventType.START, _make_span(f"span-{i}"), [proc])
+            # Give the drain loop time to pick up and process each one.
+            await asyncio.sleep(0.05)
+
+        await queue.shutdown()
+
+        # With no linger, each staggered enqueue produces its own batch.
+        assert proc.on_spans_start.call_count == 3, (
+            f"Expected three size-1 batches without linger, got "
+            f"{proc.on_spans_start.call_count}: {received}"
+        )
+
+    async def test_linger_respects_batch_size_cap(self):
+        """The linger must not push batches over batch_size."""
+        received: list[list[str]] = []
+
+        async def capture_starts(spans: list[Span]) -> None:
+            received.append([s.id for s in spans])
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=capture_starts)
+        proc.on_spans_end = AsyncMock()
+
+        # Tight batch cap, generous linger.  When the cap fills, the drain
+        # should fire immediately rather than waiting out the linger.
+        queue = AsyncSpanQueue(batch_size=3, linger_ms=500)
+
+        ids = [f"span-{i}" for i in range(7)]
+        for i in ids:
+            queue.enqueue(SpanEventType.START, _make_span(i), [proc])
+
+        await queue.shutdown()
+
+        # 7 spans / batch_size=3 ⇒ at least 3 batches (3, 3, 1).  None should
+        # exceed the cap.
+        for batch in received:
+            assert len(batch) <= 3, f"Batch exceeded cap: {batch}"
+        assert sum(len(b) for b in received) == 7
+
+
 class TestAsyncSpanQueueIntegration:
     async def test_integration_with_async_trace(self):
         call_log: list[tuple[str, str]] = []

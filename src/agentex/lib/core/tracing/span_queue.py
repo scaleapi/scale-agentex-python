@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import asyncio
 from enum import Enum
 from dataclasses import dataclass
@@ -13,6 +14,25 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 logger = make_logger(__name__)
 
 _DEFAULT_BATCH_SIZE = 50
+_DEFAULT_LINGER_MS = 100
+
+
+def _read_linger_ms_env() -> int:
+    """Read AGENTEX_SPAN_QUEUE_LINGER_MS from the environment, falling back to
+    _DEFAULT_LINGER_MS when unset or unparseable.  Negative values are clamped
+    to 0 (i.e. "drain immediately, no linger")."""
+    raw = os.environ.get("AGENTEX_SPAN_QUEUE_LINGER_MS")
+    if raw is None:
+        return _DEFAULT_LINGER_MS
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        logger.warning(
+            "Ignoring invalid AGENTEX_SPAN_QUEUE_LINGER_MS=%r; using default %d ms",
+            raw,
+            _DEFAULT_LINGER_MS,
+        )
+        return _DEFAULT_LINGER_MS
 
 
 class SpanEventType(str, Enum):
@@ -35,13 +55,23 @@ class AsyncSpanQueue:
     batch are flushed concurrently, then all END events, so that per-span
     start-before-end ordering is preserved while HTTP calls for independent
     spans execute in parallel.
+
+    Once the drain loop picks up the first item, it lingers up to
+    ``linger_ms`` waiting for more items to coalesce into the same batch.
+    Without the linger the drain almost always returned size-1 batches under
+    real agent workloads, because spans typically arrive a few ms apart.
     """
 
-    def __init__(self, batch_size: int = _DEFAULT_BATCH_SIZE) -> None:
+    def __init__(
+        self,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
+        linger_ms: int | None = None,
+    ) -> None:
         self._queue: asyncio.Queue[_SpanQueueItem] = asyncio.Queue()
         self._drain_task: asyncio.Task[None] | None = None
         self._stopping = False
         self._batch_size = batch_size
+        self._linger_ms = _read_linger_ms_env() if linger_ms is None else max(0, linger_ms)
 
     def enqueue(
         self,
@@ -69,12 +99,30 @@ class AsyncSpanQueue:
             first = await self._queue.get()
             batch: list[_SpanQueueItem] = [first]
 
-            # Opportunistically grab more ready items (non-blocking).
-            while len(batch) < self._batch_size:
-                try:
-                    batch.append(self._queue.get_nowait())
-                except asyncio.QueueEmpty:
-                    break
+            # Linger briefly so spans emitted within the window coalesce into
+            # one batch.  Stop early when the batch fills, when the linger
+            # window elapses, or as soon as the queue is briefly empty *after*
+            # the deadline.
+            if self._linger_ms > 0 and not self._stopping:
+                loop = asyncio.get_running_loop()
+                deadline = loop.time() + (self._linger_ms / 1000.0)
+                while len(batch) < self._batch_size:
+                    remaining = deadline - loop.time()
+                    if remaining <= 0:
+                        break
+                    try:
+                        batch.append(
+                            await asyncio.wait_for(self._queue.get(), timeout=remaining)
+                        )
+                    except asyncio.TimeoutError:
+                        break
+            else:
+                # No linger — drain whatever is already queued and stop.
+                while len(batch) < self._batch_size:
+                    try:
+                        batch.append(self._queue.get_nowait())
+                    except asyncio.QueueEmpty:
+                        break
 
             try:
                 # Separate START and END events.  Processing all STARTs before

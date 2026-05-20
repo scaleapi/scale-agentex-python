@@ -1,4 +1,5 @@
-from typing import Any, Dict, override
+import asyncio
+from typing import TYPE_CHECKING, Any, Dict, override
 
 from agentex import Agentex
 from agentex.types.span import Span
@@ -8,6 +9,9 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     SyncTracingProcessor,
     AsyncTracingProcessor,
 )
+
+if TYPE_CHECKING:
+    from agentex import AsyncAgentex
 
 
 class AgentexSyncTracingProcessor(SyncTracingProcessor):
@@ -67,18 +71,34 @@ class AgentexSyncTracingProcessor(SyncTracingProcessor):
 
 class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
     def __init__(self, config: AgentexTracingProcessorConfig):  # noqa: ARG002
+        # Per-event-loop client cache.  httpx.AsyncClient is bound to the
+        # loop that created it, so in sync-ACP / streaming contexts (where
+        # the active loop can change between requests) we keep one client
+        # per loop instead of disabling keepalive entirely.
+        self._clients_by_loop_id: dict[int, "AsyncAgentex"] = {}
+
+    def _build_client(self) -> "AsyncAgentex":
         import httpx
 
-        # Disable keepalive so each span HTTP call gets a fresh TCP connection.
-        # Reused connections carry asyncio primitives bound to the event loop
-        # that created them; in sync-ACP / streaming contexts the loop context
-        # can shift between calls, causing "bound to a different event loop"
-        # RuntimeErrors.
-        self.client = create_async_agentex_client(
+        # Keepalive ON: connections are reused within a single event loop,
+        # eliminating the TLS-handshake-per-span penalty under load.
+        return create_async_agentex_client(
             http_client=httpx.AsyncClient(
-                limits=httpx.Limits(max_keepalive_connections=0),
+                limits=httpx.Limits(max_keepalive_connections=20),
             ),
         )
+
+    @property
+    def client(self) -> "AsyncAgentex":
+        try:
+            loop_id = id(asyncio.get_running_loop())
+        except RuntimeError:
+            return self._build_client()
+        client = self._clients_by_loop_id.get(loop_id)
+        if client is None:
+            client = self._build_client()
+            self._clients_by_loop_id[loop_id] = client
+        return client
 
     # TODO(AGX1-199): Add batch create/update endpoints to Agentex API and use
     # them here instead of one HTTP call per span.
