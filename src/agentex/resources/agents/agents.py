@@ -9,20 +9,36 @@ from typing_extensions import Literal
 import httpx
 from pydantic import ValidationError
 
-from ..types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
-from .._types import NOT_GIVEN, Body, Omit, Query, Headers, NotGiven, omit, not_given
-from .._utils import path_template, maybe_transform, async_maybe_transform
-from .._compat import cached_property
-from .._resource import SyncAPIResource, AsyncAPIResource
-from .._response import (
+from ...types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
+from ..._types import NOT_GIVEN, Body, Omit, Query, Headers, NotGiven, omit, not_given
+from ..._utils import path_template, maybe_transform, async_maybe_transform
+from ..._compat import cached_property
+from .schedules import (
+    SchedulesResource,
+    AsyncSchedulesResource,
+    SchedulesResourceWithRawResponse,
+    AsyncSchedulesResourceWithRawResponse,
+    SchedulesResourceWithStreamingResponse,
+    AsyncSchedulesResourceWithStreamingResponse,
+)
+from ..._resource import SyncAPIResource, AsyncAPIResource
+from ..._response import (
     to_raw_response_wrapper,
     to_streamed_response_wrapper,
     async_to_raw_response_wrapper,
     async_to_streamed_response_wrapper,
 )
-from ..types.agent import Agent
-from .._base_client import make_request_options
-from ..types.agent_rpc_response import (
+from .deployments import (
+    DeploymentsResource,
+    AsyncDeploymentsResource,
+    DeploymentsResourceWithRawResponse,
+    AsyncDeploymentsResourceWithRawResponse,
+    DeploymentsResourceWithStreamingResponse,
+    AsyncDeploymentsResourceWithStreamingResponse,
+)
+from ...types.agent import Agent
+from ..._base_client import make_request_options
+from ...types.agent_rpc_response import (
     AgentRpcResponse,
     SendEventResponse,
     CancelTaskResponse,
@@ -30,13 +46,21 @@ from ..types.agent_rpc_response import (
     SendMessageResponse,
     SendMessageStreamResponse,
 )
-from ..types.agent_list_response import AgentListResponse
-from ..types.shared.delete_response import DeleteResponse
+from ...types.agent_list_response import AgentListResponse
+from ...types.shared.delete_response import DeleteResponse
 
 __all__ = ["AgentsResource", "AsyncAgentsResource"]
 
 
 class AgentsResource(SyncAPIResource):
+    @cached_property
+    def deployments(self) -> DeploymentsResource:
+        return DeploymentsResource(self._client)
+
+    @cached_property
+    def schedules(self) -> SchedulesResource:
+        return SchedulesResource(self._client)
+
     @cached_property
     def with_raw_response(self) -> AgentsResourceWithRawResponse:
         """
@@ -638,6 +662,14 @@ class AgentsResource(SyncAPIResource):
 
 
 class AsyncAgentsResource(AsyncAPIResource):
+    @cached_property
+    def deployments(self) -> AsyncDeploymentsResource:
+        return AsyncDeploymentsResource(self._client)
+
+    @cached_property
+    def schedules(self) -> AsyncSchedulesResource:
+        return AsyncSchedulesResource(self._client)
+
     @cached_property
     def with_raw_response(self) -> AsyncAgentsResourceWithRawResponse:
         """
@@ -1265,6 +1297,14 @@ class AgentsResourceWithRawResponse:
             agents.rpc_by_name,
         )
 
+    @cached_property
+    def deployments(self) -> DeploymentsResourceWithRawResponse:
+        return DeploymentsResourceWithRawResponse(self._agents.deployments)
+
+    @cached_property
+    def schedules(self) -> SchedulesResourceWithRawResponse:
+        return SchedulesResourceWithRawResponse(self._agents.schedules)
+
 
 class AsyncAgentsResourceWithRawResponse:
     def __init__(self, agents: AsyncAgentsResource) -> None:
@@ -1291,6 +1331,14 @@ class AsyncAgentsResourceWithRawResponse:
         self.rpc_by_name = async_to_raw_response_wrapper(
             agents.rpc_by_name,
         )
+
+    @cached_property
+    def deployments(self) -> AsyncDeploymentsResourceWithRawResponse:
+        return AsyncDeploymentsResourceWithRawResponse(self._agents.deployments)
+
+    @cached_property
+    def schedules(self) -> AsyncSchedulesResourceWithRawResponse:
+        return AsyncSchedulesResourceWithRawResponse(self._agents.schedules)
 
 
 class AgentsResourceWithStreamingResponse:
@@ -1319,6 +1367,14 @@ class AgentsResourceWithStreamingResponse:
             agents.rpc_by_name,
         )
 
+    @cached_property
+    def deployments(self) -> DeploymentsResourceWithStreamingResponse:
+        return DeploymentsResourceWithStreamingResponse(self._agents.deployments)
+
+    @cached_property
+    def schedules(self) -> SchedulesResourceWithStreamingResponse:
+        return SchedulesResourceWithStreamingResponse(self._agents.schedules)
+
 
 class AsyncAgentsResourceWithStreamingResponse:
     def __init__(self, agents: AsyncAgentsResource) -> None:
@@ -1345,3 +1401,11 @@ class AsyncAgentsResourceWithStreamingResponse:
         self.rpc_by_name = async_to_streamed_response_wrapper(
             agents.rpc_by_name,
         )
+
+    @cached_property
+    def deployments(self) -> AsyncDeploymentsResourceWithStreamingResponse:
+        return AsyncDeploymentsResourceWithStreamingResponse(self._agents.deployments)
+
+    @cached_property
+    def schedules(self) -> AsyncSchedulesResourceWithStreamingResponse:
+        return AsyncSchedulesResourceWithStreamingResponse(self._agents.schedules)

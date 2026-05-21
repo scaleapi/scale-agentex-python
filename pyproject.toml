@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.11.2"
+version = "0.11.3"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -36,6 +36,7 @@ dependencies = [
     "mcp[cli]>=1.4.1",
     "scale-gp>=0.1.0a59",
     "openai-agents==0.14.1",
+    "pydantic-ai-slim>=1.0,<2",
     "tzlocal>=5.3.1",
     "tzdata>=2025.2",
     "pytest>=8.4.0",

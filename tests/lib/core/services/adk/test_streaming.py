@@ -353,13 +353,20 @@ class TestCoalescingBufferClose:
         assert flushed == []
 
 
-class TestCoalescingBufferCancelDuringFlush:
+class TestCoalescingBufferCloseDuringFlush:
     @pytest.mark.asyncio
-    async def test_cancel_during_flush_recovers_remaining_items(self, task_message: TaskMessage) -> None:
-        """Regression: when ``close()`` cancels the ticker mid-flush, items in
-        the local ``drained`` list must be re-enqueued so the final drain in
-        ``close()`` can recover them. Otherwise the last coalesced batch is
-        silently dropped — visible to consumers as a truncated stream.
+    async def test_close_during_flush_is_exactly_once(
+        self, task_message: TaskMessage
+    ) -> None:
+        """Regression: ``close()`` while the ticker is mid-flush must publish
+        each delta exactly once — no loss, no duplicate.
+
+        The earlier implementation cancelled the ticker task during ``close()``
+        and re-enqueued the in-flight item to avoid silent loss; that produced
+        a duplicated tail on the Redis stream when the Redis write had in fact
+        completed before the cancellation landed. The current implementation
+        signals the ticker to exit naturally after its next drain pass, which
+        gives exactly-once delivery without the duplication.
         """
         flushed: list[StreamTaskMessageDelta] = []
         first_started = asyncio.Event()
@@ -369,8 +376,8 @@ class TestCoalescingBufferCancelDuringFlush:
             flushed.append(u)
             if len(flushed) == 1:
                 first_started.set()
-                # Block the first publish until the test releases it. This
-                # guarantees the cancellation lands inside the flush loop.
+                # Block the first publish until the test releases it; this
+                # parks close() inside the ticker's flush loop.
                 await first_continue.wait()
 
         buf = CoalescingBuffer(on_flush=slow_flush)
@@ -383,18 +390,22 @@ class TestCoalescingBufferCancelDuringFlush:
         await asyncio.wait_for(first_started.wait(), timeout=2.0)
         # Trigger close() while the first flush is blocked, then release it.
         close_task = asyncio.create_task(buf.close())
+        # Give close() a tick to set _closed and start awaiting the ticker.
+        await asyncio.sleep(0)
         first_continue.set()
         await close_task
 
-        # All five chunks must appear at least once across all publishes.
-        # (The first-flushed item may duplicate; that's the documented
-        # trade-off — duplicate > silent loss.)
-        full = "".join(u.delta.text_delta or "" for u in flushed if isinstance(u.delta, TextDelta))
-        for i in range(5):
-            assert f"chunk{i}" in full, (
-                f"chunk{i} missing — silent data loss across cancel-during-flush boundary. "
-                f"flushed payloads: {[u.delta.text_delta for u in flushed if isinstance(u.delta, TextDelta)]}"
-            )
+        full = "".join(
+            u.delta.text_delta or ""
+            for u in flushed
+            if isinstance(u.delta, TextDelta)
+        )
+        # Exactly the five chunks, in order, with no duplication of any
+        # chunk's tail.
+        assert full == "chunk0chunk1chunk2chunk3chunk4", (
+            f"expected exactly-once delivery; got: {full!r} "
+            f"(payloads: {[u.delta.text_delta for u in flushed if isinstance(u.delta, TextDelta)]})"
+        )
 
 
 class TestStreamingTaskMessageContextModes:
