@@ -389,9 +389,9 @@ class TestAsyncSpanQueueLinger:
         proc.on_spans_start = AsyncMock(side_effect=capture_starts)
         proc.on_spans_end = AsyncMock()
 
-        # Tight batch cap, generous linger.  When the cap fills, the drain
-        # should fire immediately rather than waiting out the linger.
-        queue = AsyncSpanQueue(batch_size=3, linger_ms=500)
+        # Tight batch cap, linger wide enough to coalesce but not so large
+        # that the tail singleton stalls the test for hundreds of ms.
+        queue = AsyncSpanQueue(batch_size=3, linger_ms=50)
 
         ids = [f"span-{i}" for i in range(7)]
         for i in ids:
