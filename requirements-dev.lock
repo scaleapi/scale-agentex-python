@@ -112,10 +112,13 @@ frozenlist==1.8.0
     # via aiosignal
 fsspec==2026.3.0
     # via huggingface-hub
+genai-prices==0.0.61
+    # via pydantic-ai-slim
 google-auth==2.49.1
     # via kubernetes
 griffelib==2.0.2
     # via openai-agents
+    # via pydantic-ai-slim
 h11==0.16.0
     # via httpcore
     # via uvicorn
@@ -126,12 +129,15 @@ httpcore==1.0.9
 httpx==0.28.1
     # via agentex-sdk
     # via anthropic
+    # via genai-prices
     # via httpx-aiohttp
     # via huggingface-hub
     # via langsmith
     # via litellm
     # via mcp
     # via openai
+    # via pydantic-ai-slim
+    # via pydantic-graph
     # via respx
     # via scale-gp
     # via scale-gp-beta
@@ -196,6 +202,8 @@ langsmith==0.7.22
     # via langchain-core
 litellm==1.83.7
     # via agentex-sdk
+logfire-api==4.33.0
+    # via pydantic-graph
 markdown-it-py==3.0.0
     # via rich
 markupsafe==3.0.3
@@ -236,6 +244,7 @@ opentelemetry-api==1.40.0
     # via ddtrace
     # via opentelemetry-sdk
     # via opentelemetry-semantic-conventions
+    # via pydantic-ai-slim
 opentelemetry-sdk==1.40.0
     # via agentex-sdk
 opentelemetry-semantic-conventions==0.61b0
@@ -287,18 +296,25 @@ pydantic==2.12.5
     # via agentex-sdk
     # via anthropic
     # via fastapi
+    # via genai-prices
     # via langchain-core
     # via langsmith
     # via litellm
     # via mcp
     # via openai
     # via openai-agents
+    # via pydantic-ai-slim
+    # via pydantic-graph
     # via pydantic-settings
     # via python-on-whales
     # via scale-gp
     # via scale-gp-beta
+pydantic-ai-slim==1.101.0
+    # via agentex-sdk
 pydantic-core==2.41.5
     # via pydantic
+pydantic-graph==1.101.0
+    # via pydantic-ai-slim
 pydantic-settings==2.13.1
     # via mcp
 pygments==2.19.2
@@ -308,7 +324,6 @@ pygments==2.19.2
     # via rich
 pyjwt==2.12.1
     # via mcp
-    # via redis
 pyright==1.1.399
 pytest==8.4.2
     # via agentex-sdk
@@ -339,7 +354,7 @@ pyzmq==27.1.0
     # via jupyter-client
 questionary==2.1.1
     # via agentex-sdk
-redis==5.3.1
+redis==7.4.0
     # via agentex-sdk
 referencing==0.37.0
     # via jsonschema
@@ -459,6 +474,8 @@ typing-inspection==0.4.2
     # via fastapi
     # via mcp
     # via pydantic
+    # via pydantic-ai-slim
+    # via pydantic-graph
     # via pydantic-settings
 tzdata==2025.3
     # via agentex-sdk
