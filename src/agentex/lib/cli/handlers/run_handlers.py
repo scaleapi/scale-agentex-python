@@ -365,12 +365,18 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
     env_vars = {
         "ENVIRONMENT": "development",
         "TEMPORAL_ADDRESS": "localhost:7233",
-        "REDIS_URL": "redis://localhost:6379",
         "AGENT_NAME": manifest.agent.name,
         "ACP_TYPE": manifest.agent.acp_type,
         "ACP_URL": f"http://{manifest.local_development.agent.host_address}",  # type: ignore[union-attr]
         "ACP_PORT": str(manifest.local_development.agent.port),  # type: ignore[union-attr]
     }
+
+    # Gate the default REDIS_URL on an explicit manifest flag. Agents that don't use
+    # adk.messages/adk.streaming can set local_development.redis_enabled: false to avoid
+    # the localhost:6379 default, which otherwise causes silent request hangs when no
+    # local Redis is reachable (MAY-1086).
+    if manifest.local_development is None or manifest.local_development.redis_enabled:
+        env_vars["REDIS_URL"] = "redis://localhost:6379"
 
     if manifest.agent.agent_input_type:
         env_vars["AGENT_INPUT_TYPE"] = manifest.agent.agent_input_type
