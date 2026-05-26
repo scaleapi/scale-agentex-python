@@ -8,6 +8,9 @@ authors = [
 { name = "Agentex", email = "roxanne.farhad@scale.com" },
 ]
 
+# Bare client surface only — the Stainless-generated REST client
+# (`from agentex import Agentex, AsyncAgentex`). Everything else lives
+# under the `[adk]` extra; see [project.optional-dependencies] below.
 dependencies = [
     "httpx>=0.28.1,<0.29",
     "pydantic>=2.0.0, <3",
@@ -15,37 +18,6 @@ dependencies = [
     "anyio>=3.5.0, <5",
     "distro>=1.7.0, <2",
     "sniffio",
-    "typer>=0.16,<0.17",
-    "questionary>=2.0.1,<3",
-    "rich>=13.9.2,<14",
-    "fastapi>=0.115.0",
-    "starlette>=0.49.1",
-    "uvicorn>=0.31.1",
-    "watchfiles>=0.24.0,<1.0",
-    "python-on-whales>=0.73.0,<0.74",
-    "pyyaml>=6.0.2,<7",
-    "jsonschema>=4.23.0,<5",
-    "jsonref>=1.1.0,<2",
-    "temporalio>=1.26.0,<2",
-    "aiohttp>=3.10.10,<4",
-    "redis>=5.2.0,<8",
-    "litellm>=1.83.7,<2",
-    "kubernetes>=25.0.0,<36.0.0",
-    "jinja2>=3.1.3,<4",
-    "mcp>=1.4.1",
-    "scale-gp>=0.1.0a59",
-    "openai-agents==0.14.1",
-    "pydantic-ai-slim>=1.0,<2",
-    "json_log_formatter>=1.1.1",
-    "scale-gp-beta>=0.2.0",
-    "openai>=2.2,<3", # Required by openai-agents; litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
-    "cloudpickle>=3.1.1",
-    "ddtrace>=3.13.0",
-    "yaspin>=3.1.0",
-    "claude-agent-sdk>=0.1.0",
-    "langgraph-checkpoint>=2.0.0",
-    "opentelemetry-sdk>=1.20.0",
-    "opentelemetry-api>=1.20.0",
 ]
 
 requires-python = ">= 3.11,<4"
@@ -70,7 +42,64 @@ Homepage = "https://github.com/scaleapi/scale-agentex-python"
 Repository = "https://github.com/scaleapi/scale-agentex-python"
 
 [project.optional-dependencies]
-aiohttp = ["aiohttp", "httpx_aiohttp>=0.1.9"]
+# httpx-aiohttp transport. Independent from `[adk]`.
+aiohttp = ["aiohttp>=3.10.10,<4", "httpx_aiohttp>=0.1.9"]
+
+# CLI surface — what `agentex.lib.cli.*` and `agentex.lib.sdk.config.*` need.
+# Consumers that import only `agentex.lib.cli.handlers`, `agentex.lib.sdk.config`,
+# or use the `agentex` CLI entry point can pin `agentex-sdk[cli]` instead of the
+# full `[adk]` extra.
+cli = [
+    "typer>=0.16,<0.17",
+    "questionary>=2.0.1,<3",
+    "rich>=13.9.2,<14",
+    "yaspin>=3.1.0",
+    "pyyaml>=6.0.2,<7",
+    "python-on-whales>=0.73.0,<0.74",
+    "kubernetes>=25.0.0,<36.0.0",
+    "jsonref>=1.1.0,<2",
+    "jsonschema>=4.23.0,<5",
+    "jinja2>=3.1.3,<4",
+    "watchfiles>=0.24.0,<1.0",
+]
+
+# Tracing / observability — what `agentex.lib.core.tracing.*` and
+# `agentex.lib.core.observability.*` need. Consumers that only attach the
+# SGP/Datadog/OTel tracing processors can pin `agentex-sdk[observability]`.
+observability = [
+    "ddtrace>=3.13.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "json_log_formatter>=1.1.1",
+]
+
+# Full ADK surface — everything under `agentex.lib.*`. Includes [cli] +
+# [observability] plus the ACP server, Temporal, Redis streaming, LLM provider
+# integrations, and MCP. Required for full agent authoring.
+adk = [
+    "agentex-sdk[cli,observability]",
+    # ACP server (FastAPI app surface)
+    "fastapi>=0.115.0",
+    "starlette>=0.49.1",
+    "uvicorn>=0.31.1",
+    "aiohttp>=3.10.10,<4",
+    # Temporal workflows
+    "temporalio>=1.26.0,<2",
+    "cloudpickle>=3.1.1",
+    # Async streaming infra
+    "redis>=5.2.0,<8",
+    # LLM provider integrations
+    "litellm>=1.83.7,<2",
+    "openai-agents==0.14.1",
+    "openai>=2.2,<3", # Required by openai-agents; litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
+    "claude-agent-sdk>=0.1.0",
+    "pydantic-ai-slim>=1.0,<2",
+    "langgraph-checkpoint>=2.0.0",
+    "scale-gp>=0.1.0a59",
+    "scale-gp-beta>=0.2.0",
+    "mcp>=1.4.1",
+]
+
 dev = [
     "ruff>=0.3.4",
 ]
