@@ -56,7 +56,16 @@ class TemporalACPConfig(AsyncACPConfig):
             encoding/decoding payloads (e.g. encryption, compression). NOTE:
             this only configures the ACP (client) side. The worker side must
             be configured separately via ``AgentexWorker(payload_codec=...)``
-            with the SAME codec, or decode will fail at runtime.
+            with the SAME codec, or decode will fail at runtime. Cannot be
+            combined with ``OpenAIAgentsPlugin``; use ``data_converter``
+            instead in that case.
+        data_converter: Optional pre-built ``temporalio.converter.DataConverter``.
+            Use this when composing the ``OpenAIAgentsPlugin`` with a payload
+            codec: build a ``DataConverter(payload_converter_class=
+            OpenAIPayloadConverter, payload_codec=...)`` and pass it here.
+            Mutually exclusive with ``payload_codec``. The worker side must
+            be configured separately via ``AgentexWorker(data_converter=...)``
+            with the SAME converter, or decode will fail at runtime.
     """
 
     type: Literal["temporal"] = Field(default="temporal", frozen=True)
@@ -64,6 +73,7 @@ class TemporalACPConfig(AsyncACPConfig):
     plugins: list[Any] = Field(default=[], frozen=True)
     interceptors: list[Any] = Field(default=[], frozen=True)
     payload_codec: Any = Field(default=None, frozen=True)
+    data_converter: Any = Field(default=None, frozen=True)
 
     @field_validator("plugins")
     @classmethod

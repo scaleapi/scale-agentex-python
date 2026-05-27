@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from temporalio.client import Client, Plugin as ClientPlugin
-from temporalio.converter import PayloadCodec
+from temporalio.converter import (
+    DataConverter,
+    PayloadCodec,
+    DefaultPayloadConverter,
+)
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 
@@ -68,6 +72,28 @@ class TestTemporalClient:
         mock_get.assert_awaited_once()
         assert mock_get.await_args.kwargs["payload_codec"] is codec
 
+    def test_init_stores_data_converter(self):
+        from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
+
+        dc = DataConverter(payload_codec=_NoopCodec())
+        client = TemporalClient(data_converter=dc)
+        assert client._data_converter is dc
+
+    def test_init_default_data_converter_is_none(self):
+        from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
+
+        assert TemporalClient()._data_converter is None
+
+    async def test_create_propagates_data_converter_to_get_temporal_client(self):
+        import agentex.lib.core.clients.temporal.temporal_client as module
+
+        dc = DataConverter(payload_codec=_NoopCodec())
+        with patch.object(module, "get_temporal_client", new=AsyncMock(return_value=object())) as mock_get:
+            await module.TemporalClient.create(temporal_address="localhost:7233", plugins=[], data_converter=dc)
+
+        mock_get.assert_awaited_once()
+        assert mock_get.await_args.kwargs["data_converter"] is dc
+
 
 class TestGetTemporalClientUtils:
     async def test_no_codec_uses_pydantic_data_converter_unchanged(self):
@@ -96,7 +122,7 @@ class TestGetTemporalClientUtils:
 
         codec = _NoopCodec()
         with _patch_openai_plugin(), _mock_connect() as mock_connect:
-            with pytest.raises(ValueError, match="payload_codec is not supported alongside OpenAIAgentsPlugin"):
+            with pytest.raises(ValueError, match="silently dropped by the plugin's data-converter transformer"):
                 await get_temporal_client(
                     temporal_address="localhost:7233",
                     plugins=[_FakeOpenAIPlugin()],
@@ -111,6 +137,42 @@ class TestGetTemporalClientUtils:
             await get_temporal_client(temporal_address="localhost:7233", plugins=[_FakeOpenAIPlugin()])
 
         assert "data_converter" not in mock_connect.await_args.kwargs
+
+    async def test_data_converter_passthrough_with_openai_plugin(self):
+        from agentex.lib.core.clients.temporal.utils import get_temporal_client
+
+        dc = DataConverter(payload_codec=_NoopCodec())
+        with _patch_openai_plugin(), _mock_connect() as mock_connect:
+            await get_temporal_client(
+                temporal_address="localhost:7233",
+                plugins=[_FakeOpenAIPlugin()],
+                data_converter=dc,
+            )
+
+        assert mock_connect.await_args.kwargs["data_converter"] is dc
+
+    async def test_data_converter_passthrough_without_openai_plugin(self):
+        from agentex.lib.core.clients.temporal.utils import get_temporal_client
+
+        dc = DataConverter(payload_converter_class=DefaultPayloadConverter)
+        with _mock_connect() as mock_connect:
+            await get_temporal_client(temporal_address="localhost:7233", data_converter=dc)
+
+        assert mock_connect.await_args.kwargs["data_converter"] is dc
+
+    async def test_codec_and_data_converter_together_raises(self):
+        from agentex.lib.core.clients.temporal.utils import get_temporal_client
+
+        codec = _NoopCodec()
+        dc = DataConverter(payload_codec=codec)
+        with _mock_connect() as mock_connect:
+            with pytest.raises(ValueError, match="Pass payload_codec inside `data_converter`"):
+                await get_temporal_client(
+                    temporal_address="localhost:7233",
+                    payload_codec=codec,
+                    data_converter=dc,
+                )
+            mock_connect.assert_not_awaited()
 
 
 class TestGetTemporalClientWorker:
@@ -140,7 +202,7 @@ class TestGetTemporalClientWorker:
 
         codec = _NoopCodec()
         with _patch_openai_plugin(), _mock_connect() as mock_connect:
-            with pytest.raises(ValueError, match="payload_codec is not supported alongside OpenAIAgentsPlugin"):
+            with pytest.raises(ValueError, match="silently dropped by the plugin's data-converter transformer"):
                 await get_temporal_client(
                     temporal_address="localhost:7233",
                     plugins=[_FakeOpenAIPlugin()],
@@ -155,6 +217,42 @@ class TestGetTemporalClientWorker:
             await get_temporal_client(temporal_address="localhost:7233", plugins=[_FakeOpenAIPlugin()])
 
         assert "data_converter" not in mock_connect.await_args.kwargs
+
+    async def test_data_converter_passthrough_with_openai_plugin(self):
+        from agentex.lib.core.temporal.workers.worker import get_temporal_client
+
+        dc = DataConverter(payload_codec=_NoopCodec())
+        with _patch_openai_plugin(), _mock_connect() as mock_connect:
+            await get_temporal_client(
+                temporal_address="localhost:7233",
+                plugins=[_FakeOpenAIPlugin()],
+                data_converter=dc,
+            )
+
+        assert mock_connect.await_args.kwargs["data_converter"] is dc
+
+    async def test_data_converter_passthrough_without_openai_plugin(self):
+        from agentex.lib.core.temporal.workers.worker import get_temporal_client
+
+        dc = DataConverter(payload_converter_class=DefaultPayloadConverter)
+        with _mock_connect() as mock_connect:
+            await get_temporal_client(temporal_address="localhost:7233", data_converter=dc)
+
+        assert mock_connect.await_args.kwargs["data_converter"] is dc
+
+    async def test_codec_and_data_converter_together_raises(self):
+        from agentex.lib.core.temporal.workers.worker import get_temporal_client
+
+        codec = _NoopCodec()
+        dc = DataConverter(payload_codec=codec)
+        with _mock_connect() as mock_connect:
+            with pytest.raises(ValueError, match="Pass payload_codec inside `data_converter`"):
+                await get_temporal_client(
+                    temporal_address="localhost:7233",
+                    payload_codec=codec,
+                    data_converter=dc,
+                )
+            mock_connect.assert_not_awaited()
 
 
 class TestAgentexWorkerCodec:
@@ -171,6 +269,19 @@ class TestAgentexWorkerCodec:
         worker = AgentexWorker(task_queue="test-queue", health_check_port=80)
         assert worker.payload_codec is None
 
+    def test_worker_stores_data_converter(self):
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        dc = DataConverter(payload_codec=_NoopCodec())
+        worker = AgentexWorker(task_queue="test-queue", health_check_port=80, data_converter=dc)
+        assert worker.data_converter is dc
+
+    def test_worker_default_data_converter_is_none(self):
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        worker = AgentexWorker(task_queue="test-queue", health_check_port=80)
+        assert worker.data_converter is None
+
 
 class TestTemporalACPCodec:
     def test_create_stores_payload_codec(self):
@@ -185,6 +296,19 @@ class TestTemporalACPCodec:
 
         acp = TemporalACP.create(temporal_address="localhost:7233")
         assert acp._payload_codec is None
+
+    def test_create_stores_data_converter(self):
+        from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
+
+        dc = DataConverter(payload_codec=_NoopCodec())
+        acp = TemporalACP.create(temporal_address="localhost:7233", data_converter=dc)
+        assert acp._data_converter is dc
+
+    def test_create_default_data_converter_is_none(self):
+        from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
+
+        acp = TemporalACP.create(temporal_address="localhost:7233")
+        assert acp._data_converter is None
 
 
 class TestFastACPConfigCodec:
@@ -218,3 +342,34 @@ class TestFastACPConfigCodec:
             FastACP.create("async", config=config)
 
         assert captured.get("payload_codec") is codec
+
+    def test_config_default_data_converter_is_none(self):
+        from agentex.lib.types.fastacp import TemporalACPConfig
+
+        assert TemporalACPConfig().data_converter is None
+
+    def test_config_accepts_data_converter(self):
+        from agentex.lib.types.fastacp import TemporalACPConfig
+
+        dc = DataConverter(payload_codec=_NoopCodec())
+        assert TemporalACPConfig(data_converter=dc).data_converter is dc
+
+    def test_fastacp_forwards_data_converter_from_config(self):
+        from agentex.lib.types.fastacp import TemporalACPConfig
+        from agentex.lib.sdk.fastacp.fastacp import FastACP
+
+        dc = DataConverter(payload_codec=_NoopCodec())
+        config = TemporalACPConfig(data_converter=dc)
+        captured: dict[str, Any] = {}
+
+        def fake_create(**kwargs):
+            captured.update(kwargs)
+            return object()
+
+        with patch(
+            "agentex.lib.sdk.fastacp.impl.temporal_acp.TemporalACP.create",
+            side_effect=fake_create,
+        ):
+            FastACP.create("async", config=config)
+
+        assert captured.get("data_converter") is dc

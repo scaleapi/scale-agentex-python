@@ -4,7 +4,7 @@ from typing import Any, Callable, AsyncGenerator, override
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from temporalio.converter import PayloadCodec
+from temporalio.converter import DataConverter, PayloadCodec
 
 from agentex.protocol.acp import (
     SendEventParams,
@@ -33,6 +33,7 @@ class TemporalACP(BaseACPServer):
         plugins: list[Any] | None = None,
         interceptors: list[Any] | None = None,
         payload_codec: PayloadCodec | None = None,
+        data_converter: DataConverter | None = None,
     ):
         super().__init__()
         self._temporal_task_service = temporal_task_service
@@ -40,6 +41,7 @@ class TemporalACP(BaseACPServer):
         self._plugins = plugins or []
         self._interceptors = interceptors or []
         self._payload_codec = payload_codec
+        self._data_converter = data_converter
 
     @classmethod
     @override
@@ -49,12 +51,17 @@ class TemporalACP(BaseACPServer):
         plugins: list[Any] | None = None,
         interceptors: list[Any] | None = None,
         payload_codec: PayloadCodec | None = None,
+        data_converter: DataConverter | None = None,
     ) -> "TemporalACP":
         logger.info("Initializing TemporalACP instance")
 
         # Create instance without temporal client initially
         temporal_acp = cls(
-            temporal_address=temporal_address, plugins=plugins, interceptors=interceptors, payload_codec=payload_codec
+            temporal_address=temporal_address,
+            plugins=plugins,
+            interceptors=interceptors,
+            payload_codec=payload_codec,
+            data_converter=data_converter,
         )
         temporal_acp._setup_handlers()
         logger.info("TemporalACP instance initialized now")
@@ -71,7 +78,10 @@ class TemporalACP(BaseACPServer):
             if self._temporal_task_service is None:
                 env_vars = EnvironmentVariables.refresh()
                 temporal_client = await TemporalClient.create(
-                    temporal_address=self._temporal_address, plugins=self._plugins, payload_codec=self._payload_codec
+                    temporal_address=self._temporal_address,
+                    plugins=self._plugins,
+                    payload_codec=self._payload_codec,
+                    data_converter=self._data_converter,
                 )
                 self._temporal_task_service = TemporalTaskService(
                     temporal_client=temporal_client,
