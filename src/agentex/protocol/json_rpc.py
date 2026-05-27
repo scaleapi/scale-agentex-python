@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+# Preserve the config the previous `agentex.lib.utils.model_utils.BaseModel`
+# applied — `from_attributes=True` lets callers `model_validate` from
+# attribute-bearing objects (not just dicts); `populate_by_name=True` is a
+# harmless default future-proofing for any field aliases.
+_PROTOCOL_MODEL_CONFIG = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class JSONRPCError(BaseModel):
@@ -13,6 +19,8 @@ class JSONRPCError(BaseModel):
         message: The error message
         data: The error data
     """
+
+    model_config = _PROTOCOL_MODEL_CONFIG
 
     code: int
     message: str
@@ -29,6 +37,8 @@ class JSONRPCRequest(BaseModel):
         id: The ID of the request
     """
 
+    model_config = _PROTOCOL_MODEL_CONFIG
+
     jsonrpc: Literal["2.0"] = "2.0"
     method: str
     params: dict[str, Any]
@@ -44,6 +54,8 @@ class JSONRPCResponse(BaseModel):
         error: The error of the request
         id: The ID of the request
     """
+
+    model_config = _PROTOCOL_MODEL_CONFIG
 
     jsonrpc: Literal["2.0"] = "2.0"
     result: dict[str, Any] | None = None
