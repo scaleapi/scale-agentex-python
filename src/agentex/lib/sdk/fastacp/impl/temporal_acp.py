@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from temporalio.converter import PayloadCodec
 
-from agentex.lib.types.acp import (
+from agentex.protocol.acp import (
     SendEventParams,
     CancelTaskParams,
     CreateTaskParams,

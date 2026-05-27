@@ -55,11 +55,27 @@ The package provides the `agentex` CLI with these main commands:
 
 ### Code Structure
 - `/src/agentex/` - Core SDK and generated API client code
+- `/src/agentex/protocol/` - **Canonical** location for wire-protocol shapes
+  (JSON-RPC envelopes, ACP method-param types). Depends only on `pydantic`
+  and the Stainless-generated `agentex.types.*` surface, so it is safe to
+  import from a future slim REST-only install.
+  - `acp.py` - `RPCMethod`, `CreateTaskParams`, `SendMessageParams`,
+    `SendEventParams`, `CancelTaskParams`, `RPC_SYNC_METHODS`,
+    `PARAMS_MODEL_BY_METHOD`
+  - `json_rpc.py` - `JSONRPCRequest`, `JSONRPCResponse`, `JSONRPCError`
 - `/src/agentex/lib/` - Custom library code (not modified by code generator)
   - `/cli/` - Command-line interface implementation
   - `/core/` - Core services, adapters, and temporal workflows
   - `/sdk/` - SDK utilities and FastACP implementation
   - `/types/` - Custom type definitions
+    - `acp.py`, `json_rpc.py` - **back-compat shims** re-exporting from
+      `agentex.protocol.*`. Existing `from agentex.lib.types.{acp,json_rpc}
+      import ...` keeps working; new code should import from the canonical
+      `agentex.protocol.*` paths.
+    - Other modules (`tracing`, `agent_card`, `credentials`, `fastacp`,
+      `llm_messages`, `converters`, etc.) stay here — they have heavier
+      transitive deps (temporal, openai-agents, model_utils/yaml) and
+      aren't slim-safe.
   - `/utils/` - Utility functions
 - `/examples/` - Example implementations and tutorials
 - `/tests/` - Test suites

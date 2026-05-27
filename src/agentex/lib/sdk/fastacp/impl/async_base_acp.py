@@ -1,7 +1,7 @@
 from typing import Any
 from typing_extensions import override
 
-from agentex.lib.types.acp import (
+from agentex.protocol.acp import (
     SendEventParams,
     CancelTaskParams,
     CreateTaskParams,

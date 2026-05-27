@@ -4,7 +4,7 @@ from typing import AsyncGenerator, List
 from agentex.lib import adk
 from agentex.lib.adk.providers._modules.sync_provider import SyncStreamingProvider, convert_openai_to_agentex_events
 from agentex.lib.sdk.fastacp.fastacp import FastACP
-from agentex.lib.types.acp import SendMessageParams
+from agentex.protocol.acp import SendMessageParams
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.model_utils import BaseModel
