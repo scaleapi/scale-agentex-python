@@ -31,12 +31,12 @@ def test_acp_shim_re_exports_all_original_symbols() -> None:
     still be importable from that path via the back-compat shim."""
     # Importing each symbol; ImportError here means the shim regressed.
     from agentex.lib.types.acp import (  # noqa: F401
-        PARAMS_MODEL_BY_METHOD,
         RPC_SYNC_METHODS,
-        CancelTaskParams,
-        CreateTaskParams,
+        PARAMS_MODEL_BY_METHOD,
         RPCMethod,
         SendEventParams,
+        CancelTaskParams,
+        CreateTaskParams,
         SendMessageParams,
     )
 
@@ -55,8 +55,8 @@ def test_acp_shim_classes_are_identical_to_canonical() -> None:
     """Shim re-exports must be the *same* class objects as the canonical
     path. Different objects would break ``isinstance`` for code that
     mixes import styles."""
-    from agentex.lib.types import acp as shim
     from agentex.protocol import acp as canon
+    from agentex.lib.types import acp as shim
 
     assert shim.RPCMethod is canon.RPCMethod
     assert shim.CreateTaskParams is canon.CreateTaskParams
@@ -69,8 +69,8 @@ def test_acp_shim_classes_are_identical_to_canonical() -> None:
 
 def test_json_rpc_shim_classes_are_identical_to_canonical() -> None:
     """Same identity check for the JSON-RPC envelope types."""
-    from agentex.lib.types import json_rpc as shim
     from agentex.protocol import json_rpc as canon
+    from agentex.lib.types import json_rpc as shim
 
     assert shim.JSONRPCError is canon.JSONRPCError
     assert shim.JSONRPCRequest is canon.JSONRPCRequest
