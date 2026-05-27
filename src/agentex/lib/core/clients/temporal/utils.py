@@ -6,7 +6,7 @@ from typing import Any
 from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.worker import Interceptor
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
-from temporalio.converter import DataConverter, PayloadCodec
+from temporalio.converter import PayloadCodec, DataConverter
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
@@ -118,17 +118,11 @@ async def get_temporal_client(
             "kwarg. Specifying both is ambiguous."
         )
 
-    # Check if OpenAI plugin is present - it needs to configure its own data converter
     # Lazy import to avoid pulling in opentelemetry.sdk for non-Temporal agents
     from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
     has_openai_plugin = any(isinstance(p, OpenAIAgentsPlugin) for p in (plugins or []))
 
-    # When the OpenAI plugin is present, its `_data_converter` transformer
-    # builds a fresh DataConverter (without any codec) if none is supplied,
-    # so a standalone `payload_codec` kwarg would be silently dropped and
-    # payloads would land in Temporal in plain text. Guide the caller to
-    # the working composition path instead.
     if has_openai_plugin and payload_codec is not None and data_converter is None:
         raise ValueError(
             "payload_codec passed as a kwarg alongside OpenAIAgentsPlugin would "
@@ -145,10 +139,6 @@ async def get_temporal_client(
     }
 
     if data_converter is not None:
-        # Caller supplied a pre-built converter. With the OpenAI plugin present
-        # and `payload_converter_class=OpenAIPayloadConverter` (or subclass),
-        # the plugin's `_data_converter` transformer passes it through intact,
-        # preserving any payload_codec.
         connect_kwargs["data_converter"] = data_converter
     elif not has_openai_plugin:
         dc = pydantic_data_converter

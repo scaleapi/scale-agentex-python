@@ -7,7 +7,7 @@ from collections.abc import Callable
 from temporalio.client import Client, WorkflowExecutionStatus
 from temporalio.common import RetryPolicy as TemporalRetryPolicy, WorkflowIDReusePolicy
 from temporalio.service import RPCError, RPCStatusCode
-from temporalio.converter import DataConverter, PayloadCodec
+from temporalio.converter import PayloadCodec, DataConverter
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel

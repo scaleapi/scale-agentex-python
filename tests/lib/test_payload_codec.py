@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.converter import (
-    DataConverter,
     PayloadCodec,
+    DataConverter,
     DefaultPayloadConverter,
 )
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -353,6 +353,16 @@ class TestFastACPConfigCodec:
 
         dc = DataConverter(payload_codec=_NoopCodec())
         assert TemporalACPConfig(data_converter=dc).data_converter is dc
+
+    def test_config_rejects_codec_and_data_converter_together(self):
+        from pydantic import ValidationError
+
+        from agentex.lib.types.fastacp import TemporalACPConfig
+
+        codec = _NoopCodec()
+        dc = DataConverter(payload_codec=codec)
+        with pytest.raises(ValidationError, match="Pass payload_codec inside `data_converter`"):
+            TemporalACPConfig(payload_codec=codec, data_converter=dc)
 
     def test_fastacp_forwards_data_converter_from_config(self):
         from agentex.lib.types.fastacp import TemporalACPConfig

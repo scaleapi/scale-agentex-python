@@ -4,7 +4,7 @@ from typing import Any, Callable, AsyncGenerator, override
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from temporalio.converter import DataConverter, PayloadCodec
+from temporalio.converter import PayloadCodec, DataConverter
 
 from agentex.protocol.acp import (
     SendEventParams,
