@@ -500,3 +500,70 @@ class TestAsyncSpanQueueIntegration:
         # END should still carry output and end_time
         assert end_spans[0].output is not None
         assert end_spans[0].end_time is not None
+
+
+class TestAsyncSpanQueueMetrics:
+    async def test_enqueue_records_enqueued_metric(self, monkeypatch):
+        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
+        import agentex.lib.core.observability.tracing_metrics_recording as recording
+
+        recording._metrics_enabled = None
+        mock_metrics = MagicMock()
+        proc = _make_processor()
+        queue = AsyncSpanQueue()
+
+        with patch(
+            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics",
+            return_value=mock_metrics,
+        ):
+            queue.enqueue(SpanEventType.START, _make_span(), [proc])
+            await asyncio.sleep(0.05)
+            await queue.shutdown()
+
+        mock_metrics.span_events_enqueued.add.assert_any_call(1, {"event_type": "start"})
+
+    async def test_processor_failure_records_export_failure(self, monkeypatch):
+        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
+        import agentex.lib.core.observability.tracing_metrics_recording as recording
+
+        recording._metrics_enabled = None
+        mock_metrics = MagicMock()
+
+        class ExportError(Exception):
+            pass
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=ExportError("Error code: 401 - denied"))
+        proc.on_spans_end = AsyncMock()
+        queue = AsyncSpanQueue()
+
+        with patch(
+            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics",
+            return_value=mock_metrics,
+        ):
+            queue.enqueue(SpanEventType.START, _make_span(), [proc])
+            await asyncio.sleep(0.05)
+            await queue.shutdown()
+
+        mock_metrics.export_batch_failures.add.assert_called_once()
+        mock_metrics.export_spans_failed.add.assert_called_once()
+
+    async def test_enqueue_overhead_with_metrics_disabled(self, monkeypatch):
+        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "0")
+        import agentex.lib.core.observability.tracing_metrics_recording as recording
+
+        recording._metrics_enabled = None
+        proc = _make_processor()
+        queue = AsyncSpanQueue()
+
+        with patch(
+            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics"
+        ) as mock_get:
+            start = time.monotonic()
+            for _ in range(200):
+                queue.enqueue(SpanEventType.START, _make_span(), [proc])
+            elapsed = time.monotonic() - start
+            await queue.shutdown()
+
+        assert elapsed < 0.05, f"disabled metrics enqueue too slow: {elapsed:.3f}s"
+        mock_get.assert_not_called()

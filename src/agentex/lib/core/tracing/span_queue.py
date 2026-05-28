@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+import time
 import asyncio
 from enum import Enum
 from dataclasses import dataclass
 
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.observability import tracing_metrics_recording as _metrics
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     AsyncTracingProcessor,
 )
@@ -45,6 +47,7 @@ class _SpanQueueItem:
     event_type: SpanEventType
     span: Span
     processors: list[AsyncTracingProcessor]
+    enqueued_at: float | None = None
 
 
 class AsyncSpanQueue:
@@ -81,9 +84,18 @@ class AsyncSpanQueue:
     ) -> None:
         if self._stopping:
             logger.warning("Span queue is shutting down, dropping %s event for span %s", event_type.value, span.id)
+            _metrics.record_span_dropped("shutdown")
             return
         self._ensure_drain_running()
-        self._queue.put_nowait(_SpanQueueItem(event_type=event_type, span=span, processors=processors))
+        self._queue.put_nowait(
+            _SpanQueueItem(
+                event_type=event_type,
+                span=span,
+                processors=processors,
+                enqueued_at=_metrics.monotonic_if_enabled(),
+            )
+        )
+        _metrics.record_span_enqueued(event_type.value)
 
     def _ensure_drain_running(self) -> None:
         if self._drain_task is None or self._drain_task.done():
@@ -125,6 +137,11 @@ class AsyncSpanQueue:
                         break
 
             try:
+                _metrics.record_batch_coalesced(
+                    queue_depth=self._queue.qsize(),
+                    batch_items=batch,
+                )
+
                 # Separate START and END events.  Processing all STARTs before
                 # ENDs ensures that on_span_start completes before on_span_end
                 # for any span whose both events land in the same batch.
@@ -132,9 +149,21 @@ class AsyncSpanQueue:
                 ends = [i for i in batch if i.event_type == SpanEventType.END]
 
                 if starts:
+                    phase_start = time.perf_counter()
                     await self._process_items(starts)
+                    _metrics.record_batch_phase(
+                        phase="start",
+                        size=len(starts),
+                        duration_ms=(time.perf_counter() - phase_start) * 1000.0,
+                    )
                 if ends:
+                    phase_start = time.perf_counter()
                     await self._process_items(ends)
+                    _metrics.record_batch_phase(
+                        phase="end",
+                        size=len(ends),
+                        duration_ms=(time.perf_counter() - phase_start) * 1000.0,
+                    )
             finally:
                 for _ in batch:
                     self._queue.task_done()
@@ -168,12 +197,18 @@ class AsyncSpanQueue:
                     await p.on_spans_start(spans)
                 else:
                     await p.on_spans_end(spans)
-            except Exception:
+            except Exception as exc:
                 logger.exception(
                     "Tracing processor %s failed handling %d spans during %s",
                     type(p).__name__,
                     len(spans),
                     event_type.value,
+                )
+                _metrics.record_export_failure(
+                    processor=p,
+                    event_type=event_type.value,
+                    span_count=len(spans),
+                    exc=exc,
                 )
 
         await asyncio.gather(*[_handle(p, spans) for p, spans in by_processor.items()])
@@ -189,9 +224,11 @@ class AsyncSpanQueue:
         try:
             await asyncio.wait_for(self._queue.join(), timeout=timeout)
         except asyncio.TimeoutError:
+            remaining = self._queue.qsize()
             logger.warning(
-                "Span queue shutdown timed out after %.1fs with %d items remaining", timeout, self._queue.qsize()
+                "Span queue shutdown timed out after %.1fs with %d items remaining", timeout, remaining
             )
+            _metrics.record_shutdown_timeout(remaining_items=remaining)
         if self._drain_task is not None and not self._drain_task.done():
             self._drain_task.cancel()
             try:
