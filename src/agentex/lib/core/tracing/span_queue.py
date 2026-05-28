@@ -15,24 +15,46 @@ logger = make_logger(__name__)
 
 _DEFAULT_BATCH_SIZE = 50
 _DEFAULT_LINGER_MS = 100
+# 0 == unbounded (preserves prior behavior).  A bound makes backpressure
+# visible (dropped spans are counted) and caps worst-case memory.
+_DEFAULT_MAX_SIZE = 0
+# Total attempts per batch for a *transient* failure (1 == no retry).
+_DEFAULT_MAX_RETRIES = 1
+# HTTP statuses worth retrying at the queue level.  These are explicit
+# backpressure / transient signals; everything else (esp. 401/403/4xx auth and
+# validation errors) is a permanent failure that re-enqueuing cannot fix.  Note
+# the underlying SGP client already retries these internally, so queue-level
+# retry only helps when its budget is exhausted by a longer blip.
+_RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+
+
+def _read_int_env(name: str, default: int, *, minimum: int = 0) -> int:
+    """Read a non-negative int from the environment, clamping to ``minimum``
+    and falling back to ``default`` when unset or unparseable."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return max(minimum, int(raw))
+    except ValueError:
+        logger.warning("Ignoring invalid %s=%r; using default %d", name, raw, default)
+        return default
 
 
 def _read_linger_ms_env() -> int:
     """Read AGENTEX_SPAN_QUEUE_LINGER_MS from the environment, falling back to
     _DEFAULT_LINGER_MS when unset or unparseable.  Negative values are clamped
     to 0 (i.e. "drain immediately, no linger")."""
-    raw = os.environ.get("AGENTEX_SPAN_QUEUE_LINGER_MS")
-    if raw is None:
-        return _DEFAULT_LINGER_MS
-    try:
-        return max(0, int(raw))
-    except ValueError:
-        logger.warning(
-            "Ignoring invalid AGENTEX_SPAN_QUEUE_LINGER_MS=%r; using default %d ms",
-            raw,
-            _DEFAULT_LINGER_MS,
-        )
-        return _DEFAULT_LINGER_MS
+    return _read_int_env("AGENTEX_SPAN_QUEUE_LINGER_MS", _DEFAULT_LINGER_MS)
+
+
+def _is_retryable_exc(exc: BaseException) -> bool:
+    """A failure is retryable only when it carries an HTTP ``status_code`` in
+    the retryable set.  Connection/timeout errors (no status_code) have already
+    been retried by the SGP client, and bare exceptions (programming bugs) must
+    never be retried — re-enqueuing them would spin forever."""
+    status_code = getattr(exc, "status_code", None)
+    return isinstance(status_code, int) and status_code in _RETRYABLE_STATUS_CODES
 
 
 class SpanEventType(str, Enum):
@@ -45,6 +67,9 @@ class _SpanQueueItem:
     event_type: SpanEventType
     span: Span
     processors: list[AsyncTracingProcessor]
+    # Number of times this item has already been dispatched.  Used to bound
+    # re-enqueue on transient failures.
+    attempts: int = 0
 
 
 class AsyncSpanQueue:
@@ -60,18 +85,64 @@ class AsyncSpanQueue:
     ``linger_ms`` waiting for more items to coalesce into the same batch.
     Without the linger the drain almost always returned size-1 batches under
     real agent workloads, because spans typically arrive a few ms apart.
+
+    Reliability:
+    - ``max_size`` bounds the queue.  When full, new events are dropped and
+      counted (see ``dropped_spans``) rather than growing memory without limit.
+      ``0`` keeps the queue unbounded.
+    - A batch that fails with a *transient* HTTP status (429/5xx) is
+      re-enqueued up to ``max_retries`` total attempts.  Permanent failures
+      (auth/validation/bugs) are dropped and counted immediately.
     """
 
     def __init__(
         self,
         batch_size: int = _DEFAULT_BATCH_SIZE,
         linger_ms: int | None = None,
+        max_size: int | None = None,
+        max_retries: int | None = None,
     ) -> None:
-        self._queue: asyncio.Queue[_SpanQueueItem] = asyncio.Queue()
+        resolved_max_size = (
+            _read_int_env("AGENTEX_SPAN_QUEUE_MAX_SIZE", _DEFAULT_MAX_SIZE) if max_size is None else max(0, max_size)
+        )
+        self._queue: asyncio.Queue[_SpanQueueItem] = asyncio.Queue(maxsize=resolved_max_size)
         self._drain_task: asyncio.Task[None] | None = None
         self._stopping = False
         self._batch_size = batch_size
         self._linger_ms = _read_linger_ms_env() if linger_ms is None else max(0, linger_ms)
+        self._max_retries = (
+            _read_int_env("AGENTEX_SPAN_QUEUE_MAX_RETRIES", _DEFAULT_MAX_RETRIES, minimum=1)
+            if max_retries is None
+            else max(1, max_retries)
+        )
+        # Total spans dropped for any reason (full queue, shutdown, permanent
+        # failure, exhausted retries).  Surfaced for metrics/observability so
+        # span loss stops being silent.
+        self._dropped_spans = 0
+
+    @property
+    def dropped_spans(self) -> int:
+        """Cumulative count of spans dropped (never delivered)."""
+        return self._dropped_spans
+
+    @property
+    def depth(self) -> int:
+        """Current number of items waiting in the queue."""
+        return self._queue.qsize()
+
+    def _record_drop(self, count: int, reason: str) -> None:
+        if count <= 0:
+            return
+        self._dropped_spans += count
+        # Warn on the first drop and then sparsely, so a drop storm is visible
+        # without flooding the log.
+        if self._dropped_spans == count or self._dropped_spans % 100 < count:
+            logger.warning(
+                "Span queue dropped %d span(s) (%s); %d dropped in total",
+                count,
+                reason,
+                self._dropped_spans,
+            )
 
     def enqueue(
         self,
@@ -80,10 +151,13 @@ class AsyncSpanQueue:
         processors: list[AsyncTracingProcessor],
     ) -> None:
         if self._stopping:
-            logger.warning("Span queue is shutting down, dropping %s event for span %s", event_type.value, span.id)
+            self._record_drop(1, "queue shutting down")
             return
         self._ensure_drain_running()
-        self._queue.put_nowait(_SpanQueueItem(event_type=event_type, span=span, processors=processors))
+        try:
+            self._queue.put_nowait(_SpanQueueItem(event_type=event_type, span=span, processors=processors))
+        except asyncio.QueueFull:
+            self._record_drop(1, "queue full")
 
     def _ensure_drain_running(self) -> None:
         if self._drain_task is None or self._drain_task.done():
@@ -111,9 +185,7 @@ class AsyncSpanQueue:
                     if remaining <= 0:
                         break
                     try:
-                        batch.append(
-                            await asyncio.wait_for(self._queue.get(), timeout=remaining)
-                        )
+                        batch.append(await asyncio.wait_for(self._queue.get(), timeout=remaining))
                     except asyncio.TimeoutError:
                         break
             else:
@@ -141,8 +213,7 @@ class AsyncSpanQueue:
                 # Release span data for GC.
                 batch.clear()
 
-    @staticmethod
-    async def _process_items(items: list[_SpanQueueItem]) -> None:
+    async def _process_items(self, items: list[_SpanQueueItem]) -> None:
         """Dispatch a batch of same-event-type items to each processor in one call.
 
         Groups spans by processor so each processor sees its full slice of the
@@ -157,26 +228,78 @@ class AsyncSpanQueue:
             "_process_items requires all items to share the same event_type; "
             "callers must split START and END batches before dispatching."
         )
-        by_processor: dict[AsyncTracingProcessor, list[Span]] = {}
+        by_processor: dict[AsyncTracingProcessor, list[_SpanQueueItem]] = {}
         for item in items:
             for p in item.processors:
-                by_processor.setdefault(p, []).append(item.span)
+                by_processor.setdefault(p, []).append(item)
 
-        async def _handle(p: AsyncTracingProcessor, spans: list[Span]) -> None:
-            try:
-                if event_type == SpanEventType.START:
-                    await p.on_spans_start(spans)
-                else:
-                    await p.on_spans_end(spans)
-            except Exception:
-                logger.exception(
-                    "Tracing processor %s failed handling %d spans during %s",
+        await asyncio.gather(*[self._handle(p, batch, event_type) for p, batch in by_processor.items()])
+
+    async def _handle(
+        self,
+        p: AsyncTracingProcessor,
+        items: list[_SpanQueueItem],
+        event_type: SpanEventType,
+    ) -> None:
+        spans = [item.span for item in items]
+        try:
+            if event_type == SpanEventType.START:
+                await p.on_spans_start(spans)
+            else:
+                await p.on_spans_end(spans)
+        except Exception as exc:
+            self._handle_failure(p, items, event_type, exc)
+
+    def _handle_failure(
+        self,
+        p: AsyncTracingProcessor,
+        items: list[_SpanQueueItem],
+        event_type: SpanEventType,
+        exc: Exception,
+    ) -> None:
+        # Re-enqueue transient failures, drop everything else.  Re-enqueue is
+        # bounded by max_retries, so even during shutdown the queue's join()
+        # still terminates after a finite number of passes.
+        if _is_retryable_exc(exc):
+            retriable = [item for item in items if item.attempts + 1 < self._max_retries]
+            exhausted = len(items) - len(retriable)
+            if exhausted:
+                self._record_drop(exhausted, f"{type(p).__name__} retries exhausted during {event_type.value}")
+            for item in retriable:
+                self._reenqueue(item, p)
+            if retriable:
+                logger.warning(
+                    "Tracing processor %s failed handling %d spans during %s (%s); re-enqueued %d for retry",
                     type(p).__name__,
-                    len(spans),
+                    len(items),
                     event_type.value,
+                    type(exc).__name__,
+                    len(retriable),
                 )
+            return
 
-        await asyncio.gather(*[_handle(p, spans) for p, spans in by_processor.items()])
+        self._record_drop(len(items), f"{type(p).__name__} permanent failure during {event_type.value}")
+        logger.exception(
+            "Tracing processor %s failed handling %d spans during %s",
+            type(p).__name__,
+            len(items),
+            event_type.value,
+        )
+
+    def _reenqueue(self, item: _SpanQueueItem, p: AsyncTracingProcessor) -> None:
+        """Put a single failed item back on the queue, scoped to the processor
+        that failed, with an incremented attempt count."""
+        try:
+            self._queue.put_nowait(
+                _SpanQueueItem(
+                    event_type=item.event_type,
+                    span=item.span,
+                    processors=[p],
+                    attempts=item.attempts + 1,
+                )
+            )
+        except asyncio.QueueFull:
+            self._record_drop(1, "queue full on retry")
 
     # ------------------------------------------------------------------
     # Shutdown
