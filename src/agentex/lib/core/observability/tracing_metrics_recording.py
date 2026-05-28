@@ -97,13 +97,13 @@ def record_batch_phase(*, phase: str, size: int, duration_ms: float) -> None:
         pass
 
 
-def record_export_success(*, event_type: str, span_count: int) -> None:
+def record_export_success(*, event_type: str, span_count: int, processor: str = "sgp") -> None:
     if not is_metrics_enabled():
         return
     try:
         from agentex.lib.core.observability.tracing_metrics import get_tracing_metrics
 
-        attrs = {"processor": "sgp", "event_type": event_type, "outcome": "success"}
+        attrs = {"processor": processor, "event_type": event_type, "outcome": "success"}
         metrics = get_tracing_metrics()
         metrics.export_batches.add(1, attrs)
         metrics.export_spans.add(span_count, attrs)

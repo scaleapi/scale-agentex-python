@@ -148,7 +148,7 @@ def classify_export_error(exc: BaseException) -> tuple[str, str]:
             return "client_error", "4xx"
         if 500 <= code < 600:
             return "server_error", "5xx"
-        return "other_error", str(code)
+        return "other_error", "other"
 
     if any(s in name for s in ("Authentication", "Permission")):
         return "authentication", "unknown"

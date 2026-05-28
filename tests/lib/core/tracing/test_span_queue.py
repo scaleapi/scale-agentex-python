@@ -503,6 +503,29 @@ class TestAsyncSpanQueueIntegration:
 
 
 class TestAsyncSpanQueueMetrics:
+    async def test_batch_coalesced_records_depth_including_batch(self, monkeypatch):
+        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
+        import agentex.lib.core.observability.tracing_metrics_recording as recording
+
+        recording._metrics_enabled = None
+        proc = _make_processor()
+        queue = AsyncSpanQueue(linger_ms=0)
+        recorded_depths: list[int] = []
+
+        def capture_coalesced(*, queue_depth: int, batch_items: object) -> None:
+            recorded_depths.append(queue_depth)
+
+        with patch.object(recording, "record_batch_coalesced", side_effect=capture_coalesced):
+            for _ in range(3):
+                queue.enqueue(SpanEventType.START, _make_span(), [proc])
+            await asyncio.sleep(0.05)
+            await queue.shutdown()
+
+        assert recorded_depths, "expected at least one coalesced batch"
+        assert recorded_depths[0] >= 3, (
+            f"queue_depth should include batch items removed from queue, got {recorded_depths[0]}"
+        )
+
     async def test_enqueue_records_enqueued_metric(self, monkeypatch):
         monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
         import agentex.lib.core.observability.tracing_metrics_recording as recording

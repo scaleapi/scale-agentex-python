@@ -138,7 +138,7 @@ class AsyncSpanQueue:
 
             try:
                 _metrics.record_batch_coalesced(
-                    queue_depth=self._queue.qsize(),
+                    queue_depth=self._queue.qsize() + len(batch),
                     batch_items=batch,
                 )
 

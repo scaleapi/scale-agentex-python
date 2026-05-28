@@ -33,6 +33,13 @@ class TestClassifyExportError:
         exc = APIError("Error code: 503 - unavailable")
         assert classify_export_error(exc) == ("server_error", "5xx")
 
+    def test_out_of_range_code_uses_bounded_label(self):
+        class APIError(Exception):
+            pass
+
+        exc = APIError("Error code: 100 - continue")
+        assert classify_export_error(exc) == ("other_error", "other")
+
     def test_timeout_by_name(self):
         class APITimeoutError(Exception):
             pass

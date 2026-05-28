@@ -122,3 +122,20 @@ class TestRecordingHelpers:
             12,
             {"processor": "sgp", "event_type": "end", "outcome": "success"},
         )
+
+    def test_record_export_success_accepts_processor_label(self, monkeypatch):
+        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
+        recording._metrics_enabled = None
+        mock_metrics = MagicMock()
+        with patch(
+            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics",
+            return_value=mock_metrics,
+        ):
+            recording.record_export_success(
+                event_type="start", span_count=3, processor="other"
+            )
+
+        mock_metrics.export_batches.add.assert_called_once_with(
+            1,
+            {"processor": "other", "event_type": "start", "outcome": "success"},
+        )
