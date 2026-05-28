@@ -12,8 +12,8 @@ from scale_gp_beta.lib.tracing.span import Span as SGPSpan
 from agentex.types.span import Span
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.observability import tracing_metrics_recording as _metrics
+from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     SyncTracingProcessor,
     AsyncTracingProcessor,

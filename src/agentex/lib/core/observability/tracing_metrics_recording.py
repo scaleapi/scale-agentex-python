@@ -9,10 +9,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import TYPE_CHECKING, Protocol, Sequence
-
-if TYPE_CHECKING:
-    from agentex.lib.core.tracing.span_queue import _SpanQueueItem
+from typing import Protocol, Sequence
 
 
 class _HasEnqueuedAt(Protocol):
@@ -125,9 +122,9 @@ def record_export_failure(
         return
     try:
         from agentex.lib.core.observability.tracing_metrics import (
-            classify_export_error,
-            get_tracing_metrics,
             processor_label,
+            get_tracing_metrics,
+            classify_export_error,
         )
 
         error_class, http_code = classify_export_error(exc)

@@ -5,9 +5,9 @@ from __future__ import annotations
 import agentex.lib.core.observability.tracing_metrics as tracing_metrics
 from agentex.lib.core.observability.tracing_metrics import (
     TracingMetrics,
-    classify_export_error,
-    get_tracing_metrics,
     processor_label,
+    get_tracing_metrics,
+    classify_export_error,
 )
 
 
