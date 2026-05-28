@@ -12,6 +12,8 @@ __all__ = ["Task"]
 class Task(BaseModel):
     id: str
 
+    cleaned_at: Optional[datetime] = None
+
     created_at: Optional[datetime] = None
 
     name: Optional[str] = None

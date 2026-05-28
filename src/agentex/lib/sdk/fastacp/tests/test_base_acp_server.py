@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from agentex.lib.types.acp import (
+from agentex.protocol.acp import (
     RPCMethod,
     SendEventParams,
     CancelTaskParams,

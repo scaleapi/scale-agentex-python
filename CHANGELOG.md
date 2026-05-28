@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.11.4 (2026-05-26)
+
+Full Changelog: [v0.11.3...v0.11.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.3...v0.11.4)
+
+### Chores
+
+* **deps:** relax redis pin to support 6.x/7.x ([#363](https://github.com/scaleapi/scale-agentex-python/issues/363)) ([7817ced](https://github.com/scaleapi/scale-agentex-python/commit/7817ced90b80430a69b6f51a6841aa921a33a093))
+* relax requires-python floor to &gt;= 3.11 ([#366](https://github.com/scaleapi/scale-agentex-python/issues/366)) ([a064f92](https://github.com/scaleapi/scale-agentex-python/commit/a064f928c0fac868ec1486ef49382a9baf73b5e0))
+
+## 0.11.3 (2026-05-20)
+
+Full Changelog: [v0.11.2...v0.11.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.2...v0.11.3)
+
+### Features
+
+* added Pydantic AI sync, async, temporal integration ([#359](https://github.com/scaleapi/scale-agentex-python/issues/359)) ([781dfe1](https://github.com/scaleapi/scale-agentex-python/commit/781dfe172373c2e01fb642b3c98af6908c98218a))
+* **api:** add schedule, checkpoints, and deployment endpoints ([53b5c36](https://github.com/scaleapi/scale-agentex-python/commit/53b5c3673e54ee4b49debd049483f1a1d4b0673d))
+
+
+### Bug Fixes
+
+* resolve lint and test failures from new endpoints ([#360](https://github.com/scaleapi/scale-agentex-python/issues/360)) ([bdf129c](https://github.com/scaleapi/scale-agentex-python/commit/bdf129c8ab976ed84aa9932d5585a753280a6a34))
+
 ## 0.11.2 (2026-05-13)
 
 Full Changelog: [v0.11.1...v0.11.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.1...v0.11.2)

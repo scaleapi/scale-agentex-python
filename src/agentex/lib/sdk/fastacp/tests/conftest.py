@@ -13,12 +13,12 @@ import pytest_asyncio
 
 from agentex.types.task import Task
 from agentex.types.agent import Agent
-from agentex.lib.types.acp import (
+from agentex.protocol.acp import (
     CancelTaskParams,
     CreateTaskParams,
     SendMessageParams,
 )
-from agentex.lib.types.json_rpc import JSONRPCRequest
+from agentex.protocol.json_rpc import JSONRPCRequest
 from agentex.types.task_message import TaskMessageContent
 from agentex.types.task_message_content import TextContent
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
