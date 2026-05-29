@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.11.5 (2026-05-29)
+
+Full Changelog: [v0.11.4...v0.11.5](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.4...v0.11.5)
+
+### Features
+
+* **api:** add cleaned_at field to task response types ([38ed338](https://github.com/scaleapi/scale-agentex-python/commit/38ed3384094f7f07f6b2482489f457fd1dc4f76d))
+* **deps:** bump openai-agents to &gt;=0.14.3 for scale-sandbox oai_agents adapter ([#375](https://github.com/scaleapi/scale-agentex-python/issues/375)) ([e1b31d9](https://github.com/scaleapi/scale-agentex-python/commit/e1b31d91abadec572989b805592b788500d61994))
+
+
+### Performance Improvements
+
+* **tracing:** span queue linger + per-loop httpx keepalive ([#362](https://github.com/scaleapi/scale-agentex-python/issues/362)) ([feec842](https://github.com/scaleapi/scale-agentex-python/commit/feec8426f79e9f02533451d44997717655fd33f2))
+
+
+### Chores
+
+* **deps:** drop unused runtime deps and exclude tests from wheel ([#367](https://github.com/scaleapi/scale-agentex-python/issues/367)) ([f4303d1](https://github.com/scaleapi/scale-agentex-python/commit/f4303d1e7211783d19beca6554e44eb73bb29c42))
+
+
+### Refactors
+
+* **types:** promote protocol types to agentex.protocol.* ([#371](https://github.com/scaleapi/scale-agentex-python/issues/371)) ([6f1c14f](https://github.com/scaleapi/scale-agentex-python/commit/6f1c14fd61077da52038361642a9fbc4a0a56c8b))
+
 ## 0.11.4 (2026-05-26)
 
 Full Changelog: [v0.11.3...v0.11.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.3...v0.11.4)
