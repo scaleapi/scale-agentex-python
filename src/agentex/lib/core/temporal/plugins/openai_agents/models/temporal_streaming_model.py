@@ -64,8 +64,10 @@ from agentex.lib import adk
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task_message_delta import TextDelta, ReasoningContentDelta, ReasoningSummaryDelta
+from agentex.types.tool_request_delta import ToolRequestDelta
 from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
 from agentex.types.task_message_content import TextContent, ReasoningContent
+from agentex.types.tool_request_content import ToolRequestContent
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     streaming_task_id,
@@ -671,6 +673,7 @@ class TemporalStreamingModel(Model):
 
                 # Process events from the Responses API stream
                 function_calls_in_progress = {}  # Track function calls being streamed
+                tool_call_contexts: dict[int, Any] = {}  # Open streaming contexts per function call
 
                 async for event in stream:
                     event_count += 1
@@ -723,13 +726,28 @@ class TemporalStreamingModel(Model):
                                 ).__aenter__()
                         elif item and getattr(item, 'type', None) == 'function_call':
                             # Track the function call being streamed
+                            call_id = getattr(item, 'call_id', '')
+                            name = getattr(item, 'name', '')
                             function_calls_in_progress[output_index] = {
                                 'id': getattr(item, 'id', ''),
-                                'call_id': getattr(item, 'call_id', ''),
-                                'name': getattr(item, 'name', ''),
+                                'call_id': call_id,
+                                'name': name,
                                 'arguments': getattr(item, 'arguments', ''),
                             }
                             logger.debug(f"[TemporalStreamingModel] Starting function call: {item.name}")
+
+                            # Open a streaming context so tool-call args stream live to the UI
+                            tool_ctx = await adk.streaming.streaming_task_message_context(
+                                task_id=task_id,
+                                initial_content=ToolRequestContent(
+                                    author="agent",
+                                    tool_call_id=call_id,
+                                    name=name,
+                                    arguments={},
+                                ),
+                                streaming_mode=self.streaming_mode,
+                            ).__aenter__()
+                            tool_call_contexts[output_index] = tool_ctx
 
                         elif item and getattr(item, 'type', None) == 'message':
                             # Track the message being streamed
@@ -751,6 +769,25 @@ class TemporalStreamingModel(Model):
                         if output_index in function_calls_in_progress:
                             function_calls_in_progress[output_index]['arguments'] += delta
                             logger.debug(f"[TemporalStreamingModel] Function call args delta: {delta[:50]}...")
+
+                            # Stream the args delta live to the UI. The delta event carries
+                            # no call_id/name, so pull them from function_calls_in_progress
+                            # (populated at announce time, keyed by output_index).
+                            ctx = tool_call_contexts.get(output_index)
+                            if ctx is not None and delta:
+                                try:
+                                    await ctx.stream_update(StreamTaskMessageDelta(
+                                        parent_task_message=ctx.task_message,
+                                        delta=ToolRequestDelta(
+                                            type="tool_request",
+                                            tool_call_id=function_calls_in_progress[output_index]['call_id'],
+                                            name=function_calls_in_progress[output_index]['name'],
+                                            arguments_delta=delta,
+                                        ),
+                                        type="delta",
+                                    ))
+                                except Exception as e:
+                                    logger.warning(f"Failed to stream tool-call args delta: {e}")
 
                     elif isinstance(event, ResponseFunctionCallArgumentsDoneEvent):
                         # Function call arguments complete
@@ -874,6 +911,14 @@ class TemporalStreamingModel(Model):
                                 )
                                 output_items.append(tool_call)
 
+                            # Close + pop the live-streaming context for this tool call
+                            ctx = tool_call_contexts.pop(output_index, None)
+                            if ctx is not None:
+                                try:
+                                    await ctx.close()
+                                except Exception as e:
+                                    logger.warning(f"Failed to close tool-call stream context: {e}")
+
                     elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
                         # New reasoning part/summary started - reset accumulator
                         part = getattr(event, 'part', None)
@@ -906,6 +951,16 @@ class TemporalStreamingModel(Model):
                 if streaming_context:
                     await streaming_context.close()
                     streaming_context = None
+
+                # Close any tool-call contexts still open (e.g. stream ended without
+                # a per-item done event). A partial / invalid-JSON args close can
+                # raise, so guard each one so it never crashes the activity.
+                for ctx in tool_call_contexts.values():
+                    try:
+                        await ctx.close()
+                    except Exception as e:
+                        logger.warning(f"Failed to close tool-call stream context: {e}")
+                tool_call_contexts.clear()
 
                 # Build the response from output items collected during streaming
                 # Create output from the items we collected
@@ -1061,6 +1116,17 @@ class TemporalStreamingModel(Model):
 
             except Exception as e:
                 logger.error(f"Error using Responses API: {e}")
+                # Close any tool-call streaming contexts still open so the error
+                # path doesn't leak open contexts. A partial / invalid-JSON args
+                # close can raise, so guard each one. tool_call_contexts may be
+                # unbound if the error fired before the stream loop started.
+                for ctx in locals().get("tool_call_contexts", {}).values():
+                    try:
+                        await ctx.close()
+                    except Exception as close_err:
+                        logger.warning(f"Failed to close tool-call stream context: {close_err}")
+                if "tool_call_contexts" in locals():
+                    tool_call_contexts.clear()
                 # LLMMetricsHooks.on_llm_end doesn't fire on error, so emit the
                 # failure counter here. Best-effort so the typed LLM exception
                 # always propagates intact for retry / circuit-breaker logic.

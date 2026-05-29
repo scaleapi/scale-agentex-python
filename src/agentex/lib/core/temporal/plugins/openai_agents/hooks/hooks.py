@@ -13,7 +13,7 @@ from temporalio import workflow
 from agents.tool_context import ToolContext
 
 from agentex.types.text_content import TextContent
-from agentex.types.task_message_content import ToolRequestContent, ToolResponseContent
+from agentex.types.task_message_content import ToolResponseContent
 from agentex.lib.core.observability.llm_metrics_hooks import LLMMetricsHooks
 from agentex.lib.core.temporal.plugins.openai_agents.hooks.activities import stream_lifecycle_content
 
@@ -106,44 +106,25 @@ class TemporalStreamingHooks(LLMMetricsHooks):
 
     @override
     async def on_tool_start(self, context: RunContextWrapper, agent: Agent, tool: Tool) -> None:  # noqa: ARG002
-        """Stream tool request when a tool starts execution.
+        """Called when a tool starts execution.
 
-        Extracts the tool_call_id and tool_arguments from the context and streams a
-        ToolRequestContent message to the UI showing that the tool is about to execute.
+        The tool request (ToolRequestContent) is now streamed live by the model
+        layer (TemporalStreamingModel) as the function-call arguments arrive over
+        the Responses API stream. Emitting it again here would double-render the
+        tool request in the UI, so this hook no longer streams a ToolRequestContent.
+        The tool *result* is still streamed by on_tool_end (ToolResponseContent),
+        which the model stream does not produce.
 
         Args:
             context: The run context wrapper (will be a ToolContext with tool_call_id and tool_arguments)
             agent: The agent executing the tool
             tool: The tool being executed
         """
-        import json
-
         tool_context = context if isinstance(context, ToolContext) else None
         tool_call_id = tool_context.tool_call_id if tool_context else f"call_{id(tool)}"
-
-        # Extract tool arguments from context
-        tool_arguments = {}
-        if tool_context and hasattr(tool_context, 'tool_arguments'):
-            try:
-                # tool_arguments is a JSON string, parse it
-                tool_arguments = json.loads(tool_context.tool_arguments)
-            except (json.JSONDecodeError, TypeError):
-                # If parsing fails, log and use empty dict
-                logger.warning(f"Failed to parse tool arguments: {tool_context.tool_arguments}")
-                tool_arguments = {}
-
-        await workflow.execute_activity(
-            stream_lifecycle_content,
-            args=[
-                self.task_id,
-                ToolRequestContent(
-                    author="agent",
-                    tool_call_id=tool_call_id,
-                    name=tool.name,
-                    arguments=tool_arguments,
-                ).model_dump(),
-            ],
-            start_to_close_timeout=self.timeout,
+        logger.debug(
+            f"[TemporalStreamingHooks] Tool '{tool.name}' started (tool_call_id={tool_call_id}); "
+            "tool request is streamed live by the model layer, not re-emitted here."
         )
 
     @override
