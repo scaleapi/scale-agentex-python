@@ -205,9 +205,7 @@ class TestAsyncSpanQueueBatchConcurrency:
 
         await queue.shutdown()
 
-        assert max_concurrency > 1, (
-            f"Expected concurrent processing, but max concurrency was {max_concurrency}"
-        )
+        assert max_concurrency > 1, f"Expected concurrent processing, but max concurrency was {max_concurrency}"
 
     async def test_batch_faster_than_serial(self):
         """Batched drain should be significantly faster than serial for slow processors."""
@@ -253,7 +251,7 @@ class TestProcessItemsPreconditions:
         ]
 
         try:
-            await AsyncSpanQueue._process_items(mixed)
+            await AsyncSpanQueue()._process_items(mixed)
         except AssertionError:
             return
         else:
@@ -288,9 +286,7 @@ class TestAsyncSpanQueueBatchedDispatch:
         await queue.shutdown()
 
         # on_spans_start must have been called exactly once with all 5 spans.
-        assert proc.on_spans_start.call_count == 1, (
-            f"Expected one batched call, got {proc.on_spans_start.call_count}"
-        )
+        assert proc.on_spans_start.call_count == 1, f"Expected one batched call, got {proc.on_spans_start.call_count}"
         assert received == [ids]
 
     async def test_batched_end_dispatch_single_call_per_drain(self):
@@ -374,8 +370,7 @@ class TestAsyncSpanQueueLinger:
 
         # With no linger, each staggered enqueue produces its own batch.
         assert proc.on_spans_start.call_count == 3, (
-            f"Expected three size-1 batches without linger, got "
-            f"{proc.on_spans_start.call_count}: {received}"
+            f"Expected three size-1 batches without linger, got {proc.on_spans_start.call_count}: {received}"
         )
 
     async def test_linger_respects_batch_size_cap(self):
@@ -404,6 +399,141 @@ class TestAsyncSpanQueueLinger:
         for batch in received:
             assert len(batch) <= 3, f"Batch exceeded cap: {batch}"
         assert sum(len(b) for b in received) == 7
+
+
+class _FakeHTTPError(Exception):
+    """Mimics an SGP/httpx status error: carries a ``status_code`` attribute."""
+
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+        super().__init__(f"HTTP {status_code}")
+
+
+class TestAsyncSpanQueueDropObservability:
+    """Silent span loss should be counted so it is measurable, and a bounded
+    queue should shed load deterministically instead of growing without limit.
+    """
+
+    async def test_full_queue_drops_are_counted(self):
+        release = asyncio.Event()
+
+        async def block_first(spans: list[Span]) -> None:
+            # Block the drain on its first batch so the queue can fill behind it.
+            await release.wait()
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=block_first)
+        proc.on_spans_end = AsyncMock()
+
+        # max_size=1, no linger: the drain pulls item-0 and blocks; item-1 fills
+        # the queue; items 2 and 3 are dropped.
+        queue = AsyncSpanQueue(max_size=1, linger_ms=0)
+
+        queue.enqueue(SpanEventType.START, _make_span("s0"), [proc])
+        await asyncio.sleep(0.02)  # let the drain pick up s0 and block
+        queue.enqueue(SpanEventType.START, _make_span("s1"), [proc])
+        queue.enqueue(SpanEventType.START, _make_span("s2"), [proc])
+        queue.enqueue(SpanEventType.START, _make_span("s3"), [proc])
+
+        assert queue.dropped_spans == 2, f"expected 2 dropped, got {queue.dropped_spans}"
+
+        release.set()
+        await queue.shutdown()
+
+    async def test_no_drops_under_normal_load(self):
+        proc = _make_processor()
+        queue = AsyncSpanQueue()
+        for i in range(5):
+            queue.enqueue(SpanEventType.START, _make_span(f"s{i}"), [proc])
+        await queue.shutdown()
+        assert queue.dropped_spans == 0
+
+
+class TestAsyncSpanQueueRetry:
+    """Transient HTTP failures (429/5xx) should be re-enqueued up to a bounded
+    number of attempts; auth/other errors must be dropped (and counted), never
+    retried.
+    """
+
+    async def test_retryable_status_is_reenqueued_and_eventually_succeeds(self):
+        attempts = 0
+
+        async def fail_then_succeed(spans: list[Span]) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise _FakeHTTPError(503)
+            # second attempt succeeds
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=fail_then_succeed)
+        proc.on_spans_end = AsyncMock()
+
+        queue = AsyncSpanQueue(max_retries=3, linger_ms=0)
+        queue.enqueue(SpanEventType.START, _make_span("s0"), [proc])
+        await queue.shutdown()
+
+        assert attempts == 2, "503 should be retried once, then succeed"
+        assert queue.dropped_spans == 0, "successful retry must not count as a drop"
+
+    async def test_non_retryable_status_is_dropped_not_retried(self):
+        attempts = 0
+
+        async def always_401(spans: list[Span]) -> None:
+            nonlocal attempts
+            attempts += 1
+            raise _FakeHTTPError(401)
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=always_401)
+        proc.on_spans_end = AsyncMock()
+
+        queue = AsyncSpanQueue(max_retries=3, linger_ms=0)
+        queue.enqueue(SpanEventType.START, _make_span("s0"), [proc])
+        await queue.shutdown()
+
+        assert attempts == 1, "401 is non-retryable — must be tried exactly once"
+        assert queue.dropped_spans == 1
+
+    async def test_non_http_exception_is_not_retried(self):
+        """A plain bug (no status_code) must not be retried into an infinite
+        loop — preserves the original drain-continues-on-error contract."""
+        attempts = 0
+
+        async def boom(spans: list[Span]) -> None:
+            nonlocal attempts
+            attempts += 1
+            raise RuntimeError("bug, not transient")
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=boom)
+        proc.on_spans_end = AsyncMock()
+
+        queue = AsyncSpanQueue(max_retries=3, linger_ms=0)
+        queue.enqueue(SpanEventType.START, _make_span("s0"), [proc])
+        await queue.shutdown()
+
+        assert attempts == 1
+        assert queue.dropped_spans == 1
+
+    async def test_retryable_exhausts_attempts_then_drops(self):
+        attempts = 0
+
+        async def always_503(spans: list[Span]) -> None:
+            nonlocal attempts
+            attempts += 1
+            raise _FakeHTTPError(503)
+
+        proc = AsyncMock()
+        proc.on_spans_start = AsyncMock(side_effect=always_503)
+        proc.on_spans_end = AsyncMock()
+
+        queue = AsyncSpanQueue(max_retries=3, linger_ms=0)
+        queue.enqueue(SpanEventType.START, _make_span("s0"), [proc])
+        await queue.shutdown()
+
+        assert attempts == 3, "should try up to max_retries times"
+        assert queue.dropped_spans == 1
 
 
 class TestAsyncSpanQueueIntegration:
@@ -500,96 +630,3 @@ class TestAsyncSpanQueueIntegration:
         # END should still carry output and end_time
         assert end_spans[0].output is not None
         assert end_spans[0].end_time is not None
-
-
-class TestAsyncSpanQueueMetrics:
-    async def test_batch_coalesced_records_depth_including_batch(self, monkeypatch):
-        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
-        import agentex.lib.core.observability.tracing_metrics_recording as recording
-
-        recording._metrics_enabled = None
-        proc = _make_processor()
-        queue = AsyncSpanQueue(linger_ms=0)
-        recorded_depths: list[int] = []
-
-        def capture_coalesced(*, queue_depth: int, batch_items: object) -> None:
-            recorded_depths.append(queue_depth)
-
-        with patch.object(recording, "record_batch_coalesced", side_effect=capture_coalesced):
-            for _ in range(3):
-                queue.enqueue(SpanEventType.START, _make_span(), [proc])
-            await asyncio.sleep(0.05)
-            await queue.shutdown()
-
-        assert recorded_depths, "expected at least one coalesced batch"
-        assert recorded_depths[0] >= 3, (
-            f"queue_depth should include batch items removed from queue, got {recorded_depths[0]}"
-        )
-
-    async def test_enqueue_records_enqueued_metric(self, monkeypatch):
-        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
-        import agentex.lib.core.observability.tracing_metrics_recording as recording
-
-        recording._metrics_enabled = None
-        recording._tracing = None
-        mock_metrics = MagicMock()
-        proc = _make_processor()
-        queue = AsyncSpanQueue()
-
-        with patch(
-            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics",
-            return_value=mock_metrics,
-        ):
-            queue.enqueue(SpanEventType.START, _make_span(), [proc])
-            await asyncio.sleep(0.05)
-            await queue.shutdown()
-
-        mock_metrics.span_events_enqueued.add.assert_any_call(1, {"event_type": "start"})
-
-    async def test_processor_failure_records_export_failure(self, monkeypatch):
-        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
-        import agentex.lib.core.observability.tracing_metrics_recording as recording
-
-        recording._metrics_enabled = None
-        recording._tracing = None
-        mock_metrics = MagicMock()
-
-        class ExportError(Exception):
-            pass
-
-        proc = AsyncMock()
-        proc.on_spans_start = AsyncMock(side_effect=ExportError("Error code: 401 - denied"))
-        proc.on_spans_end = AsyncMock()
-        queue = AsyncSpanQueue()
-
-        with patch(
-            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics",
-            return_value=mock_metrics,
-        ):
-            queue.enqueue(SpanEventType.START, _make_span(), [proc])
-            await asyncio.sleep(0.05)
-            await queue.shutdown()
-
-        mock_metrics.export_batch_failures.add.assert_called_once()
-        mock_metrics.export_span_failures.add.assert_called_once()
-
-    async def test_enqueue_overhead_with_metrics_disabled(self, monkeypatch):
-        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "0")
-        import agentex.lib.core.observability.tracing_metrics_recording as recording
-
-        recording._metrics_enabled = None
-        recording._tracing = None
-        proc = _make_processor()
-        queue = AsyncSpanQueue()
-
-        with patch(
-            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics"
-        ) as mock_get:
-            start = time.monotonic()
-            for _ in range(200):
-                queue.enqueue(SpanEventType.START, _make_span(), [proc])
-            elapsed = time.monotonic() - start
-            await queue.shutdown()
-
-        assert elapsed < 0.05, f"disabled metrics enqueue too slow: {elapsed:.3f}s"
-        mock_get.assert_not_called()

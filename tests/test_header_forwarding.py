@@ -46,7 +46,7 @@ sys.modules["agentex.lib.core.tracing"] = tracing_pkg_stub
 
 from agentex.lib.core.services.adk.acp.acp import ACPService
 from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
-from agentex.lib.types.acp import RPCMethod, SendMessageParams, SendEventParams
+from agentex.protocol.acp import RPCMethod, SendMessageParams, SendEventParams
 from agentex.types.task_message_content import TextContent
 from agentex.lib.sdk.fastacp.impl.temporal_acp import TemporalACP
 from agentex.lib.core.temporal.services.temporal_task_service import TemporalTaskService

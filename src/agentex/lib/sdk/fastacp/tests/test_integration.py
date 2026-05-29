@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from agentex.lib.types.acp import (
+from agentex.protocol.acp import (
     RPCMethod,
     SendEventParams,
     CancelTaskParams,

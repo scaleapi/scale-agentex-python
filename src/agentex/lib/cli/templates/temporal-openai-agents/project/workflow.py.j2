@@ -4,7 +4,7 @@ import os
 from temporalio import workflow
 
 from agentex.lib import adk
-from agentex.lib.types.acp import CreateTaskParams, SendEventParams
+from agentex.protocol.acp import CreateTaskParams, SendEventParams
 from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.utils.logging import make_logger

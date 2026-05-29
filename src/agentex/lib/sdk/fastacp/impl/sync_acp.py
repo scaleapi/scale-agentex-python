@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, override
 from collections.abc import AsyncGenerator
 
-from agentex.lib.types.acp import SendMessageParams
+from agentex.protocol.acp import SendMessageParams
 from agentex.lib.utils.logging import make_logger
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import (

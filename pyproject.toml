@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.11.2"
+version = "0.11.4"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -20,7 +20,6 @@ dependencies = [
     "rich>=13.9.2,<14",
     "fastapi>=0.115.0",
     "starlette>=0.49.1",
-    "tornado>=6.5.5",
     "uvicorn>=0.31.1",
     "watchfiles>=0.24.0,<1.0",
     "python-on-whales>=0.73.0,<0.74",
@@ -29,37 +28,31 @@ dependencies = [
     "jsonref>=1.1.0,<2",
     "temporalio>=1.26.0,<2",
     "aiohttp>=3.10.10,<4",
-    "redis>=5.2.0,<6",
+    "redis>=5.2.0,<8",
     "litellm>=1.83.7,<2",
     "kubernetes>=25.0.0,<36.0.0",
     "jinja2>=3.1.3,<4",
-    "mcp[cli]>=1.4.1",
+    "mcp>=1.4.1",
     "scale-gp>=0.1.0a59",
-    "openai-agents==0.14.1",
+    "openai-agents>=0.14.3,<0.15",
     "pydantic-ai-slim>=1.0,<2",
-    "tzlocal>=5.3.1",
-    "tzdata>=2025.2",
-    "pytest>=8.4.0",
     "json_log_formatter>=1.1.1",
-    "pytest-asyncio>=1.0.0",
     "scale-gp-beta>=0.2.0",
-    "ipykernel>=6.29.5",
     "openai>=2.2,<3", # Required by openai-agents; litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
     "cloudpickle>=3.1.1",
-    "datadog>=0.52.1",
     "ddtrace>=3.13.0",
     "yaspin>=3.1.0",
     "claude-agent-sdk>=0.1.0",
-    "anthropic>=0.40.0",
     "langgraph-checkpoint>=2.0.0",
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-api>=1.20.0",
 ]
 
-requires-python = ">= 3.12,<4"
+requires-python = ">= 3.11,<4"
 classifiers = [
   "Typing :: Typed",
   "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
@@ -151,6 +144,14 @@ include = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentex"]
+# Don't ship internal test files in the wheel. `lib/cli/templates/**/test_agent.py.j2`
+# is intentionally kept — those render into user projects.
+exclude = [
+  "src/agentex/lib/**/tests/**",
+  "src/agentex/lib/**/test_*.py",
+  "src/agentex/lib/**/conftest.py",
+  "src/agentex/lib/**/pytest.ini",
+]
 
 [tool.hatch.build.targets.sdist]
 # Basically everything except hidden files/directories (such as .github, .devcontainers, .python-version, etc)
