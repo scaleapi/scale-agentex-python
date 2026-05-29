@@ -14,7 +14,7 @@ from pydantic import TypeAdapter, ValidationError
 from starlette.types import Send, Scope, ASGIApp, Receive
 from fastapi.responses import StreamingResponse
 
-from agentex.lib.types.acp import (
+from agentex.protocol.acp import (
     RPC_SYNC_METHODS,
     PARAMS_MODEL_BY_METHOD,
     RPCMethod,
@@ -24,7 +24,7 @@ from agentex.lib.types.acp import (
     SendMessageParams,
 )
 from agentex.lib.utils.logging import make_logger, ctx_var_request_id
-from agentex.lib.types.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
+from agentex.protocol.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.registration import register_agent
 

@@ -67,14 +67,13 @@ class TracingModule:
         if self._tracing_service_lazy is None or (loop_id is not None and loop_id != self._bound_loop_id):
             import httpx
 
-            # Disable keepalive so each span HTTP call gets a fresh TCP
-            # connection.  Reused connections carry asyncio primitives bound
-            # to the event loop that created them; in sync-ACP / streaming
-            # contexts the loop context can shift between calls, causing
-            # "bound to a different event loop" RuntimeErrors.
+            # Keepalive ON: connections are reused within a single event
+            # loop, eliminating the TLS-handshake-per-span penalty under
+            # load.  Cross-loop safety is preserved by rebuilding the
+            # client whenever loop_id changes (the conditional above).
             agentex_client = create_async_agentex_client(
                 http_client=httpx.AsyncClient(
-                    limits=httpx.Limits(max_keepalive_connections=0),
+                    limits=httpx.Limits(max_keepalive_connections=20),
                 ),
             )
             tracer = AsyncTracer(agentex_client)
