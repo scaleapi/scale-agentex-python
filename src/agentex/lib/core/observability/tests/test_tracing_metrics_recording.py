@@ -15,6 +15,7 @@ class _Item:
 class TestIsMetricsEnabled:
     def setup_method(self) -> None:
         recording._metrics_enabled = None
+        recording._tracing = None
 
     def test_enabled_by_default(self, monkeypatch):
         monkeypatch.delenv("AGENTEX_TRACING_METRICS", raising=False)
@@ -29,6 +30,7 @@ class TestIsMetricsEnabled:
 class TestRecordingHelpers:
     def setup_method(self) -> None:
         recording._metrics_enabled = None
+        recording._tracing = None
 
     def test_record_span_enqueued_when_disabled_does_not_load_metrics(self, monkeypatch):
         monkeypatch.setenv("AGENTEX_TRACING_METRICS", "0")

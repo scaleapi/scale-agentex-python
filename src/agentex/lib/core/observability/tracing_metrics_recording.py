@@ -17,6 +17,7 @@ class _HasEnqueuedAt(Protocol):
 
 
 _metrics_enabled: bool | None = None
+_tracing = None  # lazy-loaded tracing_metrics module (loads OTel on first use)
 
 
 def is_metrics_enabled() -> bool:
@@ -26,6 +27,16 @@ def is_metrics_enabled() -> bool:
         raw = os.environ.get("AGENTEX_TRACING_METRICS", "1").strip().lower()
         _metrics_enabled = raw not in ("0", "false", "no", "off")
     return _metrics_enabled
+
+
+def _tracing_module():
+    """Return lazy-loaded ``tracing_metrics`` module (loads OTel on first use)."""
+    global _tracing
+    if _tracing is None:
+        from agentex.lib.core.observability import tracing_metrics
+
+        _tracing = tracing_metrics
+    return _tracing
 
 
 def monotonic_if_enabled() -> float | None:
@@ -39,9 +50,9 @@ def record_span_enqueued(event_type: str) -> None:
     if not is_metrics_enabled():
         return
     try:
-        from agentex.lib.core.observability.tracing_metrics import get_tracing_metrics
-
-        get_tracing_metrics().span_events_enqueued.add(1, {"event_type": event_type})
+        _tracing_module().get_tracing_metrics().span_events_enqueued.add(
+            1, {"event_type": event_type}
+        )
     except Exception:
         pass
 
@@ -50,9 +61,7 @@ def record_span_dropped(reason: str) -> None:
     if not is_metrics_enabled():
         return
     try:
-        from agentex.lib.core.observability.tracing_metrics import get_tracing_metrics
-
-        get_tracing_metrics().span_events_dropped.add(1, {"reason": reason})
+        _tracing_module().get_tracing_metrics().span_events_dropped.add(1, {"reason": reason})
     except Exception:
         pass
 
@@ -65,9 +74,7 @@ def record_batch_coalesced(
     if not is_metrics_enabled():
         return
     try:
-        from agentex.lib.core.observability.tracing_metrics import get_tracing_metrics
-
-        metrics = get_tracing_metrics()
+        metrics = _tracing_module().get_tracing_metrics()
         metrics.queue_depth.record(max(queue_depth, 0))
         metrics.batch_items.record(len(batch_items))
 
@@ -87,10 +94,8 @@ def record_batch_phase(*, phase: str, size: int, duration_ms: float) -> None:
     if not is_metrics_enabled():
         return
     try:
-        from agentex.lib.core.observability.tracing_metrics import get_tracing_metrics
-
         attrs = {"phase": phase}
-        metrics = get_tracing_metrics()
+        metrics = _tracing_module().get_tracing_metrics()
         metrics.batch_size.record(size, attrs)
         metrics.batch_drain_duration.record(duration_ms, attrs)
     except Exception:
@@ -101,10 +106,8 @@ def record_export_success(*, event_type: str, span_count: int, processor: str = 
     if not is_metrics_enabled():
         return
     try:
-        from agentex.lib.core.observability.tracing_metrics import get_tracing_metrics
-
         attrs = {"processor": processor, "event_type": event_type}
-        metrics = get_tracing_metrics()
+        metrics = _tracing_module().get_tracing_metrics()
         metrics.export_batches.add(1, attrs)
         metrics.export_spans.add(span_count, attrs)
     except Exception:
@@ -121,21 +124,16 @@ def record_export_failure(
     if not is_metrics_enabled():
         return
     try:
-        from agentex.lib.core.observability.tracing_metrics import (
-            processor_label,
-            get_tracing_metrics,
-            classify_export_error,
-        )
-
-        error_class, http_code = classify_export_error(exc)
-        proc = processor_label(processor)
+        tm = _tracing_module()
+        error_class, http_code = tm.classify_export_error(exc)
+        proc = tm.processor_label(processor)
         attrs = {
             "processor": proc,
             "event_type": event_type,
             "http_code": http_code,
             "error_class": error_class,
         }
-        metrics = get_tracing_metrics()
+        metrics = tm.get_tracing_metrics()
         metrics.export_batch_failures.add(1, attrs)
         metrics.export_span_failures.add(span_count, attrs)
     except Exception:
@@ -146,9 +144,7 @@ def record_shutdown_timeout(*, remaining_items: int) -> None:
     if not is_metrics_enabled():
         return
     try:
-        from agentex.lib.core.observability.tracing_metrics import get_tracing_metrics
-
-        metrics = get_tracing_metrics()
+        metrics = _tracing_module().get_tracing_metrics()
         metrics.shutdown_timeouts.add(1)
         metrics.shutdown_remaining_items.record(max(remaining_items, 0))
     except Exception:

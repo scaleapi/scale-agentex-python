@@ -531,6 +531,7 @@ class TestAsyncSpanQueueMetrics:
         import agentex.lib.core.observability.tracing_metrics_recording as recording
 
         recording._metrics_enabled = None
+        recording._tracing = None
         mock_metrics = MagicMock()
         proc = _make_processor()
         queue = AsyncSpanQueue()
@@ -550,6 +551,7 @@ class TestAsyncSpanQueueMetrics:
         import agentex.lib.core.observability.tracing_metrics_recording as recording
 
         recording._metrics_enabled = None
+        recording._tracing = None
         mock_metrics = MagicMock()
 
         class ExportError(Exception):
@@ -576,6 +578,7 @@ class TestAsyncSpanQueueMetrics:
         import agentex.lib.core.observability.tracing_metrics_recording as recording
 
         recording._metrics_enabled = None
+        recording._tracing = None
         proc = _make_processor()
         queue = AsyncSpanQueue()
 

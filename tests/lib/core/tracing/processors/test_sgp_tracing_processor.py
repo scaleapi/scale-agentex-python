@@ -227,6 +227,7 @@ class TestSGPAsyncTracingProcessor:
         import agentex.lib.core.observability.tracing_metrics_recording as recording
 
         recording._metrics_enabled = None
+        recording._tracing = None
         processor, _, mock_client = self._make_processor()
         mock_metrics = MagicMock()
 
