@@ -78,7 +78,7 @@ def record_batch_coalesced(
                 continue
             lag_ms = max(lag_ms, (now - item.enqueued_at) * 1000.0)
         if lag_ms > 0:
-            metrics.queue_lag_ms.record(lag_ms)
+            metrics.queue_lag.record(lag_ms)
     except Exception:
         pass
 
@@ -92,7 +92,7 @@ def record_batch_phase(*, phase: str, size: int, duration_ms: float) -> None:
         attrs = {"phase": phase}
         metrics = get_tracing_metrics()
         metrics.batch_size.record(size, attrs)
-        metrics.batch_drain_duration_ms.record(duration_ms, attrs)
+        metrics.batch_drain_duration.record(duration_ms, attrs)
     except Exception:
         pass
 

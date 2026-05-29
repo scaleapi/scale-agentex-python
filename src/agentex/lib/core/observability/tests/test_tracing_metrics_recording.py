@@ -69,7 +69,7 @@ class TestRecordingHelpers:
             )
         mock_metrics.queue_depth.record.assert_called_once_with(3)
         mock_metrics.batch_items.record.assert_called_once_with(2)
-        mock_metrics.queue_lag_ms.record.assert_called_once_with(1000.0)
+        mock_metrics.queue_lag.record.assert_called_once_with(1000.0)
 
     def test_record_export_failure(self, monkeypatch):
         monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")

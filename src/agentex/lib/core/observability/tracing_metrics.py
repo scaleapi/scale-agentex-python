@@ -52,8 +52,8 @@ class TracingMetrics:
             unit="1",
             description="asyncio queue depth at the start of a drain batch",
         )
-        self.queue_lag_ms = meter.create_histogram(
-            name="agentex.tracing.queue.lag_ms",
+        self.queue_lag = meter.create_histogram(
+            name="agentex.tracing.queue.lag",
             unit="ms",
             description="Max time from enqueue to drain-batch start for items in the batch",
         )
@@ -67,8 +67,8 @@ class TracingMetrics:
             unit="1",
             description="Span events in one START or END dispatch phase",
         )
-        self.batch_drain_duration_ms = meter.create_histogram(
-            name="agentex.tracing.batch.drain_duration_ms",
+        self.batch_drain_duration = meter.create_histogram(
+            name="agentex.tracing.batch.drain_duration",
             unit="ms",
             description="Wall time for one START or END _process_items dispatch",
         )
