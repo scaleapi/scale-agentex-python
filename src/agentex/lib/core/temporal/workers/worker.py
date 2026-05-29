@@ -95,35 +95,45 @@ async def get_temporal_client(
     metrics_url: str | None = None,
     plugins: list = [],
     payload_codec: PayloadCodec | None = None,
+    data_converter: DataConverter | None = None,
 ) -> Client:
     if plugins != []:  # We don't need to validate the plugins if they are empty
         _validate_plugins(plugins)
 
-    # Check if OpenAI plugin is present - it needs to configure its own data converter
+    if payload_codec is not None and data_converter is not None:
+        raise ValueError(
+            "Pass payload_codec inside `data_converter` "
+            "(DataConverter(..., payload_codec=...)) instead of as a separate "
+            "kwarg. Specifying both is ambiguous."
+        )
+
     # Lazy import to avoid pulling in opentelemetry.sdk for non-Temporal agents
     from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
     has_openai_plugin = any(isinstance(p, OpenAIAgentsPlugin) for p in (plugins or []))
 
-    if has_openai_plugin and payload_codec is not None:
+    if has_openai_plugin and payload_codec is not None and data_converter is None:
         raise ValueError(
-            "payload_codec is not supported alongside OpenAIAgentsPlugin: the plugin "
-            "installs its own data converter and the codec would be silently ignored, "
-            "leaving payloads unencoded. Remove one or the other."
+            "payload_codec passed as a kwarg alongside OpenAIAgentsPlugin would "
+            "be silently dropped by the plugin's data-converter transformer. "
+            "Build a DataConverter explicitly with "
+            "`payload_converter_class=OpenAIPayloadConverter` (or a subclass) "
+            "and `payload_codec=...`, then pass it via the `data_converter` "
+            "kwarg instead."
         )
 
-    # Build connection kwargs
-    connect_kwargs = {
+    connect_kwargs: dict[str, Any] = {
         "target_host": temporal_address,
         "plugins": plugins,
     }
 
-    # Only set data_converter if OpenAI plugin is not present
-    if not has_openai_plugin:
-        data_converter = custom_data_converter
-        if payload_codec:
-            data_converter = dataclasses.replace(data_converter, payload_codec=payload_codec)
+    if data_converter is not None:
         connect_kwargs["data_converter"] = data_converter
+    elif not has_openai_plugin:
+        dc = custom_data_converter
+        if payload_codec:
+            dc = dataclasses.replace(dc, payload_codec=payload_codec)
+        connect_kwargs["data_converter"] = dc
 
     if not metrics_url:
         client = await Client.connect(**connect_kwargs)
@@ -145,6 +155,7 @@ class AgentexWorker:
         interceptors: list = [],
         metrics_url: str | None = None,
         payload_codec: PayloadCodec | None = None,
+        data_converter: DataConverter | None = None,
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -159,6 +170,7 @@ class AgentexWorker:
         self.interceptors = interceptors
         self.metrics_url = metrics_url
         self.payload_codec = payload_codec
+        self.data_converter = data_converter
 
     @overload
     async def run(
@@ -195,6 +207,7 @@ class AgentexWorker:
             plugins=self.plugins,
             metrics_url=self.metrics_url,
             payload_codec=self.payload_codec,
+            data_converter=self.data_converter,
         )
 
         # Enable debug mode if AgentEx debug is enabled (disables deadlock detection)

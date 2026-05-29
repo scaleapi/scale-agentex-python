@@ -65,6 +65,8 @@ class FastACP:
                 temporal_config["interceptors"] = config.interceptors  # type: ignore[attr-defined]
             if hasattr(config, "payload_codec"):
                 temporal_config["payload_codec"] = config.payload_codec  # type: ignore[attr-defined]
+            if hasattr(config, "data_converter"):
+                temporal_config["data_converter"] = config.data_converter  # type: ignore[attr-defined]
             return implementation_class.create(**temporal_config)
         else:
             return implementation_class.create(**kwargs)
