@@ -6,8 +6,6 @@ Provides debugging setup functionality that can be used across different compone
 
 import os
 
-import debugpy  # type: ignore
-
 from agentex.lib.utils.logging import make_logger
 
 logger = make_logger(__name__)
@@ -30,6 +28,13 @@ def setup_debug_if_enabled() -> None:
         Any exception from debugpy setup (will bubble up naturally)
     """
     if os.getenv("AGENTEX_DEBUG_ENABLED") == "true":
+        # Imported lazily: debugpy is a development-only tool, so a normal
+        # worker startup must not require it to be installed.  Importing it at
+        # module scope forced it onto every worker (it used to be satisfied
+        # transitively via ipykernel; that dep was dropped in agentex-sdk
+        # 0.11.5, surfacing this as "No module named 'debugpy'").
+        import debugpy  # type: ignore
+
         debug_port = int(os.getenv("AGENTEX_DEBUG_PORT", "5678"))
         debug_type = os.getenv("AGENTEX_DEBUG_TYPE", "worker")
         wait_for_attach = os.getenv("AGENTEX_DEBUG_WAIT_FOR_ATTACH", "false").lower() == "true"
