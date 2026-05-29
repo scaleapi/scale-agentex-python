@@ -11,20 +11,20 @@ To run these tests:
 
 Configuration:
 - AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
-- AGENT_NAME: Name of the agent to test (default: s050-openai-agents-local-sandbox)
+- AGENT_NAME: Name of the agent to test (default: {{ agent_name }})
 """
 
 import os
 
 import pytest
-from test_utils.sync import validate_text_in_string
 
 from agentex import Agentex
 from agentex.types import TextContentParam
 from agentex.types.agent_rpc_params import ParamsSendMessageRequest
 
+
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
-AGENT_NAME = os.environ.get("AGENT_NAME", "s050-openai-agents-local-sandbox")
+AGENT_NAME = os.environ.get("AGENT_NAME", "{{ agent_name }}")
 
 
 @pytest.fixture
@@ -50,25 +50,12 @@ def agent_id(client, agent_name):
 
 
 def _response_text(result) -> str:
-    """Flatten a send_message result into a single string for assertions.
-
-    Result items may be a bare string, a ``TextContent`` (``.content`` is the
-    string), or a ``TaskMessage`` wrapping a ``TextContent`` (``.content`` is the
-    ``TextContent``, whose ``.content`` is the string). Dig through ``.content``
-    until we reach a string.
-    """
-
-    def _text_of(obj, _depth: int = 0) -> str:
-        if isinstance(obj, str):
-            return obj
-        if _depth > 5:
-            return ""
-        inner = getattr(obj, "content", None)
-        if inner is None:
-            return ""
-        return _text_of(inner, _depth + 1)
-
-    parts = [t for t in (_text_of(item) for item in result) if t]
+    """Flatten a send_message result into a single string for assertions."""
+    parts = []
+    for content in result:
+        text = getattr(content, "content", None)
+        if isinstance(text, str):
+            parts.append(text)
     return "\n".join(parts)
 
 
@@ -118,7 +105,7 @@ class TestLocalSandboxMessages:
         text = _response_text(result)
         assert text, "Expected a non-empty response from the sandbox agent."
         # The sandbox runs on Python 3.12, so the real output contains "Python 3".
-        validate_text_in_string("Python 3", text)
+        assert "Python 3" in text
 
     def test_shell_compute(self, client: Agentex, agent_name: str):
         """Test that the agent uses python3 in the sandbox to compute a value."""
@@ -141,7 +128,7 @@ class TestLocalSandboxMessages:
 
         text = _response_text(result)
         assert text, "Expected a non-empty response from the sandbox agent."
-        validate_text_in_string("42", text)
+        assert "42" in text
 
 
 if __name__ == "__main__":
