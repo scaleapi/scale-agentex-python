@@ -88,5 +88,5 @@ async def run_agent(user_message: str) -> str:
     """
     agent = create_agent()
     run_config = create_run_config()
-    result = await Runner.run(agent, input=user_message, run_config=run_config)
+    result = await Runner.run(agent, input=user_message, run_config=run_config, max_turns=10)
     return result.final_output

@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import os
 import json
-from datetime import datetime
 
 from agents import Runner
 from temporalio import workflow
@@ -147,9 +146,7 @@ class At120OpenaiAgentsLocalSandboxWorkflow(BaseWorkflow):
             agent = SandboxAgent(
                 name="Local Sandbox Assistant",
                 model=MODEL_NAME,
-                instructions=INSTRUCTIONS.format(
-                    timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                ),
+                instructions=INSTRUCTIONS,
                 capabilities=[Shell()],
             )
 
@@ -177,6 +174,7 @@ class At120OpenaiAgentsLocalSandboxWorkflow(BaseWorkflow):
                 self._state.input_list,
                 run_config=run_config,
                 hooks=TemporalStreamingHooks(task_id=params.task.id),
+                max_turns=10,
             )
 
             # IMPORTANT: We do NOT post the assistant message ourselves here.

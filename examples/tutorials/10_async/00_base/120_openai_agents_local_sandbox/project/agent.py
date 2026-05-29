@@ -92,4 +92,4 @@ async def run_agent(input_list: list) -> "Runner":
     """
     agent = create_agent()
     run_config = create_run_config()
-    return await Runner.run(agent, input=input_list, run_config=run_config)
+    return await Runner.run(agent, input=input_list, run_config=run_config, max_turns=10)

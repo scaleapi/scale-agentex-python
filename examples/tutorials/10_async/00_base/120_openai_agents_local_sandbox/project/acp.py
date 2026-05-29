@@ -41,7 +41,7 @@ logger = make_logger(__name__)
 # LiteLLM proxy auth: copy LITELLM_API_KEY to OPENAI_API_KEY for OpenAI client
 # compatibility, so the same example works behind the Scale LiteLLM gateway.
 _litellm_key = os.environ.get("LITELLM_API_KEY")
-if _litellm_key:
+if _litellm_key and not os.environ.get("OPENAI_API_KEY"):
     os.environ["OPENAI_API_KEY"] = _litellm_key
 
 add_tracing_processor_config(
