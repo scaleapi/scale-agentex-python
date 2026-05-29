@@ -102,7 +102,7 @@ def record_batch_phase(*, phase: str, size: int, duration_ms: float) -> None:
         pass
 
 
-def record_export_success(*, event_type: str, span_count: int, processor: str = "sgp") -> None:
+def record_export_success(*, event_type: str, span_count: int, processor: str) -> None:
     if not is_metrics_enabled():
         return
     try:

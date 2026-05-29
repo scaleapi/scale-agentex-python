@@ -114,7 +114,7 @@ class TestRecordingHelpers:
             "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics",
             return_value=mock_metrics,
         ):
-            recording.record_export_success(event_type="end", span_count=12)
+            recording.record_export_success(event_type="end", span_count=12, processor="sgp")
 
         mock_metrics.export_batches.add.assert_called_once_with(
             1,
