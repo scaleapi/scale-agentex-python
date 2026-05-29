@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field, BaseModel, field_validator
+from pydantic import Field, BaseModel, field_validator, model_validator
 
 from agentex.lib.core.clients.temporal.utils import validate_client_plugins, validate_worker_interceptors
 
@@ -56,7 +56,16 @@ class TemporalACPConfig(AsyncACPConfig):
             encoding/decoding payloads (e.g. encryption, compression). NOTE:
             this only configures the ACP (client) side. The worker side must
             be configured separately via ``AgentexWorker(payload_codec=...)``
-            with the SAME codec, or decode will fail at runtime.
+            with the SAME codec, or decode will fail at runtime. Cannot be
+            combined with ``OpenAIAgentsPlugin``; use ``data_converter``
+            instead in that case.
+        data_converter: Optional pre-built ``temporalio.converter.DataConverter``.
+            Use this when composing the ``OpenAIAgentsPlugin`` with a payload
+            codec: build a ``DataConverter(payload_converter_class=
+            OpenAIPayloadConverter, payload_codec=...)`` and pass it here.
+            Mutually exclusive with ``payload_codec``. The worker side must
+            be configured separately via ``AgentexWorker(data_converter=...)``
+            with the SAME converter, or decode will fail at runtime.
     """
 
     type: Literal["temporal"] = Field(default="temporal", frozen=True)
@@ -64,6 +73,7 @@ class TemporalACPConfig(AsyncACPConfig):
     plugins: list[Any] = Field(default=[], frozen=True)
     interceptors: list[Any] = Field(default=[], frozen=True)
     payload_codec: Any = Field(default=None, frozen=True)
+    data_converter: Any = Field(default=None, frozen=True)
 
     @field_validator("plugins")
     @classmethod
@@ -78,6 +88,16 @@ class TemporalACPConfig(AsyncACPConfig):
         """Validate that all interceptors are valid Temporal worker interceptors."""
         validate_worker_interceptors(v)
         return v
+
+    @model_validator(mode="after")
+    def _validate_codec_and_data_converter_mutually_exclusive(self) -> "TemporalACPConfig":
+        if self.payload_codec is not None and self.data_converter is not None:
+            raise ValueError(
+                "Pass payload_codec inside `data_converter` "
+                "(DataConverter(..., payload_codec=...)) instead of as a separate "
+                "field. Specifying both is ambiguous."
+            )
+        return self
 
 
 class AsyncBaseACPConfig(AsyncACPConfig):

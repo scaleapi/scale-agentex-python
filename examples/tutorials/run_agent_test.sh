@@ -259,8 +259,15 @@ run_test() {
     cd "$tutorial_path" || return 1
 
 
-    # Run the tests with retry mechanism
-    local -a pytest_cmd=("uv" "run" "pytest")
+    # Run the tests with retry mechanism.
+    #
+    # pytest is brought in explicitly via --with: the tutorials only list it
+    # under an optional `dev` extra (which `uv run` does not install), and it
+    # used to be pulled in transitively by agentex-sdk's runtime deps. Once
+    # agentex-sdk 0.11.5 dropped pytest as a runtime dep, `uv run pytest` could
+    # no longer find it ("Failed to spawn: pytest"). Requesting it directly is
+    # robust across all tutorials regardless of how each declares test deps.
+    local -a pytest_cmd=("uv" "run" "--with" "pytest" "--with" "pytest-asyncio" "pytest")
     if [ "$BUILD_CLI" = true ]; then
         local wheel_file
         wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
@@ -268,7 +275,7 @@ run_test() {
             wheel_file=$(ls "${SCRIPT_DIR}/../../dist/agentex_sdk-*.whl" 2>/dev/null | head -n1)
         fi
         if [[ -n "$wheel_file" ]]; then
-            pytest_cmd=("uv" "run" "--with" "$wheel_file" "pytest")
+            pytest_cmd=("uv" "run" "--with" "$wheel_file" "--with" "pytest" "--with" "pytest-asyncio" "pytest")
         fi
     fi
 
