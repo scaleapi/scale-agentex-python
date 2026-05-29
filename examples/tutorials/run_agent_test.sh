@@ -260,7 +260,7 @@ run_test() {
 
 
     # Run the tests with retry mechanism
-    local -a pytest_cmd=("uv" "run" "pytest")
+    local -a pytest_cmd=("uv" "run" "--extra" "dev" "pytest")
     if [ "$BUILD_CLI" = true ]; then
         local wheel_file
         wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
@@ -268,7 +268,7 @@ run_test() {
             wheel_file=$(ls "${SCRIPT_DIR}/../../dist/agentex_sdk-*.whl" 2>/dev/null | head -n1)
         fi
         if [[ -n "$wheel_file" ]]; then
-            pytest_cmd=("uv" "run" "--with" "$wheel_file" "pytest")
+            pytest_cmd=("uv" "run" "--extra" "dev" "--with" "$wheel_file" "pytest")
         fi
     fi
 
