@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
+import time
 import asyncio
 from enum import Enum
 from dataclasses import dataclass
 
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.observability import tracing_metrics_recording as _metrics
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     AsyncTracingProcessor,
 )
@@ -67,6 +69,7 @@ class _SpanQueueItem:
     event_type: SpanEventType
     span: Span
     processors: list[AsyncTracingProcessor]
+    enqueued_at: float | None = None
     # Number of times this item has already been dispatched.  Used to bound
     # re-enqueue on transient failures.
     attempts: int = 0
@@ -134,6 +137,12 @@ class AsyncSpanQueue:
         if count <= 0:
             return
         self._dropped_spans += count
+        if "shutdown" in reason:
+            for _ in range(count):
+                _metrics.record_span_dropped("shutdown")
+        elif "queue full" in reason:
+            for _ in range(count):
+                _metrics.record_span_dropped("queue_full")
         # Warn on the first drop and then sparsely, so a drop storm is visible
         # without flooding the log.
         if self._dropped_spans == count or self._dropped_spans % 100 < count:
@@ -155,7 +164,15 @@ class AsyncSpanQueue:
             return
         self._ensure_drain_running()
         try:
-            self._queue.put_nowait(_SpanQueueItem(event_type=event_type, span=span, processors=processors))
+            self._queue.put_nowait(
+                _SpanQueueItem(
+                    event_type=event_type,
+                    span=span,
+                    processors=processors,
+                    enqueued_at=_metrics.monotonic_if_enabled(),
+                )
+            )
+            _metrics.record_span_enqueued(event_type.value)
         except asyncio.QueueFull:
             self._record_drop(1, "queue full")
 
@@ -197,6 +214,11 @@ class AsyncSpanQueue:
                         break
 
             try:
+                _metrics.record_batch_coalesced(
+                    queue_depth=self._queue.qsize() + len(batch),
+                    batch_items=batch,
+                )
+
                 # Separate START and END events.  Processing all STARTs before
                 # ENDs ensures that on_span_start completes before on_span_end
                 # for any span whose both events land in the same batch.
@@ -204,9 +226,21 @@ class AsyncSpanQueue:
                 ends = [i for i in batch if i.event_type == SpanEventType.END]
 
                 if starts:
+                    phase_start = time.perf_counter()
                     await self._process_items(starts)
+                    _metrics.record_batch_phase(
+                        phase="start",
+                        size=len(starts),
+                        duration_ms=(time.perf_counter() - phase_start) * 1000.0,
+                    )
                 if ends:
+                    phase_start = time.perf_counter()
                     await self._process_items(ends)
+                    _metrics.record_batch_phase(
+                        phase="end",
+                        size=len(ends),
+                        duration_ms=(time.perf_counter() - phase_start) * 1000.0,
+                    )
             finally:
                 for _ in batch:
                     self._queue.task_done()
@@ -265,6 +299,12 @@ class AsyncSpanQueue:
             exhausted = len(items) - len(retriable)
             if exhausted:
                 self._record_drop(exhausted, f"{type(p).__name__} retries exhausted during {event_type.value}")
+                _metrics.record_export_failure(
+                    processor=p,
+                    event_type=event_type.value,
+                    span_count=exhausted,
+                    exc=exc,
+                )
             for item in retriable:
                 self._reenqueue(item, p)
             if retriable:
@@ -285,6 +325,12 @@ class AsyncSpanQueue:
             len(items),
             event_type.value,
         )
+        _metrics.record_export_failure(
+            processor=p,
+            event_type=event_type.value,
+            span_count=len(items),
+            exc=exc,
+        )
 
     def _reenqueue(self, item: _SpanQueueItem, p: AsyncTracingProcessor) -> None:
         """Put a single failed item back on the queue, scoped to the processor
@@ -295,6 +341,7 @@ class AsyncSpanQueue:
                     event_type=item.event_type,
                     span=item.span,
                     processors=[p],
+                    enqueued_at=item.enqueued_at,
                     attempts=item.attempts + 1,
                 )
             )
@@ -312,9 +359,11 @@ class AsyncSpanQueue:
         try:
             await asyncio.wait_for(self._queue.join(), timeout=timeout)
         except asyncio.TimeoutError:
+            remaining = self._queue.qsize()
             logger.warning(
-                "Span queue shutdown timed out after %.1fs with %d items remaining", timeout, self._queue.qsize()
+                "Span queue shutdown timed out after %.1fs with %d items remaining", timeout, remaining
             )
+            _metrics.record_shutdown_timeout(remaining_items=remaining)
         if self._drain_task is not None and not self._drain_task.done():
             self._drain_task.cancel()
             try:
