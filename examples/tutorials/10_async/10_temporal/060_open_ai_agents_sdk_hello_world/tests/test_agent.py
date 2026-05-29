@@ -1,3 +1,4 @@
+# ci: touch to re-run tutorial integration tests for the openai-agents>=0.14.3 bump
 """
 Sample tests for AgentEx ACP agent.
 

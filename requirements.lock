@@ -215,7 +215,7 @@ openai==2.30.0
     # via agentex-sdk
     # via litellm
     # via openai-agents
-openai-agents==0.14.1
+openai-agents==0.14.8
     # via agentex-sdk
 opentelemetry-api==1.40.0
     # via agentex-sdk

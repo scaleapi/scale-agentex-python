@@ -97,7 +97,7 @@ requires-dist = [
     { name = "litellm", specifier = ">=1.83.7,<2" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.4.1" },
     { name = "openai", specifier = ">=2.2,<3" },
-    { name = "openai-agents", specifier = "==0.14.1" },
+    { name = "openai-agents", specifier = ">=0.14.3,<0.15" },
     { name = "opentelemetry-api", specifier = ">=1.20.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.20.0" },
     { name = "pydantic", specifier = ">=2.0.0,<3" },
@@ -1561,7 +1561,7 @@ wheels = [
 
 [[package]]
 name = "openai-agents"
-version = "0.14.1"
+version = "0.14.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "griffelib" },
@@ -1573,9 +1573,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/16/ae/8af117a3a4a06ad72b4a60759fbab98a7158f0eb36c47d90d5d883610781/openai_agents-0.14.1.tar.gz", hash = "sha256:7baac1b4c0a171d32c82eb6e9c207fd010e0d08dd39a5e8cd762ee27969457dc", size = 5256058, upload-time = "2026-04-15T19:26:52.42Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/8a/d36ab647f05e790ec97dda9e4c0eb39d8840269d6a5194887b5dec92bd0d/openai_agents-0.14.8.tar.gz", hash = "sha256:fe1cb58b4150a07292a94f15d8fd5217ee9195bd6bcd8a6a46fdb1d9b08a70b7", size = 5314520, upload-time = "2026-04-29T03:40:07.6Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ac/1c/98efddc1e10b23a397ca901b6f6d251908be2e6a30a92e0c25fb5dff6348/openai_agents-0.14.1-py3-none-any.whl", hash = "sha256:09ea6e9c49c785dc490e071e17ea3a0b0cce9c5f97daeb50ee6dc8fb490dc817", size = 797518, upload-time = "2026-04-15T19:26:50.106Z" },
+    { url = "https://files.pythonhosted.org/packages/af/6e/1e9adcedcde7b163579b88a68f765a4915be4ead0713270386d9432cfd2f/openai_agents-0.14.8-py3-none-any.whl", hash = "sha256:2937ef582ccaa45d59e89839ed8948cb2a6d808bc9940f0881793c21f37f7776", size = 817332, upload-time = "2026-04-29T03:40:05.68Z" },
 ]
 
 [[package]]
