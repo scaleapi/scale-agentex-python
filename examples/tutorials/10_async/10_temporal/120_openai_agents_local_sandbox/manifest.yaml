@@ -1,0 +1,111 @@
+# Agent Manifest Configuration
+# ---------------------------
+# This file defines how your agent should be built and deployed.
+
+# Build Configuration
+# ------------------
+build:
+  context:
+    # Root directory for the build context
+    root: ../../../  # Up to tutorials level to include test_utils
+
+    # Paths to include in the Docker build context
+    include_paths:
+      - 10_async/10_temporal/120_openai_agents_local_sandbox
+      - test_utils
+
+    # Path to your agent's Dockerfile (relative to the root directory)
+    dockerfile: 10_async/10_temporal/120_openai_agents_local_sandbox/Dockerfile
+
+    # Path to your agent's .dockerignore
+    dockerignore: 10_async/10_temporal/120_openai_agents_local_sandbox/.dockerignore
+
+
+# Local Development Configuration
+# -----------------------------
+local_development:
+  agent:
+    port: 8000  # Port where your local ACP server is running
+    host_address: host.docker.internal  # Host address for Docker networking
+
+  # File paths for local development (relative to this manifest.yaml)
+  paths:
+    # Path to ACP server file
+    acp: project/acp.py
+    # Path to temporal worker file
+    worker: project/run_worker.py
+
+
+# Agent Configuration
+# -----------------
+agent:
+  # Type of agent - either sync or async
+  acp_type: async
+
+  # Unique name for your agent
+  name: at120-openai-agents-local-sandbox
+
+  # Description of what your agent does
+  description: A Temporal OpenAI Agents SDK agent using a local (unix_local) sandbox
+
+  # Temporal workflow configuration
+  temporal:
+    enabled: true
+    workflows:
+      # Name of the workflow class (must match the @workflow.defn name in workflow.py)
+      - name: at120-openai-agents-local-sandbox
+
+        # Queue name for task distribution
+        queue_name: at120_openai_agents_local_sandbox_queue
+
+  # Credentials mapping (maps Kubernetes secrets to environment variables)
+  credentials:
+    - env_var_name: OPENAI_API_KEY
+      secret_name: openai-api-key
+      secret_key: api-key
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+    - env_var_name: SGP_API_KEY
+      secret_name: sgp-api-key
+      secret_key: api-key
+    - env_var_name: SGP_ACCOUNT_ID
+      secret_name: sgp-account-id
+      secret_key: account-id
+    - env_var_name: SGP_CLIENT_BASE_URL
+      secret_name: sgp-client-base-url
+      secret_key: url
+
+  # Environment variables for running locally and for deployment
+  env:
+    OPENAI_AGENTS_DISABLE_TRACING: "1"
+
+
+# Deployment Configuration
+# -----------------------
+deployment:
+  # Container image configuration
+  image:
+    repository: "" # Update with your container registry
+    tag: "latest"  # Default tag, should be versioned in production
+
+  imagePullSecrets:
+    - name: my-registry-secret  # Update with your image pull secret name
+
+  # Global deployment settings that apply to all clusters
+  global:
+    agent:
+      name: "at120-openai-agents-local-sandbox"
+      description: "A Temporal OpenAI Agents SDK agent using a local (unix_local) sandbox"
+
+    # Default replica count
+    replicaCount: 1
+
+    # Default resource requirements
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
