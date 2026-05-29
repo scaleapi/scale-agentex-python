@@ -6,7 +6,7 @@ from typing import Any
 from temporalio.client import Client, Plugin as ClientPlugin
 from temporalio.worker import Interceptor
 from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
-from temporalio.converter import PayloadCodec
+from temporalio.converter import PayloadCodec, DataConverter
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
@@ -86,6 +86,7 @@ async def get_temporal_client(
     metrics_url: str | None = None,
     plugins: list[Any] = [],
     payload_codec: PayloadCodec | None = None,
+    data_converter: DataConverter | None = None,
 ) -> Client:
     """
     Create a Temporal client with plugin integration.
@@ -94,7 +95,14 @@ async def get_temporal_client(
         temporal_address: Temporal server address
         metrics_url: Optional metrics endpoint URL
         plugins: List of Temporal plugins to include
-        payload_codec: Optional payload codec for encoding/decoding payloads (e.g. encryption, compression)
+        payload_codec: Optional payload codec for encoding/decoding payloads
+            (e.g. encryption, compression). Cannot be combined with the
+            OpenAIAgentsPlugin via this kwarg — see ``data_converter``.
+        data_converter: Optional pre-built ``DataConverter``. Use this when
+            composing the OpenAIAgentsPlugin with a payload codec: build a
+            ``DataConverter(payload_converter_class=OpenAIPayloadConverter,
+            payload_codec=...)`` and pass it here. Mutually exclusive with
+            ``payload_codec``.
 
     Returns:
         Configured Temporal client
@@ -103,29 +111,40 @@ async def get_temporal_client(
     if plugins:
         validate_client_plugins(plugins)
 
-    # Check if OpenAI plugin is present - it needs to configure its own data converter
+    if payload_codec is not None and data_converter is not None:
+        raise ValueError(
+            "Pass payload_codec inside `data_converter` "
+            "(DataConverter(..., payload_codec=...)) instead of as a separate "
+            "kwarg. Specifying both is ambiguous."
+        )
+
     # Lazy import to avoid pulling in opentelemetry.sdk for non-Temporal agents
     from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 
     has_openai_plugin = any(isinstance(p, OpenAIAgentsPlugin) for p in (plugins or []))
 
-    if has_openai_plugin and payload_codec is not None:
+    if has_openai_plugin and payload_codec is not None and data_converter is None:
         raise ValueError(
-            "payload_codec is not supported alongside OpenAIAgentsPlugin: the plugin "
-            "installs its own data converter and the codec would be silently ignored, "
-            "leaving payloads unencoded. Remove one or the other."
+            "payload_codec passed as a kwarg alongside OpenAIAgentsPlugin would "
+            "be silently dropped by the plugin's data-converter transformer. "
+            "Build a DataConverter explicitly with "
+            "`payload_converter_class=OpenAIPayloadConverter` (or a subclass) "
+            "and `payload_codec=...`, then pass it via the `data_converter` "
+            "kwarg instead."
         )
 
-    connect_kwargs = {
+    connect_kwargs: dict[str, Any] = {
         "target_host": temporal_address,
         "plugins": plugins,
     }
 
-    if not has_openai_plugin:
-        data_converter = pydantic_data_converter
-        if payload_codec:
-            data_converter = dataclasses.replace(data_converter, payload_codec=payload_codec)
+    if data_converter is not None:
         connect_kwargs["data_converter"] = data_converter
+    elif not has_openai_plugin:
+        dc = pydantic_data_converter
+        if payload_codec:
+            dc = dataclasses.replace(dc, payload_codec=payload_codec)
+        connect_kwargs["data_converter"] = dc
 
     if not metrics_url:
         client = await Client.connect(**connect_kwargs)
