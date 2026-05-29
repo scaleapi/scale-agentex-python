@@ -236,6 +236,10 @@ class AsyncSpanQueue:
             if starts:
                 self._dispatch(starts, SpanEventType.START)
             if ends:
+                # Re-check backpressure before the second dispatch so a batch
+                # carrying both event types can't push _inflight past the cap.
+                while len(self._inflight) >= self._concurrency:
+                    await asyncio.wait(set(self._inflight), return_when=asyncio.FIRST_COMPLETED)
                 self._dispatch(ends, SpanEventType.END)
 
     def _dispatch(self, items: list[_SpanQueueItem], event_type: SpanEventType) -> None:
@@ -342,7 +346,14 @@ class AsyncSpanQueue:
 
     def _reenqueue(self, item: _SpanQueueItem, p: AsyncTracingProcessor) -> None:
         """Put a single failed item back on the queue, scoped to the processor
-        that failed, with an incremented attempt count."""
+        that failed, with an incremented attempt count.
+
+        NOTE: a re-enqueued START goes to the *back* of the queue.  If an END
+        for the same span is dispatched concurrently before this START is picked
+        up again, the END's barrier snapshot won't contain it, breaking the
+        START-before-END guarantee for that span.  This is benign at the default
+        ``max_retries=1`` (retries disabled) but must be addressed before
+        enabling retries by default."""
         try:
             self._queue.put_nowait(
                 _SpanQueueItem(
