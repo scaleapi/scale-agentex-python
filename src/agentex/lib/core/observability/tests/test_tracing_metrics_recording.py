@@ -94,7 +94,7 @@ class TestRecordingHelpers:
             )
 
         mock_metrics.export_batch_failures.add.assert_called_once()
-        mock_metrics.export_spans_failed.add.assert_called_once_with(
+        mock_metrics.export_span_failures.add.assert_called_once_with(
             5,
             {
                 "processor": "sgp",
@@ -116,11 +116,11 @@ class TestRecordingHelpers:
 
         mock_metrics.export_batches.add.assert_called_once_with(
             1,
-            {"processor": "sgp", "event_type": "end", "outcome": "success"},
+            {"processor": "sgp", "event_type": "end"},
         )
         mock_metrics.export_spans.add.assert_called_once_with(
             12,
-            {"processor": "sgp", "event_type": "end", "outcome": "success"},
+            {"processor": "sgp", "event_type": "end"},
         )
 
     def test_record_export_success_accepts_processor_label(self, monkeypatch):
@@ -137,5 +137,5 @@ class TestRecordingHelpers:
 
         mock_metrics.export_batches.add.assert_called_once_with(
             1,
-            {"processor": "other", "event_type": "start", "outcome": "success"},
+            {"processor": "other", "event_type": "start"},
         )

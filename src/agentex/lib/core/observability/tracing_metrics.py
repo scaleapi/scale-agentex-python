@@ -12,9 +12,8 @@ entirely (see ``tracing_metrics_recording.is_metrics_enabled``).
 Cardinality is bounded:
 - ``event_type``: ``start`` | ``end``
 - ``processor``: ``sgp`` | ``other``
-- ``outcome``: ``success`` | ``failure`` (export counters only)
-- ``http_code``: small fixed set from ``classify_export_error``
-- ``error_class``: small fixed set from ``classify_export_error``
+- ``http_code``: small fixed set from ``classify_export_error`` (failure counters only)
+- ``error_class``: small fixed set from ``classify_export_error`` (failure counters only)
 - ``reason``: ``shutdown`` (drops only)
 - ``phase``: ``start`` | ``end`` (batch drain histograms)
 
@@ -75,20 +74,20 @@ class TracingMetrics:
         self.export_batches = meter.create_counter(
             name="agentex.tracing.export.batches",
             unit="1",
-            description="HTTP export batch attempts tagged with outcome",
+            description="Successful HTTP export batches by processor and event type",
         )
         self.export_spans = meter.create_counter(
             name="agentex.tracing.export.spans",
             unit="1",
-            description="Spans included in HTTP export batches tagged with outcome",
+            description="Spans in successful HTTP export batches by processor and event type",
         )
         self.export_batch_failures = meter.create_counter(
             name="agentex.tracing.export.batch_failures",
             unit="1",
             description="Failed HTTP export batches by processor and HTTP status",
         )
-        self.export_spans_failed = meter.create_counter(
-            name="agentex.tracing.export.spans_failed",
+        self.export_span_failures = meter.create_counter(
+            name="agentex.tracing.export.span_failures",
             unit="1",
             description="Spans in failed HTTP export batches by processor and HTTP status",
         )

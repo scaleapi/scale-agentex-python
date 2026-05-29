@@ -93,7 +93,7 @@ class TestGetTracingMetrics:
             "export_batches",
             "export_spans",
             "export_batch_failures",
-            "export_spans_failed",
+            "export_span_failures",
             "shutdown_timeouts",
             "shutdown_remaining_items",
         ):

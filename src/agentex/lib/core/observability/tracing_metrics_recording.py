@@ -103,7 +103,7 @@ def record_export_success(*, event_type: str, span_count: int, processor: str = 
     try:
         from agentex.lib.core.observability.tracing_metrics import get_tracing_metrics
 
-        attrs = {"processor": processor, "event_type": event_type, "outcome": "success"}
+        attrs = {"processor": processor, "event_type": event_type}
         metrics = get_tracing_metrics()
         metrics.export_batches.add(1, attrs)
         metrics.export_spans.add(span_count, attrs)
@@ -137,7 +137,7 @@ def record_export_failure(
         }
         metrics = get_tracing_metrics()
         metrics.export_batch_failures.add(1, attrs)
-        metrics.export_spans_failed.add(span_count, attrs)
+        metrics.export_span_failures.add(span_count, attrs)
     except Exception:
         pass
 

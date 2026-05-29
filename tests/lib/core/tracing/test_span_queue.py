@@ -569,7 +569,7 @@ class TestAsyncSpanQueueMetrics:
             await queue.shutdown()
 
         mock_metrics.export_batch_failures.add.assert_called_once()
-        mock_metrics.export_spans_failed.add.assert_called_once()
+        mock_metrics.export_span_failures.add.assert_called_once()
 
     async def test_enqueue_overhead_with_metrics_disabled(self, monkeypatch):
         monkeypatch.setenv("AGENTEX_TRACING_METRICS", "0")

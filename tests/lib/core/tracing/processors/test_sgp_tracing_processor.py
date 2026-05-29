@@ -240,11 +240,11 @@ class TestSGPAsyncTracingProcessor:
 
         mock_metrics.export_batches.add.assert_called_once_with(
             1,
-            {"processor": "sgp", "event_type": "start", "outcome": "success"},
+            {"processor": "sgp", "event_type": "start"},
         )
         mock_metrics.export_spans.add.assert_called_once_with(
             n,
-            {"processor": "sgp", "event_type": "start", "outcome": "success"},
+            {"processor": "sgp", "event_type": "start"},
         )
         assert mock_client.spans.upsert_batch.call_count == 1
 
