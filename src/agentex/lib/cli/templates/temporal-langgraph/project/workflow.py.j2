@@ -1,0 +1,259 @@
+"""Temporal workflow for {{ agent_name }} — Temporal as the LangGraph runtime.
+
+*Temporal replaces the runtime; LangGraph is the agent framework.* This
+workflow is that runtime. Each turn it runs the LangGraph graph defined in
+``project/graph.py`` via the ``temporalio.contrib.langgraph`` plugin, which
+executes the graph's nodes as durable Temporal activities (the ``agent``/LLM
+node) or inline in the workflow (the ``tools`` node).
+
+Showcased here:
+
+- **Nodes as activities** — the plugin runs the LLM node as a retried,
+  observable Temporal activity (see ``execute_in`` metadata in graph.py).
+- **Human-in-the-loop** — when the graph raises a LangGraph ``interrupt`` for
+  an approval-gated tool, the workflow pauses on a Temporal signal
+  (``provide_approval``) and resumes with the human's decision.
+- **Live introspection via Temporal queries** — status, the pending approval,
+  and a Mermaid/ASCII rendering of the agent graph, queryable while it runs.
+- **Multi-turn memory** — the running message list is kept on the workflow
+  instance; durable and replay-safe for free, so no checkpoint DB is needed.
+- **Tracing** — a per-turn span shipped to SGP/AgentEx.
+"""
+
+from __future__ import annotations
+
+import os
+import json
+from typing import Any
+
+# LangGraph plugin helper: retrieves the graph registered under GRAPH_NAME.
+import langgraph.checkpoint.memory
+from temporalio import workflow
+from langgraph.types import Command
+from temporalio.contrib.langgraph import graph as lg_graph
+
+from agentex.lib import adk
+from project.graph import GRAPH_NAME, build_graph
+from agentex.lib.adk import emit_langgraph_messages
+from agentex.protocol.acp import SendEventParams, CreateTaskParams
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
+from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
+
+# Register the SGP tracing exporter (spans also reach the AgentEx backend via
+# the default processor that is lazy-initialised on first span).
+SGP_API_KEY = os.environ.get("SGP_API_KEY", "")
+SGP_ACCOUNT_ID = os.environ.get("SGP_ACCOUNT_ID", "")
+if SGP_API_KEY and SGP_ACCOUNT_ID:
+    add_tracing_processor_config(
+        SGPTracingProcessorConfig(
+            sgp_api_key=SGP_API_KEY,
+            sgp_account_id=SGP_ACCOUNT_ID,
+            sgp_base_url=os.environ.get("SGP_CLIENT_BASE_URL", ""),
+        )
+    )
+
+environment_variables = EnvironmentVariables.refresh()
+
+if environment_variables.WORKFLOW_NAME is None:
+    raise ValueError("Environment variable WORKFLOW_NAME is not set")
+if environment_variables.AGENT_NAME is None:
+    raise ValueError("Environment variable AGENT_NAME is not set")
+
+logger = make_logger(__name__)
+
+
+@workflow.defn(name=environment_variables.WORKFLOW_NAME)
+class {{ workflow_class }}(BaseWorkflow):
+    """Durable runtime that runs the LangGraph agent via the Temporal plugin."""
+
+    def __init__(self) -> None:
+        super().__init__(display_name=environment_variables.AGENT_NAME)
+        self._complete_task = False
+        self._turn_number = 0
+        # Running conversation, as LangGraph message objects. Durable: Temporal
+        # replays the activity results that produced it, so it survives crashes.
+        self._messages: list[Any] = []
+        # How many messages have already been surfaced to the AgentEx UI.
+        self._emitted = 0
+        self._status = "idle"
+        self._pending_approval: dict[str, Any] | None = None
+        self._approval_response: dict[str, Any] | None = None
+        self._viz_graph: Any = None
+
+    # ------------------------------------------------------------------ #
+    # Signals
+    # ------------------------------------------------------------------ #
+
+    @workflow.signal(name=SignalName.RECEIVE_EVENT)
+    async def on_task_event_send(self, params: SendEventParams) -> None:
+        """Handle a new user message: echo it, then run the agent graph durably."""
+        logger.info(f"Received task event for task {params.task.id}")
+        self._turn_number += 1
+        user_text = params.event.content.content
+
+        # Echo the user's message so it shows up as a chat bubble.
+        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        self._messages.append({"role": "user", "content": user_text})
+
+        async with adk.tracing.span(
+            trace_id=params.task.id,
+            task_id=params.task.id,
+            name=f"Turn {self._turn_number}",
+            input={"message": user_text},
+        ) as span:
+            final_text = await self._run_graph(params.task.id)
+            if span:
+                span.output = {"final_output": final_text}
+
+    @workflow.signal
+    async def provide_approval(self, response: dict[str, Any]) -> None:
+        """Provide a human approval decision for a pending tool call.
+
+        Args:
+            response: ``{"approved": bool, "reason": str, "approver": str}``.
+        """
+        logger.info(f"Received approval response: {response}")
+        self._approval_response = response
+
+    @workflow.signal
+    async def complete_task_signal(self) -> None:
+        """Gracefully end the task/workflow."""
+        logger.info("Received complete_task signal")
+        self._complete_task = True
+
+    # ------------------------------------------------------------------ #
+    # Agent turn — run the LangGraph graph, pausing for approvals.
+    # ------------------------------------------------------------------ #
+
+    async def _run_graph(self, task_id: str) -> str:
+        """Run one turn of the graph, handling any human-approval interrupts."""
+        # A fresh in-memory checkpointer per turn: it only needs to persist the
+        # interrupt/resume state within this turn. Temporal provides durability;
+        # cross-turn memory lives in self._messages.
+        compiled = lg_graph(GRAPH_NAME).compile(
+            checkpointer=langgraph.checkpoint.memory.InMemorySaver()
+        )
+        config = {"configurable": {"thread_id": f"{task_id}-{self._turn_number}"}}
+
+        self._status = "processing"
+        result = await compiled.ainvoke({"messages": self._messages}, config=config)
+
+        # The graph pauses (interrupt) whenever an approval-gated tool is called.
+        while result.get("__interrupt__"):
+            interrupt_value = result["__interrupt__"][0].value
+            decision = await self._await_human_approval(task_id, interrupt_value)
+            result = await compiled.ainvoke(Command(resume=decision), config=config)
+
+        self._messages = result["messages"]
+        # Surface the messages this turn produced (tool calls, results, final
+        # text) to the AgentEx UI. The SDK helper does the LangGraph→AgentEx
+        # message conversion and returns the final assistant text.
+        final_text = await emit_langgraph_messages(self._messages[self._emitted:], task_id)
+        self._emitted = len(self._messages)
+        self._status = "completed"
+        return final_text
+
+    async def _await_human_approval(self, task_id: str, pending: dict[str, Any]) -> dict[str, Any]:
+        """Pause until a ``provide_approval`` signal arrives, then return the decision."""
+        self._pending_approval = pending
+        self._approval_response = None
+        self._status = "waiting_for_approval"
+
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=(
+                    f"⏸️ Waiting for human approval to run **{pending.get('name')}** "
+                    f"with `{json.dumps(pending.get('args', {}))}`.\n\n"
+                    "Send a `provide_approval` signal, e.g. "
+                    '`{"approved": true, "approver": "you"}`.'
+                ),
+            ),
+        )
+
+        await workflow.wait_condition(lambda: self._approval_response is not None)
+
+        decision = self._approval_response or {"approved": False}
+        self._pending_approval = None
+        self._approval_response = None
+        self._status = "processing"
+        return decision
+
+    # ------------------------------------------------------------------ #
+    # Queries — inspect the running agent live from the Temporal UI/client.
+    # ------------------------------------------------------------------ #
+
+    @workflow.query
+    def get_status(self) -> str:
+        """Current status: idle | processing | waiting_for_approval | completed."""
+        return self._status
+
+    @workflow.query
+    def get_pending_approval(self) -> dict[str, Any] | None:
+        """The tool call currently awaiting human approval, if any."""
+        return self._pending_approval
+
+    @workflow.query
+    def get_graph_state(self) -> dict[str, Any]:
+        """A snapshot of the agent loop's progress."""
+        return {
+            "turn_number": self._turn_number,
+            "message_count": len(self._messages),
+            "status": self._status,
+            "pending_approval": self._pending_approval,
+            "completed": self._complete_task,
+        }
+
+    @workflow.query
+    def get_graph_mermaid(self) -> str:
+        """Mermaid diagram of the agent graph (renders in GitHub/Notion)."""
+        try:
+            return self._visualization_graph().get_graph().draw_mermaid()
+        except Exception as exc:  # pragma: no cover - visualization is best-effort
+            return f"Could not render graph: {exc}"
+
+    @workflow.query
+    def get_graph_ascii(self) -> str:
+        """ASCII-art diagram of the agent graph (requires the `grandalf` package)."""
+        try:
+            return self._visualization_graph().get_graph().draw_ascii()
+        except ImportError:
+            return "ASCII rendering requires the 'grandalf' package. Try get_graph_mermaid instead."
+        except Exception as exc:  # pragma: no cover - visualization is best-effort
+            return f"Could not render graph: {exc}"
+
+    def _visualization_graph(self):
+        """Lazily build + cache the compiled graph used purely for rendering."""
+        if self._viz_graph is None:
+            self._viz_graph = build_graph().compile()
+        return self._viz_graph
+
+    # ------------------------------------------------------------------ #
+    # Entry point
+    # ------------------------------------------------------------------ #
+
+    @workflow.run
+    async def on_task_create(self, params: CreateTaskParams) -> str:
+        """Keep the conversation alive, handling incoming message/approval signals."""
+        logger.info(f"Task created: {params.task.id}")
+
+        await adk.messages.create(
+            task_id=params.task.id,
+            content=TextContent(
+                author="agent",
+                content=(
+                    f"Task initialized with params:\n{json.dumps(params.params, indent=2)}\n\n"
+                    "Send me a message and I'll respond using a LangGraph agent whose nodes "
+                    "run as durable Temporal activities."
+                ),
+            ),
+        )
+
+        await workflow.wait_condition(lambda: self._complete_task, timeout=None)
+        return "Task completed"

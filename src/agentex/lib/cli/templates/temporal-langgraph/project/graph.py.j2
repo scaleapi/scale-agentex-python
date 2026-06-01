@@ -1,0 +1,165 @@
+"""LangGraph graph for {{ agent_name }} — nodes run as Temporal activities.
+
+This is the LangGraph half of the integration. The ``temporalio.contrib.langgraph``
+plugin executes this graph's nodes durably: each node's ``execute_in`` metadata
+says whether it runs as a Temporal **activity** or inline in the **workflow**.
+
+    START → agent → (tool calls?) → tools → agent
+                 → (no tool calls?) → END
+
+- ``agent`` (``execute_in="activity"``): the LLM call. Runs as its own durable,
+  retried Temporal activity — visible in the Temporal UI.
+- ``tools`` (``execute_in="workflow"``): executes tool calls and hosts the
+  human-in-the-loop gate. It runs inline in the workflow because (a) the
+  ``AIMessage`` with tool calls stays intact without crossing an activity
+  boundary, and (b) LangGraph ``interrupt`` (used for approvals) needs to run
+  where the workflow can pause on a Temporal signal.
+
+Why these shapes:
+- The router (``route_after_agent``) and tools are **async** so LangGraph
+  awaits them directly; sync callables would be offloaded via
+  ``run_in_executor``, which Temporal's workflow event loop does not support.
+- Tool execution as a workflow node keeps things simple for this template.
+  For long-running or heavily side-effecting tools, move that work into its
+  own activity (e.g. mark a dedicated tool node ``execute_in="activity"``).
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Any, Annotated
+from datetime import datetime, timedelta
+
+# Copy the LiteLLM proxy key to OPENAI_API_KEY so langchain-openai authenticates
+# against the Scale LiteLLM proxy when one is configured. This runs in the
+# worker process (where the agent activity executes).
+_litellm_key = os.environ.get("LITELLM_API_KEY")
+if _litellm_key:
+    os.environ.setdefault("OPENAI_API_KEY", _litellm_key)
+
+from typing_extensions import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+from langgraph.types import interrupt
+from langchain_openai import ChatOpenAI
+from temporalio.common import RetryPolicy
+from langchain_core.messages import ToolMessage, SystemMessage
+from langgraph.graph.message import add_messages
+
+from project.tools import TOOLS, TOOLS_BY_NAME, TOOLS_REQUIRING_APPROVAL
+
+# The name this graph is registered under in the LangGraphPlugin. The workflow
+# retrieves it with ``graph(GRAPH_NAME)``; acp.py and run_worker.py register it.
+GRAPH_NAME = "{{ agent_name }}"
+
+# Swap for any LangChain-supported chat model id, e.g. "gpt-4o", "o3-mini".
+MODEL_NAME = "gpt-4o"
+
+SYSTEM_PROMPT = """You are a helpful AI assistant with access to tools.
+
+Current date and time: {timestamp}
+
+Guidelines:
+- Be concise and helpful
+- Use tools when they would help answer the user's question
+- If you're unsure, ask clarifying questions
+- Always provide accurate information
+"""
+
+
+class AgentState(TypedDict):
+    """State schema for the agent graph."""
+
+    messages: Annotated[list[Any], add_messages]
+
+
+async def agent_node(state: AgentState) -> dict[str, Any]:
+    """The 'agent' node — one LLM call. Runs as a durable Temporal activity."""
+    llm = ChatOpenAI(model=MODEL_NAME).bind_tools(TOOLS)
+    messages = state["messages"]
+    if not messages or not isinstance(messages[0], SystemMessage):
+        system = SystemMessage(
+            content=SYSTEM_PROMPT.format(timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        messages = [system, *messages]
+    return {"messages": [await llm.ainvoke(messages)]}
+
+
+async def tools_node(state: AgentState) -> dict[str, Any]:
+    """The 'tools' node — executes tool calls, with a human-approval gate.
+
+    Runs inline in the workflow. For tools in ``TOOLS_REQUIRING_APPROVAL`` it
+    raises a LangGraph ``interrupt`` carrying the pending call; the workflow
+    pauses on a Temporal signal until a human approves or rejects, then resumes.
+    """
+    last_message = state["messages"][-1]
+    tool_messages: list[ToolMessage] = []
+
+    for tool_call in last_message.tool_calls:
+        name = tool_call["name"]
+
+        tool = TOOLS_BY_NAME.get(name)
+        if tool is None:
+            # The model hallucinated a tool that isn't registered — tell it so
+            # it can recover, rather than crashing the workflow.
+            tool_messages.append(
+                ToolMessage(content=f"Error: unknown tool {name!r}", tool_call_id=tool_call["id"], name=name)
+            )
+            continue
+
+        if name in TOOLS_REQUIRING_APPROVAL:
+            # interrupt() pauses the graph; the workflow resumes it with the
+            # human's decision via Command(resume=...). Durable: it can wait
+            # minutes, hours, or days and survive worker restarts.
+            decision = interrupt(
+                {"tool_call_id": tool_call["id"], "name": name, "args": tool_call["args"]}
+            )
+            if not decision.get("approved"):
+                rejection = (
+                    f"Tool call rejected by {decision.get('approver', 'human')}: "
+                    f"{decision.get('reason', 'no reason given')}"
+                )
+                tool_messages.append(
+                    ToolMessage(content=rejection, tool_call_id=tool_call["id"], name=name)
+                )
+                continue
+
+        result = await tool.ainvoke(tool_call["args"])
+        tool_messages.append(
+            ToolMessage(content=str(result), tool_call_id=tool_call["id"], name=name)
+        )
+
+    return {"messages": tool_messages}
+
+
+async def route_after_agent(state: AgentState) -> str:
+    """Route to the tools node when the model requested tools, else finish.
+
+    Async so LangGraph awaits it directly in the workflow (a sync router would
+    be offloaded via run_in_executor, unsupported in Temporal workflows).
+    """
+    last_message = state["messages"][-1]
+    return "tools" if getattr(last_message, "tool_calls", None) else END
+
+
+def build_graph() -> StateGraph:
+    """Build the agent graph with per-node Temporal execution metadata.
+
+    Registered with the ``LangGraphPlugin`` in acp.py / run_worker.py, and used
+    by the workflow's visualization queries.
+    """
+    builder = StateGraph(AgentState)
+    builder.add_node(
+        "agent",
+        agent_node,
+        metadata={
+            "execute_in": "activity",
+            "start_to_close_timeout": timedelta(minutes=5),
+            "retry_policy": RetryPolicy(maximum_attempts=3),
+        },
+    )
+    builder.add_node("tools", tools_node, metadata={"execute_in": "workflow"})
+    builder.add_edge(START, "agent")
+    builder.add_conditional_edges("agent", route_after_agent, {"tools": "tools", END: END})
+    builder.add_edge("tools", "agent")
+    return builder
