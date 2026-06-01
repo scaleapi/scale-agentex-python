@@ -27,7 +27,7 @@ _DEFAULT_MAX_RETRIES = 1
 # concurrently; issuing one batch at a time caps per-pod egress at ~1/latency.
 # Sending several concurrently lets a pod keep up with span production under
 # load.  ``1`` restores the old strictly-serial behavior.
-_DEFAULT_CONCURRENCY = 8
+_DEFAULT_CONCURRENCY = 3
 # HTTP statuses worth retrying at the queue level.  These are explicit
 # backpressure / transient signals; everything else (esp. 401/403/4xx auth and
 # validation errors) is a permanent failure that re-enqueuing cannot fix.  Note
@@ -430,6 +430,7 @@ class AsyncSpanQueue:
                 "Span queue shutdown timed out after %.1fs with %d items remaining", timeout, remaining
             )
             _metrics.record_shutdown_timeout(remaining_items=remaining)
+
         if self._drain_task is not None and not self._drain_task.done():
             self._drain_task.cancel()
             try:
