@@ -180,7 +180,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             sgp_spans.append(sgp_span)
         await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
         _metrics.record_export_success(
-            event_type="end", span_count=len(sgp_spans), processor="sgp"
+            event_type="end", span_count=len(spans), processor="sgp"
         )
 
     @override
