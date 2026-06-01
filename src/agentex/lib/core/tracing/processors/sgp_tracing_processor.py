@@ -12,6 +12,7 @@ from scale_gp_beta.lib.tracing.span import Span as SGPSpan
 from agentex.types.span import Span
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.observability import tracing_metrics_recording as _metrics
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     SyncTracingProcessor,
@@ -159,6 +160,9 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
 
         sgp_spans = [_build_sgp_span(span, self.env_vars) for span in spans]
         await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
+        _metrics.record_export_success(
+            event_type="start", span_count=len(spans), processor="sgp"
+        )
 
     @override
     async def on_spans_end(self, spans: list[Span]) -> None:
@@ -175,6 +179,9 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
             sgp_spans.append(sgp_span)
         await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
+        _metrics.record_export_success(
+            event_type="end", span_count=len(spans), processor="sgp"
+        )
 
     @override
     async def shutdown(self) -> None:

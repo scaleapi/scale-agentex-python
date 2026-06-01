@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
+
+## 0.11.8 (2026-06-01)
+
+Full Changelog: [v0.11.7...v0.11.8](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.7...v0.11.8)
+
+### Features
+
+* **cli:** add Temporal + LangGraph agent template and example ([#383](https://github.com/scaleapi/scale-agentex-python/issues/383)) ([bbc9e02](https://github.com/scaleapi/scale-agentex-python/commit/bbc9e02d2a2b063a3e509a07ffca8ca4bf459e57))
+* **tracing:** OTel span queue and export telemetry (SGPINF-1863) ([#373](https://github.com/scaleapi/scale-agentex-python/issues/373)) ([6669012](https://github.com/scaleapi/scale-agentex-python/commit/6669012638481a63bdd7629582818796ca31bdf3))
+
 ## 0.11.7 (2026-06-01)
 
 Full Changelog: [v0.11.6...v0.11.7](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.6...v0.11.7)
