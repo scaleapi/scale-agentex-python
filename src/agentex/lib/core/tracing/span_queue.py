@@ -163,7 +163,7 @@ class AsyncSpanQueue:
         if count <= 0:
             return
         self._dropped_spans += count
-        if "shutdown" in reason:
+        if "shutting down" in reason:
             for _ in range(count):
                 _metrics.record_span_dropped("shutdown")
         elif "queue full" in reason:

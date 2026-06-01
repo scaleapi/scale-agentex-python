@@ -790,6 +790,28 @@ class TestAsyncSpanQueueMetrics:
 
         mock_metrics.span_events_enqueued.add.assert_any_call(1, {"event_type": "start"})
 
+    async def test_enqueue_during_shutdown_records_dropped_metric(self, monkeypatch):
+        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
+        import agentex.lib.core.observability.tracing_metrics_recording as recording
+
+        recording._metrics_enabled = None
+        recording._tracing = None
+        mock_metrics = MagicMock()
+        proc = _make_processor()
+        queue = AsyncSpanQueue(linger_ms=0)
+
+        with patch(
+            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics",
+            return_value=mock_metrics,
+        ):
+            queue.enqueue(SpanEventType.START, _make_span(), [proc])
+            await asyncio.sleep(0.05)
+            queue._stopping = True
+            queue.enqueue(SpanEventType.END, _make_span(), [proc])
+            await queue.shutdown()
+
+        mock_metrics.span_events_dropped.add.assert_any_call(1, {"reason": "shutdown"})
+
     async def test_processor_failure_records_export_failure(self, monkeypatch):
         monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
         import agentex.lib.core.observability.tracing_metrics_recording as recording
