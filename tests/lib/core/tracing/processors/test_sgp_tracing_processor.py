@@ -222,6 +222,33 @@ class TestSGPAsyncTracingProcessor:
         items = mock_client.spans.upsert_batch.call_args.kwargs["items"]
         assert len(items) == n
 
+    async def test_on_spans_start_records_export_success_metrics(self, monkeypatch):
+        monkeypatch.setenv("AGENTEX_TRACING_METRICS", "1")
+        import agentex.lib.core.observability.tracing_metrics_recording as recording
+
+        recording._metrics_enabled = None
+        recording._tracing = None
+        processor, _, mock_client = self._make_processor()
+        mock_metrics = MagicMock()
+
+        n = 4
+        spans = [_make_span() for _ in range(n)]
+        with patch(f"{MODULE}.create_span", side_effect=lambda **kw: _make_mock_sgp_span()), patch(
+            "agentex.lib.core.observability.tracing_metrics.get_tracing_metrics",
+            return_value=mock_metrics,
+        ):
+            await processor.on_spans_start(spans)
+
+        mock_metrics.export_batches.add.assert_called_once_with(
+            1,
+            {"processor": "sgp", "event_type": "start"},
+        )
+        mock_metrics.export_spans.add.assert_called_once_with(
+            n,
+            {"processor": "sgp", "event_type": "start"},
+        )
+        assert mock_client.spans.upsert_batch.call_count == 1
+
     async def test_get_client_caches_per_event_loop(self):
         """The processor must keep one client per event loop, and reuse it
         across calls within the same loop.  This is what enables connection
