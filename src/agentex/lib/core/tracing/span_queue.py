@@ -164,11 +164,9 @@ class AsyncSpanQueue:
             return
         self._dropped_spans += count
         if "shutting down" in reason:
-            for _ in range(count):
-                _metrics.record_span_dropped("shutdown")
+            _metrics.record_span_dropped("shutdown", count)
         elif "queue full" in reason:
-            for _ in range(count):
-                _metrics.record_span_dropped("queue_full")
+            _metrics.record_span_dropped("queue_full", count)
         # Warn on the first drop and then sparsely, so a drop storm is visible
         # without flooding the log.
         if self._dropped_spans == count or self._dropped_spans % 100 < count:

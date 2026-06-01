@@ -57,11 +57,13 @@ def record_span_enqueued(event_type: str) -> None:
         pass
 
 
-def record_span_dropped(reason: str) -> None:
-    if not is_metrics_enabled():
+def record_span_dropped(reason: str, count: int = 1) -> None:
+    if count <= 0 or not is_metrics_enabled():
         return
     try:
-        _tracing_module().get_tracing_metrics().span_events_dropped.add(1, {"reason": reason})
+        _tracing_module().get_tracing_metrics().span_events_dropped.add(
+            count, {"reason": reason}
+        )
     except Exception:
         pass
 
