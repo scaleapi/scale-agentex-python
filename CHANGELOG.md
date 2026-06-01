@@ -6,6 +6,24 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.11.7 (2026-06-01)
+
+Full Changelog: [v0.11.6...v0.11.7](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.6...v0.11.7)
+
+### Features
+
+* **examples:** OpenAI Agents SDK local-sandbox tutorials (sync + async + temporal) ([#377](https://github.com/scaleapi/scale-agentex-python/issues/377)) ([a66d239](https://github.com/scaleapi/scale-agentex-python/commit/a66d23955fa1a98296ef4e8b09c11afe9461268a))
+
+
+### Performance Improvements
+
+* **tracing:** bounded-concurrency span export ([#374](https://github.com/scaleapi/scale-agentex-python/issues/374)) ([7b32a0d](https://github.com/scaleapi/scale-agentex-python/commit/7b32a0d826b3ed864a3bf9de256ff8da1dafb942))
+
+
+### Chores
+
+* back-merge release 0.11.6 into next ([#384](https://github.com/scaleapi/scale-agentex-python/issues/384)) ([13d3eab](https://github.com/scaleapi/scale-agentex-python/commit/13d3eab0657f1dd5a8b7ade6c7381d3230d60aff))
+
 ## 0.11.6 (2026-05-29)
 
 Full Changelog: [v0.11.5...v0.11.6](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.5...v0.11.6)
