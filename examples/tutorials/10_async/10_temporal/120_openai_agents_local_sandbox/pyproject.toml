@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "at120_openai_agents_local_sandbox"
+version = "0.1.0"
+description = "A Temporal OpenAI Agents SDK agent using a local (unix_local) sandbox"
+requires-python = ">=3.12"
+dependencies = [
+    "agentex-sdk>=0.6.0",
+    "openai-agents>=0.14.3,<0.15",
+    "temporalio>=1.18.2",
+    "scale-gp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "isort",
+    "flake8",
+    "debugpy>=1.8.15",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["project"]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+line_length = 88
