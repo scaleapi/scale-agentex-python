@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 
+# This script is run by Release Doctor to validate the release environment.
+# After the dual-package split (slim agentex-client + heavy agentex-sdk),
+# both PyPI tokens must be present — one for each package name. If only
+# PYPI_TOKEN is set, fall back to using it for both (back-compat for legacy
+# single-token setups, which forces an account-scoped token).
+
 errors=()
 
-if [ -z "${PYPI_TOKEN}" ]; then
-  errors+=("The PYPI_TOKEN secret has not been set. Please set it in either this repository's secrets or your organization secrets.")
+# Heavy `agentex-sdk` token (existing PyPI name).
+if [ -z "${AGENTEX_PYPI_TOKEN}" ] && [ -z "${PYPI_TOKEN}" ]; then
+  errors+=("The AGENTEX_PYPI_TOKEN secret has not been set (and no fallback PYPI_TOKEN). Add it in repo secrets so the heavy 'agentex-sdk' package can be published.")
+fi
+
+# Slim `agentex-client` token (new PyPI name).
+if [ -z "${AGENTEX_CLIENT_PYPI_TOKEN}" ] && [ -z "${PYPI_TOKEN}" ]; then
+  errors+=("The AGENTEX_CLIENT_PYPI_TOKEN secret has not been set (and no fallback PYPI_TOKEN). Add it in repo secrets so the slim 'agentex-client' package can be published. Falling back to PYPI_TOKEN requires an account-scoped token.")
 fi
 
 lenErrors=${#errors[@]}

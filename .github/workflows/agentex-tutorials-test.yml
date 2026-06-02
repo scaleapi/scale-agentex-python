@@ -124,9 +124,11 @@ jobs:
 
       - name: Build AgentEx SDK
         run: |
-          echo "🔨 Building AgentEx SDK wheel..."
-          uv build
-          echo "✅ SDK built successfully"
+          echo "🔨 Building both SDK wheels (slim client + heavy ADK overlay)..."
+          # uv workspace builds both members into the root dist/. --wheel: the
+          # heavy's cross-dir force-include can't build via the sdist default.
+          uv build --all-packages --wheel
+          echo "✅ Both SDK wheels built successfully"
           ls -la dist/
 
       - name: Test Tutorial
