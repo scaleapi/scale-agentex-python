@@ -56,3 +56,12 @@ class LocalDevelopmentConfig(BaseModel):
     paths: LocalPathsConfig | None = Field(
         default=None, description="File paths for local development"
     )
+    redis_enabled: bool = Field(
+        default=True,
+        description=(
+            "Whether the local CLI should set REDIS_URL=redis://localhost:6379 for the "
+            "agent process. Set to false for agents that don't use adk.messages/adk.streaming "
+            "when no local Redis is available, to avoid silent request hangs from the lazy "
+            "Redis client."
+        ),
+    )
