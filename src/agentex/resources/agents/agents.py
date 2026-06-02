@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Union, Optional
+from typing import Dict, Union, Optional
 from typing_extensions import Literal
 
 import httpx
 
-from ...types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params
+from ...types import agent_rpc_params, agent_list_params, agent_rpc_by_name_params, agent_register_build_params
 from ..._types import Body, Omit, Query, Headers, NotGiven, omit, not_given
 from ..._utils import path_template, maybe_transform, async_maybe_transform
 from ..._compat import cached_property
@@ -226,6 +226,62 @@ class AgentsResource(SyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=DeleteResponse,
+        )
+
+    def register_build(
+        self,
+        *,
+        description: str,
+        name: str,
+        agent_input_type: Optional[Literal["text", "json"]] | Omit = omit,
+        principal_context: object | Omit = omit,
+        registration_metadata: Optional[Dict[str, object]] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> Agent:
+        """
+        Register an agent at build time, before it is deployed, so it can be
+        permissioned and shared prior to deploy. Idempotent by name.
+
+        Args:
+          description: The description of the agent.
+
+          name: The unique name of the agent.
+
+          agent_input_type: The type of input the agent expects.
+
+          principal_context: Principal used for authorization
+
+          registration_metadata: The metadata for the agent's build registration.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return self._post(
+            "/agents/register-build",
+            body=maybe_transform(
+                {
+                    "description": description,
+                    "name": name,
+                    "agent_input_type": agent_input_type,
+                    "principal_context": principal_context,
+                    "registration_metadata": registration_metadata,
+                },
+                agent_register_build_params.AgentRegisterBuildParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Agent,
         )
 
     def retrieve_by_name(
@@ -543,6 +599,62 @@ class AsyncAgentsResource(AsyncAPIResource):
             cast_to=DeleteResponse,
         )
 
+    async def register_build(
+        self,
+        *,
+        description: str,
+        name: str,
+        agent_input_type: Optional[Literal["text", "json"]] | Omit = omit,
+        principal_context: object | Omit = omit,
+        registration_metadata: Optional[Dict[str, object]] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> Agent:
+        """
+        Register an agent at build time, before it is deployed, so it can be
+        permissioned and shared prior to deploy. Idempotent by name.
+
+        Args:
+          description: The description of the agent.
+
+          name: The unique name of the agent.
+
+          agent_input_type: The type of input the agent expects.
+
+          principal_context: Principal used for authorization
+
+          registration_metadata: The metadata for the agent's build registration.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        return await self._post(
+            "/agents/register-build",
+            body=await async_maybe_transform(
+                {
+                    "description": description,
+                    "name": name,
+                    "agent_input_type": agent_input_type,
+                    "principal_context": principal_context,
+                    "registration_metadata": registration_metadata,
+                },
+                agent_register_build_params.AgentRegisterBuildParams,
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Agent,
+        )
+
     async def retrieve_by_name(
         self,
         agent_name: str,
@@ -689,6 +801,9 @@ class AgentsResourceWithRawResponse:
         self.delete_by_name = to_raw_response_wrapper(
             agents.delete_by_name,
         )
+        self.register_build = to_raw_response_wrapper(
+            agents.register_build,
+        )
         self.retrieve_by_name = to_raw_response_wrapper(
             agents.retrieve_by_name,
         )
@@ -723,6 +838,9 @@ class AsyncAgentsResourceWithRawResponse:
         )
         self.delete_by_name = async_to_raw_response_wrapper(
             agents.delete_by_name,
+        )
+        self.register_build = async_to_raw_response_wrapper(
+            agents.register_build,
         )
         self.retrieve_by_name = async_to_raw_response_wrapper(
             agents.retrieve_by_name,
@@ -759,6 +877,9 @@ class AgentsResourceWithStreamingResponse:
         self.delete_by_name = to_streamed_response_wrapper(
             agents.delete_by_name,
         )
+        self.register_build = to_streamed_response_wrapper(
+            agents.register_build,
+        )
         self.retrieve_by_name = to_streamed_response_wrapper(
             agents.retrieve_by_name,
         )
@@ -793,6 +914,9 @@ class AsyncAgentsResourceWithStreamingResponse:
         )
         self.delete_by_name = async_to_streamed_response_wrapper(
             agents.delete_by_name,
+        )
+        self.register_build = async_to_streamed_response_wrapper(
+            agents.register_build,
         )
         self.retrieve_by_name = async_to_streamed_response_wrapper(
             agents.retrieve_by_name,
