@@ -1,6 +1,6 @@
 [project]
 name = "agentex-sdk"
-version = "0.11.9"
+version = "0.12.0"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
@@ -55,7 +55,6 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
   "Operating System :: OS Independent",
   "Operating System :: POSIX",
   "Operating System :: MacOS",
@@ -78,10 +77,13 @@ dev = [
 [project.scripts]
 agentex = "agentex.lib.cli.commands.main:app"
 
-[tool.rye]
+[tool.uv]
 managed = true
-# version pins are in requirements-dev.lock
-dev-dependencies = [
+required-version = ">=0.9"
+
+[dependency-groups]
+# version pins are in uv.lock
+dev = [
     "pyright==1.1.399",
     "mypy==1.17",
     "respx",
@@ -89,53 +91,20 @@ dev-dependencies = [
     "pytest-asyncio",
     "ruff",
     "time-machine",
-    "nox",
     "dirty-equals>=0.6.0",
     "importlib-metadata>=6.7.0",
     "rich>=13.7.1",
     "nest_asyncio==1.6.0",
     "pytest-xdist>=3.6.1",
     "debugpy>=1.8.15",
-]
-
-[tool.rye.scripts]
-format = { chain = [
-  "format:ruff",
-  "format:docs",
-  "fix:ruff",
-  # run formatting again to fix any inconsistencies when imports are stripped
-  "format:ruff",
-]}
-"format:docs" = "bash -c 'python scripts/utils/ruffen-docs.py README.md $(find . -type f -name api.md)'"
-"format:ruff" = "ruff format"
-
-"lint" = { chain = [
-  "check:ruff",
-  "typecheck",
-  "check:importable",
-]}
-"check:ruff" = "ruff check ."
-"fix:ruff" = "ruff check --fix ."
-
-"check:importable" = "python -c 'import agentex'"
-
-typecheck = { chain = [
-  "typecheck:pyright"
-]}
-"typecheck:pyright" = "pyright"
-"typecheck:verify-types" = "pyright --verifytypes agentex --ignoreexternal"
-"typecheck:mypy" = "mypy ."
-
-[build-system]
-requires = ["hatchling==1.26.3", "hatch-fancy-pypi-readme"]
-build-backend = "hatchling.build"
-
-[dependency-groups]
-dev = [
     "ipywidgets>=8.1.7",
     "nbstripout>=0.8.1",
     "yaspin>=3.1.0",
 ]
+
+[build-system]
+requires = ["hatchling==1.26.3", "hatch-fancy-pypi-readme"]
+build-backend = "hatchling.build"
 
 [tool.hatch.build]
 include = [

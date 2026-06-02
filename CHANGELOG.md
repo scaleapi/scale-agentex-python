@@ -6,6 +6,19 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.12.0 (2026-06-02)
+
+Full Changelog: [v0.11.9...v0.12.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.9...v0.12.0)
+
+### Features
+
+* **api:** Bump edition to switch rye -&gt; UV ([1bd4ff7](https://github.com/scaleapi/scale-agentex-python/commit/1bd4ff7c3299ea4238cd3e36141f7e4b035967ef))
+
+
+### Bug Fixes
+
+* cap Python test matrix at 3.13 and align dev tooling versions ([#391](https://github.com/scaleapi/scale-agentex-python/issues/391)) ([729763c](https://github.com/scaleapi/scale-agentex-python/commit/729763c9652faf3a68386083d6f617dd48f642b7))
+
 ## 0.11.9 (2026-06-02)
 
 Full Changelog: [v0.11.8...v0.11.9](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.8...v0.11.9)
