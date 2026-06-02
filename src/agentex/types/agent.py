@@ -41,7 +41,7 @@ class Agent(BaseModel):
     registration_metadata: Optional[Dict[str, object]] = None
     """The metadata for the agent's registration."""
 
-    status: Optional[Literal["Ready", "Failed", "Unknown", "Deleted", "Unhealthy"]] = None
+    status: Optional[Literal["Ready", "Failed", "Unknown", "Deleted", "Unhealthy", "BuildOnly"]] = None
     """The status of the action, indicating if it's building, ready, failed, etc."""
 
     status_reason: Optional[str] = None
