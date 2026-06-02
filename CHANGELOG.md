@@ -6,6 +6,14 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.11.9 (2026-06-02)
+
+Full Changelog: [v0.11.8...v0.11.9](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.8...v0.11.9)
+
+### Features
+
+* **api:** add register build api endpoint ([30c5da4](https://github.com/scaleapi/scale-agentex-python/commit/30c5da47d84ce2bfbfbb798c2f62b9552881db7d))
+
 ## 0.11.8 (2026-06-01)
 
 Full Changelog: [v0.11.7...v0.11.8](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.7...v0.11.8)
