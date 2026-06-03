@@ -68,7 +68,11 @@ class ACPModule:
         Create a new task.
 
         Args:
-            name: The name of the task.
+            name: Optional human-readable name for the task. task/create is
+                get-or-create by name: omit it (or make it unique, e.g. append a
+                UUID) for a fresh task on each call; passing a name that already
+                exists returns that task with its prior history instead of
+                creating a new one. Keep it globally unique when set.
             agent_id: The ID of the agent to create the task for.
             agent_name: The name of the agent to create the task for.
             params: The parameters for the task.
