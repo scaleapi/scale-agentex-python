@@ -98,6 +98,11 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             disabled=disabled,
         )
         self.env_vars = EnvironmentVariables.refresh()
+        logger.info(
+            "SGP tracing span-start upsert %s (%s)",
+            "disabled — end-only ingest" if _skip_span_start_enabled() else "enabled",
+            _SKIP_SPAN_START_ENV,
+        )
 
     @override
     def on_span_start(self, span: Span) -> None:
@@ -134,6 +139,11 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             asyncio.AbstractEventLoop, AsyncSGPClient
         ] = weakref.WeakKeyDictionary()
         self.env_vars = EnvironmentVariables.refresh()
+        logger.info(
+            "SGP tracing span-start upsert %s (%s)",
+            "disabled — end-only ingest" if _skip_span_start_enabled() else "enabled",
+            _SKIP_SPAN_START_ENV,
+        )
 
     def _build_client(self) -> AsyncSGPClient:
         import httpx
