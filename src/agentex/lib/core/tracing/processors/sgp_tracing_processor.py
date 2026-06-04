@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import asyncio
 import weakref
 from typing import cast, override
@@ -20,6 +21,28 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 )
 
 logger = make_logger(__name__)
+
+
+_SKIP_SPAN_START_ENV = "AGENTEX_TRACING_SKIP_SPAN_START"
+
+
+def _skip_span_start_enabled() -> bool:
+    """Whether to skip the span-start upsert and write each span only on end.
+
+    Tracing writes each span twice — once on start (no ``end_time``) and once
+    on end. The start row is only ever overwritten by the end write moments
+    later, so persisting it doubles span-ingest write volume and, on the SGP
+    backend, costs a non-HOT UPDATE (tsvector/GIN recompute + index churn) plus
+    a dead tuple per span. Skipping the start makes the end write a single
+    INSERT.
+
+    Default ON. Set ``AGENTEX_TRACING_SKIP_SPAN_START`` to
+    ``0``/``false``/``no``/``off`` to restore the start write — e.g. if you
+    need in-flight spans visible before they complete, or spans that never end
+    (process crash) to still be persisted.
+    """
+    raw = os.environ.get(_SKIP_SPAN_START_ENV, "1").strip().lower()
+    return raw not in ("0", "false", "no", "off")
 
 
 def _get_span_type(span: Span) -> str:
@@ -78,6 +101,10 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
 
     @override
     def on_span_start(self, span: Span) -> None:
+        # End-only ingest: by default the start write is skipped (see
+        # _skip_span_start_enabled) so each span is persisted once, on end.
+        if _skip_span_start_enabled():
+            return
         sgp_span = _build_sgp_span(span, self.env_vars)
         sgp_span.flush(blocking=False)
 
@@ -150,6 +177,10 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
 
     @override
     async def on_spans_start(self, spans: list[Span]) -> None:
+        # End-only ingest: by default the start write is skipped (see
+        # _skip_span_start_enabled) so each span is persisted once, on end.
+        if _skip_span_start_enabled():
+            return
         if not spans:
             return
 
