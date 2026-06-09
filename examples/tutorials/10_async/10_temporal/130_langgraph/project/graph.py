@@ -78,7 +78,13 @@ async def tools_node(state: AgentState) -> dict[str, Any]:
     last = state["messages"][-1]
     results: list[Any] = []
     for call in getattr(last, "tool_calls", None) or []:
-        output = await _TOOLS_BY_NAME[call["name"]].ainvoke(call["args"])
+        tool = _TOOLS_BY_NAME.get(call["name"])
+        # Mirror ToolNode: surface an unknown/hallucinated tool name as an error
+        # ToolMessage so the graph keeps running instead of crashing the node.
+        if tool is None:
+            output = f"Error: unknown tool {call['name']!r}. Available: {list(_TOOLS_BY_NAME)}"
+        else:
+            output = await tool.ainvoke(call["args"])
         results.append(
             ToolMessage(content=str(output), tool_call_id=call["id"], name=call["name"])
         )
