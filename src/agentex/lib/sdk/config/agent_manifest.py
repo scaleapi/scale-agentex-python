@@ -1,3 +1,13 @@
+"""Back-compat shim, manifest loader, and Docker build-context machinery.
+
+The :class:`AgentManifest` model's canonical location is
+:mod:`agentex.config.agent_manifest`; it is re-exported here so existing
+``from agentex.lib.sdk.config.agent_manifest import AgentManifest`` imports keep
+working. The yaml loader (`load_agent_manifest`) and build machinery
+(`build_context_manager`, `BuildContextManager`) stay here (CLI/build-side) so
+the promoted model remains slim-safe.
+"""
+
 from __future__ import annotations
 
 import io
@@ -11,58 +21,21 @@ from pathlib import Path
 from contextlib import contextmanager
 from collections.abc import Iterator
 
-from pydantic import Field
-
+from agentex.lib.utils.io import load_yaml_file
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.utils.model_utils import BaseModel
-from agentex.lib.sdk.config.agent_config import AgentConfig
-from agentex.lib.sdk.config.build_config import BuildConfig
-from agentex.lib.sdk.config.deployment_config import DeploymentConfig
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentsConfig
-from agentex.lib.sdk.config.local_development_config import LocalDevelopmentConfig
+from agentex.config.agent_manifest import AgentManifest  # noqa: F401
 
 logger = make_logger(__name__)
 
 
-class AgentManifest(BaseModel):
-    """
-    Represents a manifest file that describes how to build and deploy an agent.
-    """
-
-    build: BuildConfig
-    agent: AgentConfig
-    local_development: LocalDevelopmentConfig | None = Field(
-        default=None, description="Configuration for local development"
-    )
-    deployment: DeploymentConfig | None = Field(
-        default=None, description="Deployment configuration for the agent"
-    )
+def load_agent_manifest(file_path: str) -> AgentManifest:
+    """Load and validate a manifest.yaml file into an AgentManifest."""
+    return AgentManifest.model_validate(load_yaml_file(file_path=file_path))
 
 
-    def context_manager(self, build_context_root: Path) -> BuildContextManager:
-        """
-        Creates a build context manager
-        """
-        return BuildContextManager(
-            agent_manifest=self, build_context_root=build_context_root
-        )
-    
-    def load_environments_config(self, manifest_dir: Path) -> "AgentEnvironmentsConfig | None":
-        """Load environments.yaml from same directory as manifest.yaml.
-        
-        Args:
-            manifest_dir: Directory containing manifest.yaml
-            
-        Returns:
-            AgentEnvironmentsConfig if environments.yaml exists, None otherwise
-            
-        Raises:
-            ValueError: If environments.yaml exists but is invalid
-        """
-        # Import here to avoid circular imports
-        from agentex.lib.sdk.config.environment_config import load_environments_config_from_manifest_dir
-        
-        return load_environments_config_from_manifest_dir(manifest_dir)
+def build_context_manager(agent_manifest: AgentManifest, build_context_root: Path) -> BuildContextManager:
+    """Create a build context manager for the given manifest."""
+    return BuildContextManager(agent_manifest=agent_manifest, build_context_root=build_context_root)
 
 
 class BuildContextManager:

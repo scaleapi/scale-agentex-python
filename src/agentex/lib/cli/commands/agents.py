@@ -22,7 +22,7 @@ from agentex.lib.cli.utils.kubectl_utils import (
     validate_namespace,
     check_and_switch_cluster_context,
 )
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
+from agentex.lib.sdk.config.agent_manifest import load_agent_manifest
 from agentex.lib.cli.handlers.agent_handlers import (
     run_agent,
     build_agent,
@@ -281,7 +281,7 @@ def run(
     if cleanup_on_start:
         try:
             # Parse manifest to get agent name
-            manifest_obj = AgentManifest.from_yaml(file_path=manifest)
+            manifest_obj = load_agent_manifest(file_path=manifest)
             agent_name = manifest_obj.agent.name
 
             console.print(f"[yellow]Cleaning up existing workflows for agent '{agent_name}'...[/yellow]")
@@ -374,7 +374,7 @@ def deploy(
             raise typer.Exit(1) from e
 
         # Load manifest for credential validation
-        manifest_obj = AgentManifest.from_yaml(str(manifest_path))
+        manifest_obj = load_agent_manifest(str(manifest_path))
 
         # Use namespace from environment config if not overridden
         if not namespace and agent_env_config:

@@ -13,16 +13,16 @@ from rich.console import Console
 from kubernetes.client.rest import ApiException
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.types.credentials import CredentialMapping
+from agentex.config.credentials import CredentialMapping
+from agentex.config.agent_config import AgentConfig
+from agentex.config.agent_manifest import AgentManifest
 from agentex.lib.cli.utils.cli_utils import handle_questionary_cancellation
-from agentex.lib.cli.utils.kubectl_utils import get_k8s_client
-from agentex.lib.sdk.config.agent_config import AgentConfig
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
-from agentex.lib.sdk.config.deployment_config import (
+from agentex.config.deployment_config import (
     DeploymentConfig,
     ImagePullSecretConfig,
     InjectedSecretsValues,
 )
+from agentex.lib.cli.utils.kubectl_utils import get_k8s_client
 from agentex.lib.cli.utils.kubernetes_secrets_utils import (
     VALID_SECRET_TYPES,
     KUBERNETES_SECRET_TYPE_OPAQUE,

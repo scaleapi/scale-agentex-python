@@ -9,6 +9,7 @@ from agentex.lib.sdk.config.environment_config import (
     AgentKubernetesConfig,
     AgentEnvironmentConfig,
     AgentEnvironmentsConfig,
+    load_environments_config,
 )
 
 
@@ -119,8 +120,8 @@ class TestAgentEnvironmentsConfig:
         assert set(envs) == {"dev", "staging", "prod"}
 
 
-class TestAgentEnvironmentsConfigFromYaml:
-    """Test cases for AgentEnvironmentsConfig.from_yaml method."""
+class TestLoadEnvironmentsConfig:
+    """Test cases for the load_environments_config yaml loader."""
 
     def test_load_single_env_yaml(self):
         """Test loading a YAML file with a single environment."""
@@ -139,7 +140,7 @@ environments:
             f.write(yaml_content)
             f.flush()
 
-            config = AgentEnvironmentsConfig.from_yaml(f.name)
+            config = load_environments_config(f.name)
 
             assert config.schema_version == "v1"
             assert "dev" in config.environments
@@ -170,7 +171,7 @@ environments:
             f.write(yaml_content)
             f.flush()
 
-            config = AgentEnvironmentsConfig.from_yaml(f.name)
+            config = load_environments_config(f.name)
 
             assert "dev" in config.environments
             assert "prod" in config.environments
@@ -201,7 +202,7 @@ environments:
             f.write(yaml_content)
             f.flush()
 
-            config = AgentEnvironmentsConfig.from_yaml(f.name)
+            config = load_environments_config(f.name)
 
             assert config.environments["dev-aws"].environment == "dev"
             assert config.environments["dev-gcp"].environment == "dev"
@@ -230,7 +231,7 @@ environments:
             f.write(yaml_content)
             f.flush()
 
-            config = AgentEnvironmentsConfig.from_yaml(f.name)
+            config = load_environments_config(f.name)
 
             assert config.environments["dev"].helm_overrides["replicaCount"] == 3
             assert config.environments["dev"].helm_overrides["resources"]["requests"]["cpu"] == "500m"
@@ -253,7 +254,7 @@ environments:
             f.write(yaml_content)
             f.flush()
 
-            config = AgentEnvironmentsConfig.from_yaml(f.name)
+            config = load_environments_config(f.name)
 
             assert config.environments["dev"].helm_repository_name == "custom-repo"
             assert config.environments["dev"].helm_repository_url == "https://custom.example.com/charts"
@@ -261,7 +262,7 @@ environments:
     def test_load_nonexistent_yaml_raises_file_not_found(self):
         """Test that loading non-existent file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError, match="environments.yaml not found"):
-            AgentEnvironmentsConfig.from_yaml("/nonexistent/path/environments.yaml")
+            load_environments_config("/nonexistent/path/environments.yaml")
 
     def test_load_empty_yaml_raises_value_error(self):
         """Test that loading empty YAML file raises ValueError."""
@@ -270,7 +271,7 @@ environments:
             f.flush()
 
             with pytest.raises(ValueError, match="empty"):
-                AgentEnvironmentsConfig.from_yaml(f.name)
+                load_environments_config(f.name)
 
     def test_load_invalid_yaml_syntax_raises_value_error(self):
         """Test that loading invalid YAML syntax raises ValueError."""
@@ -279,7 +280,7 @@ environments:
             f.flush()
 
             with pytest.raises(ValueError, match="Invalid YAML"):
-                AgentEnvironmentsConfig.from_yaml(f.name)
+                load_environments_config(f.name)
 
     def test_load_yaml_missing_required_auth_raises_error(self):
         """Test that YAML missing required 'auth' field raises validation error."""
@@ -295,7 +296,7 @@ environments:
             f.flush()
 
             with pytest.raises(ValueError, match="Failed to load"):
-                AgentEnvironmentsConfig.from_yaml(f.name)
+                load_environments_config(f.name)
 
     def test_load_yaml_with_oci_registry(self):
         """Test loading YAML with nested oci_registry configuration."""
@@ -317,7 +318,7 @@ environments:
             f.write(yaml_content)
             f.flush()
 
-            config = AgentEnvironmentsConfig.from_yaml(f.name)
+            config = load_environments_config(f.name)
 
             env = config.environments["dev"]
             assert env.oci_registry is not None
@@ -341,5 +342,5 @@ environments:
             f.write(yaml_content)
             f.flush()
 
-            config = AgentEnvironmentsConfig.from_yaml(f.name)
+            config = load_environments_config(f.name)
             assert config.environments["dev"].oci_registry is None
