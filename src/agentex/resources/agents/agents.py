@@ -243,7 +243,6 @@ class AgentsResource(SyncAPIResource):
         description: str,
         name: str,
         agent_input_type: Optional[Literal["text", "json"]] | Omit = omit,
-        principal_context: object | Omit = omit,
         registration_metadata: Optional[Dict[str, object]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -263,8 +262,6 @@ class AgentsResource(SyncAPIResource):
 
           agent_input_type: The type of input the agent expects.
 
-          principal_context: Principal used for authorization
-
           registration_metadata: The metadata for the agent's build registration.
 
           extra_headers: Send extra headers
@@ -282,7 +279,6 @@ class AgentsResource(SyncAPIResource):
                     "description": description,
                     "name": name,
                     "agent_input_type": agent_input_type,
-                    "principal_context": principal_context,
                     "registration_metadata": registration_metadata,
                 },
                 agent_register_build_params.AgentRegisterBuildParams,
@@ -908,7 +904,6 @@ class AsyncAgentsResource(AsyncAPIResource):
         description: str,
         name: str,
         agent_input_type: Optional[Literal["text", "json"]] | Omit = omit,
-        principal_context: object | Omit = omit,
         registration_metadata: Optional[Dict[str, object]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -928,8 +923,6 @@ class AsyncAgentsResource(AsyncAPIResource):
 
           agent_input_type: The type of input the agent expects.
 
-          principal_context: Principal used for authorization
-
           registration_metadata: The metadata for the agent's build registration.
 
           extra_headers: Send extra headers
@@ -947,7 +940,6 @@ class AsyncAgentsResource(AsyncAPIResource):
                     "description": description,
                     "name": name,
                     "agent_input_type": agent_input_type,
-                    "principal_context": principal_context,
                     "registration_metadata": registration_metadata,
                 },
                 agent_register_build_params.AgentRegisterBuildParams,
