@@ -100,8 +100,6 @@ class StateService:
         ) as span:
             state_model = await self._agentex_client.states.update(
                 state_id=state_id,
-                task_id=task_id,
-                agent_id=agent_id,
                 state=state,
             )
             if span:

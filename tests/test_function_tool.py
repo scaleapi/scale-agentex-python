@@ -6,7 +6,7 @@ from typing import Any, override
 import pytest
 from pydantic import ValidationError
 
-from src.agentex.lib.core.temporal.activities.adk.providers.openai_activities import (  # type: ignore[import-untyped]
+from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
     FunctionTool,
 )
 

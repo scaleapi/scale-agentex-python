@@ -29,10 +29,13 @@ jobs:
           version: '0.10.2'
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --all-packages --all-extras
 
       - name: Run lints
         run: ./scripts/lint
+
+      - name: Check slim dependency set
+        run: ./scripts/check-slim-deps
 
   build:
     if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
@@ -51,10 +54,12 @@ jobs:
           version: '0.10.2'
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --all-packages --all-extras
 
       - name: Run build
-        run: uv build
+        # Both workspace members. --wheel is load-bearing: the heavy's cross-dir
+        # force-include can't build via the sdist-then-wheel default.
+        run: uv build --all-packages --wheel
 
       - name: Get GitHub OIDC Token
         if: |-
