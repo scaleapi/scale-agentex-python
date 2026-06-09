@@ -15,18 +15,8 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 
 logger = make_logger(__name__)
 
-# Max spans coalesced into one ``upsert_batch`` HTTP call (one
-# ``INSERT ... ON CONFLICT`` statement server-side).  Larger batches amortize
-# the per-request round trip and the per-statement parse/plan + index
-# maintenance overhead, which dominates at high span volume.  Kept well under
-# the EGP backend's 1000-row cap; tune per-deploy via
-# ``AGENTEX_SPAN_QUEUE_BATCH_SIZE``.
-_DEFAULT_BATCH_SIZE = 200
-# Max time the drain lingers after the first span to let a batch fill.  Spans
-# typically arrive a few ms apart, so a longer linger fills the larger batch
-# above rather than shipping near-size-1 batches; bounded so worst-case ingest
-# latency (and the in-flight loss window) stays sub-second.
-_DEFAULT_LINGER_MS = 250
+_DEFAULT_BATCH_SIZE = 50
+_DEFAULT_LINGER_MS = 100
 # 0 == unbounded (preserves prior behavior).  A bound makes backpressure
 # visible (dropped spans are counted) and caps worst-case memory.
 _DEFAULT_MAX_SIZE = 0
@@ -124,7 +114,7 @@ class AsyncSpanQueue:
 
     def __init__(
         self,
-        batch_size: int | None = None,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         linger_ms: int | None = None,
         max_size: int | None = None,
         max_retries: int | None = None,
@@ -136,11 +126,7 @@ class AsyncSpanQueue:
         self._queue: asyncio.Queue[_SpanQueueItem] = asyncio.Queue(maxsize=resolved_max_size)
         self._drain_task: asyncio.Task[None] | None = None
         self._stopping = False
-        self._batch_size = (
-            _read_int_env("AGENTEX_SPAN_QUEUE_BATCH_SIZE", _DEFAULT_BATCH_SIZE, minimum=1)
-            if batch_size is None
-            else max(1, batch_size)
-        )
+        self._batch_size = batch_size
         self._linger_ms = _read_linger_ms_env() if linger_ms is None else max(0, linger_ms)
         self._max_retries = (
             _read_int_env("AGENTEX_SPAN_QUEUE_MAX_RETRIES", _DEFAULT_MAX_RETRIES, minimum=1)

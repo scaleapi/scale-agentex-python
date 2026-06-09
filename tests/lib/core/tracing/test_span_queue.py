@@ -8,11 +8,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from agentex.types.span import Span
-from agentex.lib.core.tracing.span_queue import (
-    _DEFAULT_BATCH_SIZE,
-    SpanEventType,
-    AsyncSpanQueue,
-)
+from agentex.lib.core.tracing.span_queue import SpanEventType, AsyncSpanQueue
 
 
 def _make_span(span_id: str | None = None) -> Span:
@@ -863,31 +859,3 @@ class TestAsyncSpanQueueMetrics:
 
         assert elapsed < 0.05, f"disabled metrics enqueue too slow: {elapsed:.3f}s"
         mock_get.assert_not_called()
-
-
-class TestAsyncSpanQueueBatchSizeConfig:
-    """batch_size resolution: explicit arg > AGENTEX_SPAN_QUEUE_BATCH_SIZE env > default."""
-
-    async def test_default_batch_size(self, monkeypatch):
-        monkeypatch.delenv("AGENTEX_SPAN_QUEUE_BATCH_SIZE", raising=False)
-        assert AsyncSpanQueue()._batch_size == _DEFAULT_BATCH_SIZE
-
-    async def test_explicit_arg_overrides_default(self, monkeypatch):
-        monkeypatch.delenv("AGENTEX_SPAN_QUEUE_BATCH_SIZE", raising=False)
-        assert AsyncSpanQueue(batch_size=10)._batch_size == 10
-
-    async def test_explicit_arg_clamped_to_min_one(self, monkeypatch):
-        monkeypatch.delenv("AGENTEX_SPAN_QUEUE_BATCH_SIZE", raising=False)
-        assert AsyncSpanQueue(batch_size=0)._batch_size == 1
-
-    async def test_env_used_when_arg_is_none(self, monkeypatch):
-        monkeypatch.setenv("AGENTEX_SPAN_QUEUE_BATCH_SIZE", "500")
-        assert AsyncSpanQueue()._batch_size == 500
-
-    async def test_explicit_arg_beats_env(self, monkeypatch):
-        monkeypatch.setenv("AGENTEX_SPAN_QUEUE_BATCH_SIZE", "500")
-        assert AsyncSpanQueue(batch_size=7)._batch_size == 7
-
-    async def test_invalid_env_falls_back_to_default(self, monkeypatch):
-        monkeypatch.setenv("AGENTEX_SPAN_QUEUE_BATCH_SIZE", "not-an-int")
-        assert AsyncSpanQueue()._batch_size == _DEFAULT_BATCH_SIZE
