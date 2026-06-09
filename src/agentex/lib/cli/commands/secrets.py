@@ -14,7 +14,7 @@ from agentex.lib.cli.utils.kubectl_utils import (
     validate_namespace,
     check_and_switch_cluster_context,
 )
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
+from agentex.lib.sdk.config.agent_manifest import load_agent_manifest
 from agentex.lib.cli.handlers.secret_handlers import (
     get_secret,
     sync_secrets,
@@ -157,7 +157,7 @@ def sync(
         )
         raise typer.Exit(1)
 
-    agent_manifest = AgentManifest.from_yaml(file_path=manifest)
+    agent_manifest = load_agent_manifest(file_path=manifest)
 
     # Always call sync_secrets - it will handle the case of no credentials
     sync_secrets(

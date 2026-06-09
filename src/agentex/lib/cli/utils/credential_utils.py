@@ -3,7 +3,7 @@ import subprocess
 from rich.prompt import Prompt, Confirm
 from rich.console import Console
 
-from agentex.lib.types.credentials import CredentialMapping
+from agentex.config.credentials import CredentialMapping
 
 console = Console()
 

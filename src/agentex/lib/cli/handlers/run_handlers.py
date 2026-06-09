@@ -11,12 +11,13 @@ from rich.console import Console
 # Import debug functionality
 from agentex.lib.cli.debug import DebugConfig, start_acp_server_debug, start_temporal_worker_debug
 from agentex.lib.utils.logging import make_logger
+from agentex.config.agent_manifest import AgentManifest
 from agentex.lib.cli.utils.path_utils import (
     get_file_paths,
     calculate_uvicorn_target_for_local,
 )
 from agentex.lib.environment_variables import EnvVarKeys
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
+from agentex.lib.sdk.config.agent_manifest import load_agent_manifest
 from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows, should_cleanup_on_restart
 
 logger = make_logger(__name__)
@@ -263,7 +264,7 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
 
     # Parse manifest
     try:
-        manifest = AgentManifest.from_yaml(file_path=manifest_path)
+        manifest = load_agent_manifest(file_path=manifest_path)
     except Exception as e:
         raise RunError(f"Failed to parse manifest: {str(e)}") from e
 

@@ -11,13 +11,15 @@ from pydantic import Field, BaseModel
 from rich.console import Console
 
 from agentex.lib.utils.logging import make_logger
+from agentex.config.agent_config import AgentConfig
+from agentex.config.agent_manifest import AgentManifest
 from agentex.lib.cli.utils.exceptions import HelmError, DeploymentError
 from agentex.lib.cli.utils.path_utils import PathResolutionError, calculate_docker_acp_module
+from agentex.config.environment_config import OciRegistryConfig, AgentEnvironmentConfig
 from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
-from agentex.lib.sdk.config.agent_config import AgentConfig
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
-from agentex.lib.sdk.config.environment_config import OciRegistryConfig, AgentEnvironmentConfig
+from agentex.lib.sdk.config.agent_manifest import load_agent_manifest
+from agentex.lib.sdk.config.environment_config import load_environments_config_from_manifest_dir
 
 logger = make_logger(__name__)
 console = Console()
@@ -461,13 +463,13 @@ def deploy_agent(
     # Switch to the specified cluster context
     check_and_switch_cluster_context(cluster_name)
 
-    manifest = AgentManifest.from_yaml(file_path=manifest_path)
+    manifest = load_agent_manifest(file_path=manifest_path)
 
     # Load agent environment configuration
     agent_env_config = None
     if environment_name:
         manifest_dir = Path(manifest_path).parent
-        environments_config = manifest.load_environments_config(manifest_dir)
+        environments_config = load_environments_config_from_manifest_dir(manifest_dir)
         if environments_config:
             agent_env_config = environments_config.get_config_for_env(environment_name)
             console.print(f"[green]✓[/green] Using environment config: {environment_name}")
