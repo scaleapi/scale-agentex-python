@@ -25,6 +25,10 @@ from agentex.protocol.acp import (
 )
 from agentex.lib.utils.logging import make_logger, ctx_var_request_id
 from agentex.protocol.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
+from agentex.lib.runtime.context import (
+    run_with_request_context,
+    wrap_async_generator_with_request_context,
+)
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.registration import register_agent
 
@@ -131,6 +135,36 @@ class BaseACPServer(FastAPI):
 
         return wrapper
 
+    def _resolve_agent_id(self, params: Any) -> str:
+        agent = getattr(params, "agent", None)
+        if agent is not None and getattr(agent, "id", None):
+            return agent.id
+        return self.agent_id or ""
+
+    async def _invoke_handler(
+        self,
+        handler: Callable[..., Awaitable[Any]],
+        params: Any,
+        request_headers: dict[str, str],
+    ) -> Any:
+        agent_id = self._resolve_agent_id(params)
+
+        async def _call_handler() -> Any:
+            return await handler(params)
+
+        result = await run_with_request_context(
+            request_headers,
+            agent_id,
+            _call_handler,
+        )
+        if inspect.isasyncgen(result):
+            return wrap_async_generator_with_request_context(
+                result,
+                request_headers,
+                agent_id,
+            )
+        return result
+
     async def _handle_jsonrpc(self, request: Request):
         """Main JSON-RPC endpoint handler"""
         rpc_request = None
@@ -148,7 +182,6 @@ class BaseACPServer(FastAPI):
                         error=JSONRPCError(code=-32601, message="Unauthorized"),
                     )
 
-
             # Check if method is valid first
             try:
                 method = RPCMethod(rpc_request.method)
@@ -156,18 +189,14 @@ class BaseACPServer(FastAPI):
                 logger.error(f"Method {rpc_request.method} was invalid")
                 return JSONRPCResponse(
                     id=rpc_request.id,
-                    error=JSONRPCError(
-                        code=-32601, message=f"Method {rpc_request.method} not found"
-                    ),
+                    error=JSONRPCError(code=-32601, message=f"Method {rpc_request.method} not found"),
                 )
 
             if method not in self._handlers or self._handlers[method] is None:
                 logger.error(f"Method {method} not found on existing ACP server")
                 return JSONRPCResponse(
                     id=rpc_request.id,
-                    error=JSONRPCError(
-                        code=-32601, message=f"Method {method} not found"
-                    ),
+                    error=JSONRPCError(code=-32601, message=f"Method {method} not found"),
                 )
 
             # Extract application headers using allowlist approach (only x-* headers)
@@ -180,11 +209,11 @@ class BaseACPServer(FastAPI):
                 and key.lower() not in FASTACP_HEADER_SKIP_EXACT
                 and not any(key.lower().startswith(p) for p in FASTACP_HEADER_SKIP_PREFIXES)
             }
-            
+
             # Parse params into appropriate model based on method and include headers
             params_model = PARAMS_MODEL_BY_METHOD[method]
             params_data = dict(rpc_request.params) if rpc_request.params else {}
-            
+
             # Add custom headers to the request structure if any headers were provided
             # Gateway sends filtered headers via HTTP, SDK extracts and populates params.request
             if custom_headers:
@@ -193,19 +222,15 @@ class BaseACPServer(FastAPI):
 
             if method in RPC_SYNC_METHODS:
                 handler = self._handlers[method]
-                result = await handler(params)
+                result = await self._invoke_handler(handler, params, custom_headers)
 
                 if rpc_request.id is None:
                     # Seems like you should return None for notifications
                     return None
                 else:
                     # Handle streaming vs non-streaming for MESSAGE_SEND
-                    if method == RPCMethod.MESSAGE_SEND and isinstance(
-                        result, AsyncGenerator
-                    ):
-                        return await self._handle_streaming_response(
-                            rpc_request.id, result
-                        )
+                    if method == RPCMethod.MESSAGE_SEND and isinstance(result, AsyncGenerator):
+                        return await self._handle_streaming_response(rpc_request.id, result)
                     else:
                         if isinstance(result, BaseModel):
                             result = result.model_dump()
@@ -213,18 +238,21 @@ class BaseACPServer(FastAPI):
             else:
                 # If this is a notification (no request ID), process in background and return immediately
                 if rpc_request.id is None:
-                    asyncio.create_task(self._process_notification(method, params))
+                    asyncio.create_task(self._process_notification(method, params, custom_headers))
                     return JSONRPCResponse(id=None)
 
                 # For regular requests, start processing in background but return immediately
                 asyncio.create_task(
-                    self._process_request(rpc_request.id, method, params)
+                    self._process_request(
+                        rpc_request.id,
+                        method,
+                        params,
+                        custom_headers,
+                    )
                 )
 
                 # Return immediate acknowledgment
-                return JSONRPCResponse(
-                    id=rpc_request.id, result={"status": "processing"}
-                )
+                return JSONRPCResponse(id=rpc_request.id, result={"status": "processing"})
 
         except Exception as e:
             logger.error(f"Error handling JSON-RPC request: {e}", exc_info=True)
@@ -236,9 +264,7 @@ class BaseACPServer(FastAPI):
                 error=JSONRPCError(code=-32603, message=str(e)).model_dump(),
             )
 
-    async def _handle_streaming_response(
-        self, request_id: int | str, async_gen: AsyncGenerator
-    ):
+    async def _handle_streaming_response(self, request_id: int | str, async_gen: AsyncGenerator):
         """Handle streaming response by formatting TaskMessageUpdate objects as JSON-RPC stream"""
 
         async def generate_json_rpc_stream():
@@ -248,9 +274,7 @@ class BaseACPServer(FastAPI):
                     # Validate using Pydantic's TypeAdapter to ensure it's a proper TaskMessageUpdate
                     try:
                         # This will validate that chunk conforms to the TaskMessageUpdate union type
-                        validated_chunk = task_message_update_adapter.validate_python(
-                            chunk
-                        )
+                        validated_chunk = task_message_update_adapter.validate_python(chunk)
                         # Use mode="json" to properly serialize datetime objects
                         chunk_data = validated_chunk.model_dump(mode="json")
                     except ValidationError as e:
@@ -285,26 +309,33 @@ class BaseACPServer(FastAPI):
             },
         )
 
-    async def _process_notification(self, method: RPCMethod, params: Any):
+    async def _process_notification(
+        self,
+        method: RPCMethod,
+        params: Any,
+        request_headers: dict[str, str],
+    ):
         """Process a notification (request with no ID) in the background"""
         try:
             handler = self._handlers[method]
-            await handler(params)
+            await self._invoke_handler(handler, params, request_headers)
         except Exception as e:
             logger.error(f"Error processing notification {method}: {e}", exc_info=True)
 
     async def _process_request(
-        self, request_id: int | str, method: RPCMethod, params: Any
+        self,
+        request_id: int | str,
+        method: RPCMethod,
+        params: Any,
+        request_headers: dict[str, str],
     ):
         """Process a request in the background"""
         try:
             handler = self._handlers[method]
-            await handler(params)
+            await self._invoke_handler(handler, params, request_headers)
             # Note: In a real implementation, you might want to store the result somewhere
             # or notify the client through a different mechanism
-            logger.info(
-                f"Successfully processed request {request_id} for method {method}"
-            )
+            logger.info(f"Successfully processed request {request_id} for method {method}")
         except Exception as e:
             logger.error(
                 f"Error processing request {request_id} for method {method}: {e}",
@@ -377,7 +408,7 @@ class BaseACPServer(FastAPI):
             # Check if the function is an async generator function
 
             # Regardless of whether the Agent developer implemented an Async generator or not, we will always turn the function into an async generator and yield SSE events back tot he Agentex server so there is only one way for it to process the response. Then, based on the client's desire to stream or not, the Agentex server will either yield back the async generator objects directly (if streaming) or aggregate the content into a list of TaskMessageContents and to dispatch to the client. This basically gives the Agentex server the flexibility to handle both cases itself.
-            
+
             if inspect.isasyncgenfunction(fn):
                 # The client wants streaming, an async generator already streams the content, so just return it
                 return fn(params)
@@ -389,7 +420,9 @@ class BaseACPServer(FastAPI):
                     task_message_content_list = []
                 elif isinstance(task_message_content_response, list):
                     # Filter out None values from lists
-                    task_message_content_list = [content for content in task_message_content_response if content is not None]
+                    task_message_content_list = [
+                        content for content in task_message_content_response if content is not None
+                    ]
                 else:
                     task_message_content_list = [task_message_content_response]
 
@@ -413,5 +446,3 @@ class BaseACPServer(FastAPI):
     def run(self, host: str = "0.0.0.0", port: int = 8000, **kwargs):
         """Start the Uvicorn server for async handlers."""
         uvicorn.run(self, host=host, port=port, **kwargs)
-
-    
