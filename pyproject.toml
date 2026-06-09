@@ -1,5 +1,5 @@
 [project]
-name = "agentex-sdk"
+name = "agentex-client"
 version = "0.12.0"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
