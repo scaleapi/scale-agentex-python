@@ -205,7 +205,6 @@ class TestAgents:
             description="description",
             name="name",
             agent_input_type="text",
-            principal_context={},
             registration_metadata={"foo": "bar"},
         )
         assert_matches_type(Agent, agent, path=["response"])
@@ -600,7 +599,6 @@ class TestAsyncAgents:
             description="description",
             name="name",
             agent_input_type="text",
-            principal_context={},
             registration_metadata={"foo": "bar"},
         )
         assert_matches_type(Agent, agent, path=["response"])

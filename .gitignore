@@ -19,3 +19,6 @@ Brewfile.lock.json
 
 # Claude workspace directories
 .claude-workspace/
+
+# Claude Code local scheduled-task lock
+.claude/scheduled_tasks.lock

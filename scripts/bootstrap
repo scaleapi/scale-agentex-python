@@ -23,8 +23,9 @@ echo "==> Installing Python…"
 uv python install
 
 echo "==> Installing Python dependencies…"
-uv sync --all-extras
+# --all-packages: install both workspace members (slim client + heavy ADK overlay).
+uv sync --all-packages --all-extras
 
 echo "==> Exporting Python dependencies…"
 # note: `--no-hashes` is required because of https://github.com/pypa/pip/issues/4995
-uv export -o requirements-dev.lock --no-hashes
+uv export --all-packages -o requirements-dev.lock --no-hashes

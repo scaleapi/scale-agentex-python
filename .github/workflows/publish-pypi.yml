@@ -25,4 +25,11 @@ jobs:
         run: |
           bash ./bin/publish-pypi
         env:
+          # Heavy `agentex-sdk` package token (existing PyPI name).
+          AGENTEX_PYPI_TOKEN: ${{ secrets.AGENTEX_PYPI_TOKEN }}
+          # Slim `agentex-client` package token (new PyPI name; needs
+          # to be added to repo secrets when the slim is registered).
+          AGENTEX_CLIENT_PYPI_TOKEN: ${{ secrets.AGENTEX_CLIENT_PYPI_TOKEN }}
+          # Back-compat fallback — used by bin/publish-pypi when the
+          # dedicated tokens above are unset.
           PYPI_TOKEN: ${{ secrets.AGENTEX_PYPI_TOKEN || secrets.PYPI_TOKEN }}
