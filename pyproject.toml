@@ -8,7 +8,7 @@
 #   - Reduce the dep list to the 6 bare-client deps below
 #   - Add `adk/**` to `keep_files` so the ADK overlay persists across codegen
 name = "agentex-client"
-version = "0.12.0"
+version = "0.13.0"
 description = "The official Python REST client for the Agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
