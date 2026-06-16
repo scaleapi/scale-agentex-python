@@ -112,6 +112,23 @@ async def get_temporal_client(
 
     has_openai_plugin = any(isinstance(p, OpenAIAgentsPlugin) for p in (plugins or []))
 
+    if has_openai_plugin:
+        # Disable the OpenAI Agents SDK's built-in trace exporter. That exporter
+        # is process-global and POSTs spans to api.openai.com/v1/traces. Under
+        # Temporal the run's trace context does not survive the workflow->activity
+        # hop, so spans created in activities have no active trace and are emitted
+        # as NoOpSpans (trace_id="no-op"); the exporter then rejects every turn
+        # with "Invalid 'data[0].trace_id': 'no-op'". We never want this exporter:
+        # Agentex has its own SGP tracing pipeline (AsyncTracer / SGPTracingProcessor)
+        # that is wholly separate from the OpenAI SDK trace provider.
+        #
+        # This must be an env var, not agents.set_tracing_disabled(): the plugin
+        # installs a fresh TemporalTraceProvider at worker/client startup whose
+        # `_disabled` is re-read from OPENAI_AGENTS_DISABLE_TRACING in __init__, so
+        # any prior set_tracing_disabled() call is discarded. setdefault preserves
+        # an explicit operator override (e.g. =0 to re-enable).
+        os.environ.setdefault("OPENAI_AGENTS_DISABLE_TRACING", "1")
+
     if has_openai_plugin and payload_codec is not None and data_converter is None:
         raise ValueError(
             "payload_codec passed as a kwarg alongside OpenAIAgentsPlugin would "
