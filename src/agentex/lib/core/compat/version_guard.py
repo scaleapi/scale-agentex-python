@@ -34,8 +34,15 @@ MIN_BACKEND_CONTRACT = "0.1.0"
 
 SKIP_ENV = "AGENTEX_SKIP_VERSION_CHECK"
 
-# major.minor.patch, optional `-prerelease`; build metadata (after `+`) is ignored.
-_VERSION_RE = re.compile(r"^\s*v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?")
+# Full-string SemVer. Accepts: `1.2.3`, leading `v`, surrounding whitespace, `-prerelease`
+# (captured), `+build` (ignored). Anchored at both ends so a malformed tail (`0.1.0rc1`,
+# `0.1.0.1`) is rejected → None → "unknown, proceed", not silently coerced to stable `0.1.0`.
+_VERSION_RE = re.compile(
+    r"^\s*v?(\d+)\.(\d+)\.(\d+)"  # major.minor.patch
+    r"(?:-([0-9A-Za-z.-]+))?"  # optional -prerelease (captured)
+    r"(?:\+[0-9A-Za-z.-]+)?"  # optional +build metadata (ignored)
+    r"\s*$"
+)
 
 
 class IncompatibleBackendError(RuntimeError):
