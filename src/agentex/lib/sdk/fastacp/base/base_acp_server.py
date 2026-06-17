@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import uuid
 import asyncio
 import inspect
@@ -42,6 +43,55 @@ logger = make_logger(__name__)
 
 # Create a TypeAdapter for TaskMessageUpdate validation
 task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
+
+
+def _count_ddtrace_route_handler_wraps() -> int:
+    """Best-effort count of ddtrace ``traced_handler`` wrappers on the route handler.
+    >1 means double-instrumentation; 0 if ddtrace is not active. Never raises."""
+    if "ddtrace" not in sys.modules:
+        return 0
+    try:
+        import fastapi.routing
+        import starlette.routing
+
+        def walk(handle: Any) -> int:
+            count, seen, obj = 0, set(), handle
+            while obj is not None and id(obj) not in seen:
+                seen.add(id(obj))
+                wrapper = getattr(obj, "_self_wrapper", None)
+                if (
+                    wrapper is not None
+                    and "ddtrace" in (getattr(wrapper, "__module__", "") or "")
+                    and "traced_handler" in (getattr(wrapper, "__name__", "") or "")
+                ):
+                    count += 1
+                obj = getattr(obj, "__wrapped__", None)
+            return count
+
+        return max(
+            walk(fastapi.routing.APIRoute.handle),
+            walk(starlette.routing.Route.handle),
+        )
+    except Exception:
+        return 0
+
+
+def _warn_if_double_instrumented() -> None:
+    """Warn at startup if ddtrace wrapped the ACP route handler more than once."""
+    wraps = _count_ddtrace_route_handler_wraps()
+    if wraps > 1:
+        logger.warning(
+            "ddtrace is instrumenting the ACP route handler %d times (expected 1). This "
+            "doubles the APM resource_name/http.route (e.g. 'POST /api/api', 'GET "
+            "/healthz/healthz') while the served path stays single, so monitors and "
+            "dashboards filtered on the single-prefix resource_name silently miss the "
+            "doubled traffic. Cause: more than one ddtrace auto-instrumentation entry "
+            "point in this process — typically a manual ddtrace.patch_all()/ddtrace-run in "
+            "agent code alongside Datadog single-step instrumentation "
+            "(admission.datadoghq.com/enabled). Use exactly one: when the platform injects "
+            "single-step instrumentation, remove the in-app patch_all()/ddtrace-run.",
+            wraps,
+        )
 
 
 class RequestIDMiddleware:
@@ -102,6 +152,7 @@ class BaseACPServer(FastAPI):
     def get_lifespan_function(self):
         @asynccontextmanager
         async def lifespan_context(app: FastAPI):  # noqa: ARG001
+            _warn_if_double_instrumented()
             env_vars = EnvironmentVariables.refresh()
             if env_vars.AGENTEX_BASE_URL:
                 await register_agent(env_vars, agent_card=self._agent_card)
