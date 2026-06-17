@@ -2,11 +2,6 @@
 # This is the Stainless-generated REST client. The hand-authored ADK
 # overlay (formerly `src/agentex/lib/*`) now lives in `adk/` and ships
 # as the sibling `agentex-sdk` package — see `adk/pyproject.toml`.
-#
-# Stainless dashboard config must:
-#   - Rename `package_name` from `agentex-sdk` to `agentex-client`
-#   - Reduce the dep list to the 6 bare-client deps below
-#   - Add `adk/**` to `keep_files` so the ADK overlay persists across codegen
 name = "agentex-client"
 version = "0.13.0"
 description = "The official Python REST client for the Agentex API"

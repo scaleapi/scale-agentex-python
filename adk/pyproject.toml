@@ -3,9 +3,6 @@
 # `agentex/lib/*` to the agentex.* namespace; the REST client surface
 # (agentex/{__init__.py, _*.py, types/, resources/}) ships from the slim
 # sibling package `agentex-client` which is pinned as a runtime dep.
-#
-# This entire `adk/` directory must be preserved across Stainless codegen
-# via `keep_files: ["adk/**"]` in the Stainless dashboard config.
 name = "agentex-sdk"
 version = "0.13.0"
 description = "Agent Development Kit (ADK) overlay for the Agentex API — FastACP server, Temporal workflows, LLM provider integrations, observability"
