@@ -14,11 +14,20 @@ def _run(coro):
 
 
 def test_parse_versions():
-    assert vg._parse("0.2.1") == (0, 2, 1)
-    assert vg._parse("v1.4.0") == (1, 4, 0)
-    assert vg._parse("0.2.1-rc.1+build5") == (0, 2, 1)
+    assert vg._parse("0.2.1") == (0, 2, 1, None)
+    assert vg._parse("v1.4.0") == (1, 4, 0, None)
+    assert vg._parse("0.2.1-rc.1+build5") == (0, 2, 1, "rc.1")  # build metadata ignored
     assert vg._parse("garbage") is None
     assert vg._parse(None) is None
+
+
+def test_prerelease_precedence():
+    k = lambda v: vg._precedence_key(vg._parse(v))  # noqa: E731
+    assert k("0.1.0-rc.1") < k("0.1.0")       # prerelease precedes its stable release (SemVer §11)
+    assert k("0.1.0-rc.1") < k("0.1.0-rc.2")  # numeric prerelease identifiers compare numerically
+    assert k("0.1.0-alpha") < k("0.1.0-rc")   # numeric/alpha ordering by identifier
+    assert k("0.1.0") < k("0.1.1-rc.1")       # patch bump outranks prior stable
+    assert k("0.2.0-rc.1") > k("0.1.0")       # prerelease of a higher version still clears the floor
 
 
 def test_compatible_backend_passes(monkeypatch):
@@ -39,6 +48,15 @@ def test_incompatible_backend_raises(monkeypatch):
         _run(vg.assert_backend_compatible("http://backend", min_version="0.1.0", sdk_version="0.13.0"))
     msg = str(exc.value)
     assert "0.13.0" in msg and "0.1.0" in msg and "0.0.9" in msg  # actionable message
+
+
+def test_prerelease_backend_below_stable_floor_raises(monkeypatch):
+    async def fake(url, **kw):
+        return "0.1.0-rc.1"  # release candidate: precedes the stable 0.1.0 contract
+
+    monkeypatch.setattr(vg, "fetch_backend_version", fake)
+    with pytest.raises(vg.IncompatibleBackendError):
+        _run(vg.assert_backend_compatible("http://backend", min_version="0.1.0", sdk_version="0.13.0"))
 
 
 def test_skip_env_bypasses(monkeypatch):

@@ -34,16 +34,43 @@ MIN_BACKEND_CONTRACT = "0.1.0"
 
 SKIP_ENV = "AGENTEX_SKIP_VERSION_CHECK"
 
-_VERSION_RE = re.compile(r"^\s*v?(\d+)\.(\d+)\.(\d+)")
+# major.minor.patch, optional `-prerelease`; build metadata (after `+`) is ignored.
+_VERSION_RE = re.compile(r"^\s*v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?")
 
 
 class IncompatibleBackendError(RuntimeError):
     """Raised when the agentex backend is older than this SDK's minimum supported contract."""
 
 
-def _parse(version: str | None) -> tuple[int, int, int] | None:
+def _parse(version: str | None) -> tuple[int, int, int, str | None] | None:
+    """Parse ``major.minor.patch[-prerelease]`` → ``(major, minor, patch, prerelease)``.
+
+    ``prerelease`` is the raw dot-separated identifier string (e.g. ``"rc.1"``), or None for
+    a stable release. Build metadata (after ``+``) is ignored. Returns None if unparseable.
+    """
     m = _VERSION_RE.match(version or "")
-    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+    if not m:
+        return None
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4) or None)
+
+
+def _precedence_key(parsed: tuple[int, int, int, str | None]):
+    """SemVer §11 precedence key (directly comparable with ``<``).
+
+    A stable release outranks any prerelease of the same triplet (``0.1.0-rc.1 < 0.1.0``);
+    among prereleases, numeric identifiers rank below alphanumeric and compare field-by-field,
+    with a longer identifier list outranking a shorter prefix-equal one.
+    """
+    major, minor, patch, prerelease = parsed
+    if prerelease is None:
+        return (major, minor, patch, (1,))  # stable sorts above every prerelease
+    identifiers = []
+    for ident in prerelease.split("."):
+        if ident.isdigit():
+            identifiers.append((0, int(ident), ""))  # numeric: lowest class, numeric order
+        else:
+            identifiers.append((1, 0, ident))  # alphanumeric: higher class, lexical order
+    return (major, minor, patch, (0, identifiers))
 
 
 def _truthy(name: str) -> bool:
@@ -108,7 +135,7 @@ async def assert_backend_compatible(
         )
         return
 
-    if backend < minimum:
+    if _precedence_key(backend) < _precedence_key(minimum):
         raise IncompatibleBackendError(
             f"agentex-sdk {sdk_version} requires agentex backend >= {min_version}, "
             f"but {base_url} reports {backend_version}. "
