@@ -6,6 +6,20 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.13.1 (2026-06-17)
+
+Full Changelog: [agentex-client-v0.13.0...agentex-client-v0.13.1](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.13.0...agentex-client-v0.13.1)
+
+### Bug Fixes
+
+* **adk:** re-send task_id/agent_id in state updates for backend compatibility ([#405](https://github.com/scaleapi/scale-agentex-python/issues/405)) ([f59f26d](https://github.com/scaleapi/scale-agentex-python/commit/f59f26d4402f01318cf34d57820e121d97719986))
+* **packaging:** guard agentex-client surface, bump floor, smoke-test wheel install ([#406](https://github.com/scaleapi/scale-agentex-python/issues/406)) ([a5abbb9](https://github.com/scaleapi/scale-agentex-python/commit/a5abbb9669c6ab71c52e60db72676c95c20d840d))
+
+
+### Documentation
+
+* drop stale keep_files / dashboard-config comments ([#401](https://github.com/scaleapi/scale-agentex-python/issues/401)) ([23858df](https://github.com/scaleapi/scale-agentex-python/commit/23858df775d0a617c6418eed28f1b68c9bf9ed5c))
+
 ## 0.13.0 (2026-06-10)
 
 Full Changelog: [agentex-client-v0.12.0...agentex-client-v0.13.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.12.0...agentex-client-v0.13.0)

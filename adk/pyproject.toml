@@ -4,7 +4,7 @@
 # (agentex/{__init__.py, _*.py, types/, resources/}) ships from the slim
 # sibling package `agentex-client` which is pinned as a runtime dep.
 name = "agentex-sdk"
-version = "0.13.0"
+version = "0.13.1"
 description = "Agent Development Kit (ADK) overlay for the Agentex API — FastACP server, Temporal workflows, LLM provider integrations, observability"
 license = "Apache-2.0"
 authors = [
