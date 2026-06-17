@@ -61,6 +61,10 @@ jobs:
         # force-include can't build via the sdist-then-wheel default.
         run: uv build --all-packages --wheel
 
+      - name: Smoke-test wheel install
+        # Both wheels must install together into one working agentex.* namespace.
+        run: ./scripts/check-wheel-install
+
       - name: Get GitHub OIDC Token
         if: |-
           github.repository == 'stainless-sdks/agentex-sdk-python' &&

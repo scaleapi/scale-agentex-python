@@ -15,7 +15,7 @@ readme = "README.md"
 dependencies = [
     # Co-released in lockstep; floor-only by design — a ceiling would
     # eventually exclude the co-versioned slim (release-please can't bump it).
-    "agentex-client>=0.12.0",
+    "agentex-client>=0.13.0",
     # CLI surface (agentex.lib.cli.*, agentex.lib.sdk.config.*)
     "typer>=0.16,<0.17",
     "questionary>=2.0.1,<3",
