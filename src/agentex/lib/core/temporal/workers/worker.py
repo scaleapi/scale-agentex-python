@@ -30,6 +30,7 @@ from temporalio.converter import (
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.registration import register_agent
 from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.compat.version_guard import assert_backend_compatible
 
 logger = make_logger(__name__)
 
@@ -278,6 +279,10 @@ class AgentexWorker:
     async def _register_agent(self):
         env_vars = EnvironmentVariables.refresh()
         if env_vars and env_vars.AGENTEX_BASE_URL:
+            # Fail fast if this worker is pointed at a backend older than the SDK supports —
+            # the worker process never goes through the ACP server lifespan, so it needs its
+            # own guard (mirrors base_acp_server.lifespan_context).
+            await assert_backend_compatible(env_vars.AGENTEX_BASE_URL)
             await register_agent(env_vars)
         else:
             logger.warning("AGENTEX_BASE_URL not set, skipping worker registration")
