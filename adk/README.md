@@ -29,4 +29,4 @@ The two packages contribute disjoint files to the `agentex.*` namespace — `age
 
 ## Repo layout
 
-This package is hand-authored and lives at `adk/` inside [scaleapi/scale-agentex-python](https://github.com/scaleapi/scale-agentex-python). The Stainless generator preserves `adk/**` via `keep_files` so its codegen never touches anything here. The sibling `agentex-client` package lives at the repo root and IS Stainless-generated.
+This package is hand-authored and lives at `adk/` inside [scaleapi/scale-agentex-python](https://github.com/scaleapi/scale-agentex-python). Stainless codegen never touches `adk/**` — it's outside the generated surface. The sibling `agentex-client` package lives at the repo root and IS Stainless-generated.

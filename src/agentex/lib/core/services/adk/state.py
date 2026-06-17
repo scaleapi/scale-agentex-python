@@ -98,9 +98,12 @@ class StateService:
                 "state": state,
             },
         ) as span:
+            # Send task_id/agent_id in the body for backends predating
+            # scale-agentex#278, which still require them (newer ones ignore them).
             state_model = await self._agentex_client.states.update(
                 state_id=state_id,
                 state=state,
+                extra_body={"task_id": task_id, "agent_id": agent_id},
             )
             if span:
                 span.output = state_model.model_dump()

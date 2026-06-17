@@ -3,11 +3,8 @@
 # `agentex/lib/*` to the agentex.* namespace; the REST client surface
 # (agentex/{__init__.py, _*.py, types/, resources/}) ships from the slim
 # sibling package `agentex-client` which is pinned as a runtime dep.
-#
-# This entire `adk/` directory must be preserved across Stainless codegen
-# via `keep_files: ["adk/**"]` in the Stainless dashboard config.
 name = "agentex-sdk"
-version = "0.13.0"
+version = "0.13.1"
 description = "Agent Development Kit (ADK) overlay for the Agentex API — FastACP server, Temporal workflows, LLM provider integrations, observability"
 license = "Apache-2.0"
 authors = [
@@ -18,7 +15,7 @@ readme = "README.md"
 dependencies = [
     # Co-released in lockstep; floor-only by design — a ceiling would
     # eventually exclude the co-versioned slim (release-please can't bump it).
-    "agentex-client>=0.12.0",
+    "agentex-client>=0.13.0",
     # CLI surface (agentex.lib.cli.*, agentex.lib.sdk.config.*)
     "typer>=0.16,<0.17",
     "questionary>=2.0.1,<3",
