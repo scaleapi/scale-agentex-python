@@ -54,7 +54,13 @@ def _parse(version: str | None) -> tuple[int, int, int, str | None] | None:
     return (int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4) or None)
 
 
-def _precedence_key(parsed: tuple[int, int, int, str | None]):
+# Comparable SemVer precedence key. The 4th element keeps a uniform shape across stable and
+# prerelease so the whole tuple is orderable: (rank, identifiers), where stable rank 1 > prerelease
+# rank 0 (and the identifier list is only ever compared when both sides are prereleases, rank 0).
+_PreKey = tuple[int, int, int, tuple[int, list[tuple[int, int, str]]]]
+
+
+def _precedence_key(parsed: tuple[int, int, int, str | None]) -> _PreKey:
     """SemVer §11 precedence key (directly comparable with ``<``).
 
     A stable release outranks any prerelease of the same triplet (``0.1.0-rc.1 < 0.1.0``);
@@ -63,8 +69,8 @@ def _precedence_key(parsed: tuple[int, int, int, str | None]):
     """
     major, minor, patch, prerelease = parsed
     if prerelease is None:
-        return (major, minor, patch, (1,))  # stable sorts above every prerelease
-    identifiers = []
+        return (major, minor, patch, (1, []))  # stable sorts above every prerelease
+    identifiers: list[tuple[int, int, str]] = []
     for ident in prerelease.split("."):
         if ident.isdigit():
             identifiers.append((0, int(ident), ""))  # numeric: lowest class, numeric order
