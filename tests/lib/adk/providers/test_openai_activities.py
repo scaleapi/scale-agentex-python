@@ -335,23 +335,28 @@ class TestOpenAIActivities:
         expected_params.tools = [CodeInterpreterTool(tool_config={"type": "code_interpreter"})]
         self._assert_starting_agent_params(starting_agent, expected_params)
 
-        # Verify streaming context received tool request and response updates
-        # Should have been called twice - once for tool request, once for response
-        assert mock_streaming_context.stream_update.call_count == 2
+        # Under the unified harness, the OpenAI events are converted to canonical
+        # StreamTaskMessageFull events and auto_send posts each full tool message
+        # by opening a streaming context with the content as initial_content and
+        # closing it (no stream_update). So assert on the opened contents.
+        opened = mock_streaming_context.opened_contents
+        tool_contents = [
+            c
+            for c in opened
+            if getattr(c, "type", None) in ("tool_request", "tool_response")
+        ]
+        assert len(tool_contents) == 2
 
-        # First call should be tool request
-        first_call = mock_streaming_context.stream_update.call_args_list[0]
-        first_update = first_call[1]["update"]  # keyword argument
-        assert hasattr(first_update, "content")
-        assert first_update.content.name == "code_interpreter"
-        assert first_update.content.tool_call_id == "code_interpreter_call_123"
+        # First opened context is the tool request.
+        first = tool_contents[0]
+        assert first.type == "tool_request"
+        assert first.name == "code_interpreter"
+        assert first.tool_call_id == "code_interpreter_call_123"
 
-        # Second call should be tool response
-        second_call = mock_streaming_context.stream_update.call_args_list[1]
-        second_update = second_call[1]["update"]  # keyword argument
-        assert hasattr(second_update, "content")
-        assert second_update.content.name == "code_interpreter_call"
-        assert second_update.content.tool_call_id == "code_interpreter_call_123"
+        # Second opened context is the tool response.
+        second = tool_contents[1]
+        assert second.type == "tool_response"
+        assert second.tool_call_id == "code_interpreter_call_123"
 
     def _create_mock_tracer(self):
         """Helper method to create a properly mocked tracer with async context manager support."""
@@ -635,15 +640,25 @@ class TestOpenAIActivities:
         mock_streaming_context.task_message = mock_task_message
         mock_streaming_context.stream_update = AsyncMock()
 
+        # Record the initial_content passed to each opened streaming context.
+        # The unified harness auto_send path posts full tool messages by opening
+        # a context with initial_content and closing it (no stream_update), so
+        # assertions inspect the opened contents rather than stream_update calls.
+        opened_contents: list = []
+
         # Create a proper async context manager mock
         from contextlib import asynccontextmanager
         from unittest.mock import AsyncMock
 
         @asynccontextmanager
-        async def mock_streaming_context_manager(*_args, **_kwargs):
+        async def mock_streaming_context_manager(*_args, **kwargs):
+            if "initial_content" in kwargs:
+                opened_contents.append(kwargs["initial_content"])
             yield mock_streaming_context
 
         mock_streaming_service.streaming_task_message_context = mock_streaming_context_manager
+        # Expose the recorded contents on the returned context mock for assertions.
+        mock_streaming_context.opened_contents = opened_contents
 
         openai_service.streaming_service = mock_streaming_service
         openai_service.agentex_client = mock_agentex_client
@@ -680,6 +695,9 @@ class TestOpenAIActivities:
         mock_streaming_result = Mock(spec=RunResultStreaming)
         mock_streaming_result.final_output = final_output
         mock_streaming_result.new_items = []
+        # OpenAITurn reads raw_responses after stream exhaustion to aggregate
+        # usage; provide an empty list so usage normalizes to model-only.
+        mock_streaming_result.raw_responses = []
         mock_streaming_result.final_input_list = [
             {"role": "user", "content": "Run some Python code"},
             {"role": "assistant", "content": final_output},

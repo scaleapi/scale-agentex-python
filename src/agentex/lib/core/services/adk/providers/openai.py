@@ -14,15 +14,8 @@ from agents.agent import StopAtTools, ToolsToFinalOutputFunction
 from agents.guardrail import InputGuardrail, OutputGuardrail
 from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
 from openai.types.responses import (
-    ResponseCompletedEvent,
-    ResponseTextDeltaEvent,
-    ResponseFunctionToolCall,
     ResponseFunctionWebSearch,
-    ResponseOutputItemDoneEvent,
     ResponseCodeInterpreterToolCall,
-    ResponseReasoningSummaryPartDoneEvent,
-    ResponseReasoningSummaryPartAddedEvent,
-    ResponseReasoningSummaryTextDeltaEvent,
 )
 
 # Local imports
@@ -31,24 +24,14 @@ from agentex.lib.utils import logging
 from agentex.lib.utils.mcp import redact_mcp_server_params
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
 from agentex.lib.core.tracing.tracer import AsyncTracer
-from agentex.types.task_message_delta import (
-    TextDelta,
-    ReasoningSummaryDelta,
-)
-from agentex.types.task_message_update import (
-    StreamTaskMessageFull,
-    StreamTaskMessageDelta,
-)
+from agentex.lib.core.harness.emitter import UnifiedEmitter
+from agentex.types.task_message_update import StreamTaskMessageFull
 from agentex.types.task_message_content import (
     TextContent,
-    ReasoningContent,
     ToolRequestContent,
     ToolResponseContent,
 )
-from agentex.lib.core.services.adk.streaming import (
-    StreamingService,
-    StreamingTaskMessageContext,
-)
+from agentex.lib.core.services.adk.streaming import StreamingService
 
 logger = logging.make_logger(__name__)
 
@@ -733,8 +716,6 @@ class OpenAIService:
         if self.agentex_client is None:
             raise ValueError("Agentex client must be provided for auto_send methods")
 
-        tool_call_map: dict[str, ResponseFunctionToolCall] = {}
-
         if self.tracer is None:
             raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
         trace = self.tracer.trace(trace_id)
@@ -761,12 +742,18 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent streamed auto send")
 
-            # Consume the workflow-supplied created_at on the FIRST message
-            # opened by this activity (whichever streaming context opens first
-            # for this turn). That's the message that races the workflow's
-            # user-echo at the server. Subsequent messages in the same turn are
-            # separated by network/processing latency and rely on the server's
-            # wall clock.
+            # created_at limitation: the unified auto_send path
+            # (UnifiedEmitter.auto_send_turn -> auto_send) does not thread the
+            # workflow-supplied created_at through to the per-message streaming
+            # contexts it opens for the agent's turn. The previous inline loop
+            # stamped the first message of the turn with workflow.now() to win
+            # the race against the workflow's user-echo at the server; under the
+            # unified surface that first agent message instead falls back to the
+            # server's wall clock. This is an accepted trade-off for migrating
+            # onto the shared harness; if strict first-message ordering becomes
+            # necessary, auto_send must accept and dispense a created_at.
+            # The dispenser is still used below for the guardrail-rejection
+            # messages, which open their own streaming contexts directly.
             _take_created_at = _make_created_at_dispenser(created_at)
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
@@ -809,198 +796,28 @@ class OpenAIService:
                 else:
                     result = Runner.run_streamed(starting_agent=agent, input=input_list)
 
-                item_id_to_streaming_context: dict[str, StreamingTaskMessageContext] = {}
-                unclosed_item_ids: set[str] = set()
-                # Simple string to accumulate reasoning summary
-                current_reasoning_summary: str = ""
+                # Migrate onto the unified harness surface: wrap the streamed run
+                # as an OpenAITurn (provider -> canonical StreamTaskMessage*
+                # adapter) and let UnifiedEmitter.auto_send_turn drive delivery +
+                # tracing + usage. The previous ~270-line inline loop that hand-
+                # rolled per-item streaming contexts, reasoning handling, and
+                # span derivation now lives in the shared harness modules.
+                # Imported lazily: openai_turn pulls in agentex.lib.adk, which
+                # imports this service module, so an eager import would create a
+                # circular import at package init.
+                from agentex.lib.adk.providers._modules.openai_turn import OpenAITurn
+
+                turn = OpenAITurn(result=result, model=model)
+                emitter = UnifiedEmitter(
+                    task_id=task_id,
+                    trace_id=trace_id,
+                    parent_span_id=parent_span_id,
+                    tracer=self.tracer,
+                    streaming=self.streaming_service,
+                )
 
                 try:
-                    # Process streaming events with TaskMessage creation
-                    async for event in result.stream_events():
-                        heartbeat_if_in_workflow("processing stream event with auto send")
-
-                        if event.type == "run_item_stream_event":
-                            if event.item.type == "tool_call_item":
-                                tool_call_item = event.item.raw_item
-
-                                # Extract tool call information using the helper method
-                                call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
-                                tool_call_map[call_id] = tool_call_item
-
-                                tool_request_content = ToolRequestContent(
-                                    author="agent",
-                                    tool_call_id=call_id,
-                                    name=tool_name,
-                                    arguments=tool_arguments,
-                                )
-
-                                # Create tool request using streaming context (immediate completion)
-                                async with self.streaming_service.streaming_task_message_context(
-                                    task_id=task_id,
-                                    initial_content=tool_request_content,
-                                    created_at=_take_created_at(),
-                                ) as streaming_context:
-                                    # The message has already been persisted, but we still need to send an upda
-                                    await streaming_context.stream_update(
-                                        update=StreamTaskMessageFull(
-                                            parent_task_message=streaming_context.task_message,
-                                            content=tool_request_content,
-                                            type="full",
-                                        ),
-                                    )
-
-                            elif event.item.type == "tool_call_output_item":
-                                tool_output_item = event.item.raw_item
-
-                                # Extract tool response information using the helper method
-                                call_id, tool_name, content = self._extract_tool_response_info(
-                                    tool_call_map, tool_output_item
-                                )
-
-                                tool_response_content = ToolResponseContent(
-                                    author="agent",
-                                    tool_call_id=call_id,
-                                    name=tool_name,
-                                    content=content,
-                                )
-
-                                # Create tool response using streaming context (immediate completion)
-                                async with self.streaming_service.streaming_task_message_context(
-                                    task_id=task_id,
-                                    initial_content=tool_response_content,
-                                    created_at=_take_created_at(),
-                                ) as streaming_context:
-                                    # The message has already been persisted, but we still need to send an update
-                                    await streaming_context.stream_update(
-                                        update=StreamTaskMessageFull(
-                                            parent_task_message=streaming_context.task_message,
-                                            content=tool_response_content,
-                                            type="full",
-                                        ),
-                                    )
-
-                        elif event.type == "raw_response_event":
-                            if isinstance(event.data, ResponseTextDeltaEvent):
-                                # Handle text delta
-                                item_id = event.data.item_id
-
-                                # Check if we already have a streaming context for this item
-                                if item_id not in item_id_to_streaming_context:
-                                    # Create a new streaming context for this item
-                                    streaming_context = self.streaming_service.streaming_task_message_context(
-                                        task_id=task_id,
-                                        initial_content=TextContent(
-                                            author="agent",
-                                            content="",
-                                        ),
-                                        created_at=_take_created_at(),
-                                    )
-                                    # Open the streaming context
-                                    item_id_to_streaming_context[item_id] = await streaming_context.open()
-                                    unclosed_item_ids.add(item_id)
-                                else:
-                                    streaming_context = item_id_to_streaming_context[item_id]
-
-                                # Stream the delta through the streaming service
-                                await streaming_context.stream_update(
-                                    update=StreamTaskMessageDelta(
-                                        parent_task_message=streaming_context.task_message,
-                                        delta=TextDelta(text_delta=event.data.delta, type="text"),
-                                        type="delta",
-                                    ),
-                                )
-                            # Reasoning step one: new summary part added
-                            elif isinstance(event.data, ResponseReasoningSummaryPartAddedEvent):
-                                # We need to create a new streaming context for this reasoning item
-                                item_id = event.data.item_id
-
-                                # Reset the reasoning summary string
-                                current_reasoning_summary = ""
-
-                                streaming_context = self.streaming_service.streaming_task_message_context(
-                                    task_id=task_id,
-                                    initial_content=ReasoningContent(
-                                        author="agent",
-                                        summary=[],
-                                        content=[],
-                                        type="reasoning",
-                                        style="active",
-                                    ),
-                                    created_at=_take_created_at(),
-                                )
-
-                                # Replace the existing streaming context (if it exists)
-                                # Why do we replace? Cause all the reasoning parts use the same item_id!
-                                item_id_to_streaming_context[item_id] = await streaming_context.open()
-                                unclosed_item_ids.add(item_id)
-
-                            # Reasoning step two: handling summary text delta
-                            elif isinstance(event.data, ResponseReasoningSummaryTextDeltaEvent):
-                                # Accumulate the delta into the string
-                                current_reasoning_summary += event.data.delta
-                                streaming_context = item_id_to_streaming_context[item_id]
-
-                                # Stream the summary delta through the streaming service
-                                await streaming_context.stream_update(
-                                    update=StreamTaskMessageDelta(
-                                        parent_task_message=streaming_context.task_message,
-                                        delta=ReasoningSummaryDelta(
-                                            summary_index=event.data.summary_index,
-                                            summary_delta=event.data.delta,
-                                            type="reasoning_summary",
-                                        ),
-                                        type="delta",
-                                    ),
-                                )
-
-                            # Reasoning step three: handling summary text done, closing the streaming context
-                            elif isinstance(event.data, ResponseReasoningSummaryPartDoneEvent):
-                                # Handle reasoning summary text completion
-                                streaming_context = item_id_to_streaming_context[item_id]
-
-                                # Create the complete reasoning content with the accumulated summary
-                                complete_reasoning_content = ReasoningContent(
-                                    author="agent",
-                                    summary=[current_reasoning_summary],
-                                    content=[],
-                                    type="reasoning",
-                                    style="static",
-                                )
-
-                                # Send a full message update with the complete reasoning content
-                                await streaming_context.stream_update(
-                                    update=StreamTaskMessageFull(
-                                        parent_task_message=streaming_context.task_message,
-                                        content=complete_reasoning_content,
-                                        type="full",
-                                    ),
-                                )
-
-                                await streaming_context.close()
-                                unclosed_item_ids.discard(item_id)
-
-                            elif isinstance(event.data, ResponseOutputItemDoneEvent):
-                                # Handle item completion
-                                item_id = event.data.item.id
-
-                                # Finish the streaming context (sends DONE event and updates message)
-                                if item_id in item_id_to_streaming_context:
-                                    streaming_context = item_id_to_streaming_context[item_id]
-                                    await streaming_context.close()
-                                    if item_id in unclosed_item_ids:
-                                        unclosed_item_ids.remove(item_id)
-
-                            elif isinstance(event.data, ResponseCompletedEvent):
-                                # All items complete, finish all remaining streaming contexts for this session
-                                # Create a copy to avoid modifying set during iteration
-                                remaining_items = list(unclosed_item_ids)
-                                for item_id in remaining_items:
-                                    if (
-                                        item_id in unclosed_item_ids and item_id in item_id_to_streaming_context
-                                    ):  # Check if still unclosed
-                                        streaming_context = item_id_to_streaming_context[item_id]
-                                        await streaming_context.close()
-                                        unclosed_item_ids.discard(item_id)
+                    await emitter.auto_send_turn(turn)
 
                 except InputGuardrailTripwireTriggered as e:
                     # Handle guardrail trigger by sending a rejection message
@@ -1079,18 +896,6 @@ class OpenAIService:
 
                     # Re-raise to let the activity handle it
                     raise
-
-                finally:
-                    # Cleanup: ensure all streaming contexts for this session are properly finished
-                    # Create a copy to avoid modifying set during iteration
-                    remaining_items = list(unclosed_item_ids)
-                    for item_id in remaining_items:
-                        if (
-                            item_id in unclosed_item_ids and item_id in item_id_to_streaming_context
-                        ):  # Check if still unclosed
-                            streaming_context = item_id_to_streaming_context[item_id]
-                            await streaming_context.close()
-                            unclosed_item_ids.discard(item_id)
 
                 if span:
                     span.output = {
