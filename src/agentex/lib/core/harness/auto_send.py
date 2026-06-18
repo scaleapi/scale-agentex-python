@@ -48,14 +48,12 @@ async def auto_send(
     deriver = SpanDeriver() if tracer is not None else None
     final_text_parts: list[str] = []
     current_ctx: Any = None
-    current_kind: str | None = None  # "text" | "reasoning"
 
     async def _close_current() -> None:
-        nonlocal current_ctx, current_kind
+        nonlocal current_ctx
         if current_ctx is not None:
             await current_ctx.close()
             current_ctx = None
-            current_kind = None
 
     try:
         async for event in events:
@@ -72,7 +70,6 @@ async def auto_send(
                         initial_content=event.content,
                     )
                     current_ctx = await ctx.__aenter__()
-                    current_kind = ctype
 
             elif isinstance(event, StreamTaskMessageDelta):
                 if current_ctx is not None and event.delta is not None:
@@ -100,14 +97,15 @@ async def auto_send(
                 # streaming context first, then post the full message by opening
                 # a context with the content and closing it immediately
                 # (no deltas; StreamingTaskMessageContext.close() persists
-                # initial_content when the accumulator is empty).
+                # initial_content when the accumulator is empty). Use async with
+                # so the context is closed even if close() raises (__aexit__
+                # delegates to close()).
                 await _close_current()
-                ctx = streaming.streaming_task_message_context(
+                async with streaming.streaming_task_message_context(
                     task_id=task_id,
                     initial_content=event.content,
-                )
-                full_ctx = await ctx.__aenter__()
-                await full_ctx.close()
+                ):
+                    pass
 
     finally:
         await _close_current()
