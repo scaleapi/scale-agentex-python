@@ -23,6 +23,8 @@ register(Fixture(
 
 @pytest.mark.parametrize("fixture", all_fixtures(), ids=lambda f: f.name)
 def test_span_derivation_is_deterministic(fixture):
+    """Exercises the cross-channel guarantee: yield and auto-send observe the
+    same event stream, so span derivation must be deterministic/idempotent."""
     # Deriving twice over the same events yields identical signals (the property
     # that makes yield vs auto-send equivalent, since both observe the same stream).
     assert derive_all(fixture.events) == derive_all(fixture.events)

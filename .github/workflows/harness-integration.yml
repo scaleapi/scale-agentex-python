@@ -1,6 +1,8 @@
 name: Harness Integration
 
 on:
+  push:
+    branches: [main]
   pull_request:
     paths:
       - "src/agentex/lib/core/harness/**"
@@ -21,8 +23,13 @@ jobs:
       - name: Bootstrap
         run: ./scripts/bootstrap
 
+      # Defer to scripts/test so the harness suite runs under the exact same
+      # invocation as the main CI test job: DEFER_PYDANTIC_BUILD=false and
+      # `uv run --isolated --all-packages --all-extras pytest`, across the
+      # min/max supported Python versions. Running `uv run pytest` directly
+      # would risk an all-extras-only dep passing locally but failing in CI.
       - name: Conformance suite
-        run: uv run pytest tests/lib/core/harness/ -v
+        run: ./scripts/test tests/lib/core/harness/ -v
 
   # Live integration matrix (harness x {sync, async, temporal}) is added per-harness
   # in the migration plans. Placeholder job keeps the workflow valid until then.
@@ -30,4 +37,4 @@ jobs:
     runs-on: ubuntu-latest
     if: false  # enabled once the first harness's test agents land
     steps:
-      - run: echo "populated by migration PRs"
+      - run: echo "populated by migration PRs"  # TODO(harness-migration): enable per-harness; see docs/superpowers/plans migration PRs 4-8
