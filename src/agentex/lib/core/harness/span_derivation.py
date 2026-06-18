@@ -105,7 +105,21 @@ class SpanDeriver:
         return []
 
     def _on_full(self, event: StreamTaskMessageFull) -> list[SpanSignal]:
+        """Handle a Full event.
+
+        A `Full(ToolRequestContent)` opens a tool span (keyed by tool_call_id)
+        if it is not already open; the matching `Full(ToolResponseContent)`
+        closes it. This handles harnesses (e.g. LangGraph) that emit tool calls
+        as a single Full rather than Start+Done.
+        """
         content = event.content
+        if isinstance(content, ToolRequestContent):
+            tcid = content.tool_call_id
+            if tcid not in self._open_tool_ids:
+                self._open_tool_ids[tcid] = None
+                args = dict(content.arguments or {})
+                return [OpenSpan(key=tcid, kind="tool", name=content.name, input=args)]
+            return []
         if isinstance(content, ToolResponseContent):
             tcid = content.tool_call_id
             if tcid in self._open_tool_ids:
