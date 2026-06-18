@@ -87,15 +87,33 @@ tracer as a side effect.
 
 ### 4. Tracing tap (shared)
 
-Derives spans from the canonical stream:
+A stateful reducer that derives spans from the canonical stream. It only *observes*
+`index` and `tool_call_id`; it never mutates or reorders the stream, so streaming fidelity
+is unchanged.
 
-- tool span = `ToolRequestContent` (start/full) → matching `ToolResponseContent` by
+Derivation rules:
+
+- **Tool span open:** on `StreamTaskMessageDone` for an index whose `Start` content was a
+  `ToolRequestContent`. Arguments are fully known by `Done` (covers both streamed-args and
+  one-shot tools). The open span is keyed by `tool_call_id`.
+- **Tool span close:** on `StreamTaskMessageFull(ToolResponseContent)` matching by
   `tool_call_id`.
-- reasoning span = reasoning start → done.
-- subagent span = the Task/Agent tool's span (a tool span by another name).
+- **Parallel / interleaved tools:** `ToolRequestContent`, `ToolResponseContent`,
+  `ToolRequestDelta`, and `ToolResponseDelta` all carry `tool_call_id` + `name`, so multiple
+  open tool spans pair correctly regardless of arrival order.
+- **Reasoning span:** `Start(ReasoningContent)` → `Done` on that index.
+- **Subagent span:** the Task/Agent tool's span (a tool span by another name), nested under
+  the turn span.
 
 Default-on whenever a trace context exists; **overridable** by passing a custom tracer, or
 `None` to disable. Replaces the per-harness `_tracing.py` handlers.
+
+**Open decision — tool error status.** `ToolResponseContent` currently has no
+`is_error`/`status` field (only `content`), so a derived tool span cannot mark failure. The
+golden agent's `ToolCompleted` carried `is_error`. Recommended resolution: add an additive
+optional `is_error: bool | None` to `ToolResponseContent`. This is a generated type, so it is
+a small upstream API-spec change (tracked as a prerequisite to the relevant migration PR), not
+a local edit. Until it lands, derived spans omit tool error status rather than inferring it.
 
 ### Facade
 
@@ -121,12 +139,65 @@ One pass over the canonical stream, fanned out by delivery mode.
   activity (converters run in activities, not workflows, so determinism is not a concern).
 - **Tracing** is the same derivation in both modes (it observes the canonical stream), so
   sync and auto-send produce identical spans.
-- **Turn-level metadata** (usage / cost / model) is not an Agentex event. It rides a small
-  side-channel: the tap returns a final typed `TurnResult` (or yields a terminal record)
-  that the caller attaches to the turn span. This mirrors how the golden agent already treats
-  `TurnCompleted` as "handled by the caller, not the stream."
+- **Turn-level metadata** (usage / cost / model) is not an Agentex event, so it is surfaced
+  as a first-class `TurnUsage` shape rather than ad-hoc data (see below).
 
 Net dedup: **3 files × N harnesses → 1 tap × N harnesses + 3 shared components.**
+
+## Unified turn usage / cost
+
+Turn metadata is a first-class, harness-independent shape attached to the turn span and
+returned to the caller — not a loose side-channel.
+
+```
+class TurnUsage(BaseModel):
+    model: str | None
+    input_tokens: int | None
+    output_tokens: int | None
+    cached_input_tokens: int | None   # subset of input_tokens served from cache
+    reasoning_tokens: int | None      # subset of output_tokens
+    total_tokens: int | None
+    cost_usd: float | None
+    duration_ms: int | None           # wall-clock, measured by the emitter
+    num_llm_calls: int
+    num_tool_calls: int               # derived from the canonical stream
+    num_reasoning_blocks: int         # derived from the canonical stream
+
+class TurnResult(BaseModel):
+    final_text: str
+    usage: TurnUsage
+```
+
+- Token field names align with the existing `agentex.lib.core.observability.llm_metrics`
+  taxonomy (`input_tokens` / `output_tokens` / `cached_input_tokens` / `reasoning_tokens`),
+  not a new vocabulary. (The OpenAI-style `llm_messages.Usage` —
+  `prompt_tokens`/`completion_tokens` — is mapped into this richer shape.)
+- **Each harness tap normalizes its native usage** into `TurnUsage`: pydantic-ai
+  `result.usage()`, LangGraph `usage_metadata`, OpenAI `response.usage`, claude-code/codex
+  the final `result` envelope (`cost_usd` + usage). Per-harness normalization, one output
+  shape.
+- The stream-derived counts (`num_tool_calls`, `num_reasoning_blocks`) come for free from the
+  tracing tap's reduction; `duration_ms` is measured by the emitter; tokens/cost/model come
+  from the tap's native-usage normalization.
+- The emitter attaches `TurnUsage` to the **turn span** via `adk.tracing.span(data=...)`
+  (which already accepts a `BaseModel`) and returns `TurnResult` to the caller. The same
+  object can feed the OTel `LLMMetrics` and downstream metrics (e.g. the golden agent's
+  per-turn DogStatsD emission), so traces and metrics share one shape.
+
+### Surfacing `TurnUsage` from the tap
+
+Python async generators cannot cleanly return a value to their consumer, so the tap does not
+return `TurnUsage` via `StopAsyncIteration`. Instead the per-harness entry is a small object:
+
+```
+class HarnessTurn:
+    events: AsyncIterator[StreamTaskMessage*]   # the canonical stream
+    def usage(self) -> TurnUsage                 # populated once `events` is exhausted
+```
+
+The emitter drives `events` (delivering + tracing), then reads `usage()` to finalize the turn
+span and build `TurnResult`. This keeps the canonical stream pure (only `StreamTaskMessage*`)
+while giving usage/cost a typed home.
 
 ## Backwards compatibility (every change is additive)
 
@@ -195,6 +266,43 @@ any uncovered cell is logged/documented, never silently skipped.
   `adk.streaming` context, no dangling span.
 - Tracing failures are best-effort and never break delivery (matches the golden agent's
   contract).
+
+## Golden agent integration (SGP / sandbox coupling preserved)
+
+The unified surface is designed so the golden agent keeps **all** of its SGP-coupled layers
+and only swaps its hand-rolled parsing/streaming/tracing internals for the SDK's taps +
+emitter. Nothing SGP-specific moves into the SDK.
+
+What stays in the golden agent, untouched:
+
+- Sandbox pool acquire modes (cold-create / warm-claim / reconnect), lease coordination, and
+  the data-plane URL override.
+- Secret resolution, OAuth/MCP reauth, and reconnect-notice emission (the notice is just
+  another standalone message on the task stream, independent of the harness tap).
+- Spawning `claude -p` / `codex exec` inside the sandbox.
+
+What changes inside the golden agent's provider:
+
+1. Acquire/provision the sandbox and resolve secrets/MCP exactly as today (SGP-coupled).
+2. Spawn the CLI in the sandbox and feed its stdout (stream-json lines) into the SDK tap
+   `convert_claude_code_to_agentex_events` / `convert_codex_to_agentex_events`.
+3. Run that tap through the SDK emitter's **auto-send** path from inside the existing Temporal
+   activity, getting streaming + tracing + `TurnUsage` for free. The agent's
+   `_StreamJsonProcessor` and `AgentexStreamAdapter` are retired in favor of the SDK tap +
+   emitter.
+
+**Sandbox-setup events:** today the golden agent surfaces provisioning steps (reconnect /
+find / create / configure-git / clone) as UI tool calls by yielding them into the same
+adapter. Under the unified surface these become agent-produced `ToolRequestContent` /
+`ToolResponseContent` messages, chained *before* the harness tap's stream into one canonical
+stream for the turn (`chain(setup_events, convert_claude_code(stdout))`). The emitter then
+delivers and traces the whole turn uniformly, so setup steps keep appearing in the UI and the
+span tree.
+
+This means the claude-code/codex parser PRs (7, 8) deliver the SDK taps, and a corresponding
+**golden-agent-side change** (out of this repo's PR stack) rewires its providers onto them.
+The golden agent's in-process litellm / OpenAI-Agents harness can likewise adopt the OpenAI
+tap, though that is optional and not required by this design.
 
 ## Out of scope
 
