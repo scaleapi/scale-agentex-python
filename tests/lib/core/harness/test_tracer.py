@@ -1,7 +1,7 @@
 import pytest
 
-from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.types import OpenSpan, CloseSpan
+from agentex.lib.core.harness.tracer import SpanTracer
 
 
 class _FakeSpan:

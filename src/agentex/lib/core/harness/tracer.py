@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentex.lib.core.harness.types import CloseSpan, OpenSpan, SpanSignal
+from agentex.lib.core.harness.types import OpenSpan, CloseSpan, SpanSignal
 
 try:
     from agentex.lib.utils.logging import make_logger

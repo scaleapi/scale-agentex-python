@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from agentex.lib.core.harness.span_derivation import SpanDeriver
 from agentex.lib.core.harness.types import SpanSignal, StreamTaskMessage
+from agentex.lib.core.harness.span_derivation import SpanDeriver
 
 
 @dataclass

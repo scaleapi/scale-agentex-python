@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Literal, Protocol, Union, runtime_checkable
+from typing import Any, Union, Literal, Protocol, AsyncIterator, runtime_checkable
+from dataclasses import field, dataclass
+
+from pydantic import BaseModel, ConfigDict
 
 from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
     StreamTaskMessageDone,
     StreamTaskMessageFull,
+    StreamTaskMessageDelta,
     StreamTaskMessageStart,
 )
-from pydantic import BaseModel, ConfigDict
 
 # The canonical stream element. Taps yield these; delivery adapters consume them.
 StreamTaskMessage = Union[

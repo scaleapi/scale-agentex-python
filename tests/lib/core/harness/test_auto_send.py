@@ -13,17 +13,17 @@ import types as _types
 
 import pytest
 
-from agentex.lib.core.harness.auto_send import auto_send
-from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message import TaskMessage
+from agentex.types.text_content import TextContent
+from agentex.lib.core.harness.tracer import SpanTracer
+from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import (
-    StreamTaskMessageStart,
-    StreamTaskMessageDelta,
     StreamTaskMessageDone,
     StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+    StreamTaskMessageStart,
 )
-from agentex.types.text_content import TextContent
-from agentex.types.task_message_delta import TextDelta
+from agentex.lib.core.harness.auto_send import auto_send
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 
@@ -40,9 +40,7 @@ class _FakeCtx:
         self.sink = sink
         self.content_type = content_type
         # Real TaskMessage so StreamTaskMessageDelta(parent_task_message=...) passes validation
-        self.task_message = TaskMessage(
-            id="msg-1", task_id="task1", content=initial_content
-        )
+        self.task_message = TaskMessage(id="msg-1", task_id="task1", content=initial_content)
 
     async def __aenter__(self):
         self.sink.append(("open", self.content_type))
@@ -67,9 +65,7 @@ class _FakeStreaming:
     def __init__(self):
         self.sink = []
 
-    def streaming_task_message_context(
-        self, task_id, initial_content, streaming_mode="coalesced", created_at=None
-    ):
+    def streaming_task_message_context(self, task_id, initial_content, streaming_mode="coalesced", created_at=None):
         ctype = getattr(initial_content, "type", None)
         self.sink.append(("ctx", ctype))
         return _FakeCtx(self.sink, ctype, initial_content)
@@ -84,20 +80,24 @@ async def _gen(events):
 # Test 1: text streaming — open, stream deltas, close; return accumulated text
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_auto_send_streams_text_and_returns_final_text():
     streaming = _FakeStreaming()
     events = [
         StreamTaskMessageStart(
-            type="start", index=0,
+            type="start",
+            index=0,
             content=TextContent(type="text", author="agent", content=""),
         ),
         StreamTaskMessageDelta(
-            type="delta", index=0,
+            type="delta",
+            index=0,
             delta=TextDelta(type="text", text_delta="Hel"),
         ),
         StreamTaskMessageDelta(
-            type="delta", index=0,
+            type="delta",
+            index=0,
             delta=TextDelta(type="text", text_delta="lo"),
         ),
         StreamTaskMessageDone(type="done", index=0),
@@ -122,6 +122,7 @@ async def test_auto_send_streams_text_and_returns_final_text():
 # (open context with the content, no deltas, close immediately)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_auto_send_posts_full_tool_messages():
     streaming = _FakeStreaming()
@@ -129,24 +130,36 @@ async def test_auto_send_posts_full_tool_messages():
         # A bare tool_request Start (no Done/Full) must NOT open a streaming
         # context on its own — only Full events post messages.
         StreamTaskMessageStart(
-            type="start", index=0,
+            type="start",
+            index=0,
             content=ToolRequestContent(
-                type="tool_request", author="agent",
-                tool_call_id="c0", name="Bash", arguments={},
+                type="tool_request",
+                author="agent",
+                tool_call_id="c0",
+                name="Bash",
+                arguments={},
             ),
         ),
         StreamTaskMessageFull(
-            type="full", index=1,
+            type="full",
+            index=1,
             content=ToolRequestContent(
-                type="tool_request", author="agent",
-                tool_call_id="c1", name="Bash", arguments={"cmd": "ls"},
+                type="tool_request",
+                author="agent",
+                tool_call_id="c1",
+                name="Bash",
+                arguments={"cmd": "ls"},
             ),
         ),
         StreamTaskMessageFull(
-            type="full", index=2,
+            type="full",
+            index=2,
             content=ToolResponseContent(
-                type="tool_response", author="agent",
-                tool_call_id="c1", name="Bash", content="file.py",
+                type="tool_response",
+                author="agent",
+                tool_call_id="c1",
+                name="Bash",
+                content="file.py",
             ),
         ),
     ]
@@ -176,6 +189,7 @@ async def test_auto_send_posts_full_tool_messages():
 # Test 3: tracing — spans are derived and handed to the tracer
 # ---------------------------------------------------------------------------
 
+
 class _RecordTracing:
     def __init__(self):
         self.started, self.ended = [], []
@@ -196,25 +210,31 @@ async def test_auto_send_derives_tool_spans_via_tracer():
 
     events = [
         StreamTaskMessageStart(
-            type="start", index=0,
+            type="start",
+            index=0,
             content=ToolRequestContent(
-                type="tool_request", author="agent",
-                tool_call_id="c1", name="Bash", arguments={},
+                type="tool_request",
+                author="agent",
+                tool_call_id="c1",
+                name="Bash",
+                arguments={},
             ),
         ),
         StreamTaskMessageDone(type="done", index=0),
         StreamTaskMessageFull(
-            type="full", index=1,
+            type="full",
+            index=1,
             content=ToolResponseContent(
-                type="tool_response", author="agent",
-                tool_call_id="c1", name="Bash", content="ok",
+                type="tool_response",
+                author="agent",
+                tool_call_id="c1",
+                name="Bash",
+                content="ok",
             ),
         ),
     ]
 
-    result = await auto_send(
-        _gen(events), task_id="task1", tracer=tracer, streaming=streaming
-    )
+    result = await auto_send(_gen(events), task_id="task1", tracer=tracer, streaming=streaming)
 
     assert result.final_text == ""
     assert fake_tracing.started == ["Bash"]
@@ -225,24 +245,31 @@ async def test_auto_send_derives_tool_spans_via_tracer():
 # Test 4: text followed by a tool Full — text context is closed before Full
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_auto_send_closes_text_context_before_full_message():
     streaming = _FakeStreaming()
     events = [
         StreamTaskMessageStart(
-            type="start", index=0,
+            type="start",
+            index=0,
             content=TextContent(type="text", author="agent", content=""),
         ),
         StreamTaskMessageDelta(
-            type="delta", index=0,
+            type="delta",
+            index=0,
             delta=TextDelta(type="text", text_delta="Hi"),
         ),
         StreamTaskMessageDone(type="done", index=0),
         StreamTaskMessageFull(
-            type="full", index=1,
+            type="full",
+            index=1,
             content=ToolRequestContent(
-                type="tool_request", author="agent",
-                tool_call_id="c2", name="read_file", arguments={},
+                type="tool_request",
+                author="agent",
+                tool_call_id="c2",
+                name="read_file",
+                arguments={},
             ),
         ),
     ]
@@ -261,21 +288,21 @@ async def test_auto_send_closes_text_context_before_full_message():
 # Test 5: midstream error — propagates AND the open context is closed (finally)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_open_context_closed_on_midstream_error():
     streaming = _FakeStreaming()
 
     async def _exploding_gen():
         yield StreamTaskMessageStart(
-            type="start", index=0,
+            type="start",
+            index=0,
             content=TextContent(type="text", author="agent", content=""),
         )
         raise RuntimeError("boom")
 
     with pytest.raises(RuntimeError, match="boom"):
-        await auto_send(
-            _exploding_gen(), task_id="task1", tracer=None, streaming=streaming
-        )
+        await auto_send(_exploding_gen(), task_id="task1", tracer=None, streaming=streaming)
 
     # The text context that was opened mid-stream was closed by the finally block.
     assert ("open", "text") in [(s[0], s[1]) for s in streaming.sink]

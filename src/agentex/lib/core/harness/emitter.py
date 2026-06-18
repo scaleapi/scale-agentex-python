@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import AsyncGenerator
 
-from agentex.lib.core.harness.auto_send import auto_send
+from agentex.lib.core.harness.types import TurnResult, HarnessTurn, StreamTaskMessage
 from agentex.lib.core.harness.tracer import SpanTracer
-from agentex.lib.core.harness.types import HarnessTurn, StreamTaskMessage, TurnResult
+from agentex.lib.core.harness.auto_send import auto_send
 from agentex.lib.core.harness.yield_delivery import yield_events
 
 

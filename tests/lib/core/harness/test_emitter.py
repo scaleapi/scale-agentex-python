@@ -1,15 +1,15 @@
 import pytest
 
-from agentex.lib.core.harness.emitter import UnifiedEmitter
-from agentex.lib.core.harness.types import TurnUsage
 from agentex.types.task_message import TaskMessage
+from agentex.types.text_content import TextContent
+from agentex.lib.core.harness.types import TurnUsage
+from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
     StreamTaskMessageDone,
+    StreamTaskMessageDelta,
     StreamTaskMessageStart,
 )
-from agentex.types.text_content import TextContent
 
 
 class _FakeTracing:
@@ -48,9 +48,7 @@ class _FakeStreaming:
     def __init__(self):
         self.sink = []
 
-    def streaming_task_message_context(
-        self, task_id, initial_content, streaming_mode="coalesced", created_at=None
-    ):
+    def streaming_task_message_context(self, task_id, initial_content, streaming_mode="coalesced", created_at=None):
         ctype = getattr(initial_content, "type", None)
         self.sink.append(("ctx", ctype))
         return _FakeCtx(self.sink, ctype, initial_content)
@@ -73,8 +71,7 @@ class _Turn:
 @pytest.mark.asyncio
 async def test_emitter_yield_mode_passes_through():
     events = [
-        StreamTaskMessageStart(type="start", index=0,
-            content=TextContent(type="text", author="agent", content="hi")),
+        StreamTaskMessageStart(type="start", index=0, content=TextContent(type="text", author="agent", content="hi")),
         StreamTaskMessageDone(type="done", index=0),
     ]
     turn = _Turn(events, TurnUsage(model="m"))
@@ -87,8 +84,7 @@ async def test_emitter_yield_mode_passes_through():
 async def test_emitter_tracing_default_on_when_trace_id_present():
     # Inject a fake tracing backend so the test env doesn't need temporalio.
     # This exercises the default-on path (tracer=None) when trace_id is truthy.
-    emitter = UnifiedEmitter(task_id="t", trace_id="trace1", parent_span_id="p",
-                             tracing=_FakeTracing())
+    emitter = UnifiedEmitter(task_id="t", trace_id="trace1", parent_span_id="p", tracing=_FakeTracing())
     assert emitter.tracer is not None
 
 
@@ -102,10 +98,8 @@ async def test_emitter_tracing_overridable_off():
 async def test_emitter_auto_send_turn_returns_usage():
     usage = TurnUsage(model="m", input_tokens=5)
     events = [
-        StreamTaskMessageStart(type="start", index=0,
-            content=TextContent(type="text", author="agent", content="")),
-        StreamTaskMessageDelta(type="delta", index=0,
-            delta=TextDelta(type="text", text_delta="Hello")),
+        StreamTaskMessageStart(type="start", index=0, content=TextContent(type="text", author="agent", content="")),
+        StreamTaskMessageDelta(type="delta", index=0, delta=TextDelta(type="text", text_delta="Hello")),
         StreamTaskMessageDone(type="done", index=0),
     ]
     turn = _Turn(events, usage)
