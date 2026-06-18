@@ -118,3 +118,24 @@ def test_unclosed_tool_closed_incomplete_on_flush():
     sigs = _signals(d, events)
     assert sigs[0] == OpenSpan(key="x", kind="tool", name="Bash", input={})
     assert sigs[1] == CloseSpan(key="x", output=None, is_complete=False)
+
+
+def test_none_index_is_skipped():
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageStart(type="start", index=None,
+            content=ToolRequestContent(type="tool_request", author="agent",
+                                       tool_call_id="n", name="Bash", arguments={})),
+        StreamTaskMessageDone(type="done", index=None),
+    ]
+    assert _signals(d, events) == []
+
+
+def test_orphan_tool_response_ignored():
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageFull(type="full", index=0,
+            content=ToolResponseContent(type="tool_response", author="agent",
+                                        tool_call_id="z", name="Bash", content="r")),
+    ]
+    assert _signals(d, events) == []
