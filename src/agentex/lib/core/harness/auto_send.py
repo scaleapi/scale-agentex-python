@@ -58,9 +58,9 @@ async def auto_send(
 
     try:
         async for event in events:
-            if deriver is not None:
+            if deriver is not None and tracer is not None:
                 for signal in deriver.observe(event):
-                    await tracer.handle(signal)  # type: ignore[union-attr]
+                    await tracer.handle(signal)
 
             if isinstance(event, StreamTaskMessageStart):
                 ctype = getattr(event.content, "type", None)
@@ -107,8 +107,8 @@ async def auto_send(
 
     finally:
         await _close_current()
-        if deriver is not None:
+        if deriver is not None and tracer is not None:
             for signal in deriver.flush():
-                await tracer.handle(signal)  # type: ignore[union-attr]
+                await tracer.handle(signal)
 
     return TurnResult(final_text="".join(final_text_parts), usage=usage or TurnUsage())
