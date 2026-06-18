@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import AsyncGenerator, AsyncIterator
+from typing import AsyncIterator, AsyncGenerator
 
-from agentex.lib.core.harness.span_derivation import SpanDeriver
-from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.types import StreamTaskMessage
+from agentex.lib.core.harness.tracer import SpanTracer
+from agentex.lib.core.harness.span_derivation import SpanDeriver
 
 
 async def yield_events(

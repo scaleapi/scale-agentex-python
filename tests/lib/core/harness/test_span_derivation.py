@@ -1,16 +1,16 @@
-from agentex.lib.core.harness.span_derivation import SpanDeriver
-from agentex.lib.core.harness.types import OpenSpan, CloseSpan
-from agentex.types.task_message_update import (
-    StreamTaskMessageStart,
-    StreamTaskMessageDelta,
-    StreamTaskMessageFull,
-    StreamTaskMessageDone,
-)
 from agentex.types.text_content import TextContent
+from agentex.lib.core.harness.types import OpenSpan, CloseSpan
 from agentex.types.reasoning_content import ReasoningContent
+from agentex.types.tool_request_delta import ToolRequestDelta
+from agentex.types.task_message_update import (
+    StreamTaskMessageDone,
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+    StreamTaskMessageStart,
+)
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
-from agentex.types.tool_request_delta import ToolRequestDelta
+from agentex.lib.core.harness.span_derivation import SpanDeriver
 
 
 def _signals(deriver, events):
@@ -23,19 +23,17 @@ def _signals(deriver, events):
 
 def _tool_req(idx, tcid, name, args):
     return StreamTaskMessageStart(
-        type="start", index=idx,
-        content=ToolRequestContent(type="tool_request", author="agent",
-                                   tool_call_id=tcid, name=name, arguments=args),
+        type="start",
+        index=idx,
+        content=ToolRequestContent(type="tool_request", author="agent", tool_call_id=tcid, name=name, arguments=args),
     )
 
 
 def test_text_only_yields_no_spans():
     d = SpanDeriver()
     events = [
-        StreamTaskMessageStart(type="start", index=0,
-            content=TextContent(type="text", author="agent", content="")),
-        StreamTaskMessageDelta(type="delta", index=0,
-            delta=None),
+        StreamTaskMessageStart(type="start", index=0, content=TextContent(type="text", author="agent", content="")),
+        StreamTaskMessageDelta(type="delta", index=0, delta=None),
         StreamTaskMessageDone(type="done", index=0),
     ]
     assert _signals(d, events) == []
@@ -46,9 +44,13 @@ def test_single_tool_opens_on_done_closes_on_response():
     events = [
         _tool_req(0, "call_1", "Bash", {"cmd": "ls"}),
         StreamTaskMessageDone(type="done", index=0),
-        StreamTaskMessageFull(type="full", index=1,
-            content=ToolResponseContent(type="tool_response", author="agent",
-                                        tool_call_id="call_1", name="Bash", content="files")),
+        StreamTaskMessageFull(
+            type="full",
+            index=1,
+            content=ToolResponseContent(
+                type="tool_response", author="agent", tool_call_id="call_1", name="Bash", content="files"
+            ),
+        ),
     ]
     sigs = _signals(d, events)
     assert sigs == [
@@ -60,8 +62,9 @@ def test_single_tool_opens_on_done_closes_on_response():
 def test_reasoning_opens_on_start_closes_on_done():
     d = SpanDeriver()
     events = [
-        StreamTaskMessageStart(type="start", index=0,
-            content=ReasoningContent(type="reasoning", author="agent", summary=[], content=[])),
+        StreamTaskMessageStart(
+            type="start", index=0, content=ReasoningContent(type="reasoning", author="agent", summary=[], content=[])
+        ),
         StreamTaskMessageDone(type="done", index=0),
     ]
     sigs = _signals(d, events)
@@ -76,12 +79,20 @@ def test_parallel_tools_pair_by_tool_call_id():
         _tool_req(1, "b", "T2", {}),
         StreamTaskMessageDone(type="done", index=0),
         StreamTaskMessageDone(type="done", index=1),
-        StreamTaskMessageFull(type="full", index=2,
-            content=ToolResponseContent(type="tool_response", author="agent",
-                                        tool_call_id="b", name="T2", content="rb")),
-        StreamTaskMessageFull(type="full", index=3,
-            content=ToolResponseContent(type="tool_response", author="agent",
-                                        tool_call_id="a", name="T1", content="ra")),
+        StreamTaskMessageFull(
+            type="full",
+            index=2,
+            content=ToolResponseContent(
+                type="tool_response", author="agent", tool_call_id="b", name="T2", content="rb"
+            ),
+        ),
+        StreamTaskMessageFull(
+            type="full",
+            index=3,
+            content=ToolResponseContent(
+                type="tool_response", author="agent", tool_call_id="a", name="T1", content="ra"
+            ),
+        ),
     ]
     sigs = _signals(d, events)
     opens = [s for s in sigs if isinstance(s, OpenSpan)]
@@ -94,15 +105,23 @@ def test_parallel_tools_pair_by_tool_call_id():
 def test_streamed_args_accumulate_into_open_input():
     d = SpanDeriver()
     events = [
-        StreamTaskMessageStart(type="start", index=0,
-            content=ToolRequestContent(type="tool_request", author="agent",
-                                       tool_call_id="c", name="Bash", arguments={})),
-        StreamTaskMessageDelta(type="delta", index=0,
-            delta=ToolRequestDelta(type="tool_request", tool_call_id="c", name="Bash",
-                                   arguments_delta='{"cmd":')),
-        StreamTaskMessageDelta(type="delta", index=0,
-            delta=ToolRequestDelta(type="tool_request", tool_call_id="c", name="Bash",
-                                   arguments_delta='"ls"}')),
+        StreamTaskMessageStart(
+            type="start",
+            index=0,
+            content=ToolRequestContent(
+                type="tool_request", author="agent", tool_call_id="c", name="Bash", arguments={}
+            ),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=ToolRequestDelta(type="tool_request", tool_call_id="c", name="Bash", arguments_delta='{"cmd":'),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=ToolRequestDelta(type="tool_request", tool_call_id="c", name="Bash", arguments_delta='"ls"}'),
+        ),
         StreamTaskMessageDone(type="done", index=0),
     ]
     sigs = _signals(d, events)
@@ -123,9 +142,13 @@ def test_unclosed_tool_closed_incomplete_on_flush():
 def test_none_index_is_skipped():
     d = SpanDeriver()
     events = [
-        StreamTaskMessageStart(type="start", index=None,
-            content=ToolRequestContent(type="tool_request", author="agent",
-                                       tool_call_id="n", name="Bash", arguments={})),
+        StreamTaskMessageStart(
+            type="start",
+            index=None,
+            content=ToolRequestContent(
+                type="tool_request", author="agent", tool_call_id="n", name="Bash", arguments={}
+            ),
+        ),
         StreamTaskMessageDone(type="done", index=None),
     ]
     assert _signals(d, events) == []
@@ -134,8 +157,12 @@ def test_none_index_is_skipped():
 def test_orphan_tool_response_ignored():
     d = SpanDeriver()
     events = [
-        StreamTaskMessageFull(type="full", index=0,
-            content=ToolResponseContent(type="tool_response", author="agent",
-                                        tool_call_id="z", name="Bash", content="r")),
+        StreamTaskMessageFull(
+            type="full",
+            index=0,
+            content=ToolResponseContent(
+                type="tool_response", author="agent", tool_call_id="z", name="Bash", content="r"
+            ),
+        ),
     ]
     assert _signals(d, events) == []

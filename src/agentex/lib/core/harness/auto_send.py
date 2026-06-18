@@ -4,17 +4,16 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator
 
+from agentex.types.text_delta import TextDelta
+from agentex.lib.core.harness.types import TurnUsage, TurnResult, StreamTaskMessage
+from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
     StreamTaskMessageDone,
     StreamTaskMessageFull,
+    StreamTaskMessageDelta,
     StreamTaskMessageStart,
 )
-from agentex.types.text_delta import TextDelta
-
 from agentex.lib.core.harness.span_derivation import SpanDeriver
-from agentex.lib.core.harness.tracer import SpanTracer
-from agentex.lib.core.harness.types import StreamTaskMessage, TurnResult, TurnUsage
 
 
 async def auto_send(

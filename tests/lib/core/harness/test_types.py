@@ -3,10 +3,10 @@ from typing import AsyncIterator
 from agentex.lib.core.harness.types import (
     OpenSpan,
     CloseSpan,
-    HarnessTurn,
-    StreamTaskMessage,
     TurnUsage,
     TurnResult,
+    HarnessTurn,
+    StreamTaskMessage,
 )
 
 

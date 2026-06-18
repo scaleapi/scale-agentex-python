@@ -5,17 +5,17 @@ package derives spans from it and delivers it (yield or auto-send), so every
 harness tap gets streaming + tracing + turn usage uniformly.
 """
 
-from agentex.lib.core.harness.emitter import UnifiedEmitter
-from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.types import (
-    CloseSpan,
-    HarnessTurn,
     OpenSpan,
-    SpanSignal,
-    StreamTaskMessage,
-    TurnResult,
+    CloseSpan,
     TurnUsage,
+    SpanSignal,
+    TurnResult,
+    HarnessTurn,
+    StreamTaskMessage,
 )
+from agentex.lib.core.harness.tracer import SpanTracer
+from agentex.lib.core.harness.emitter import UnifiedEmitter
 
 __all__ = [
     "UnifiedEmitter",

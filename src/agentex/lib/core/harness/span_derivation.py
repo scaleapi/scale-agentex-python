@@ -9,17 +9,16 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from agentex.lib.core.harness.types import OpenSpan, CloseSpan, SpanSignal, StreamTaskMessage
+from agentex.types.tool_request_delta import ToolRequestDelta
 from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
     StreamTaskMessageDone,
     StreamTaskMessageFull,
+    StreamTaskMessageDelta,
     StreamTaskMessageStart,
 )
 from agentex.types.tool_request_content import ToolRequestContent
-from agentex.types.tool_request_delta import ToolRequestDelta
 from agentex.types.tool_response_content import ToolResponseContent
-
-from agentex.lib.core.harness.types import CloseSpan, OpenSpan, SpanSignal, StreamTaskMessage
 
 
 @dataclass
