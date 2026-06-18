@@ -3,10 +3,28 @@
 Converts LangGraph graph.astream() events into Agentex TaskMessageUpdate
 events that are yielded back over the HTTP response. For use with sync ACP
 agents that stream via HTTP yields rather than Redis.
+
+Unified sync path
+-----------------
+Prefer using ``LangGraphTurn`` with ``UnifiedEmitter.yield_turn`` for new
+agents, which adds usage capture and optional tracing via the shared harness
+surface::
+
+    from agentex.lib.core.harness.emitter import UnifiedEmitter
+    from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
+
+    turn = LangGraphTurn(stream)
+    emitter = UnifiedEmitter(task_id=task_id, trace_id=trace_id, parent_span_id=span_id)
+    async for event in emitter.yield_turn(turn):
+        yield event
+
+``convert_langgraph_to_agentex_events`` remains available as a lower-level
+primitive (e.g. for callers that need the raw event stream without the
+harness envelope).
 """
 
 
-async def convert_langgraph_to_agentex_events(stream):
+async def convert_langgraph_to_agentex_events(stream, on_final_ai_message=None):
     """Convert LangGraph streaming events to Agentex TaskMessageUpdate events.
 
     Expects the stream from graph.astream() called with
@@ -22,8 +40,17 @@ async def convert_langgraph_to_agentex_events(stream):
     Supports both regular models (chunk.content is a str) and reasoning models
     like gpt-5/o1/o3 (chunk.content is a list of typed content blocks).
 
+    AGX1-377 note: LangGraph emits tool requests as ``StreamTaskMessageFull`` (from
+    "updates" events), NOT Start+Delta+Done like pydantic-ai. No coalesce_tool_requests
+    option is needed for LangGraph.
+
     Args:
         stream: Async iterator from graph.astream(..., stream_mode=["messages", "updates"])
+        on_final_ai_message: Optional callback ``(msg: AIMessage) -> None`` called for
+            each ``AIMessage`` in an "agent" node update. Use this to capture
+            ``usage_metadata`` for token accounting without re-traversing the stream.
+            The callback fires *after* all events for that message are yielded.
+            No-op when ``None`` (default).
 
     Yields:
         TaskMessageUpdate events (Start, Delta, Done, Full)
@@ -204,6 +231,13 @@ async def convert_langgraph_to_agentex_events(stream):
                                     ),
                                 )
                                 message_index += 1
+
+                        # Notify caller of the final AIMessage (e.g. for usage capture)
+                        if on_final_ai_message is not None:
+                            from langchain_core.messages import AIMessage as _AIMessage
+
+                            if isinstance(msg, _AIMessage):
+                                on_final_ai_message(msg)
 
                 elif node_name == "tools":
                     messages = state_update.get("messages", [])

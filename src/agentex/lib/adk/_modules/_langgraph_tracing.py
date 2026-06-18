@@ -1,9 +1,20 @@
-"""LangChain callback handler that creates Agentex spans for LLM calls and tool executions."""
+"""LangChain callback handler that creates Agentex spans for LLM calls and tool executions.
+
+.. deprecated::
+    ``AgentexLangGraphTracingHandler`` and ``create_langgraph_tracing_handler`` are
+    superseded by the unified harness surface (``LangGraphTurn`` +
+    ``UnifiedEmitter``), which derives spans automatically from the canonical
+    event stream without requiring a LangChain callback handler.
+
+    They remain importable and functional for backward compatibility, but new
+    agents should use the unified path instead.
+"""
 # ruff: noqa: ARG002
 # Callback methods must accept all arguments defined by LangChain's AsyncCallbackHandler interface.
 
 from __future__ import annotations
 
+import warnings
 from uuid import UUID
 from typing import Any, override
 
@@ -31,6 +42,11 @@ class AgentexLangGraphTracingHandler(AsyncCallbackHandler):
           ├── llm:<model>       (LLM call)
           ├── tool:<tool_name>  (tool execution)
           └── llm:<model>       (LLM call)
+
+    .. deprecated::
+        Use ``LangGraphTurn`` with ``UnifiedEmitter`` instead. The unified
+        harness derives equivalent spans from the canonical event stream,
+        removing the need for a LangChain callback handler entirely.
     """
 
     def __init__(
@@ -237,7 +253,28 @@ def create_langgraph_tracing_handler(
 
     Returns:
         An ``AgentexLangGraphTracingHandler`` instance ready to use as a LangChain callback.
+
+    .. deprecated::
+        Use ``LangGraphTurn`` with ``UnifiedEmitter`` instead. The unified harness
+        derives equivalent spans from the canonical event stream automatically, with
+        no LangChain callback required::
+
+            from agentex.lib.core.harness.emitter import UnifiedEmitter
+            from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
+
+            turn = LangGraphTurn(stream)
+            emitter = UnifiedEmitter(task_id=task_id, trace_id=trace_id, parent_span_id=span_id)
+            result = await emitter.auto_send_turn(turn)
+
+        This function remains available for backward compatibility.
     """
+    warnings.warn(
+        "create_langgraph_tracing_handler is deprecated. Use LangGraphTurn with "
+        "UnifiedEmitter instead — the unified harness derives equivalent spans from "
+        "the canonical event stream without a LangChain callback handler.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return AgentexLangGraphTracingHandler(
         trace_id=trace_id,
         parent_span_id=parent_span_id,
