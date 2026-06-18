@@ -265,6 +265,7 @@ class TestAsyncAutoSendContentVerification:
 
         tool_resps = [m for m in fake_streaming.messages_opened if isinstance(m, ToolResponseContent)]
         assert len(tool_resps) == 1, "Expected exactly one ToolResponseContent"
+        assert isinstance(tool_resps[0].content, str)
         assert "72F" in tool_resps[0].content
         assert tool_resps[0].name == "get_weather"
 

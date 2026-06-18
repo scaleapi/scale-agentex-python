@@ -276,6 +276,7 @@ class TestToolRequestCoalescing:
             e for e in turn_out if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ToolRequestDelta)
         ]
         assert len(deltas) == 1, "streamed tool-call args must surface as a ToolRequestDelta when coalesce is off"
+        assert isinstance(deltas[0].delta, ToolRequestDelta)
         assert deltas[0].delta.arguments_delta == '{"city":"Paris"}'
 
     async def test_coalesce_on_emits_single_full_with_accumulated_args_and_no_delta(self):

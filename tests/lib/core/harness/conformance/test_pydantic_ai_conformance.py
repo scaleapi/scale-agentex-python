@@ -39,13 +39,14 @@ from pydantic_ai.messages import (
     FunctionToolResultEvent,
 )
 
-from tests.lib.core.harness.conformance.runner import (
+from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
+
+from .runner import (
     Fixture,
     register,
     derive_all,
     run_cross_channel_conformance,
 )
-from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 
 # ---------------------------------------------------------------------------
 # Helpers

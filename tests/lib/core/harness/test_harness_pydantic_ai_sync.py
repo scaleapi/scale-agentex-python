@@ -31,12 +31,13 @@ test_harness_pydantic_ai_temporal.py for the other two channels.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 import pytest
 from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
+from agentex.types.text_delta import TextDelta
 from agentex.lib.core.harness.types import OpenSpan, CloseSpan
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
@@ -128,6 +129,7 @@ async def _run_yield_turn(
             tracing=fake_tracing,
         )
 
+    events: list[Any] = []
     async with agent.run_stream_events(user_msg) as stream:
         turn = PydanticAITurn(stream, model="test")
         emitter = UnifiedEmitter(
@@ -136,7 +138,8 @@ async def _run_yield_turn(
             parent_span_id=parent_span_id,
             tracer=tracer if tracer is not None else False,
         )
-        return [ev async for ev in emitter.yield_turn(turn)]
+        events = [ev async for ev in emitter.yield_turn(turn)]
+    return events
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +211,7 @@ class TestSyncYieldEventOrder:
         assert len(full_events) >= 1, "Expected at least one tool_response Full event"
         tool_response = full_events[0].content
         assert isinstance(tool_response, ToolResponseContent)
+        assert isinstance(tool_response.content, str)
         assert "72F" in tool_response.content
         assert tool_response.name == "get_weather"
 
@@ -221,7 +225,7 @@ class TestSyncYieldEventOrder:
         accumulated = "".join(
             ev.delta.text_delta
             for ev in events
-            if isinstance(ev, StreamTaskMessageDelta) and hasattr(ev.delta, "text_delta") and ev.delta.text_delta
+            if isinstance(ev, StreamTaskMessageDelta) and isinstance(ev.delta, TextDelta) and ev.delta.text_delta
         )
         assert accumulated == "The weather in Paris is sunny and 72F."
 
@@ -336,6 +340,7 @@ class TestSyncYieldSpanDerivation:
         received_signals: list[Any] = []
 
         class _RecordingTracer(RealTracer):
+            @override
             async def handle(self, signal: Any) -> None:
                 received_signals.append(signal)
                 await super().handle(signal)

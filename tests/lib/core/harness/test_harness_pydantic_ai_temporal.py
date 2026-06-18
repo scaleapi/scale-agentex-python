@@ -257,6 +257,7 @@ class TestTemporalEventStreamHandlerContent:
 
         tool_resps = [m for m in fake_streaming.messages_opened if isinstance(m, ToolResponseContent)]
         assert len(tool_resps) == 1
+        assert isinstance(tool_resps[0].content, str)
         assert "72F" in tool_resps[0].content
         assert tool_resps[0].name == "get_weather"
 
@@ -328,6 +329,7 @@ class TestTemporalAgentStreamEventsOffline:
 
         tool_results = [ev for ev in events if isinstance(ev, FunctionToolResultEvent)]
         assert len(tool_results) >= 1
+        assert isinstance(tool_results[0].part.content, str)
         assert "72F" in tool_results[0].part.content
 
 
