@@ -185,11 +185,11 @@ async def _fake_stream_pydantic_ai_events(
     """Like stream_pydantic_ai_events but uses an injected fake streaming backend.
 
     Mirrors the exact chain that stream_pydantic_ai_events uses internally:
-      PydanticAITurn(stream, coalesce_tool_requests=True)
+      PydanticAITurn(stream)
       + UnifiedEmitter.auto_send_turn(turn)
     but with the fake backend injected so no Redis is needed.
     """
-    turn = PydanticAITurn(stream, model=None, coalesce_tool_requests=True)
+    turn = PydanticAITurn(stream, model=None)
     emitter = UnifiedEmitter(
         task_id=task_id,
         trace_id=None,

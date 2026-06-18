@@ -51,16 +51,10 @@ async def stream_pydantic_ai_events(
     from agentex.lib.core.harness.emitter import UnifiedEmitter
     from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 
-    # coalesce_tool_requests=True is a temporary workaround (AGX1-377): the
-    # foundation auto_send currently DROPS tool requests delivered as the
-    # streamed Start+ToolRequestDelta+Done shape, so we collapse them into a
-    # single Full here. Once auto_send handles the streamed tool-request shape
-    # natively, this flag should be removed and the default (off) used.
     turn = PydanticAITurn(
         stream,
         model=None,
         tracing_handler=tracing_handler,
-        coalesce_tool_requests=True,
     )
     emitter = UnifiedEmitter(
         task_id=task_id,

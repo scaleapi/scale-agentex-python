@@ -10,12 +10,9 @@ Same single-tool agent as the sync test: ``get_weather(city: str) -> str``
 returning "sunny and 72F". TestModel is configured to call the tool once then
 produce a fixed text reply.
 
-For the async path, ``coalesce_tool_requests=True`` is used (current workaround
-for AGX1-377): tool-request Start+Delta+Done sequences are collapsed into a
-single Full(ToolRequestContent) before being passed to auto_send, which in turn
-opens a streaming context with the full tool_request content and closes it
-immediately. This matches the shape the Agentex streaming backend expects for
-atomic messages.
+The async path uses the bare PydanticAITurn (no coalescing): the foundation
+auto_send delivers streamed tool-request Start+ToolRequestDelta+Done messages
+natively (AGX1-377 fix), so no coalescing wrapper is needed.
 
 What is tested
 --------------
@@ -23,9 +20,8 @@ What is tested
   backend: tool_request + tool_response + text (in that order).
 - final_text equals the TestModel custom output.
 - With a SpanTracer, tool spans are derived and forwarded to the fake tracing
-  backend (note: spans are NOT derived when coalesce_tool_requests=True because
-  the tool-request Full event does not trigger an OpenSpan; use the sync path
-  for span-derivation coverage with tool calls).
+  backend (streamed tool-request delivery now triggers span derivation on the
+  async path).
 
 What is NOT covered without live infrastructure
 -----------------------------------------------
@@ -185,7 +181,6 @@ async def _run_auto_send_turn(
         turn = PydanticAITurn(
             stream,
             model="test",
-            coalesce_tool_requests=True,
         )
         emitter = UnifiedEmitter(
             task_id="task1",
@@ -306,20 +301,18 @@ class TestAsyncAutoSendFinalText:
         assert len(opens) == len(closes) == 3, "Each of the 3 messages must have exactly one open and one close"
 
 
-class TestAsyncAutoSendSpanNote:
-    """Note: span derivation behaves differently on the async path.
+class TestAsyncAutoSendSpanDerivation:
+    """Span derivation on the async path now works for streamed tool requests.
 
-    coalesce_tool_requests=True replaces the tool-request Start+Done sequence with
-    a single Full(ToolRequestContent). The SpanDeriver opens a tool span only on
-    Done(tool_request), so with coalescing ON the tool span is never opened and
-    no spans are derived. Use the sync path (coalesce=False) for span-derivation
-    coverage.
-
-    These tests document this expected behaviour and ensure no accidental spans.
+    The foundation auto_send delivers Start+ToolRequestDelta+Done natively
+    (AGX1-377 fix). The SpanDeriver opens a tool span on Done(tool_request),
+    so the async path now derives spans just like the sync path.
     """
 
-    async def test_no_tool_spans_when_coalescing(self) -> None:
-        """When coalesce_tool_requests=True, no tool spans are derived."""
+    async def test_tool_span_derived_on_async_path(self) -> None:
+        """With the bare PydanticAITurn (no coalescing), a tool span is derived
+        on the async/auto_send path when auto_send delivers the streamed
+        Start+ToolRequestDelta+Done sequence."""
         agent = _make_agent()
         fake_tracing = _FakeTracing()
         tracer = SpanTracer(
@@ -331,7 +324,7 @@ class TestAsyncAutoSendSpanNote:
         fake_streaming = _FakeStreaming()
 
         async with agent.run_stream_events("What is the weather in Paris?") as stream:
-            turn = PydanticAITurn(stream, model="test", coalesce_tool_requests=True)
+            turn = PydanticAITurn(stream, model="test")
             emitter = UnifiedEmitter(
                 task_id="task1",
                 trace_id="trace1",
@@ -341,11 +334,11 @@ class TestAsyncAutoSendSpanNote:
             )
             await emitter.auto_send_turn(turn)
 
-        assert fake_tracing.started == [], (
-            "No tool span should be opened when coalescing tool_requests. "
-            "Span derivation for the async path requires AGX1-377 to land."
+        assert len(fake_tracing.started) == 1, (
+            "Expected one tool span to be started for the get_weather call."
         )
-        assert fake_tracing.ended == []
+        assert fake_tracing.started[0][0] == "get_weather"
+        assert len(fake_tracing.ended) == 1
 
 
 @pytest.mark.parametrize(

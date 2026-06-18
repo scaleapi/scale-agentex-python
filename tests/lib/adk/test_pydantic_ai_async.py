@@ -82,7 +82,9 @@ class FakeStreamingModule:
     def __init__(self) -> None:
         self.contexts: list[FakeContext] = []
 
-    def streaming_task_message_context(self, *, task_id: str, initial_content: Any) -> FakeContext:
+    def streaming_task_message_context(
+        self, *, task_id: str, initial_content: Any, streaming_mode: str = "coalesced", created_at: Any = None
+    ) -> FakeContext:
         tm = TaskMessage(
             id=f"m{len(self.contexts) + 1}",
             task_id=task_id,
@@ -255,25 +257,24 @@ class TestThinkingStreaming:
 
 
 class TestToolCallEmission:
-    async def test_tool_call_emits_full_tool_request_message_on_part_end(
+    async def test_tool_call_opens_streaming_context_with_identity(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        """Tool requests are posted as full messages (open+close on streaming context).
+        """Tool requests are delivered as a streaming context (Start+Delta+Done).
 
-        AGX1-373 envelope change: tool messages now arrive via
-        streaming_task_message_context (open+close pair) instead of
-        adk.messages.create. The logical content (tool_call_id, name,
-        arguments, author) is identical; only the delivery channel changed.
+        AGX1-377 fix: auto_send now delivers streamed tool-request messages
+        natively (Start+ToolRequestDelta+Done). The streaming context is opened
+        at the Start event with the initial ToolRequestContent (tool_call_id +
+        name + empty arguments), argument tokens are streamed as deltas, and the
+        context is closed on Done.
 
         This test uses a realistic pydantic-ai event sequence: args arrive as a
         PartDeltaEvent fragment (the way OpenAI/Anthropic actually stream JSON
-        tool-call arguments). The new implementation accumulates them correctly.
-
-        Parts-manager invariant: PartEnd.part is the accumulated snapshot; real
-        pydantic-ai conveys args via PartStart + PartDeltaEvent, so a
-        PartStart(None)+PartEnd(json) with no delta is not realizable.
+        tool-call arguments).
         """
         from pydantic_ai.messages import ToolCallPartDelta
+
+        from agentex.types.tool_request_delta import ToolRequestDelta
 
         streaming, messages = fake_adk
         events = [
@@ -293,23 +294,27 @@ class TestToolCallEmission:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        # AGX1-373: tool messages arrive via streaming_task_message_context,
-        # NOT via adk.messages.create.
-        assert messages.created == [], "adk.messages.create must not be called after reimplementation"
-        assert len(streaming.contexts) == 1, "tool_request opens a streaming context (open+close)"
+        # AGX1-373: tool messages arrive via streaming_task_message_context.
+        assert messages.created == [], "adk.messages.create must not be called"
+        assert len(streaming.contexts) == 1, "tool_request opens a streaming context"
         ctx = streaming.contexts[0]
         assert ctx.closed is True
         content = ctx.initial_content
         assert isinstance(content, ToolRequestContent)
         assert content.tool_call_id == "c1"
         assert content.name == "get_weather"
-        assert content.arguments == {"city": "Paris"}
         assert content.author == "agent"
-        assert ctx.updates == [], "open+close only — no deltas for tool messages"
+        # AGX1-377 streamed shape: initial_content has empty args (args come via delta)
+        assert content.arguments == {}
+        # The arg delta is delivered as a stream_update
+        assert len(ctx.updates) == 1
+        assert isinstance(ctx.updates[0].delta, ToolRequestDelta)
+        assert ctx.updates[0].delta.arguments_delta == '{"city":"Paris"}'
 
     async def test_tool_call_with_dict_args_passes_through(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
+        """When args arrive pre-populated as a dict in PartStart, they're in initial_content."""
         streaming, messages = fake_adk
         events = [
             PartStartEvent(
@@ -326,24 +331,25 @@ class TestToolCallEmission:
         # AGX1-373: tool messages via streaming_task_message_context
         assert messages.created == []
         assert len(streaming.contexts) == 1
+        # Dict args present at PartStart land directly in initial_content.arguments
         assert streaming.contexts[0].initial_content.arguments == {"q": "weather"}
+        assert streaming.contexts[0].updates == [], "no delta for pre-populated dict args"
 
     async def test_tool_call_with_invalid_json_args_surfaces_raw(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        """Don't drop the tool call when the model emits malformed JSON args.
+        """Malformed JSON arg delta is surfaced as a ToolRequestDelta with the raw string.
 
-        The arguments field is preserved under ``_raw`` so the failure is
-        visible to the UI rather than silently truncated.
-
-        Uses a PartDeltaEvent to deliver the invalid string (the way pydantic-ai
-        actually surfaces arg tokens) so the coalescer picks it up.
+        The argument delta is delivered as-is by auto_send; the client-side
+        accumulator or the streaming backend handles malformed JSON gracefully.
 
         Parts-manager invariant: PartEnd.part is the accumulated snapshot; real
         pydantic-ai conveys args via PartStart + PartDeltaEvent, so a
         PartStart(None)+PartEnd(json) with no delta is not realizable.
         """
         from pydantic_ai.messages import ToolCallPartDelta
+
+        from agentex.types.tool_request_delta import ToolRequestDelta
 
         streaming, messages = fake_adk
         events = [
@@ -366,7 +372,13 @@ class TestToolCallEmission:
         # AGX1-373: tool messages via streaming_task_message_context
         assert messages.created == []
         assert len(streaming.contexts) == 1
-        assert streaming.contexts[0].initial_content.arguments == {"_raw": "not-json{"}
+        ctx = streaming.contexts[0]
+        # Initial content has empty args (args come via delta)
+        assert ctx.initial_content.arguments == {}
+        # The malformed JSON is surfaced verbatim in the ToolRequestDelta
+        assert len(ctx.updates) == 1
+        assert isinstance(ctx.updates[0].delta, ToolRequestDelta)
+        assert ctx.updates[0].delta.arguments_delta == "not-json{"
 
     async def test_tool_call_with_none_args_defaults_to_empty_dict(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
@@ -388,6 +400,7 @@ class TestToolCallEmission:
         assert messages.created == []
         assert len(streaming.contexts) == 1
         assert streaming.contexts[0].initial_content.arguments == {}
+        assert streaming.contexts[0].updates == [], "no delta when args are absent"
 
 
 class TestToolResult:
