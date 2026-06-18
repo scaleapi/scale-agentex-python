@@ -49,6 +49,10 @@ def pydantic_ai_usage_to_turn_usage(usage: Any, model: str | None) -> TurnUsage:
         output_tokens      -> output_tokens
         cache_read_tokens  -> cached_input_tokens
         total_tokens       -> total_tokens
+
+    getattr results pass straight through: a MISSING attribute degrades to
+    None (defensive), while a real 0 stays 0 (a cache-hit with 0 output
+    tokens is a genuine zero, not "unknown") and a real N stays N.
     """
     raw_input = getattr(usage, "input_tokens", None)
     raw_output = getattr(usage, "output_tokens", None)
@@ -58,10 +62,10 @@ def pydantic_ai_usage_to_turn_usage(usage: Any, model: str | None) -> TurnUsage:
 
     return TurnUsage(
         model=model,
-        input_tokens=raw_input if raw_input else None,
-        output_tokens=raw_output if raw_output else None,
-        cached_input_tokens=raw_cache_read if raw_cache_read else None,
-        total_tokens=raw_total if raw_total else None,
+        input_tokens=raw_input,
+        output_tokens=raw_output,
+        cached_input_tokens=raw_cache_read,
+        total_tokens=raw_total,
         num_llm_calls=raw_requests if raw_requests is not None else 0,
     )
 

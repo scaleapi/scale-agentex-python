@@ -70,13 +70,39 @@ class TestUsageNormalization:
         turn_usage = pydantic_ai_usage_to_turn_usage(usage, model=None)
         assert turn_usage.model is None
 
-    def test_empty_usage_produces_zero_counts(self):
-        """An empty RunUsage maps to 0 counts and None tokens."""
+    def test_all_zero_usage_preserves_real_zeros(self):
+        """An all-zero RunUsage maps real 0s through (not None).
+
+        RunUsage token fields are ints defaulting to 0. A 0 is a genuine
+        value (e.g. a cache-hit with 0 output tokens), not "unknown", so it
+        must survive normalization as 0 rather than being coerced to None.
+        """
         usage = RunUsage()
         turn_usage = pydantic_ai_usage_to_turn_usage(usage, model="openai:gpt-4o")
         assert turn_usage.num_llm_calls == 0
-        assert turn_usage.input_tokens is None
+        assert turn_usage.input_tokens == 0
+        assert turn_usage.output_tokens == 0
+        assert turn_usage.cached_input_tokens == 0
+        assert turn_usage.total_tokens == 0
+
+    def test_missing_field_degrades_to_none(self):
+        """A usage object MISSING a field maps that field to None (defensive getattr).
+
+        Guards the version-rename guarantee: if pydantic-ai renames a field,
+        the absent attribute degrades to None rather than raising.
+        """
+
+        class StubUsage:
+            requests = 2
+            input_tokens = 100
+            # no output_tokens / cache_read_tokens / total_tokens attributes
+
+        turn_usage = pydantic_ai_usage_to_turn_usage(StubUsage(), model="openai:gpt-4o")
+        assert turn_usage.num_llm_calls == 2
+        assert turn_usage.input_tokens == 100
         assert turn_usage.output_tokens is None
+        assert turn_usage.cached_input_tokens is None
+        assert turn_usage.total_tokens is None
 
 
 class TestPydanticAITurn:
@@ -148,6 +174,46 @@ class TestPydanticAITurn:
         for a, b in zip(turn_out, bare_out):
             assert type(a) is type(b)
             assert a.model_dump() == b.model_dump()
+
+    async def test_usage_captured_via_real_usage_accessor(self):
+        """Drive the turn through the REAL ``result.usage`` property accessor.
+
+        The production code reads ``getattr(run_result, "usage", None)``, which
+        on this pydantic-ai version resolves the ``_DeprecatedCallableRunUsage``
+        property (NOT ``_state.usage`` directly). This asserts that the real
+        accessor path the converter uses captures the run usage. Constructing
+        the event without our test's ``_state`` shortcut: we set ``_state.usage``
+        only because that is the sole supported way to seed an
+        ``AgentRunResult``, but we then assert capture happens through the
+        public ``.usage`` attribute access (verified below).
+        """
+        known_usage = RunUsage(requests=4, input_tokens=512, output_tokens=64)
+        result = AgentRunResult(output="done", _output_tool_name=None)
+        result._state.usage = known_usage
+        result_event = AgentRunResultEvent(result=result)
+
+        # Sanity: the value is reachable via the real public accessor the
+        # production code uses (not just via the private _state). The
+        # _DeprecatedCallableRunUsage property wraps the value, so compare by
+        # equality rather than identity.
+        accessed = getattr(result_event.result, "usage", None)
+        assert accessed is not None
+        assert accessed.input_tokens == 512
+        assert accessed.requests == 4
+
+        events = [
+            PartStartEvent(index=0, part=TextPart(content="")),
+            PartEndEvent(index=0, part=TextPart(content="")),
+            result_event,
+        ]
+        turn = PydanticAITurn(_aiter(events), model="anthropic:claude-3-5-sonnet")
+        await _collect(turn.events)
+
+        usage = turn.usage()
+        assert usage.model == "anthropic:claude-3-5-sonnet"
+        assert usage.input_tokens == 512
+        assert usage.output_tokens == 64
+        assert usage.num_llm_calls == 4
 
     async def test_no_usage_event_leaves_default_usage(self):
         """If the stream has no AgentRunResultEvent, usage() returns the default (tokens None)."""
