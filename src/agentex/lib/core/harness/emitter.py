@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import AsyncGenerator
+from datetime import datetime
 
 from agentex.lib.core.harness.types import TurnResult, HarnessTurn, StreamTaskMessage
 from agentex.lib.core.harness.tracer import SpanTracer
@@ -56,12 +57,18 @@ class UnifiedEmitter:
         async for event in yield_events(turn.events, tracer=self.tracer):
             yield event
 
-    async def auto_send_turn(self, turn: HarnessTurn) -> TurnResult:
-        """Async/temporal delivery: push to the task stream, return TurnResult."""
+    async def auto_send_turn(self, turn: HarnessTurn, created_at: datetime | None = None) -> TurnResult:
+        """Async/temporal delivery: push to the task stream, return TurnResult.
+
+        Pass `created_at` (e.g. `workflow.now()` under Temporal) to stamp the
+        turn's messages with a deterministic timestamp; it is forwarded to the
+        streaming contexts. Default None preserves server-side timestamps.
+        """
         return await auto_send(
             turn.events,
             task_id=self.task_id,
             tracer=self.tracer,
             streaming=self._streaming,
             usage=turn.usage(),
+            created_at=created_at,
         )
