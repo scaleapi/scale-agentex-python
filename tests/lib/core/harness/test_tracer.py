@@ -52,3 +52,16 @@ async def test_tracing_failure_is_swallowed():
     # Must not raise.
     await tracer.handle(OpenSpan(key="k", kind="tool", name="X"))
     await tracer.handle(CloseSpan(key="k"))
+    assert tracer._open == {}
+
+
+@pytest.mark.asyncio
+async def test_duplicate_open_replaces_silently():
+    fake = _FakeTracing()
+    tracer = SpanTracer(trace_id="t1", parent_span_id="p1", tracing=fake)
+    await tracer.handle(OpenSpan(key="k", kind="tool", name="A"))
+    await tracer.handle(OpenSpan(key="k", kind="tool", name="B"))
+    await tracer.handle(CloseSpan(key="k"))
+    # Both opens started spans, but only the second ("B") is closed.
+    assert [name for name, _, _ in fake.started] == ["A", "B"]
+    assert fake.ended == [("B", None)]

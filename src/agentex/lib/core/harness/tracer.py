@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from agentex.lib.core.harness.types import CloseSpan, OpenSpan, SpanSignal
 
-logger = logging.getLogger(__name__)
+try:
+    from agentex.lib.utils.logging import make_logger
+
+    logger = make_logger(__name__)
+except Exception:  # ddtrace may be absent in some envs; fall back to stdlib
+    import logging
+
+    logger = logging.getLogger(__name__)
 
 
 class SpanTracer:
@@ -19,6 +25,14 @@ class SpanTracer:
     The real TracingModule.end_span does NOT accept an output kwarg — output is
     recorded by mutating span.output before calling end_span, matching the pattern
     used throughout the codebase (see _langgraph_tracing.py on_tool_end etc.).
+
+    Span-lifecycle contract: the `_open` dict (span key -> span object) is scoped
+    to a single turn. Pairing is by `key`:
+    - A duplicate OpenSpan for a key already in `_open` silently replaces the
+      earlier span; the earlier span is then orphaned (never closed / leaked).
+    - A CloseSpan for an unknown key is a no-op.
+    - Unpaired opens accumulate in `_open` for the lifetime of the tracer; since
+      a tracer is expected to live for one turn, this is bounded and acceptable.
     """
 
     def __init__(
