@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 from typing import Any, AsyncIterator
 
 import pytest
@@ -524,6 +525,7 @@ class TestOnResultCallback:
         assert len(out_with) == len(out_without)
         for a, b in zip(out_with, out_without):
             assert type(a) is type(b)
+            assert a.model_dump() == b.model_dump()
         assert len(captured) == 1
 
     async def test_no_callback_no_error(self):
@@ -534,15 +536,22 @@ class TestOnResultCallback:
         assert out == []
 
     async def test_async_callback_is_awaited(self):
-        """An async on_result callable is properly awaited."""
-        captured: list[AgentRunResultEvent] = []
+        """An async on_result callable is properly awaited.
+
+        The callback suspends (``await asyncio.sleep(0)``) before recording its
+        side effect, so ``awaited`` is only populated if the converter actually
+        awaits the returned coroutine — distinguishing "awaited" from
+        "called-but-not-awaited."
+        """
+        awaited: list[AgentRunResultEvent] = []
 
         async def on_result_async(event: AgentRunResultEvent) -> None:
-            captured.append(event)
+            await asyncio.sleep(0)
+            awaited.append(event)
 
         result_event = self._make_result_event("async_output")
         events = [result_event]
         await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events), on_result=on_result_async))
 
-        assert len(captured) == 1
-        assert captured[0].result.output == "async_output"
+        assert len(awaited) == 1
+        assert awaited[0].result.output == "async_output"
