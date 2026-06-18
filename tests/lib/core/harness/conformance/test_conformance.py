@@ -11,8 +11,9 @@ verifies two guarantees:
    - yield channel delivers StreamTaskMessageFull(ToolResponseContent) as-is.
    - auto_send delivers the same tool-response by opening a streaming context
      with the full content and closing it immediately.
-   Both collapse to LogicalDelivery(content_type, identity) tuples that compare
-   equal.
+   Both collapse to LogicalDelivery(content_type, identity, payload) tuples
+   that compare equal. The payload includes initial_content (TextContent.content
+   and ReasoningContent.summary) so a channel that drops initial content fails.
 
 2. **Span signal equivalence**: both channels feed the same pure SpanDeriver
    over the same event sequence, so the derived span signals must be identical.
@@ -22,6 +23,12 @@ What is NOT asserted
 Raw wire-level event shapes are NOT compared (that would fail by design: the
 Full vs Start+Done envelope difference is a documented, acceptable choice in
 auto_send — see runner.py for the rationale).
+
+AGX1-377 fix: auto_send now delivers streamed tool-request messages. The
+suppression that previously prevented the yield normaliser from emitting a
+LogicalDelivery for Start(tool_request)+Done is removed. Both channels now
+produce a delivery for streamed tool_request, verified by the
+"streamed-tool-request" fixture.
 """
 
 from __future__ import annotations
@@ -54,7 +61,8 @@ from .runner import (
 # ---------------------------------------------------------------------------
 
 _FIXTURES: list[Fixture] = [
-    # fixture 1: single tool call (the canonical builtin example)
+    # fixture 1: single tool call — tool_request delivered via Full (classic path)
+    # plus a streamed tool_response via Full. Both channels should deliver both.
     Fixture(
         name="builtin-single-tool",
         events=[
@@ -75,14 +83,16 @@ _FIXTURES: list[Fixture] = [
             ),
         ],
     ),
-    # fixture 2: streaming text — exercises the text start/delta/done path
+    # fixture 2: streaming text — exercises the text start/delta/done path.
+    # Uses non-empty initial_content so the payload comparison catches a channel
+    # that drops StreamTaskMessageStart.content (Greptile id 3438655533, P1).
     Fixture(
         name="streaming-text",
         events=[
             StreamTaskMessageStart(
                 type="start",
                 index=0,
-                content=TextContent(type="text", author="agent", content=""),
+                content=TextContent(type="text", author="agent", content="Init"),
             ),
             StreamTaskMessageDelta(
                 type="delta",
@@ -97,7 +107,9 @@ _FIXTURES: list[Fixture] = [
             StreamTaskMessageDone(type="done", index=0),
         ],
     ),
-    # fixture 3: reasoning block — exercises reasoning span open/close + delivery
+    # fixture 3: reasoning block — exercises reasoning span open/close + delivery.
+    # ReasoningContent.summary is included in the payload so a channel that drops
+    # the reasoning-summary fails (Greptile id 3438655533, P1).
     Fixture(
         name="reasoning-block",
         events=[
@@ -120,6 +132,37 @@ _FIXTURES: list[Fixture] = [
                 ),
             ),
             StreamTaskMessageDone(type="done", index=0),
+        ],
+    ),
+    # fixture 4: streamed tool_request (AGX1-377 fix) — tool_request delivered
+    # via Start+Done (no Full). auto_send now delivers this instead of dropping
+    # it. Both channels must produce a LogicalDelivery for this fixture.
+    Fixture(
+        name="streamed-tool-request",
+        events=[
+            StreamTaskMessageStart(
+                type="start",
+                index=0,
+                content=ToolRequestContent(
+                    type="tool_request",
+                    author="agent",
+                    tool_call_id="tr-1",
+                    name="Read",
+                    arguments={"path": "/tmp/foo"},
+                ),
+            ),
+            StreamTaskMessageDone(type="done", index=0),
+            StreamTaskMessageFull(
+                type="full",
+                index=1,
+                content=ToolResponseContent(
+                    type="tool_response",
+                    author="agent",
+                    tool_call_id="tr-1",
+                    name="Read",
+                    content="file contents",
+                ),
+            ),
         ],
     ),
 ]

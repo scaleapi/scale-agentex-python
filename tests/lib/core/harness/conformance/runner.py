@@ -13,11 +13,12 @@ A fixture is (name, list[StreamTaskMessage]). The runner asserts two things:
    conformance test compares those normalised sequences.
 
    `payload` carries the content that callers actually consume:
-   - text/reasoning: the accumulated concatenated delta string
-   - tool_request: the arguments dict (JSON-sorted)
+   - text: initial_content.content prepended, then accumulated delta string
+   - reasoning: initial_content.summary joined, then accumulated delta string
+   - tool_request: the arguments dict (JSON-sorted), from Start content
    - tool_response: the content value (str)
-   This catches a channel that delivers the right structural shape but corrupts
-   or drops the payload.
+   This catches a channel that delivers the right structural shape but corrupts,
+   drops, or omits initial_content (including reasoning summary) or payload.
 
 2. **Span signal equivalence**: each channel is driven with its own recording
    tracer that captures every SpanSignal it actually receives in handle(); the
@@ -51,6 +52,13 @@ logical-content level, Full(ToolResponseContent) from yield and
 Start(content)+Done from auto_send are equivalent. The recorded span signals are
 identical because both adapters drive the same SpanDeriver.observe() call
 sequence and forward every signal to their tracer.
+
+AGX1-377 fix: auto_send now DELIVERS streamed tool-request messages (Start+Done)
+instead of dropping them. The conformance normaliser previously suppressed the
+delivery for Start(tool_request)+Done on the yield channel to match auto_send's
+old drop behaviour. That suppression is now removed: both channels produce a
+LogicalDelivery for a streamed tool_request, and the cross-channel assertion
+verifies it is delivered on both.
 """
 
 from __future__ import annotations
@@ -113,9 +121,11 @@ class LogicalDelivery(NamedTuple):
     pairs that uniquely identify the content (e.g. tool_call_id for tool
     messages, or index for text/reasoning). `payload` is a stable string
     representation of the content callers actually consume:
-    - text/reasoning: accumulated delta string
-    - tool_request: JSON-sorted arguments
-    - tool_response: str(content)
+    - text: initial_content.content prepended to accumulated delta strings
+    - reasoning: initial_content.summary joined, prepended to accumulated
+      reasoning-content delta strings
+    - tool_request: JSON-sorted arguments from Start content
+    - tool_response: str(content) from Full event
     """
 
     content_type: str
@@ -128,24 +138,39 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
 
     The yield channel forwards events verbatim. A logical delivery is:
     - A Full event (tool_request / tool_response): content delivered as-is.
-    - A Start + ... + Done sequence for text/reasoning content.
+    - A Start + ... + Done sequence for text/reasoning/tool_request content.
 
-    The `payload` field captures the content callers consume: accumulated delta
-    text for text/reasoning, arguments for tool_request, and response body for
-    tool_response. This ensures a channel that delivers the right structure but
-    corrupts the payload is caught.
+    The `payload` field captures the content callers consume:
+    - text: initial_content.content (from Start) prepended to accumulated deltas
+    - reasoning: initial_content.summary joined (from Start) prepended to
+      accumulated reasoning-content deltas (this catches a channel that drops
+      the summary)
+    - tool_request: JSON-sorted arguments from the Start content (AGX1-377: now
+      delivered on both channels, no longer suppressed)
+    - tool_response: str(content) from Full event
     """
+    from agentex.types.text_content import TextContent
+    from agentex.types.reasoning_content import ReasoningContent
+    from agentex.types.tool_request_content import ToolRequestContent
+
     deliveries: list[LogicalDelivery] = []
     # Track which indices had a Start so we can pair with Done
     started: dict[int, Any] = {}  # index -> initial content
-    # Accumulate delta text per index
+    # Accumulate delta text per index (seed with initial_content text if present)
     accumulated: dict[int, list[str]] = {}  # index -> list of delta strings
 
     for event in events:
         if isinstance(event, StreamTaskMessageStart):
             if event.index is not None:
                 started[event.index] = event.content
-                accumulated[event.index] = []
+                # Seed accumulator with initial_content so a channel that drops
+                # initial_content but delivers deltas correctly will fail.
+                seed: list[str] = []
+                if isinstance(event.content, TextContent) and event.content.content:
+                    seed = [event.content.content]
+                elif isinstance(event.content, ReasoningContent) and event.content.summary:
+                    seed = list(event.content.summary)
+                accumulated[event.index] = seed
         elif isinstance(event, StreamTaskMessageDelta):
             if event.index is not None and event.delta is not None:
                 if isinstance(event.delta, TextDelta) and event.delta.text_delta:
@@ -165,11 +190,22 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
                             payload="".join(deltas),
                         )
                     )
-                # tool_request Start+Done just means the span opens; the message
-                # itself is delivered via Full (ToolRequestContent Full), so we
-                # don't emit a delivery here for Start(tool_request)+Done.
-                # AGX1-377: once auto_send handles the streamed tool-request shape,
-                # this suppression will be removed and the delivery counted here.
+                elif ctype == "tool_request" and isinstance(content, ToolRequestContent):
+                    # AGX1-377 fix: auto_send now delivers streamed tool-request
+                    # messages. Emit a delivery here so the cross-channel
+                    # assertion verifies it is present on both channels.
+                    deliveries.append(
+                        LogicalDelivery(
+                            content_type=ctype,
+                            identity=frozenset(
+                                {
+                                    ("tool_call_id", content.tool_call_id),
+                                    ("name", content.name),
+                                }
+                            ),
+                            payload=json.dumps(content.arguments, sort_keys=True),
+                        )
+                    )
         elif isinstance(event, StreamTaskMessageFull):
             content = event.content
             ctype = getattr(content, "type", None) or ""
@@ -323,9 +359,17 @@ def _auto_send_logical_deliveries(sink: list[Any]) -> list[LogicalDelivery]:
       ("close", ctype)          -- context closed
 
     A logical delivery corresponds to each open+close pair. For text/reasoning
-    we identify by sequential position and accumulate the delta payload; for
-    tool messages we use tool_call_id + name and capture arguments/content.
+    we identify by sequential position and build the payload by prepending the
+    initial_content text (TextContent.content) or summary (ReasoningContent.summary)
+    to accumulated deltas. This matches _yield_logical_deliveries so a channel
+    that drops initial_content or reasoning summary fails the comparison.
+    For tool messages we use tool_call_id + name and capture arguments/content.
     """
+    from agentex.types.text_content import TextContent
+    from agentex.types.reasoning_content import ReasoningContent
+    from agentex.types.tool_request_content import ToolRequestContent
+    from agentex.types.tool_response_content import ToolResponseContent
+
     deliveries: list[LogicalDelivery] = []
     open_idx = 0
     while open_idx < len(sink):
@@ -335,6 +379,12 @@ def _auto_send_logical_deliveries(sink: list[Any]) -> list[LogicalDelivery]:
             content: Any = entry[2]
             found_open = False
             delta_parts: list[str] = []
+            # Seed delta_parts with initial_content so payload comparison
+            # catches a channel that drops initial_content but delivers deltas.
+            if isinstance(content, TextContent) and content.content:
+                delta_parts = [content.content]
+            elif isinstance(content, ReasoningContent) and content.summary:
+                delta_parts = list(content.summary)
             for j in range(open_idx + 1, len(sink)):
                 if sink[j][0] == "open" and sink[j][1] == ctype and not found_open:
                     found_open = True
@@ -358,8 +408,6 @@ def _auto_send_logical_deliveries(sink: list[Any]) -> list[LogicalDelivery]:
                             )
                         )
                     elif ctype == "tool_response":
-                        from agentex.types.tool_response_content import ToolResponseContent
-
                         if isinstance(content, ToolResponseContent):
                             deliveries.append(
                                 LogicalDelivery(
@@ -374,8 +422,6 @@ def _auto_send_logical_deliveries(sink: list[Any]) -> list[LogicalDelivery]:
                                 )
                             )
                     elif ctype == "tool_request":
-                        from agentex.types.tool_request_content import ToolRequestContent
-
                         if isinstance(content, ToolRequestContent):
                             deliveries.append(
                                 LogicalDelivery(
