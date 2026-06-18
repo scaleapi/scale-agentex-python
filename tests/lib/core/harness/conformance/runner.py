@@ -9,8 +9,15 @@ A fixture is (name, list[StreamTaskMessage]). The runner asserts two things:
    - auto_send channel delivers the same tool-response by opening a streaming
      context with the full content and closing it immediately (Start+Done on the
      wire), not a Full event.
-   Both reduce to the same LogicalDelivery(type, identity) tuple; the conformance
-   test compares those normalised sequences.
+   Both reduce to the same LogicalDelivery(type, identity, payload) tuple; the
+   conformance test compares those normalised sequences.
+
+   `payload` carries the content that callers actually consume:
+   - text/reasoning: the accumulated concatenated delta string
+   - tool_request: the arguments dict (JSON-sorted)
+   - tool_response: the content value (str)
+   This catches a channel that delivers the right structural shape but corrupts
+   or drops the payload.
 
 2. **Span signal equivalence**: each channel is driven with its own recording
    tracer that captures every SpanSignal it actually receives in handle(); the
@@ -48,18 +55,22 @@ sequence and forward every signal to their tracer.
 
 from __future__ import annotations
 
+import json
 import types as _types
 from typing import Any, NamedTuple, override
 from dataclasses import dataclass
 
+from agentex.types.text_delta import TextDelta
 from agentex.types.task_message import TaskMessage
 from agentex.lib.core.harness.types import SpanSignal, StreamTaskMessage
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message_update import (
     StreamTaskMessageDone,
     StreamTaskMessageFull,
+    StreamTaskMessageDelta,
     StreamTaskMessageStart,
 )
+from agentex.types.reasoning_content_delta import ReasoningContentDelta
 from agentex.lib.core.harness.span_derivation import SpanDeriver
 
 
@@ -100,11 +111,16 @@ class LogicalDelivery(NamedTuple):
     `content_type` is the .type of the content (e.g. "text", "reasoning",
     "tool_request", "tool_response"). `identity` is a frozenset of key=value
     pairs that uniquely identify the content (e.g. tool_call_id for tool
-    messages, or index for text/reasoning).
+    messages, or index for text/reasoning). `payload` is a stable string
+    representation of the content callers actually consume:
+    - text/reasoning: accumulated delta string
+    - tool_request: JSON-sorted arguments
+    - tool_response: str(content)
     """
 
     content_type: str
     identity: frozenset[tuple[str, Any]]
+    payload: str = ""
 
 
 def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDelivery]:
@@ -113,30 +129,47 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
     The yield channel forwards events verbatim. A logical delivery is:
     - A Full event (tool_request / tool_response): content delivered as-is.
     - A Start + ... + Done sequence for text/reasoning content.
+
+    The `payload` field captures the content callers consume: accumulated delta
+    text for text/reasoning, arguments for tool_request, and response body for
+    tool_response. This ensures a channel that delivers the right structure but
+    corrupts the payload is caught.
     """
     deliveries: list[LogicalDelivery] = []
     # Track which indices had a Start so we can pair with Done
     started: dict[int, Any] = {}  # index -> initial content
+    # Accumulate delta text per index
+    accumulated: dict[int, list[str]] = {}  # index -> list of delta strings
 
     for event in events:
         if isinstance(event, StreamTaskMessageStart):
             if event.index is not None:
                 started[event.index] = event.content
+                accumulated[event.index] = []
+        elif isinstance(event, StreamTaskMessageDelta):
+            if event.index is not None and event.delta is not None:
+                if isinstance(event.delta, TextDelta) and event.delta.text_delta:
+                    accumulated.setdefault(event.index, []).append(event.delta.text_delta)
+                elif isinstance(event.delta, ReasoningContentDelta) and event.delta.content_delta:
+                    accumulated.setdefault(event.index, []).append(event.delta.content_delta)
         elif isinstance(event, StreamTaskMessageDone):
             if event.index is not None and event.index in started:
                 content = started.pop(event.index)
+                deltas = accumulated.pop(event.index, [])
                 ctype = getattr(content, "type", None) or ""
                 if ctype in ("text", "reasoning"):
-                    # Identify text by index, reasoning by index
                     deliveries.append(
                         LogicalDelivery(
                             content_type=ctype,
                             identity=frozenset({("index", event.index)}),
+                            payload="".join(deltas),
                         )
                     )
                 # tool_request Start+Done just means the span opens; the message
                 # itself is delivered via Full (ToolRequestContent Full), so we
                 # don't emit a delivery here for Start(tool_request)+Done.
+                # AGX1-377: once auto_send handles the streamed tool-request shape,
+                # this suppression will be removed and the delivery counted here.
         elif isinstance(event, StreamTaskMessageFull):
             content = event.content
             ctype = getattr(content, "type", None) or ""
@@ -153,6 +186,7 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
                                     ("name", content.name),
                                 }
                             ),
+                            payload=str(content.content),
                         )
                     )
             elif ctype == "tool_request":
@@ -168,6 +202,7 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
                                     ("name", content.name),
                                 }
                             ),
+                            payload=json.dumps(content.arguments, sort_keys=True),
                         )
                     )
 
@@ -284,42 +319,42 @@ def _auto_send_logical_deliveries(sink: list[Any]) -> list[LogicalDelivery]:
     Each context lifecycle in the sink looks like:
       ("ctx", ctype, content)  -- context created
       ("open", ctype, content) -- context __aenter__
-      [("update", delta), ...]  -- optional deltas
+      [("update", delta), ...]  -- optional deltas (StreamTaskMessageDelta)
       ("close", ctype)          -- context closed
 
     A logical delivery corresponds to each open+close pair. For text/reasoning
-    we identify by index embedded in the content; for tool messages we use
-    tool_call_id + name.
+    we identify by sequential position and accumulate the delta payload; for
+    tool messages we use tool_call_id + name and capture arguments/content.
     """
     deliveries: list[LogicalDelivery] = []
-    # Pair up opens by scanning the sink in order
     open_idx = 0
     while open_idx < len(sink):
         entry = sink[open_idx]
         if entry[0] == "ctx":
             ctype: str = entry[1]
             content: Any = entry[2]
-            # Find the matching open (should be right after ctx)
-            # and close for this ctype
             found_open = False
+            delta_parts: list[str] = []
             for j in range(open_idx + 1, len(sink)):
                 if sink[j][0] == "open" and sink[j][1] == ctype and not found_open:
                     found_open = True
+                elif found_open and sink[j][0] == "update":
+                    # Accumulate delta content from StreamTaskMessageDelta
+                    update = sink[j][1]
+                    if isinstance(update, StreamTaskMessageDelta) and update.delta is not None:
+                        if isinstance(update.delta, TextDelta) and update.delta.text_delta:
+                            delta_parts.append(update.delta.text_delta)
+                        elif isinstance(update.delta, ReasoningContentDelta) and update.delta.content_delta:
+                            delta_parts.append(update.delta.content_delta)
                 elif sink[j][0] == "close" and sink[j][1] == ctype and found_open:
-                    # Matched: emit logical delivery
+                    # Matched open+close: emit logical delivery with payload
                     if ctype in ("text", "reasoning"):
-                        # For text/reasoning, we use the index from the event
-                        # which auto_send doesn't track directly. However the
-                        # conformance test sends a single stream so the order
-                        # of text/reasoning deliveries IS meaningful; use
-                        # a positional counter derived from the sink scan.
-                        # We identify text/reasoning by counting how many text/
-                        # reasoning ctx entries appeared before this one.
                         count = sum(1 for k in range(open_idx) if sink[k][0] == "ctx" and sink[k][1] == ctype)
                         deliveries.append(
                             LogicalDelivery(
                                 content_type=ctype,
                                 identity=frozenset({("seq", count)}),
+                                payload="".join(delta_parts),
                             )
                         )
                     elif ctype == "tool_response":
@@ -335,6 +370,7 @@ def _auto_send_logical_deliveries(sink: list[Any]) -> list[LogicalDelivery]:
                                             ("name", content.name),
                                         }
                                     ),
+                                    payload=str(content.content),
                                 )
                             )
                     elif ctype == "tool_request":
@@ -350,6 +386,7 @@ def _auto_send_logical_deliveries(sink: list[Any]) -> list[LogicalDelivery]:
                                             ("name", content.name),
                                         }
                                     ),
+                                    payload=json.dumps(content.arguments, sort_keys=True),
                                 )
                             )
                     open_idx = j + 1
@@ -379,6 +416,7 @@ def _yield_text_reasoning_seq(deliveries: list[LogicalDelivery]) -> list[Logical
                 LogicalDelivery(
                     content_type=d.content_type,
                     identity=frozenset({("seq", seq)}),
+                    payload=d.payload,
                 )
             )
         else:
