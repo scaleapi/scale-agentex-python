@@ -10,6 +10,7 @@ from agentex.types.task_message_update import (
     StreamTaskMessageFull,
     StreamTaskMessageStart,
 )
+from agentex.types.text_delta import TextDelta
 
 from agentex.lib.core.harness.span_derivation import SpanDeriver
 from agentex.lib.core.harness.tracer import SpanTracer
@@ -83,10 +84,7 @@ async def auto_send(
                         index=event.index,
                     )
                     await current_ctx.stream_update(delta_with_parent)
-                    if (
-                        getattr(event.delta, "type", None) == "text"
-                        and event.delta.text_delta
-                    ):
+                    if isinstance(event.delta, TextDelta) and event.delta.text_delta:
                         final_text_parts.append(event.delta.text_delta)
 
             elif isinstance(event, StreamTaskMessageDone):
