@@ -7,7 +7,8 @@ from agentex.types.task_message_update import (
 )
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
-from tests.lib.core.harness.conformance.runner import Fixture, register, derive_all, all_fixtures
+
+from .runner import Fixture, register, derive_all, all_fixtures
 
 register(
     Fixture(
