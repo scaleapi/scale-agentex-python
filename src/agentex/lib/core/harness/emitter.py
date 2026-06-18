@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import AsyncIterator
+from typing import AsyncGenerator
 
 from agentex.lib.core.harness.auto_send import auto_send
 from agentex.lib.core.harness.tracer import SpanTracer
@@ -13,8 +13,13 @@ from agentex.lib.core.harness.yield_delivery import yield_events
 class UnifiedEmitter:
     """Ties trace context + chosen delivery together.
 
-    Tracing is default-on whenever `trace_id` is truthy; pass `tracer=False` to
-    disable, or a custom `SpanTracer` to override.
+    Tracing modes (the `tracer` arg):
+    - tracer=None (default): auto-construct a SpanTracer if `trace_id` is present.
+    - tracer=False: disable tracing entirely, regardless of `trace_id`.
+    - tracer=<SpanTracer>: use the supplied instance.
+
+    `tracing` and `streaming` are injection escape-hatches for tests/advanced
+    use; leave them None in production so the real adk modules are used.
     """
 
     tracer: SpanTracer | None
@@ -26,10 +31,12 @@ class UnifiedEmitter:
         parent_span_id: str | None,
         tracer: SpanTracer | bool | None = None,
         tracing: object | None = None,
+        streaming: object | None = None,
     ):
         self.task_id = task_id
         self.trace_id = trace_id
         self.parent_span_id = parent_span_id
+        self._streaming = streaming
         if tracer is False:
             self.tracer = None
         elif isinstance(tracer, SpanTracer):
@@ -44,7 +51,7 @@ class UnifiedEmitter:
         else:
             self.tracer = None
 
-    async def yield_turn(self, turn: HarnessTurn) -> AsyncIterator[StreamTaskMessage]:
+    async def yield_turn(self, turn: HarnessTurn) -> AsyncGenerator[StreamTaskMessage, None]:
         """Sync HTTP ACP delivery: forward events, trace as side effect."""
         async for event in yield_events(turn.events, tracer=self.tracer):
             yield event
@@ -55,5 +62,6 @@ class UnifiedEmitter:
             turn.events,
             task_id=self.task_id,
             tracer=self.tracer,
+            streaming=self._streaming,
             usage=turn.usage(),
         )
