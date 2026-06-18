@@ -3,6 +3,15 @@
 A fixture is (name, list[StreamTaskMessage]). The runner asserts that span
 derivation over the events is identical regardless of delivery channel, which is
 the cross-channel guarantee from the spec.
+
+Registry shared-state hazard: `_REGISTRY` is process-global. Every `test_*.py`
+module that calls `register()` at import time contributes to it, so a module
+that parametrizes over `all_fixtures()` will see fixtures registered by ANY
+other conformance module imported earlier in the same pytest process (collection
+order is not guaranteed). To stay deterministic, each future harness conformance
+module should register and parametrize over its OWN fixtures (e.g. keep a
+module-local list it both registers and parametrizes), rather than relying on
+cross-module global accumulation via `all_fixtures()`.
 """
 
 from __future__ import annotations
