@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import sys
 from typing import Any
+from datetime import datetime, timezone
 from dataclasses import field, dataclass
 
 import pytest
@@ -68,6 +69,7 @@ class _FakeTracingBackend:
             id=f"span-{len(self.spans_started) + 1}",
             trace_id=kw.get("trace_id", "trace1"),
             name=kw.get("name", ""),
+            start_time=datetime.now(tz=timezone.utc),
         )
         self.spans_started.append(kw)
         return sp

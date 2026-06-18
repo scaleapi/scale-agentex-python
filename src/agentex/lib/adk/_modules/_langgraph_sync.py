@@ -23,8 +23,16 @@ primitive (e.g. for callers that need the raw event stream without the
 harness envelope).
 """
 
+from __future__ import annotations
 
-async def convert_langgraph_to_agentex_events(stream, on_final_ai_message=None):
+from typing import Any, Callable, Optional
+from collections.abc import AsyncGenerator
+
+
+async def convert_langgraph_to_agentex_events(
+    stream: Any,
+    on_final_ai_message: Optional[Callable[..., None]] = None,
+) -> AsyncGenerator[Any, None]:
     """Convert LangGraph streaming events to Agentex TaskMessageUpdate events.
 
     Expects the stream from graph.astream() called with

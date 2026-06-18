@@ -12,6 +12,7 @@ handles Full events correctly; no coalescing wrapper is needed.
 from __future__ import annotations
 
 from typing import Any, AsyncIterator
+from collections.abc import AsyncGenerator
 
 from agentex.lib.core.harness.types import TurnUsage, StreamTaskMessage
 from agentex.lib.adk._modules._langgraph_sync import convert_langgraph_to_agentex_events
@@ -100,7 +101,7 @@ class LangGraphTurn:
     def events(self) -> AsyncIterator[StreamTaskMessage]:
         return self._generate_events()
 
-    async def _generate_events(self) -> AsyncIterator[StreamTaskMessage]:
+    async def _generate_events(self) -> AsyncGenerator[StreamTaskMessage, None]:
         def _capture(ai_msg: Any) -> None:
             usage_metadata = getattr(ai_msg, "usage_metadata", None)
             if usage_metadata is not None:
