@@ -126,15 +126,24 @@ async def test_auto_send_streams_text_and_returns_final_text():
 async def test_auto_send_posts_full_tool_messages():
     streaming = _FakeStreaming()
     events = [
+        # A bare tool_request Start (no Done/Full) must NOT open a streaming
+        # context on its own — only Full events post messages.
+        StreamTaskMessageStart(
+            type="start", index=0,
+            content=ToolRequestContent(
+                type="tool_request", author="agent",
+                tool_call_id="c0", name="Bash", arguments={},
+            ),
+        ),
         StreamTaskMessageFull(
-            type="full", index=0,
+            type="full", index=1,
             content=ToolRequestContent(
                 type="tool_request", author="agent",
                 tool_call_id="c1", name="Bash", arguments={"cmd": "ls"},
             ),
         ),
         StreamTaskMessageFull(
-            type="full", index=1,
+            type="full", index=2,
             content=ToolResponseContent(
                 type="tool_response", author="agent",
                 tool_call_id="c1", name="Bash", content="file.py",
@@ -145,12 +154,12 @@ async def test_auto_send_posts_full_tool_messages():
 
     assert result.final_text == ""
 
-    # One context per Full event
+    # The opened contexts correspond ONLY to the two Full events — the
+    # tool_request Start did not open a context.
     ctx_events = [s for s in streaming.sink if s[0] == "ctx"]
     assert len(ctx_events) == 2
     content_types = [s[1] for s in ctx_events]
-    assert "tool_request" in content_types
-    assert "tool_response" in content_types
+    assert content_types == ["tool_request", "tool_response"]
 
     # Each context is opened and closed
     opens = [s for s in streaming.sink if s[0] == "open"]
@@ -246,3 +255,28 @@ async def test_auto_send_closes_text_context_before_full_message():
     text_close_idx = next(i for i, s in enumerate(event_sequence) if s == ("close", "text"))
     tool_open_idx = next(i for i, s in enumerate(event_sequence) if s == ("open", "tool_request"))
     assert text_open_idx < text_close_idx < tool_open_idx
+
+
+# ---------------------------------------------------------------------------
+# Test 5: midstream error — propagates AND the open context is closed (finally)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_open_context_closed_on_midstream_error():
+    streaming = _FakeStreaming()
+
+    async def _exploding_gen():
+        yield StreamTaskMessageStart(
+            type="start", index=0,
+            content=TextContent(type="text", author="agent", content=""),
+        )
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await auto_send(
+            _exploding_gen(), task_id="task1", tracer=None, streaming=streaming
+        )
+
+    # The text context that was opened mid-stream was closed by the finally block.
+    assert ("open", "text") in [(s[0], s[1]) for s in streaming.sink]
+    assert ("close", "text") in [(s[0], s[1]) for s in streaming.sink]
