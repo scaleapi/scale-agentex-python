@@ -268,6 +268,10 @@ class TestToolCallEmission:
         This test uses a realistic pydantic-ai event sequence: args arrive as a
         PartDeltaEvent fragment (the way OpenAI/Anthropic actually stream JSON
         tool-call arguments). The new implementation accumulates them correctly.
+
+        Parts-manager invariant: PartEnd.part is the accumulated snapshot; real
+        pydantic-ai conveys args via PartStart + PartDeltaEvent, so a
+        PartStart(None)+PartEnd(json) with no delta is not realizable.
         """
         from pydantic_ai.messages import ToolCallPartDelta
 
@@ -334,6 +338,10 @@ class TestToolCallEmission:
 
         Uses a PartDeltaEvent to deliver the invalid string (the way pydantic-ai
         actually surfaces arg tokens) so the coalescer picks it up.
+
+        Parts-manager invariant: PartEnd.part is the accumulated snapshot; real
+        pydantic-ai conveys args via PartStart + PartDeltaEvent, so a
+        PartStart(None)+PartEnd(json) with no delta is not realizable.
         """
         from pydantic_ai.messages import ToolCallPartDelta
 

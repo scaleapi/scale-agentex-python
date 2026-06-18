@@ -154,10 +154,12 @@ class PydanticAITurn:
     canonical ``StreamTaskMessage*`` stream; ``usage()`` returns a normalized
     ``TurnUsage`` (valid only after ``events`` is exhausted).
 
-    Tool-request events emitted by ``convert_pydantic_ai_to_agentex_events``
-    as ``Start+Done`` pairs are coalesced into ``StreamTaskMessageFull``
-    events so that ``auto_send`` can deliver them as atomic messages (Option A
-    — no streaming of argument tokens in the async path).
+    By default ``events`` is identical to the bare
+    ``convert_pydantic_ai_to_agentex_events`` output (tool calls stream as
+    ``Start + ToolRequestDelta + Done``, preserving argument-token streaming on
+    the sync/yield channel). When ``coalesce_tool_requests=True``, tool-request
+    sequences are collapsed into a single ``StreamTaskMessageFull`` (Option A —
+    no streaming of argument tokens) for the async/auto_send path.
     """
 
     def __init__(
@@ -165,10 +167,12 @@ class PydanticAITurn:
         stream: AsyncIterator[Any],
         model: str | None = None,
         tracing_handler: "AgentexPydanticAITracingHandler | None" = None,
+        coalesce_tool_requests: bool = False,
     ) -> None:
         self._stream = stream
         self._model = model
         self._tracing_handler = tracing_handler
+        self._coalesce_tool_requests = coalesce_tool_requests
         self._usage = TurnUsage(model=model)
 
     @property
@@ -195,8 +199,12 @@ class PydanticAITurn:
             tracing_handler=self._tracing_handler,
             on_result=_capture,
         )
-        async for ev in _coalesce_tool_requests(raw_stream):
-            yield ev
+        if self._coalesce_tool_requests:
+            async for ev in _coalesce_tool_requests(raw_stream):
+                yield ev
+        else:
+            async for ev in raw_stream:
+                yield ev
 
     def usage(self) -> TurnUsage:
         """Return the normalized usage for this turn.

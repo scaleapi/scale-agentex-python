@@ -228,3 +228,93 @@ class TestPydanticAITurn:
         assert usage.model == "openai:gpt-4o"
         assert usage.input_tokens is None
         assert usage.num_llm_calls == 0
+
+
+class TestToolRequestCoalescing:
+    """The ``coalesce_tool_requests`` flag controls tool-call delivery shape.
+
+    Default (off): tool calls stream as Start + ToolRequestDelta + Done,
+    matching the bare converter and preserving argument-token streaming on the
+    sync/yield channel.
+
+    On: tool-request sequences collapse into a single StreamTaskMessageFull
+    (Option A) for the async/auto_send path (a temporary AGX1-377 workaround).
+    """
+
+    async def test_default_off_matches_bare_converter_for_streamed_tool_call(self):
+        """Default Turn (coalesce off) yields a ToolRequestDelta for a streamed-args
+        tool call — i.e. it is byte-for-byte the bare converter output, so the
+        sync/yield channel keeps its argument-token streaming."""
+        from pydantic_ai.messages import ToolCallPart, ToolCallPartDelta
+
+        from agentex.types.tool_request_delta import ToolRequestDelta
+        from agentex.types.task_message_update import StreamTaskMessageDelta
+        from agentex.lib.adk._modules._pydantic_ai_sync import convert_pydantic_ai_to_agentex_events
+
+        tool_events = [
+            PartStartEvent(index=0, part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1")),
+            PartDeltaEvent(index=0, delta=ToolCallPartDelta(args_delta='{"city":"Paris"}')),
+            PartEndEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args='{"city":"Paris"}', tool_call_id="c1"),
+            ),
+        ]
+
+        turn = PydanticAITurn(_aiter(tool_events), model="openai:gpt-4o")
+        turn_out = await _collect(turn.events)
+
+        bare_out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(tool_events)))
+
+        # Default Turn is identical to the bare converter.
+        assert len(turn_out) == len(bare_out)
+        for a, b in zip(turn_out, bare_out):
+            assert type(a) is type(b)
+            assert a.model_dump() == b.model_dump()
+
+        # And the arg-streaming delta is present (not coalesced away).
+        deltas = [
+            e for e in turn_out if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ToolRequestDelta)
+        ]
+        assert len(deltas) == 1, "streamed tool-call args must surface as a ToolRequestDelta when coalesce is off"
+        assert deltas[0].delta.arguments_delta == '{"city":"Paris"}'
+
+    async def test_coalesce_on_emits_single_full_with_accumulated_args_and_no_delta(self):
+        """coalesce_tool_requests=True yields one StreamTaskMessageFull(tool_request)
+        with fully-accumulated arguments and NO ToolRequestDelta."""
+        from pydantic_ai.messages import ToolCallPart, ToolCallPartDelta
+
+        from agentex.types.tool_request_delta import ToolRequestDelta
+        from agentex.types.task_message_update import (
+            StreamTaskMessageDone,
+            StreamTaskMessageFull,
+            StreamTaskMessageDelta,
+            StreamTaskMessageStart,
+        )
+        from agentex.types.tool_request_content import ToolRequestContent
+
+        tool_events = [
+            PartStartEvent(index=0, part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1")),
+            PartDeltaEvent(index=0, delta=ToolCallPartDelta(args_delta='{"city":"Paris"}')),
+            PartEndEvent(
+                index=0,
+                part=ToolCallPart(tool_name="get_weather", args='{"city":"Paris"}', tool_call_id="c1"),
+            ),
+        ]
+
+        turn = PydanticAITurn(_aiter(tool_events), model="openai:gpt-4o", coalesce_tool_requests=True)
+        turn_out = await _collect(turn.events)
+
+        # Exactly one event: a Full(tool_request). No Start/Delta/Done leak through.
+        assert len(turn_out) == 1
+        full = turn_out[0]
+        assert isinstance(full, StreamTaskMessageFull)
+        assert isinstance(full.content, ToolRequestContent)
+        assert full.content.tool_call_id == "c1"
+        assert full.content.name == "get_weather"
+        assert full.content.arguments == {"city": "Paris"}, "args must be fully accumulated"
+
+        assert not any(isinstance(e, StreamTaskMessageStart) for e in turn_out)
+        assert not any(isinstance(e, StreamTaskMessageDone) for e in turn_out)
+        assert not any(
+            isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ToolRequestDelta) for e in turn_out
+        ), "no ToolRequestDelta when coalescing is on"
