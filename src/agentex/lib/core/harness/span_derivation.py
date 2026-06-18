@@ -15,6 +15,9 @@ from agentex.types.task_message_update import (
     StreamTaskMessageFull,
     StreamTaskMessageStart,
 )
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_request_delta import ToolRequestDelta
+from agentex.types.tool_response_content import ToolResponseContent
 
 from agentex.lib.core.harness.types import CloseSpan, OpenSpan, SpanSignal, StreamTaskMessage
 
@@ -79,15 +82,14 @@ class SpanDeriver:
             return []
         idx = event.index
         content = event.content
-        ctype = getattr(content, "type", None)
-        if ctype == "tool_request":
+        if isinstance(content, ToolRequestContent):
             self._tool_by_index[idx] = _ToolReqMeta(
                 tool_call_id=content.tool_call_id,
                 name=content.name,
                 arguments=dict(content.arguments or {}),
             )
             return []
-        if ctype == "reasoning":
+        if content.type == "reasoning":
             self._reasoning_index_open.add(idx)
             return [OpenSpan(key=f"reasoning:{idx}", kind="reasoning", name="reasoning", input={})]
         return []
@@ -97,7 +99,7 @@ class SpanDeriver:
             return []
         idx = event.index
         delta = event.delta
-        if delta is not None and getattr(delta, "type", None) == "tool_request":
+        if isinstance(delta, ToolRequestDelta):
             meta = self._tool_by_index.get(idx)
             if meta is not None and delta.arguments_delta:
                 meta.args_buf += delta.arguments_delta
@@ -105,7 +107,7 @@ class SpanDeriver:
 
     def _on_full(self, event: StreamTaskMessageFull) -> list[SpanSignal]:
         content = event.content
-        if getattr(content, "type", None) == "tool_response":
+        if isinstance(content, ToolResponseContent):
             tcid = content.tool_call_id
             if tcid in self._open_tool_ids:
                 self._open_tool_ids.pop(tcid, None)

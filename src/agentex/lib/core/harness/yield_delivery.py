@@ -21,11 +21,11 @@ async def yield_events(
     deriver = SpanDeriver() if tracer is not None else None
     try:
         async for event in events:
-            if deriver is not None:  # tracer is non-None whenever deriver is set
+            if deriver is not None and tracer is not None:
                 for signal in deriver.observe(event):
                     await tracer.handle(signal)
             yield event
     finally:
-        if deriver is not None:  # tracer is non-None whenever deriver is set
+        if deriver is not None and tracer is not None:
             for signal in deriver.flush():
                 await tracer.handle(signal)
