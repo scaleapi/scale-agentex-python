@@ -7,6 +7,7 @@ on:
     paths:
       - "src/agentex/lib/core/harness/**"
       - "src/agentex/lib/adk/_modules/**"
+      - "tests/lib/core/harness/test_harness_pydantic_ai_*.py"
       - ".github/workflows/harness-integration.yml"
 
 jobs:
@@ -31,10 +32,28 @@ jobs:
       - name: Conformance suite
         run: ./scripts/test tests/lib/core/harness/ -v
 
-  # Live integration matrix (harness x {sync, async, temporal}) is added per-harness
-  # in the migration plans. Placeholder job keeps the workflow valid until then.
+  # Offline pydantic-ai integration tests (sync / async / temporal channels).
+  # These use pydantic-ai TestModel + fake streaming/tracing and require no live
+  # infrastructure. Enabled here for PR 4 (pydantic-ai migration). Future harness
+  # migration PRs (5-8) should add their integration-test paths to this matrix.
   live-matrix:
     runs-on: ubuntu-latest
-    if: false  # enabled once the first harness's test agents land
+    strategy:
+      matrix:
+        channel: [sync, async, temporal]
+      fail-fast: false
+    name: pydantic-ai-${{ matrix.channel }}
     steps:
-      - run: echo "populated by migration PRs"  # TODO(harness-migration): enable per-harness; see migration PRs 4-8
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: '0.10.2'
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: pydantic-ai ${{ matrix.channel }} integration tests (offline, TestModel)
+        run: |
+          ./scripts/test tests/lib/core/harness/test_harness_pydantic_ai_${{ matrix.channel }}.py -v
