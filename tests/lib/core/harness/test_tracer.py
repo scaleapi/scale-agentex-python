@@ -1,3 +1,5 @@
+from typing import override
+
 import pytest
 
 from agentex.lib.core.harness.types import OpenSpan, CloseSpan
@@ -45,6 +47,7 @@ async def test_no_trace_id_is_noop():
 @pytest.mark.asyncio
 async def test_tracing_failure_is_swallowed():
     class _Boom(_FakeTracing):
+        @override
         async def start_span(self, **kw):
             raise RuntimeError("backend down")
 
