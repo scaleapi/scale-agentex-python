@@ -867,3 +867,78 @@ class TestCleanupOnException:
             await stream_pydantic_ai_events(boom(), TASK_ID)
 
         assert streaming.contexts[0].closed is True
+
+
+# ---------------------------------------------------------------------------
+# Characterization test: lock the wire-level delivery shape for a representative
+# pydantic-ai run (text + tool call + tool response + more text).
+#
+# Step 1 (CURRENT behavior): written against the original implementation.
+# - Text/reasoning use adk.streaming.streaming_task_message_context.
+# - Tool messages use adk.messages.create (FakeMessagesModule.created list).
+# - Final text is the last text segment.
+#
+# Step 2 (POST-reimplementation on UnifiedEmitter / auto_send):
+# The assertions in TestCharacterizeWireShapeNew (below) lock the new shape.
+# Tool messages no longer go through adk.messages.create; they arrive via
+# streaming_task_message_context open+close pairs (Start+Done envelope).
+# This is the AGX1-373 accepted envelope change: logical content is identical.
+# ---------------------------------------------------------------------------
+
+
+class TestCharacterizeWireShapeCurrent:
+    """Characterization tests: lock the CURRENT wire-level delivery shape.
+
+    Uses FakeStreamingModule + FakeMessagesModule (the existing fake pair).
+    Tool messages arrive via adk.messages.create; text via adk.streaming.
+    """
+
+    async def test_text_tool_text_current_wire_shape(
+        self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
+    ) -> None:
+        """Representative run: text -> tool call -> tool response -> more text.
+
+        Records the CURRENT delivery shape before reimplementation:
+        - Two streaming contexts (text segments).
+        - Two adk.messages.create calls (tool_request, tool_response).
+        - Final text == "It's sunny." (last segment only).
+        """
+        from pydantic_ai.messages import ToolReturnPart
+
+        streaming, messages = fake_adk
+        events = [
+            PartStartEvent(index=0, part=TextPart(content="")),
+            PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="Looking up...")),
+            PartEndEvent(index=0, part=TextPart(content="Looking up...")),
+            PartStartEvent(
+                index=1,
+                part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1"),
+            ),
+            PartEndEvent(
+                index=1,
+                part=ToolCallPart(tool_name="get_weather", args="{}", tool_call_id="c1"),
+            ),
+            FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny", tool_call_id="c1"),
+            ),
+            PartStartEvent(index=0, part=TextPart(content="")),
+            PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="It's sunny.")),
+            PartEndEvent(index=0, part=TextPart(content="It's sunny.")),
+        ]
+
+        final = await stream_pydantic_ai_events(_aiter(events), TASK_ID)
+
+        assert final == "It's sunny.", "multi-step: only the last text segment is returned"
+        assert len(streaming.contexts) == 2, "two text segments -> two streaming contexts"
+        assert all(ctx.closed for ctx in streaming.contexts)
+        assert _text_deltas(streaming.contexts[0]) == ["Looking up..."]
+        assert _text_deltas(streaming.contexts[1]) == ["It's sunny."]
+
+        # CURRENT shape: tool messages arrive via adk.messages.create
+        assert len(messages.created) == 2, "one tool_request + one tool_response"
+        assert isinstance(messages.created[0]["content"], ToolRequestContent)
+        assert messages.created[0]["content"].tool_call_id == "c1"
+        assert messages.created[0]["content"].name == "get_weather"
+        assert isinstance(messages.created[1]["content"], ToolResponseContent)
+        assert messages.created[1]["content"].tool_call_id == "c1"
+        assert messages.created[1]["content"].content == "Sunny"
