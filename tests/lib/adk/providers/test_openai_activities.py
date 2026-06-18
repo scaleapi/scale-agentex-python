@@ -618,6 +618,48 @@ class TestOpenAIActivities:
         else:
             raise ValueError(f"Unknown tools_case: {tools_case}")
 
+    @patch("agents.Runner.run_streamed")
+    async def test_run_agent_streamed_auto_send_forwards_created_at(self, mock_runner_run_streamed):
+        """created_at is forwarded to every streaming context opened by auto_send_turn (AGX1-378)."""
+        from datetime import datetime, timezone
+
+        from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+            RunAgentStreamedAutoSendParams,
+        )
+
+        deterministic_ts = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+
+        mock_streaming_result = self._create_streaming_result_mock()
+
+        async def _no_events():
+            return
+            yield  # make it an async generator
+
+        mock_streaming_result.stream_events = _no_events
+        mock_runner_run_streamed.return_value = mock_streaming_result
+
+        mock_tracer = self._create_mock_tracer()
+        openai_service, openai_activities, env = self._create_test_setup(mock_tracer)
+        mock_ctx, recorded_created_ats = self._setup_streaming_service_mocks_with_created_at(openai_service)
+
+        params = RunAgentStreamedAutoSendParams(
+            input_list=[{"role": "user", "content": "hello"}],
+            mcp_server_params=[],
+            agent_name="test_agent",
+            agent_instructions="You are a helpful assistant",
+            trace_id="test-trace-id",
+            parent_span_id="test-span-id",
+            task_id="test-task-id",
+            created_at=deterministic_ts,
+        )
+
+        await env.run(openai_activities.run_agent_streamed_auto_send, params)
+
+        assert all(ts == deterministic_ts for ts in recorded_created_ats), (
+            f"Expected all streaming contexts to receive created_at={deterministic_ts!r}, "
+            f"got: {recorded_created_ats!r}"
+        )
+
     def _setup_streaming_service_mocks(self, openai_service):
         """Helper method to setup streaming service mocks for run_agent_auto_send."""
         from unittest.mock import AsyncMock
@@ -664,6 +706,39 @@ class TestOpenAIActivities:
         openai_service.agentex_client = mock_agentex_client
 
         return mock_streaming_context
+
+    def _setup_streaming_service_mocks_with_created_at(self, openai_service):
+        """Like _setup_streaming_service_mocks but also records every created_at kwarg."""
+        from contextlib import asynccontextmanager
+        from unittest.mock import AsyncMock
+
+        from agentex.types.task_message import TaskMessage
+
+        mock_streaming_service = AsyncMock()
+        mock_agentex_client = AsyncMock()
+
+        mock_streaming_context = AsyncMock()
+        mock_task_message = Mock(spec=TaskMessage)
+        mock_task_message.id = "test-task-message-id"
+        mock_task_message.task_id = "test-task-id"
+        mock_task_message.content = {"type": "text", "content": "test"}
+        mock_streaming_context.task_message = mock_task_message
+        mock_streaming_context.stream_update = AsyncMock()
+
+        recorded_created_ats: list = []
+
+        @asynccontextmanager
+        async def mock_ctx_manager(*_args, **kwargs):
+            recorded_created_ats.append(kwargs.get("created_at"))
+            yield mock_streaming_context
+
+        mock_streaming_service.streaming_task_message_context = mock_ctx_manager
+        mock_streaming_context.opened_contents = []
+
+        openai_service.streaming_service = mock_streaming_service
+        openai_service.agentex_client = mock_agentex_client
+
+        return mock_streaming_context, recorded_created_ats
 
     def _create_code_interpreter_tool_call_mock(self, call_id="code_interpreter_call_123"):
         """Helper to create ResponseCodeInterpreterToolCall mock objects."""

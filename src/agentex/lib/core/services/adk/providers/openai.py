@@ -742,18 +742,13 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent streamed auto send")
 
-            # created_at limitation: the unified auto_send path
-            # (UnifiedEmitter.auto_send_turn -> auto_send) does not thread the
-            # workflow-supplied created_at through to the per-message streaming
-            # contexts it opens for the agent's turn. The previous inline loop
-            # stamped the first message of the turn with workflow.now() to win
-            # the race against the workflow's user-echo at the server; under the
-            # unified surface that first agent message instead falls back to the
-            # server's wall clock. This is an accepted trade-off for migrating
-            # onto the shared harness; if strict first-message ordering becomes
-            # necessary, auto_send must accept and dispense a created_at.
-            # The dispenser is still used below for the guardrail-rejection
-            # messages, which open their own streaming contexts directly.
+            # AGX1-378 restored: created_at is now threaded through
+            # UnifiedEmitter.auto_send_turn -> auto_send -> every
+            # streaming_task_message_context call, so the first agent message of
+            # the turn is stamped with the workflow-supplied timestamp (e.g.
+            # workflow.now()) just as the original inline loop did.
+            # The dispenser is still used below for guardrail-rejection messages,
+            # which open their own streaming contexts directly.
             _take_created_at = _make_created_at_dispenser(created_at)
 
             async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
@@ -817,7 +812,7 @@ class OpenAIService:
                 )
 
                 try:
-                    await emitter.auto_send_turn(turn)
+                    await emitter.auto_send_turn(turn, created_at=created_at)
 
                 except InputGuardrailTripwireTriggered as e:
                     # Handle guardrail trigger by sending a rejection message
