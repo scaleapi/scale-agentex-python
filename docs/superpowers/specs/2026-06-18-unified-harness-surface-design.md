@@ -112,8 +112,9 @@ Default-on whenever a trace context exists; **overridable** by passing a custom 
 `is_error`/`status` field (only `content`), so a derived tool span cannot mark failure. The
 golden agent's `ToolCompleted` carried `is_error`. Recommended resolution: add an additive
 optional `is_error: bool | None` to `ToolResponseContent`. This is a generated type, so it is
-a small upstream API-spec change (tracked as a prerequisite to the relevant migration PR), not
-a local edit. Until it lands, derived spans omit tool error status rather than inferring it.
+a small upstream API-spec change, not a local edit. **Deferred** — tracked in Linear as
+AGX1-371 (Agentex "Starter Tasks"). Until it lands, derived spans omit tool error status
+rather than inferring it.
 
 ### Facade
 
