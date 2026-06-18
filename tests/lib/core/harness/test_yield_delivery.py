@@ -56,3 +56,22 @@ async def test_yield_without_tracer_is_pure_passthrough():
     ]
     out = [e async for e in yield_events(_gen(events), tracer=None)]
     assert out == events
+
+
+@pytest.mark.asyncio
+async def test_flush_runs_on_early_close():
+    fake = _RecordTracing()
+    tracer = SpanTracer(trace_id="t", parent_span_id="p", tracing=fake)
+    events = [
+        StreamTaskMessageStart(type="start", index=0,
+            content=ToolRequestContent(type="tool_request", author="agent",
+                                       tool_call_id="c", name="Bash", arguments={})),
+        StreamTaskMessageDone(type="done", index=0),
+        # response intentionally never arrives
+    ]
+    gen = yield_events(_gen(events), tracer=tracer)
+    first = await gen.__anext__()   # Start
+    second = await gen.__anext__()  # Done -> tool span opens here
+    await gen.aclose()              # triggers the finally -> flush()
+    assert fake.started == ["Bash"]
+    assert fake.ended == [None]     # flush closed the unpaired span (incomplete, no output)
