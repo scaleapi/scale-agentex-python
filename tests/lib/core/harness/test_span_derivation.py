@@ -166,3 +166,92 @@ def test_orphan_tool_response_ignored():
         ),
     ]
     assert _signals(d, events) == []
+
+
+def test_full_tool_request_opens_span():
+    """Full(ToolRequestContent) must open a tool span (for LangGraph-style harnesses)."""
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageFull(
+            type="full",
+            index=0,
+            content=ToolRequestContent(
+                type="tool_request",
+                author="agent",
+                tool_call_id="call_x",
+                name="Bash",
+                arguments={"cmd": "ls"},
+            ),
+        ),
+    ]
+    sigs = _signals(d, events)
+    assert sigs[0] == OpenSpan(key="call_x", kind="tool", name="Bash", input={"cmd": "ls"})
+    assert sigs[1] == CloseSpan(key="call_x", output=None, is_complete=False)
+
+
+def test_full_tool_request_and_response_paired():
+    """Full(ToolRequestContent) + Full(ToolResponseContent) produces a complete span pair."""
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageFull(
+            type="full",
+            index=0,
+            content=ToolRequestContent(
+                type="tool_request",
+                author="agent",
+                tool_call_id="call_y",
+                name="Grep",
+                arguments={},
+            ),
+        ),
+        StreamTaskMessageFull(
+            type="full",
+            index=1,
+            content=ToolResponseContent(
+                type="tool_response",
+                author="agent",
+                tool_call_id="call_y",
+                name="Grep",
+                content="result",
+            ),
+        ),
+    ]
+    sigs = _signals(d, events)
+    assert sigs == [
+        OpenSpan(key="call_y", kind="tool", name="Grep", input={}),
+        CloseSpan(key="call_y", output="result", is_complete=True),
+    ]
+
+
+def test_full_tool_request_does_not_double_open():
+    """A Full(ToolRequestContent) for an already-open tool_call_id is a no-op."""
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageStart(
+            type="start",
+            index=0,
+            content=ToolRequestContent(
+                type="tool_request",
+                author="agent",
+                tool_call_id="call_z",
+                name="X",
+                arguments={},
+            ),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+        StreamTaskMessageFull(
+            type="full",
+            index=1,
+            content=ToolRequestContent(
+                type="tool_request",
+                author="agent",
+                tool_call_id="call_z",
+                name="X",
+                arguments={},
+            ),
+        ),
+    ]
+    sigs = _signals(d, events)
+    opens = [s for s in sigs if isinstance(s, OpenSpan)]
+    assert len(opens) == 1
+    assert opens[0].key == "call_z"

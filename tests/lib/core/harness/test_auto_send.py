@@ -10,6 +10,7 @@ This mirrors _langgraph_async.py lines 62-78 and 100-127.
 """
 
 import types as _types
+from datetime import datetime
 
 import pytest
 
@@ -17,6 +18,7 @@ from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message_delta import TextDelta
+from agentex.types.tool_request_delta import ToolRequestDelta
 from agentex.types.task_message_update import (
     StreamTaskMessageDone,
     StreamTaskMessageFull,
@@ -64,10 +66,12 @@ class _FakeStreaming:
 
     def __init__(self):
         self.sink = []
+        self.recorded_created_at: list[datetime | None] = []
 
     def streaming_task_message_context(self, task_id, initial_content, streaming_mode="coalesced", created_at=None):
         ctype = getattr(initial_content, "type", None)
         self.sink.append(("ctx", ctype))
+        self.recorded_created_at.append(created_at)
         return _FakeCtx(self.sink, ctype, initial_content)
 
 
@@ -127,22 +131,10 @@ async def test_auto_send_streams_text_and_returns_final_text():
 async def test_auto_send_posts_full_tool_messages():
     streaming = _FakeStreaming()
     events = [
-        # A bare tool_request Start (no Done/Full) must NOT open a streaming
-        # context on its own — only Full events post messages.
-        StreamTaskMessageStart(
-            type="start",
-            index=0,
-            content=ToolRequestContent(
-                type="tool_request",
-                author="agent",
-                tool_call_id="c0",
-                name="Bash",
-                arguments={},
-            ),
-        ),
+        # Two Full events post two messages (open+close immediately, no deltas).
         StreamTaskMessageFull(
             type="full",
-            index=1,
+            index=0,
             content=ToolRequestContent(
                 type="tool_request",
                 author="agent",
@@ -153,7 +145,7 @@ async def test_auto_send_posts_full_tool_messages():
         ),
         StreamTaskMessageFull(
             type="full",
-            index=2,
+            index=1,
             content=ToolResponseContent(
                 type="tool_response",
                 author="agent",
@@ -167,8 +159,7 @@ async def test_auto_send_posts_full_tool_messages():
 
     assert result.final_text == ""
 
-    # The opened contexts correspond ONLY to the two Full events — the
-    # tool_request Start did not open a context.
+    # Each Full event opens and closes exactly one context.
     ctx_events = [s for s in streaming.sink if s[0] == "ctx"]
     assert len(ctx_events) == 2
     content_types = [s[1] for s in ctx_events]
@@ -307,3 +298,193 @@ async def test_open_context_closed_on_midstream_error():
     # The text context that was opened mid-stream was closed by the finally block.
     assert ("open", "text") in [(s[0], s[1]) for s in streaming.sink]
     assert ("close", "text") in [(s[0], s[1]) for s in streaming.sink]
+
+
+# ---------------------------------------------------------------------------
+# Test 6: streamed tool_request delivered (AGX1-377 core)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_auto_send_streams_tool_request():
+    """A Start(ToolRequestContent) MUST open a streaming context (AGX1-377)."""
+    streaming = _FakeStreaming()
+    events = [
+        StreamTaskMessageStart(
+            type="start",
+            index=0,
+            content=ToolRequestContent(
+                type="tool_request",
+                author="agent",
+                tool_call_id="c_tool",
+                name="Bash",
+                arguments={},
+            ),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=ToolRequestDelta(
+                type="tool_request",
+                tool_call_id="c_tool",
+                name="Bash",
+                arguments_delta='{"cmd": "ls"}',
+            ),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+    ]
+    result = await auto_send(_gen(events), task_id="task1", tracer=None, streaming=streaming)
+
+    assert result.final_text == ""
+
+    ctx_events = [s for s in streaming.sink if s[0] == "ctx"]
+    assert len(ctx_events) == 1
+    assert ctx_events[0][1] == "tool_request"
+
+    opens = [s for s in streaming.sink if s[0] == "open"]
+    closes = [s for s in streaming.sink if s[0] == "close"]
+    assert len(opens) == 1
+    assert len(closes) == 1
+
+    updates = [s for s in streaming.sink if s[0] == "update"]
+    assert len(updates) == 1
+
+
+# ---------------------------------------------------------------------------
+# Test 7: interleaved indexes route correctly
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_auto_send_interleaved_indexes_route_correctly():
+    """Deltas must be routed to the correct index-keyed context."""
+    streaming = _FakeStreaming()
+    events = [
+        StreamTaskMessageStart(
+            type="start",
+            index=0,
+            content=TextContent(type="text", author="agent", content=""),
+        ),
+        StreamTaskMessageStart(
+            type="start",
+            index=1,
+            content=TextContent(type="text", author="agent", content=""),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=TextDelta(type="text", text_delta="A"),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=1,
+            delta=TextDelta(type="text", text_delta="B"),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+        StreamTaskMessageDone(type="done", index=1),
+    ]
+    result = await auto_send(_gen(events), task_id="task1", tracer=None, streaming=streaming)
+
+    ctx_events = [s for s in streaming.sink if s[0] == "ctx"]
+    assert len(ctx_events) == 2
+
+    opens = [s for s in streaming.sink if s[0] == "open"]
+    assert len(opens) == 2
+
+    updates = [s for s in streaming.sink if s[0] == "update"]
+    assert len(updates) == 2
+
+    update_deltas = [s[1].delta for s in streaming.sink if s[0] == "update"]
+    text_deltas = [d.text_delta for d in update_deltas if isinstance(d, TextDelta)]
+    assert set(text_deltas) == {"A", "B"}
+
+
+# ---------------------------------------------------------------------------
+# Test 8: final_text returns last text segment for multi-step
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_auto_send_final_text_last_segment():
+    """final_text must be the LAST text segment, not accumulated across all turns."""
+    streaming = _FakeStreaming()
+    events = [
+        StreamTaskMessageStart(
+            type="start",
+            index=0,
+            content=TextContent(type="text", author="agent", content=""),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=TextDelta(type="text", text_delta="First"),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+        StreamTaskMessageStart(
+            type="start",
+            index=1,
+            content=TextContent(type="text", author="agent", content=""),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=1,
+            delta=TextDelta(type="text", text_delta="Second"),
+        ),
+        StreamTaskMessageDone(type="done", index=1),
+    ]
+    result = await auto_send(_gen(events), task_id="task1", tracer=None, streaming=streaming)
+    assert result.final_text == "Second"
+
+
+# ---------------------------------------------------------------------------
+# Test 9: Full(TextContent) contributes to final_text
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_auto_send_full_text_content_sets_final_text():
+    """A Full(TextContent) must contribute its text to final_text."""
+    streaming = _FakeStreaming()
+    events = [
+        StreamTaskMessageFull(
+            type="full",
+            index=0,
+            content=TextContent(type="text", author="agent", content="hello"),
+        ),
+    ]
+    result = await auto_send(_gen(events), task_id="task1", tracer=None, streaming=streaming)
+    assert result.final_text == "hello"
+
+
+# ---------------------------------------------------------------------------
+# Test 10: created_at is forwarded to streaming context (AGX1-378)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_auto_send_created_at_forwarded():
+    """created_at must be forwarded to every streaming_task_message_context call."""
+    streaming = _FakeStreaming()
+    dt = datetime(2025, 1, 15, 12, 0, 0)
+    events = [
+        StreamTaskMessageStart(
+            type="start",
+            index=0,
+            content=TextContent(type="text", author="agent", content=""),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+        StreamTaskMessageFull(
+            type="full",
+            index=1,
+            content=ToolRequestContent(
+                type="tool_request",
+                author="agent",
+                tool_call_id="c_ts",
+                name="Bash",
+                arguments={},
+            ),
+        ),
+    ]
+    await auto_send(_gen(events), task_id="task1", tracer=None, streaming=streaming, created_at=dt)
+
+    assert all(ts == dt for ts in streaming.recorded_created_at)
