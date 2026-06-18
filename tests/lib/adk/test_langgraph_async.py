@@ -1,9 +1,14 @@
-"""Characterization tests for stream_langgraph_events.
+"""Characterization tests for stream_langgraph_events (unified surface).
 
-These tests record the current behavior of the bespoke ``stream_langgraph_events``
-implementation BEFORE the unified-surface refactor (Task 4). They act as a
-contract test: after Task 4 rewrites the internals, these tests must still pass,
-proving behavioral parity.
+These tests verify the behavior of ``stream_langgraph_events`` after it was
+reimplemented on top of ``LangGraphTurn`` + ``UnifiedEmitter.auto_send_turn``
+(Task 4). They serve as a contract test for the public signature.
+
+Key behavioral notes (unified surface vs. old bespoke implementation):
+- Tool calls/responses are posted via ``streaming_task_message_context`` (not
+  ``adk.messages.create``); they appear as contexts with no stream_update calls.
+- ``final_text`` accumulates ALL text across the turn (the old bespoke impl
+  only returned the last text segment — behavior varied across models).
 
 NOTE: langchain_core imports are deferred to test scope because conftest.py
 stubs ``langchain_core.messages`` with MagicMock.
@@ -128,7 +133,7 @@ def _text_deltas(ctx: FakeContext) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Characterization tests
+# Characterization tests (unified surface behavior)
 # ---------------------------------------------------------------------------
 
 
@@ -156,6 +161,8 @@ class TestCharacterization:
         assert isinstance(ctx.initial_content, TextContent)
         assert _text_deltas(ctx) == ["Hello, world!"]
         assert ctx.closed is True
+        # Unified surface: no messages.create for text
+        assert messages.created == []
 
     async def test_empty_stream_returns_empty_string(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
@@ -165,50 +172,69 @@ class TestCharacterization:
         assert final == ""
         assert streaming.contexts == []
 
-    async def test_tool_call_creates_tool_request_message(
+    async def test_tool_call_posted_via_streaming_context(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
+        """Unified surface: tool calls go through streaming_task_message_context,
+        not adk.messages.create. The context is opened and immediately closed
+        (no deltas) so the initial_content is the tool request."""
         from langchain_core.messages import AIMessage
 
-        _, messages = fake_adk
+        streaming, messages = fake_adk
         tc = {"id": "call_1", "name": "get_weather", "args": {"city": "Paris"}}
         ai_msg = AIMessage(content="", tool_calls=[tc])
         stream = _make_stream([("updates", {"agent": {"messages": [ai_msg]}})])
 
         await stream_langgraph_events(stream, TASK_ID)
 
-        assert len(messages.created) == 1
-        content = messages.created[0]["content"]
+        # Unified surface: tool messages go via streaming_task_message_context
+        assert len(streaming.contexts) == 1
+        assert messages.created == [], "Unified surface uses streaming_task_message_context, not messages.create"
+
         from agentex.types.tool_request_content import ToolRequestContent
 
+        content = streaming.contexts[0].initial_content
         assert isinstance(content, ToolRequestContent)
         assert content.tool_call_id == "call_1"
         assert content.name == "get_weather"
         assert content.arguments == {"city": "Paris"}
+        # Full messages close immediately (no delta updates)
+        assert streaming.contexts[0].closed is True
+        assert streaming.contexts[0].updates == []
 
-    async def test_tool_response_creates_tool_response_message(
+    async def test_tool_response_posted_via_streaming_context(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
+        """Unified surface: tool responses go through streaming_task_message_context."""
         from langchain_core.messages import ToolMessage
 
-        _, messages = fake_adk
+        streaming, messages = fake_adk
         tool_msg = ToolMessage(content="Sunny, 72F", tool_call_id="call_1", name="get_weather")
         stream = _make_stream([("updates", {"tools": {"messages": [tool_msg]}})])
 
         await stream_langgraph_events(stream, TASK_ID)
 
-        assert len(messages.created) == 1
-        content = messages.created[0]["content"]
+        assert len(streaming.contexts) == 1
+        assert messages.created == []
+
         from agentex.types.tool_response_content import ToolResponseContent
 
+        content = streaming.contexts[0].initial_content
         assert isinstance(content, ToolResponseContent)
         assert content.tool_call_id == "call_1"
         assert content.name == "get_weather"
         assert content.content == "Sunny, 72F"
+        assert streaming.contexts[0].closed is True
 
-    async def test_multi_step_text_then_tool_then_text(
+    async def test_multi_step_text_then_tool_then_text_accumulates_all_text(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
+        """Unified surface: final_text accumulates all text across the turn.
+
+        Old bespoke impl only returned the last text segment (reset final_text
+        each time a new text context opened). The unified surface accumulates
+        all text because auto_send appends every TextDelta.
+        """
         from langchain_core.messages import AIMessage, ToolMessage, AIMessageChunk
 
         streaming, messages = fake_adk
@@ -230,12 +256,15 @@ class TestCharacterization:
 
         final = await stream_langgraph_events(stream, TASK_ID)
 
-        assert final == "Found it!"
-        # Tool request + tool response messages
-        assert len(messages.created) == 2
-        # Two text streaming contexts
-        assert len(streaming.contexts) == 2
-        assert all(ctx.closed for ctx in streaming.contexts)
+        # Unified surface accumulates all text (not just the last segment)
+        assert "Looking up..." in final
+        assert "Found it!" in final
+        # Two text streaming contexts (one per text segment)
+        text_ctxs = [c for c in streaming.contexts if isinstance(c.initial_content, TextContent)]
+        assert len(text_ctxs) == 2
+        assert all(ctx.closed for ctx in text_ctxs)
+        # Tool request + tool response via streaming_task_message_context (not messages.create)
+        assert messages.created == []
 
     async def test_context_closed_on_exception(self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]) -> None:
         from langchain_core.messages import AIMessageChunk
