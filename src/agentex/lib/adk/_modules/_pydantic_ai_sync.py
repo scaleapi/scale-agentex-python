@@ -21,7 +21,8 @@ Typical sync usage:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, AsyncIterator
+import inspect
+from typing import TYPE_CHECKING, Any, Callable, AsyncIterator
 
 from pydantic_ai.run import AgentRunResultEvent
 
@@ -105,6 +106,7 @@ def _tool_return_content(result: ToolReturnPart | Any) -> Any:
 async def convert_pydantic_ai_to_agentex_events(
     stream_response: AsyncIterator[Any],
     tracing_handler: "AgentexPydanticAITracingHandler | None" = None,
+    on_result: Callable[[AgentRunResultEvent], Any] | None = None,
 ) -> AsyncIterator[StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone]:
     """Convert a Pydantic AI agent event stream into Agentex stream events.
 
@@ -132,6 +134,12 @@ async def convert_pydantic_ai_to_agentex_events(
             tool call in the run is also recorded as an Agentex child span
             beneath the handler's configured ``parent_span_id``. Streaming
             behavior is unchanged when omitted.
+        on_result: Optional callback invoked with the terminal
+            ``AgentRunResultEvent`` when the run completes. Both sync and
+            async callables are accepted. No ``StreamTaskMessage*`` events are
+            yielded for this terminal event; the callback is the only side
+            effect. Useful for capturing run-level usage without altering the
+            streaming output.
 
     Yields:
         Agentex ``StreamTaskMessage*`` events suitable for forwarding back over
@@ -328,6 +336,10 @@ async def convert_pydantic_ai_to_agentex_events(
             # Already covered by PartStart/PartDelta/PartEnd events above, or
             # informational only (FinalResultEvent / AgentRunResultEvent signal
             # run-level state, not new content to surface).
+            if isinstance(event, AgentRunResultEvent) and on_result is not None:
+                ret = on_result(event)
+                if inspect.iscoroutine(ret):
+                    await ret
             continue
 
         else:
