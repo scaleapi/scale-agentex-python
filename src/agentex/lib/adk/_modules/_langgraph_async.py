@@ -16,6 +16,8 @@ AGX1-377 note: LangGraph emits tool requests as ``StreamTaskMessageFull`` events
 handles Full events correctly; no coalescing wrapper is needed.
 """
 
+from agentex.lib.utils.temporal import workflow_now_if_in_workflow
+
 
 async def stream_langgraph_events(stream, task_id: str) -> str:
     """Stream LangGraph events to Agentex via Redis.
@@ -37,6 +39,11 @@ async def stream_langgraph_events(stream, task_id: str) -> str:
     NOT Start+Delta+Done like pydantic-ai. ``auto_send`` handles Full events
     correctly; no coalescing wrapper is needed.
 
+    AGX1-378 note: ``created_at`` is set from ``workflow.now()`` when called inside a
+    Temporal workflow, matching the pattern used by the openai/litellm providers.
+    Outside a workflow (plain async activities, sync agents) it is ``None`` and the
+    server's wall clock is used.
+
     Args:
         stream: Async iterator from graph.astream(..., stream_mode=["messages", "updates"])
         task_id: The Agentex task ID to stream messages to.
@@ -50,7 +57,9 @@ async def stream_langgraph_events(stream, task_id: str) -> str:
     # AGX1-377 note: LangGraph emits tool requests as Full events (from "updates"),
     # NOT Start+Delta+Done like pydantic-ai. auto_send handles Full events correctly;
     # no coalescing wrapper is needed.
+    # AGX1-378: stamp messages with workflow.now() inside Temporal for deterministic
+    # created_at ordering; falls back to None (server wall clock) outside a workflow.
     turn = LangGraphTurn(stream, model=None)
     emitter = UnifiedEmitter(task_id=task_id, trace_id=None, parent_span_id=None)
-    result = await emitter.auto_send_turn(turn)
+    result = await emitter.auto_send_turn(turn, created_at=workflow_now_if_in_workflow())
     return result.final_text

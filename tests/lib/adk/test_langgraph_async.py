@@ -79,7 +79,7 @@ class FakeStreamingModule:
     def __init__(self) -> None:
         self.contexts: list[FakeContext] = []
 
-    def streaming_task_message_context(self, *, task_id: str, initial_content: Any) -> FakeContext:
+    def streaming_task_message_context(self, *, task_id: str, initial_content: Any, **kw: Any) -> FakeContext:
         tm = TaskMessage(
             id=f"m{len(self.contexts) + 1}",
             task_id=task_id,
@@ -226,14 +226,15 @@ class TestCharacterization:
         assert content.content == "Sunny, 72F"
         assert streaming.contexts[0].closed is True
 
-    async def test_multi_step_text_then_tool_then_text_accumulates_all_text(
+    async def test_multi_step_text_then_tool_then_text_last_segment(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        """Unified surface: final_text accumulates all text across the turn.
+        """Unified surface: final_text uses last-segment semantics.
 
-        Old bespoke impl only returned the last text segment (reset final_text
-        each time a new text context opened). The unified surface accumulates
-        all text because auto_send appends every TextDelta.
+        auto_send resets final_text_parts when a new Start(TextContent) is seen,
+        so multi-step turns (text -> tool -> text) return only the LAST text segment.
+        Both text contexts are still opened and streamed to Redis; only the
+        return value is last-segment. This matches stream_pydantic_ai_events.
         """
         from langchain_core.messages import AIMessage, ToolMessage, AIMessageChunk
 
@@ -256,10 +257,9 @@ class TestCharacterization:
 
         final = await stream_langgraph_events(stream, TASK_ID)
 
-        # Unified surface accumulates all text (not just the last segment)
-        assert "Looking up..." in final
-        assert "Found it!" in final
-        # Two text streaming contexts (one per text segment)
+        # Last segment only — first text segment is NOT in final_text
+        assert final == "Found it!"
+        # Two text streaming contexts (one per text segment) — both streamed to Redis
         text_ctxs = [c for c in streaming.contexts if isinstance(c.initial_content, TextContent)]
         assert len(text_ctxs) == 2
         assert all(ctx.closed for ctx in text_ctxs)

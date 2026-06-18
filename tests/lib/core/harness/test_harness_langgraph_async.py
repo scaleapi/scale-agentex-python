@@ -213,8 +213,14 @@ class TestAsyncAutoSendChannel:
         assert tool_resp_ctxs[0].initial_content.content == "Sunny, 72F"
         assert tool_resp_ctxs[0].closed is True
 
-    async def test_multi_step_accumulates_all_text(self):
-        """Unified surface: final_text accumulates all text, not just last segment."""
+    async def test_multi_step_final_text_is_last_segment(self):
+        """Unified surface: final_text uses last-segment semantics.
+
+        auto_send resets final_text_parts when a new Start(TextContent) is seen,
+        so multi-step turns (text -> tool -> text) return only the LAST text segment.
+        This matches the behaviour documented in auto_send.py and mirrors
+        stream_pydantic_ai_events.
+        """
         from langchain_core.messages import AIMessage, ToolMessage, AIMessageChunk
 
         chunk1 = AIMessageChunk(content="Searching...")
@@ -232,11 +238,10 @@ class TestAsyncAutoSendChannel:
         ]
         result, fake_streaming, _ = await _run_auto_send_turn(events)
 
-        # All text accumulated
-        assert "Searching..." in result.final_text
-        assert "Found it!" in result.final_text
+        # Last segment only — first text segment is NOT in final_text
+        assert result.final_text == "Found it!"
 
-        # Two text streaming contexts
+        # Two text streaming contexts still opened (both streamed to Redis)
         text_ctxs = [c for c in fake_streaming.contexts if isinstance(c.initial_content, TextContent)]
         assert len(text_ctxs) == 2
 
@@ -269,8 +274,12 @@ class TestAsyncAutoSendChannel:
         assert usage.output_tokens == 5
         assert usage.total_tokens == 15
 
-    async def test_tracer_does_not_produce_tool_spans_for_full_events(self):
-        """AGX1-377: Full events don't trigger SpanDeriver tool spans."""
+    async def test_tracer_produces_tool_spans_for_full_events(self):
+        """AGX1-377: SpanDeriver now handles Full tool events (request opens, response closes).
+
+        Full(ToolRequestContent) opens a tool span; Full(ToolResponseContent) closes it.
+        This aligns LangGraph tracing with Start+Done harnesses (pydantic-ai, openai-agents).
+        """
         from langchain_core.messages import AIMessage, ToolMessage
 
         tc = {"id": "c1", "name": "t", "args": {}}
@@ -284,4 +293,6 @@ class TestAsyncAutoSendChannel:
         _, _, fake_tracing = await _run_auto_send_turn(events, trace_id="trace-1")
 
         assert fake_tracing is not None
-        assert fake_tracing.started == [], "AGX1-377: Full events don't trigger tool spans"
+        assert len(fake_tracing.started) == 1, "Full(ToolRequestContent) opens one tool span"
+        assert fake_tracing.started[0][0] == "t", "span name matches the tool name"
+        assert len(fake_tracing.ended) == 1, "Full(ToolResponseContent) closes the span"

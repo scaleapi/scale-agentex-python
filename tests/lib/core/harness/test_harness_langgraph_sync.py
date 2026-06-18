@@ -189,9 +189,12 @@ class TestSyncYieldChannel:
         out, _ = await _run_yield_turn([])
         assert out == []
 
-    async def test_tracer_invoked_but_no_tool_spans_for_full_events(self):
-        """AGX1-377: tool spans are NOT derived from Full events (SpanDeriver uses Start+Done).
-        This is the documented gap; full cross-channel equivalence arrives with AGX1-373."""
+    async def test_tracer_produces_tool_spans_for_full_events(self):
+        """AGX1-377: SpanDeriver now handles Full tool events (request opens, response closes).
+
+        Full(ToolRequestContent) opens a tool span; Full(ToolResponseContent) closes it.
+        This aligns LangGraph tracing with Start+Done harnesses (pydantic-ai, openai-agents).
+        """
         from langchain_core.messages import AIMessage, ToolMessage
 
         tc = {"id": "c1", "name": "t", "args": {}}
@@ -205,8 +208,9 @@ class TestSyncYieldChannel:
         _, fake_tracing = await _run_yield_turn(events, trace_id="trace-1")
 
         assert fake_tracing is not None
-        # No tool spans opened — Full events don't trigger OpenSpan in SpanDeriver
-        assert fake_tracing.started == [], "Expected no tool spans for LangGraph Full events (AGX1-377)"
+        assert len(fake_tracing.started) == 1, "Full(ToolRequestContent) opens one tool span"
+        assert fake_tracing.started[0][0] == "t", "span name matches the tool name"
+        assert len(fake_tracing.ended) == 1, "Full(ToolResponseContent) closes the span"
 
     async def test_usage_captured_after_yield(self):
         from langchain_core.messages import AIMessage

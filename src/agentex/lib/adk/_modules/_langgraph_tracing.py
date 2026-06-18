@@ -14,7 +14,6 @@
 
 from __future__ import annotations
 
-import warnings
 from uuid import UUID
 from typing import Any, override
 
@@ -268,13 +267,6 @@ def create_langgraph_tracing_handler(
 
         This function remains available for backward compatibility.
     """
-    warnings.warn(
-        "create_langgraph_tracing_handler is deprecated. Use LangGraphTurn with "
-        "UnifiedEmitter instead — the unified harness derives equivalent spans from "
-        "the canonical event stream without a LangChain callback handler.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
     return AgentexLangGraphTracingHandler(
         trace_id=trace_id,
         parent_span_id=parent_span_id,

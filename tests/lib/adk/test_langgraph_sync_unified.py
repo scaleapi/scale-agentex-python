@@ -149,16 +149,13 @@ class TestSpanDerivation:
         )
         return tracer, backend
 
-    async def test_tool_span_not_derived_from_full_events(self, fake_tracer):
-        """AGX1-377: LangGraph emits tool calls as Full events (not Start+Done).
-        The SpanDeriver opens tool spans from Start(ToolRequestContent)+Done
-        sequences. Since LangGraph uses Full, no tool span is opened by the
-        SpanDeriver -- this is the documented AGX1-377 gap resolved by the
-        unified surface (Full events are emitted identically; cross-channel
-        span equivalence arrives with AGX1-373).
+    async def test_tool_span_derived_from_full_events(self, fake_tracer):
+        """AGX1-377: SpanDeriver now handles Full tool events for LangGraph.
 
-        The tracer must still be invoked (SpanDeriver.observe is called for each
-        event); it just produces no open-span signals for LangGraph Full tool events.
+        Full(ToolRequestContent) opens a tool span keyed by tool_call_id;
+        Full(ToolResponseContent) closes it. This bridges the previous gap where
+        LangGraph's Full-event path produced no spans, aligning it with
+        Start+Done harnesses (pydantic-ai, openai-agents).
         """
         from langchain_core.messages import AIMessage, ToolMessage
 
@@ -175,13 +172,10 @@ class TestSpanDerivation:
         emitter = UnifiedEmitter(task_id="t", trace_id="trace1", parent_span_id=None, tracer=tracer)
         _ = [e async for e in emitter.yield_turn(LangGraphTurn(_make_stream(events_raw)))]
 
-        # AGX1-377: Full events don't produce tool spans via SpanDeriver today.
-        # This is the documented gap; full cross-channel equivalence arrives with AGX1-373.
-        assert backend.spans_started == [], (
-            "Expected no tool spans for LangGraph Full events (AGX1-377); if this "
-            "assertion fails it means SpanDeriver now handles Full events — update "
-            "the test to assert the new span names."
-        )
+        assert len(backend.spans_started) == 1, "Full(ToolRequestContent) opens one tool span"
+        started = backend.spans_started[0]
+        assert started["name"] == "get_weather"
+        assert started["input"] == {"city": "Paris"}
 
     async def test_no_spans_when_no_tool_calls(self, fake_tracer):
         """yield_turn with tracer but no tool calls emits no spans."""
