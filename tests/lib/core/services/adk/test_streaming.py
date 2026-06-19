@@ -303,6 +303,60 @@ class TestCoalescingBufferTimeWindow:
             await buf.close()
 
 
+class TestCoalescingBufferIdleParks:
+    """Regression: the ticker must park (block on its wake event) when there is
+    no buffered data, instead of waking every FLUSH_INTERVAL_S. The old
+    fixed-interval ticker spun at 1/FLUSH_INTERVAL forever, so a buffer that
+    outlived its stream (orphaned, close() not run) pinned worker CPU — one
+    spinning task per such stream.
+    """
+
+    @staticmethod
+    def _count_drains(buf: CoalescingBuffer) -> list[int]:
+        """Instrument _drain_locked to count ticker wake/drain cycles."""
+        n = [0]
+        orig = buf._drain_locked
+
+        def counting() -> list[StreamTaskMessageDelta]:
+            n[0] += 1
+            return orig()
+
+        buf._drain_locked = counting  # type: ignore[method-assign]
+        return n
+
+    @pytest.mark.asyncio
+    async def test_idle_buffer_does_not_spin(self) -> None:
+        """With no data ever added, the ticker must not drain at all over many
+        FLUSH_INTERVAL_S windows."""
+        buf = CoalescingBuffer(on_flush=AsyncMock())
+        drains = self._count_drains(buf)
+        buf.start()
+        try:
+            # ~8 windows at FLUSH_INTERVAL_S=0.050; a polling ticker would have
+            # woken ~8 times. A parked ticker drains 0 times.
+            await asyncio.sleep(0.4)
+            assert drains[0] == 0, f"idle ticker woke {drains[0]}x (must park at 0)"
+        finally:
+            await buf.close()
+
+    @pytest.mark.asyncio
+    async def test_orphaned_buffer_parks_after_flush(self, task_message: TaskMessage) -> None:
+        """A buffer whose close() never runs (orphaned on an abnormal stream
+        exit) must still park at zero CPU once its data is drained — not spin.
+        This is the exact condition that previously leaked worker CPU."""
+        buf = CoalescingBuffer(on_flush=AsyncMock())
+        buf.start()
+        try:
+            await buf.add(_text(task_message, "hi"))  # one immediate flush
+            await asyncio.sleep(0.020)  # let it flush and park
+            drains = self._count_drains(buf)
+            # Deliberately do NOT close — simulate an orphaned buffer.
+            await asyncio.sleep(0.4)
+            assert drains[0] == 0, f"orphaned ticker woke {drains[0]}x (must park at 0)"
+        finally:
+            await buf.close()  # cleanup only
+
+
 class TestCoalescingBufferClose:
     @pytest.mark.asyncio
     async def test_close_drains_remaining_buffered_items(self, task_message: TaskMessage) -> None:

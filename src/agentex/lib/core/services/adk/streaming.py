@@ -166,7 +166,12 @@ class CoalescingBuffer:
         self._first_flushed = False
         self._closed = False
         self._lock = asyncio.Lock()
-        self._flush_signal = asyncio.Event()
+        # Two events so the ticker can park at zero CPU when idle:
+        #   _wake      — buffer went empty -> non-empty; the ticker should run
+        #   _flush_now — flush immediately (first delta / size threshold / close),
+        #                bypassing the coalescing window
+        self._wake = asyncio.Event()
+        self._flush_now = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
 
     def start(self) -> None:
@@ -177,22 +182,42 @@ class CoalescingBuffer:
         if self._closed:
             return
         async with self._lock:
+            was_empty = not self._buf
             self._buf.append(update)
             self._buf_chars += _delta_char_len(update.delta)
             if not self._first_flushed or self._buf_chars >= self.MAX_BUFFERED_CHARS:
                 self._first_flushed = True
-                self._flush_signal.set()
+                self._flush_now.set()
+            # Wake the (possibly parked) ticker when the buffer goes from empty
+            # to non-empty; it then applies the coalescing window itself.
+            if was_empty:
+                self._wake.set()
 
     async def _run(self) -> None:
         try:
             while True:
-                try:
-                    await asyncio.wait_for(self._flush_signal.wait(), timeout=self.FLUSH_INTERVAL_S)
-                except asyncio.TimeoutError:
-                    pass
+                # Park at zero CPU until there is data to flush (or close()).
+                # This is the key change from a fixed-interval ticker: an idle
+                # or orphaned buffer blocks here instead of waking every
+                # FLUSH_INTERVAL_S forever — the latter leaked CPU when a buffer
+                # outlived its stream without close() running (one spinning task
+                # per such stream).
+                await self._wake.wait()
+                self._wake.clear()
+                # First delta / size threshold / close flush immediately;
+                # otherwise coalesce for up to FLUSH_INTERVAL_S so consecutive
+                # deltas batch into a single publish.
+                if not self._flush_now.is_set() and not self._closed:
+                    try:
+                        await asyncio.wait_for(self._flush_now.wait(), timeout=self.FLUSH_INTERVAL_S)
+                    except asyncio.TimeoutError:
+                        pass
                 async with self._lock:
-                    self._flush_signal.clear()
+                    self._flush_now.clear()
                     drained = self._drain_locked()
+                    # Data that arrived during the flush keeps the ticker running.
+                    if self._buf:
+                        self._wake.set()
                 for u in drained:
                     try:
                         await self._on_flush(u)
@@ -215,12 +240,17 @@ class CoalescingBuffer:
         # producing the duplicate-tail symptom seen on the UI stream.
         self._closed = True
         if self._task is not None:
-            self._flush_signal.set()
+            # Wake the parked ticker so it sees _closed and exits after its
+            # next drain.
+            self._wake.set()
+            self._flush_now.set()
             try:
                 await self._task
             except asyncio.CancelledError:
-                # Propagate if our caller is being cancelled; the task itself
-                # swallows CancelledError so this only fires on outer cancel.
+                # Our caller is being cancelled. Force-cancel the ticker so it
+                # can never be orphaned into a parked/looping task, then
+                # propagate the cancellation.
+                self._task.cancel()
                 raise
             self._task = None
         async with self._lock:
