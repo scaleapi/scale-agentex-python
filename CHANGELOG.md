@@ -1,5 +1,215 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
+
+## 0.13.1 (2026-06-17)
+
+Full Changelog: [agentex-client-v0.13.0...agentex-client-v0.13.1](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.13.0...agentex-client-v0.13.1)
+
+### Bug Fixes
+
+* **adk:** re-send task_id/agent_id in state updates for backend compatibility ([#405](https://github.com/scaleapi/scale-agentex-python/issues/405)) ([f59f26d](https://github.com/scaleapi/scale-agentex-python/commit/f59f26d4402f01318cf34d57820e121d97719986))
+* **packaging:** guard agentex-client surface, bump floor, smoke-test wheel install ([#406](https://github.com/scaleapi/scale-agentex-python/issues/406)) ([a5abbb9](https://github.com/scaleapi/scale-agentex-python/commit/a5abbb9669c6ab71c52e60db72676c95c20d840d))
+
+
+### Documentation
+
+* drop stale keep_files / dashboard-config comments ([#401](https://github.com/scaleapi/scale-agentex-python/issues/401)) ([23858df](https://github.com/scaleapi/scale-agentex-python/commit/23858df775d0a617c6418eed28f1b68c9bf9ed5c))
+
+## 0.13.0 (2026-06-10)
+
+Full Changelog: [agentex-client-v0.12.0...agentex-client-v0.13.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.12.0...agentex-client-v0.13.0)
+
+### ⚠ BREAKING CHANGES
+
+* **packaging:** release tag scheme changes from v* to <component>-v*.
+
+### Features
+
+* add AgentCard for self-describing agent capabilities ([#296](https://github.com/scaleapi/scale-agentex-python/issues/296)) ([6509be1](https://github.com/scaleapi/scale-agentex-python/commit/6509be1e5d9bc53e6058b22c45c760e04a4c4006))
+* add HTTP-proxy LangGraph checkpointer ([19fae2f](https://github.com/scaleapi/scale-agentex-python/commit/19fae2f6e3ce4302066a403cac4c6499410ec4ad))
+* add OCI Helm registry support for agent deployments ([#255](https://github.com/scaleapi/scale-agentex-python/issues/255)) ([5f054b5](https://github.com/scaleapi/scale-agentex-python/commit/5f054b514ff919479b0914883ed163279820c848))
+* **adk:** allow all ClaudeAgentOptions in run_claude_agent_activity ([25bbe24](https://github.com/scaleapi/scale-agentex-python/commit/25bbe24b57feaab2e557ca15279369bfb59e02db))
+* **adk:** Revamp run_claude_agent_activity to use more streaming ([#309](https://github.com/scaleapi/scale-agentex-python/issues/309)) ([0c16595](https://github.com/scaleapi/scale-agentex-python/commit/0c16595017164649bbea1bab8767010c9be7228d))
+* **api:** api update ([7b1b642](https://github.com/scaleapi/scale-agentex-python/commit/7b1b642404f34ff74d866e91a5ed2d6f0a4424c6))
+* **api:** api update ([710c63f](https://github.com/scaleapi/scale-agentex-python/commit/710c63f3a9b0494635c41e0d3498d69dc9145b81))
+* **api:** api update ([8abce2b](https://github.com/scaleapi/scale-agentex-python/commit/8abce2ba6131732688f04bacff33da506e47c77f))
+* **api:** Switch target to -client ([e741990](https://github.com/scaleapi/scale-agentex-python/commit/e74199029367ec7c626f5ea3057eb462e9f81b30))
+* **lib:** Add task updates to adk ([a58747f](https://github.com/scaleapi/scale-agentex-python/commit/a58747f0d85733f32f67b06eee222a1464eb87fe))
+* **openai_agents:** expose real `usage`, `response_id`, plumb `previous_response_id`, opt-in `prompt_cache_key` for stateful responses and prompt caching ([#335](https://github.com/scaleapi/scale-agentex-python/issues/335)) ([ba5d64b](https://github.com/scaleapi/scale-agentex-python/commit/ba5d64be1f959ff1a35b30e647a0a5ead21a8402))
+* **packaging:** introduce slim agentex-client + heavy agentex-sdk split ([bbfb22e](https://github.com/scaleapi/scale-agentex-python/commit/bbfb22eb113dd1f3d5ddf82b4d377895f5ae5466))
+* pass AGENTEX_DEPLOYMENT_ID in registration metadata ([#305](https://github.com/scaleapi/scale-agentex-python/issues/305)) ([31af8c6](https://github.com/scaleapi/scale-agentex-python/commit/31af8c6fc4aaafad57b70ded4883ced1254aeb1b))
+* **tracing:** Add background queue for async span processing ([#303](https://github.com/scaleapi/scale-agentex-python/issues/303)) ([3a60add](https://github.com/scaleapi/scale-agentex-python/commit/3a60add048ff24266a45700b4e78def8ffed3e0b))
+
+
+### Bug Fixes
+
+* add litellm retry with exponential backoff for rate limit errors ([ccdb24a](https://github.com/scaleapi/scale-agentex-python/commit/ccdb24a08607298f8dafd748ee9e7fe8ba13d5fe))
+* **adk:** fix to queue drain ([#327](https://github.com/scaleapi/scale-agentex-python/issues/327)) ([a862a06](https://github.com/scaleapi/scale-agentex-python/commit/a862a0646365d86acd4b0e1cf470fce522a6fbb3))
+* **api:** remove agent_id and task_id parameters from states update method ([a7cbaae](https://github.com/scaleapi/scale-agentex-python/commit/a7cbaae4416e2d712623ecfac5e251c07c537958))
+* **client:** preserve hardcoded query params when merging with user params ([d2c4788](https://github.com/scaleapi/scale-agentex-python/commit/d2c47883c4247a0c5a318042ff38384ddc8db4ea))
+* ensure file data are only sent as 1 parameter ([48fae27](https://github.com/scaleapi/scale-agentex-python/commit/48fae27b6a761984f7fb70cb7a87da76a4192d12))
+* render .env.example template in agentex init ([#351](https://github.com/scaleapi/scale-agentex-python/issues/351)) ([6092595](https://github.com/scaleapi/scale-agentex-python/commit/6092595fa8a267b2c305baba09e2682c04d593b3))
+* Temporal Union deserialization causing tool_response messages to be lost ([79ef4dd](https://github.com/scaleapi/scale-agentex-python/commit/79ef4dd7a0ab1b8bb1151f5e16124ec5a947dfd4))
+* **temporal:** allowing-ACP-temporal-telemetry ([9b44eb0](https://github.com/scaleapi/scale-agentex-python/commit/9b44eb0f5c6482984f972674d7a8612980c5b576))
+* **tests:** repair test_streaming_model so all 28 tests run and pass ([#334](https://github.com/scaleapi/scale-agentex-python/issues/334)) ([7e5e69c](https://github.com/scaleapi/scale-agentex-python/commit/7e5e69c132c89d054516e1a762e0437375859663))
+* **tracing:** Fix memory leak in SGP tracing processors ([#302](https://github.com/scaleapi/scale-agentex-python/issues/302)) ([f43dac4](https://github.com/scaleapi/scale-agentex-python/commit/f43dac4fa7ca7090b37c6c3bf285eb12515764bb))
+* **tutorials:** stop at130-langgraph workflow deadlock on graph compile ([#399](https://github.com/scaleapi/scale-agentex-python/issues/399)) ([bd90a61](https://github.com/scaleapi/scale-agentex-python/commit/bd90a613958a330f1a6670f621000a9aaed1025b))
+
+
+### Performance Improvements
+
+* **client:** optimize file structure copying in multipart requests ([f5064f9](https://github.com/scaleapi/scale-agentex-python/commit/f5064f939788d72fedac91436982a8848d0f1f4f))
+* **tracing:** larger span batch + linger_ms for high-volume ingest ([#397](https://github.com/scaleapi/scale-agentex-python/issues/397)) ([c0d6330](https://github.com/scaleapi/scale-agentex-python/commit/c0d633052d373daa63e8cefb9339736c0a7855fb))
+* **tracing:** skip span-start upsert by default (end-only ingest) ([#394](https://github.com/scaleapi/scale-agentex-python/issues/394)) ([ae1c7ca](https://github.com/scaleapi/scale-agentex-python/commit/ae1c7caa8599f5f82492086d04caae9a6d2b7c7d))
+
+
+### Chores
+
+* **ci:** upgrade `actions/github-script` ([7c867e8](https://github.com/scaleapi/scale-agentex-python/commit/7c867e8960b51234e5e41a9b8e3129c1dada5680))
+* gitignore .claude/scheduled_tasks.lock ([#400](https://github.com/scaleapi/scale-agentex-python/issues/400)) ([e186352](https://github.com/scaleapi/scale-agentex-python/commit/e1863526408451d087568676feafca033a4656c4))
+
+
+### Documentation
+
+* **api:** clarify name parameter behavior in agent task creation ([ce5af72](https://github.com/scaleapi/scale-agentex-python/commit/ce5af729cc3a0f05905d0cebfe2ef18c16d8563e))
+* clarify task name is optional in adk.acp.create_task ([#392](https://github.com/scaleapi/scale-agentex-python/issues/392)) ([bd41d9b](https://github.com/scaleapi/scale-agentex-python/commit/bd41d9bb10f08a354f02f982e6507847c19d2ad9))
+
+
+### Refactors
+
+* **config:** promote deployment-config models to agentex.config.* ([#396](https://github.com/scaleapi/scale-agentex-python/issues/396)) ([9825dba](https://github.com/scaleapi/scale-agentex-python/commit/9825dba3301754e2a86632214adcc62ff97e28bd))
+
+## 0.12.0 (2026-06-02)
+
+Full Changelog: [v0.11.9...v0.12.0](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.9...v0.12.0)
+
+### Features
+
+* **api:** Bump edition to switch rye -&gt; UV ([1bd4ff7](https://github.com/scaleapi/scale-agentex-python/commit/1bd4ff7c3299ea4238cd3e36141f7e4b035967ef))
+
+
+### Bug Fixes
+
+* cap Python test matrix at 3.13 and align dev tooling versions ([#391](https://github.com/scaleapi/scale-agentex-python/issues/391)) ([729763c](https://github.com/scaleapi/scale-agentex-python/commit/729763c9652faf3a68386083d6f617dd48f642b7))
+
+## 0.11.9 (2026-06-02)
+
+Full Changelog: [v0.11.8...v0.11.9](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.8...v0.11.9)
+
+### Features
+
+* **api:** add register build api endpoint ([30c5da4](https://github.com/scaleapi/scale-agentex-python/commit/30c5da47d84ce2bfbfbb798c2f62b9552881db7d))
+
+## 0.11.8 (2026-06-01)
+
+Full Changelog: [v0.11.7...v0.11.8](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.7...v0.11.8)
+
+### Features
+
+* **cli:** add Temporal + LangGraph agent template and example ([#383](https://github.com/scaleapi/scale-agentex-python/issues/383)) ([bbc9e02](https://github.com/scaleapi/scale-agentex-python/commit/bbc9e02d2a2b063a3e509a07ffca8ca4bf459e57))
+* **tracing:** OTel span queue and export telemetry (SGPINF-1863) ([#373](https://github.com/scaleapi/scale-agentex-python/issues/373)) ([6669012](https://github.com/scaleapi/scale-agentex-python/commit/6669012638481a63bdd7629582818796ca31bdf3))
+
+## 0.11.7 (2026-06-01)
+
+Full Changelog: [v0.11.6...v0.11.7](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.6...v0.11.7)
+
+### Features
+
+* **examples:** OpenAI Agents SDK local-sandbox tutorials (sync + async + temporal) ([#377](https://github.com/scaleapi/scale-agentex-python/issues/377)) ([a66d239](https://github.com/scaleapi/scale-agentex-python/commit/a66d23955fa1a98296ef4e8b09c11afe9461268a))
+
+
+### Performance Improvements
+
+* **tracing:** bounded-concurrency span export ([#374](https://github.com/scaleapi/scale-agentex-python/issues/374)) ([7b32a0d](https://github.com/scaleapi/scale-agentex-python/commit/7b32a0d826b3ed864a3bf9de256ff8da1dafb942))
+
+
+### Chores
+
+* back-merge release 0.11.6 into next ([#384](https://github.com/scaleapi/scale-agentex-python/issues/384)) ([13d3eab](https://github.com/scaleapi/scale-agentex-python/commit/13d3eab0657f1dd5a8b7ade6c7381d3230d60aff))
+
+## 0.11.6 (2026-05-29)
+
+Full Changelog: [v0.11.5...v0.11.6](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.5...v0.11.6)
+
+### Features
+
+* **api:** add cleaned_at field to task response types ([38ed338](https://github.com/scaleapi/scale-agentex-python/commit/38ed3384094f7f07f6b2482489f457fd1dc4f76d))
+* **deps:** bump openai-agents to &gt;=0.14.3 for scale-sandbox oai_agents adapter ([#375](https://github.com/scaleapi/scale-agentex-python/issues/375)) ([e1b31d9](https://github.com/scaleapi/scale-agentex-python/commit/e1b31d91abadec572989b805592b788500d61994))
+* **lib:** expose data_converter kwarg on AgentexWorker and Temporal client APIs ([#372](https://github.com/scaleapi/scale-agentex-python/issues/372)) ([d04624e](https://github.com/scaleapi/scale-agentex-python/commit/d04624e6899e43a0429ef2deeb84509265b9f636))
+
+
+### Bug Fixes
+
+* **tutorials:** restore tutorial CI deps after agentex-sdk 0.11.5 (pytest + debugpy) ([#379](https://github.com/scaleapi/scale-agentex-python/issues/379)) ([0a2418c](https://github.com/scaleapi/scale-agentex-python/commit/0a2418cc9f9b06e3bdc46099106e50d226412fa0))
+
+
+### Performance Improvements
+
+* **tracing:** span queue linger + per-loop httpx keepalive ([#362](https://github.com/scaleapi/scale-agentex-python/issues/362)) ([feec842](https://github.com/scaleapi/scale-agentex-python/commit/feec8426f79e9f02533451d44997717655fd33f2))
+
+
+### Chores
+
+* back-merge release 0.11.5 into next ([#381](https://github.com/scaleapi/scale-agentex-python/issues/381)) ([ab5a7d9](https://github.com/scaleapi/scale-agentex-python/commit/ab5a7d9732a56d47efad469675c7630046106ef6))
+* **deps:** drop unused runtime deps and exclude tests from wheel ([#367](https://github.com/scaleapi/scale-agentex-python/issues/367)) ([f4303d1](https://github.com/scaleapi/scale-agentex-python/commit/f4303d1e7211783d19beca6554e44eb73bb29c42))
+
+
+### Refactors
+
+* **types:** promote protocol types to agentex.protocol.* ([#371](https://github.com/scaleapi/scale-agentex-python/issues/371)) ([6f1c14f](https://github.com/scaleapi/scale-agentex-python/commit/6f1c14fd61077da52038361642a9fbc4a0a56c8b))
+
+## 0.11.5 (2026-05-29)
+
+Full Changelog: [v0.11.4...v0.11.5](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.4...v0.11.5)
+
+### Features
+
+* **api:** add cleaned_at field to task response types ([38ed338](https://github.com/scaleapi/scale-agentex-python/commit/38ed3384094f7f07f6b2482489f457fd1dc4f76d))
+* **deps:** bump openai-agents to &gt;=0.14.3 for scale-sandbox oai_agents adapter ([#375](https://github.com/scaleapi/scale-agentex-python/issues/375)) ([e1b31d9](https://github.com/scaleapi/scale-agentex-python/commit/e1b31d91abadec572989b805592b788500d61994))
+
+
+### Performance Improvements
+
+* **tracing:** span queue linger + per-loop httpx keepalive ([#362](https://github.com/scaleapi/scale-agentex-python/issues/362)) ([feec842](https://github.com/scaleapi/scale-agentex-python/commit/feec8426f79e9f02533451d44997717655fd33f2))
+
+
+### Chores
+
+* **deps:** drop unused runtime deps and exclude tests from wheel ([#367](https://github.com/scaleapi/scale-agentex-python/issues/367)) ([f4303d1](https://github.com/scaleapi/scale-agentex-python/commit/f4303d1e7211783d19beca6554e44eb73bb29c42))
+
+
+### Refactors
+
+* **types:** promote protocol types to agentex.protocol.* ([#371](https://github.com/scaleapi/scale-agentex-python/issues/371)) ([6f1c14f](https://github.com/scaleapi/scale-agentex-python/commit/6f1c14fd61077da52038361642a9fbc4a0a56c8b))
+
+## 0.11.4 (2026-05-26)
+
+Full Changelog: [v0.11.3...v0.11.4](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.3...v0.11.4)
+
+### Chores
+
+* **deps:** relax redis pin to support 6.x/7.x ([#363](https://github.com/scaleapi/scale-agentex-python/issues/363)) ([7817ced](https://github.com/scaleapi/scale-agentex-python/commit/7817ced90b80430a69b6f51a6841aa921a33a093))
+* relax requires-python floor to &gt;= 3.11 ([#366](https://github.com/scaleapi/scale-agentex-python/issues/366)) ([a064f92](https://github.com/scaleapi/scale-agentex-python/commit/a064f928c0fac868ec1486ef49382a9baf73b5e0))
+
+## 0.11.3 (2026-05-20)
+
+Full Changelog: [v0.11.2...v0.11.3](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.2...v0.11.3)
+
+### Features
+
+* added Pydantic AI sync, async, temporal integration ([#359](https://github.com/scaleapi/scale-agentex-python/issues/359)) ([781dfe1](https://github.com/scaleapi/scale-agentex-python/commit/781dfe172373c2e01fb642b3c98af6908c98218a))
+* **api:** add schedule, checkpoints, and deployment endpoints ([53b5c36](https://github.com/scaleapi/scale-agentex-python/commit/53b5c3673e54ee4b49debd049483f1a1d4b0673d))
+
+
+### Bug Fixes
+
+* resolve lint and test failures from new endpoints ([#360](https://github.com/scaleapi/scale-agentex-python/issues/360)) ([bdf129c](https://github.com/scaleapi/scale-agentex-python/commit/bdf129c8ab976ed84aa9932d5585a753280a6a34))
+
 ## 0.11.2 (2026-05-13)
 
 Full Changelog: [v0.11.1...v0.11.2](https://github.com/scaleapi/scale-agentex-python/compare/v0.11.1...v0.11.2)

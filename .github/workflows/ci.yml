@@ -23,19 +23,19 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Install Rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-        env:
-          RYE_VERSION: '0.44.0'
-          RYE_INSTALL_OPTION: '--yes'
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: '0.10.2'
 
       - name: Install dependencies
-        run: rye sync --all-features
+        run: uv sync --all-packages --all-extras
 
       - name: Run lints
         run: ./scripts/lint
+
+      - name: Check slim dependency set
+        run: ./scripts/check-slim-deps
 
   build:
     if: (github.event_name == 'push' || github.event.pull_request.head.repo.fork) && (github.event_name != 'push' || github.event.head_commit.message != 'codegen metadata')
@@ -48,19 +48,22 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Install Rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-        env:
-          RYE_VERSION: '0.44.0'
-          RYE_INSTALL_OPTION: '--yes'
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: '0.10.2'
 
       - name: Install dependencies
-        run: rye sync --all-features
+        run: uv sync --all-packages --all-extras
 
       - name: Run build
-        run: rye build
+        # Both workspace members. --wheel is load-bearing: the heavy's cross-dir
+        # force-include can't build via the sdist-then-wheel default.
+        run: uv build --all-packages --wheel
+
+      - name: Smoke-test wheel install
+        # Both wheels must install together into one working agentex.* namespace.
+        run: ./scripts/check-wheel-install
 
       - name: Get GitHub OIDC Token
         if: |-
@@ -89,13 +92,10 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Install Rye
-        run: |
-          curl -sSf https://rye.astral.sh/get | bash
-          echo "$HOME/.rye/shims" >> $GITHUB_PATH
-        env:
-          RYE_VERSION: '0.44.0'
-          RYE_INSTALL_OPTION: '--yes'
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: '0.10.2'
 
       - name: Bootstrap
         run: ./scripts/bootstrap

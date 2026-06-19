@@ -9,7 +9,7 @@ from python_on_whales import DockerException, docker
 from agentex.lib.cli.debug import DebugConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.cli.handlers.run_handlers import RunError, run_agent as _run_agent
-from agentex.lib.sdk.config.agent_manifest import AgentManifest, BuildContextManager
+from agentex.lib.sdk.config.agent_manifest import BuildContextManager, load_agent_manifest, build_context_manager
 
 logger = make_logger(__name__)
 console = Console()
@@ -53,7 +53,7 @@ def build_agent(
     Returns:
         The image URL
     """
-    agent_manifest = AgentManifest.from_yaml(file_path=manifest_path)
+    agent_manifest = load_agent_manifest(file_path=manifest_path)
     build_context_root = (Path(manifest_path).parent / agent_manifest.build.context.root).resolve()
 
     repository_name = repository_name or agent_manifest.agent.name
@@ -69,7 +69,7 @@ def build_agent(
     else:
         image_name = f"{image_name}:latest"
 
-    with agent_manifest.context_manager(build_context_root) as build_context:
+    with build_context_manager(agent_manifest, build_context_root) as build_context:
         logger.info(f"Building image {image_name} locally...")
 
         # Log build context information for debugging
@@ -208,7 +208,7 @@ def prepare_cloud_build_context(
     Returns:
         CloudBuildContext containing the archive bytes, dockerfile path, and metadata
     """
-    agent_manifest = AgentManifest.from_yaml(file_path=manifest_path)
+    agent_manifest = load_agent_manifest(file_path=manifest_path)
     build_context_root = (Path(manifest_path).parent / agent_manifest.build.context.root).resolve()
 
     agent_name = agent_manifest.agent.name
@@ -260,7 +260,7 @@ def prepare_cloud_build_context(
 
     logger.info("Preparing build context...")
 
-    with agent_manifest.context_manager(build_context_root) as build_context:
+    with build_context_manager(agent_manifest, build_context_root) as build_context:
         # Compress the prepared context using the static zipped method
         with BuildContextManager.zipped(root_path=build_context.path) as archive_buffer:
             archive_bytes = archive_buffer.read()

@@ -105,9 +105,7 @@ class TestStates:
     def test_method_update(self, client: Agentex) -> None:
         state = client.states.update(
             state_id="state_id",
-            agent_id="agent_id",
             state={"foo": "bar"},
-            task_id="task_id",
         )
         assert_matches_type(State, state, path=["response"])
 
@@ -116,9 +114,7 @@ class TestStates:
     def test_raw_response_update(self, client: Agentex) -> None:
         response = client.states.with_raw_response.update(
             state_id="state_id",
-            agent_id="agent_id",
             state={"foo": "bar"},
-            task_id="task_id",
         )
 
         assert response.is_closed is True
@@ -131,9 +127,7 @@ class TestStates:
     def test_streaming_response_update(self, client: Agentex) -> None:
         with client.states.with_streaming_response.update(
             state_id="state_id",
-            agent_id="agent_id",
             state={"foo": "bar"},
-            task_id="task_id",
         ) as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -149,9 +143,7 @@ class TestStates:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `state_id` but received ''"):
             client.states.with_raw_response.update(
                 state_id="",
-                agent_id="agent_id",
                 state={"foo": "bar"},
-                task_id="task_id",
             )
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
@@ -330,9 +322,7 @@ class TestAsyncStates:
     async def test_method_update(self, async_client: AsyncAgentex) -> None:
         state = await async_client.states.update(
             state_id="state_id",
-            agent_id="agent_id",
             state={"foo": "bar"},
-            task_id="task_id",
         )
         assert_matches_type(State, state, path=["response"])
 
@@ -341,9 +331,7 @@ class TestAsyncStates:
     async def test_raw_response_update(self, async_client: AsyncAgentex) -> None:
         response = await async_client.states.with_raw_response.update(
             state_id="state_id",
-            agent_id="agent_id",
             state={"foo": "bar"},
-            task_id="task_id",
         )
 
         assert response.is_closed is True
@@ -356,9 +344,7 @@ class TestAsyncStates:
     async def test_streaming_response_update(self, async_client: AsyncAgentex) -> None:
         async with async_client.states.with_streaming_response.update(
             state_id="state_id",
-            agent_id="agent_id",
             state={"foo": "bar"},
-            task_id="task_id",
         ) as response:
             assert not response.is_closed
             assert response.http_request.headers.get("X-Stainless-Lang") == "python"
@@ -374,9 +360,7 @@ class TestAsyncStates:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `state_id` but received ''"):
             await async_client.states.with_raw_response.update(
                 state_id="",
-                agent_id="agent_id",
                 state={"foo": "bar"},
-                task_id="task_id",
             )
 
     @pytest.mark.skip(reason="Mock server tests are disabled")

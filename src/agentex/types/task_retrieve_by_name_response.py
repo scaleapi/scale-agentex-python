@@ -17,6 +17,8 @@ class TaskRetrieveByNameResponse(BaseModel):
 
     agents: Optional[List[Agent]] = None
 
+    cleaned_at: Optional[datetime] = None
+
     created_at: Optional[datetime] = None
 
     name: Optional[str] = None

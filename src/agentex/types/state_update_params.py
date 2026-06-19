@@ -9,8 +9,4 @@ __all__ = ["StateUpdateParams"]
 
 
 class StateUpdateParams(TypedDict, total=False):
-    agent_id: Required[str]
-
     state: Required[Dict[str, object]]
-
-    task_id: Required[str]

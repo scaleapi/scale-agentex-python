@@ -1,0 +1,29 @@
+"""Sandbox capabilities for the OpenAI Agents SDK local-sandbox agent.
+
+Unlike the Pydantic AI tutorial (040), this agent does not register hand-written
+Python functions as tools. Instead it is given *capabilities* — the OpenAI Agents
+SDK sandbox runtime turns each capability into a real set of tools (run a shell
+command, read a file, etc.) backed by an actual sandbox backend.
+
+Here we use the ``Shell`` capability, which lets the model run real shell commands.
+With the local (``unix_local``) backend those commands execute ON THE HOST — the
+agent's own process/container — so there is no Docker, Temporal, or remote infra
+involved. This module hosts the capability factory so the agent wiring in
+``project.agent`` stays readable and the capability set is easy to extend
+(e.g. add ``Filesystem()`` or ``Memory()``).
+"""
+
+from __future__ import annotations
+
+from agents.sandbox.capabilities import Shell
+
+
+def get_capabilities() -> list:
+    """Return the sandbox capabilities the agent is allowed to use.
+
+    Returns:
+        A list of OpenAI Agents SDK sandbox capabilities. We grant ``Shell`` so
+        the agent can run real shell commands on the local machine. Add
+        ``Filesystem()`` or ``Memory()`` here to expand what the agent can do.
+    """
+    return [Shell()]

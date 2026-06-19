@@ -191,6 +191,54 @@ class TestAgents:
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
+    def test_method_register_build(self, client: Agentex) -> None:
+        agent = client.agents.register_build(
+            description="description",
+            name="name",
+        )
+        assert_matches_type(Agent, agent, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_method_register_build_with_all_params(self, client: Agentex) -> None:
+        agent = client.agents.register_build(
+            description="description",
+            name="name",
+            agent_input_type="text",
+            registration_metadata={"foo": "bar"},
+        )
+        assert_matches_type(Agent, agent, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_raw_response_register_build(self, client: Agentex) -> None:
+        response = client.agents.with_raw_response.register_build(
+            description="description",
+            name="name",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        agent = response.parse()
+        assert_matches_type(Agent, agent, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_streaming_response_register_build(self, client: Agentex) -> None:
+        with client.agents.with_streaming_response.register_build(
+            description="description",
+            name="name",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            agent = response.parse()
+            assert_matches_type(Agent, agent, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
     def test_method_retrieve_by_name(self, client: Agentex) -> None:
         agent = client.agents.retrieve_by_name(
             "agent_name",
@@ -534,6 +582,54 @@ class TestAsyncAgents:
             await async_client.agents.with_raw_response.delete_by_name(
                 "",
             )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_register_build(self, async_client: AsyncAgentex) -> None:
+        agent = await async_client.agents.register_build(
+            description="description",
+            name="name",
+        )
+        assert_matches_type(Agent, agent, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_register_build_with_all_params(self, async_client: AsyncAgentex) -> None:
+        agent = await async_client.agents.register_build(
+            description="description",
+            name="name",
+            agent_input_type="text",
+            registration_metadata={"foo": "bar"},
+        )
+        assert_matches_type(Agent, agent, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_raw_response_register_build(self, async_client: AsyncAgentex) -> None:
+        response = await async_client.agents.with_raw_response.register_build(
+            description="description",
+            name="name",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        agent = await response.parse()
+        assert_matches_type(Agent, agent, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_streaming_response_register_build(self, async_client: AsyncAgentex) -> None:
+        async with async_client.agents.with_streaming_response.register_build(
+            description="description",
+            name="name",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            agent = await response.parse()
+            assert_matches_type(Agent, agent, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize

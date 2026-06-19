@@ -122,9 +122,7 @@ class StatesResource(SyncAPIResource):
         self,
         state_id: str,
         *,
-        agent_id: str,
         state: Dict[str, object],
-        task_id: str,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -148,14 +146,7 @@ class StatesResource(SyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `state_id` but received {state_id!r}")
         return self._put(
             path_template("/states/{state_id}", state_id=state_id),
-            body=maybe_transform(
-                {
-                    "agent_id": agent_id,
-                    "state": state,
-                    "task_id": task_id,
-                },
-                state_update_params.StateUpdateParams,
-            ),
+            body=maybe_transform({"state": state}, state_update_params.StateUpdateParams),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -356,9 +347,7 @@ class AsyncStatesResource(AsyncAPIResource):
         self,
         state_id: str,
         *,
-        agent_id: str,
         state: Dict[str, object],
-        task_id: str,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
         extra_headers: Headers | None = None,
@@ -382,14 +371,7 @@ class AsyncStatesResource(AsyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `state_id` but received {state_id!r}")
         return await self._put(
             path_template("/states/{state_id}", state_id=state_id),
-            body=await async_maybe_transform(
-                {
-                    "agent_id": agent_id,
-                    "state": state,
-                    "task_id": task_id,
-                },
-                state_update_params.StateUpdateParams,
-            ),
+            body=await async_maybe_transform({"state": state}, state_update_params.StateUpdateParams),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),

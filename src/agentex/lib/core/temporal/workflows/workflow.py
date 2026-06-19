@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 from temporalio import workflow
 
-from agentex.lib.types.acp import SendEventParams, CreateTaskParams
+from agentex.protocol.acp import SendEventParams, CreateTaskParams
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.temporal.types.workflow import SignalName
 

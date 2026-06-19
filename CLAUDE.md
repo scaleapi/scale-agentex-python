@@ -55,11 +55,40 @@ The package provides the `agentex` CLI with these main commands:
 
 ### Code Structure
 - `/src/agentex/` - Core SDK and generated API client code
+- `/src/agentex/protocol/` - **Canonical** location for wire-protocol shapes
+  (JSON-RPC envelopes, ACP method-param types). Depends only on `pydantic`
+  and the Stainless-generated `agentex.types.*` surface, so it is safe to
+  import from a future slim REST-only install.
+  - `acp.py` - `RPCMethod`, `CreateTaskParams`, `SendMessageParams`,
+    `SendEventParams`, `CancelTaskParams`, `RPC_SYNC_METHODS`,
+    `PARAMS_MODEL_BY_METHOD`
+  - `json_rpc.py` - `JSONRPCRequest`, `JSONRPCResponse`, `JSONRPCError`
+- `/src/agentex/config/` - **Canonical** location for deployment/agent
+  configuration models (manifest shapes). Depends only on `pydantic`, so it is
+  safe to import from a slim REST-only install.
+  - `agent_config.py`, `build_config.py`, `deployment_config.py`,
+    `local_development_config.py`, `environment_config.py`, `agent_manifest.py`
+    (model classes only), plus their model deps `credentials.py` and
+    `agent_configs.py`
+  - yaml loaders / build machinery (`load_environments_config*`,
+    `load_agent_manifest`, `build_context_manager`, `BuildContextManager`) stay
+    in `agentex.lib.sdk.config.*` so these models stay slim-safe
 - `/src/agentex/lib/` - Custom library code (not modified by code generator)
   - `/cli/` - Command-line interface implementation
   - `/core/` - Core services, adapters, and temporal workflows
   - `/sdk/` - SDK utilities and FastACP implementation
+    - `config/` - manifest loaders + Docker build machinery (`agent_manifest`'s
+      `load_agent_manifest`/`build_context_manager`/`BuildContextManager`,
+      `validation`, `project_config`) plus **back-compat shims** for the model
+      classes now canonical under `agentex.config.*`
   - `/types/` - Custom type definitions
+    - `acp.py`, `json_rpc.py` - **back-compat shims** re-exporting from
+      `agentex.protocol.*`. `credentials.py`, `agent_configs.py` - shims
+      re-exporting from `agentex.config.*`. Existing `from agentex.lib...`
+      imports keep working; new code should import from the canonical paths.
+    - Other modules (`tracing`, `agent_card`, `fastacp`, `llm_messages`,
+      `converters`, etc.) stay here — they have heavier transitive deps
+      (temporal, openai-agents, model_utils/yaml) and aren't slim-safe.
   - `/utils/` - Utility functions
 - `/examples/` - Example implementations and tutorials
 - `/tests/` - Test suites
