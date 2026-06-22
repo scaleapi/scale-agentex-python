@@ -18,6 +18,8 @@ from agentex.lib.adk._modules._claude_code_turn import (
     ClaudeCodeTurn,
     claude_code_usage_to_turn_usage,
 )
+from agentex.lib.adk._modules._codex_sync import convert_codex_to_agentex_events
+from agentex.lib.adk._modules._codex_turn import CodexTurn, codex_usage_to_turn_usage
 from agentex.lib.adk._modules.events import EventsModule
 from agentex.lib.adk._modules.messages import MessagesModule
 from agentex.lib.adk._modules.state import StateModule
@@ -63,6 +65,10 @@ __all__ = [
     "convert_claude_code_to_agentex_events",
     "ClaudeCodeTurn",
     "claude_code_usage_to_turn_usage",
+    # Codex
+    "convert_codex_to_agentex_events",
+    "CodexTurn",
+    "codex_usage_to_turn_usage",
     # Providers
     "providers",
     # Utils
