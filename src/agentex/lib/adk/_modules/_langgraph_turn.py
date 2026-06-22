@@ -62,6 +62,33 @@ def langgraph_usage_to_turn_usage(usage_metadata: Any, model: str | None) -> Tur
     )
 
 
+def _add_optional(a: int | None, b: int | None) -> int | None:
+    """Sum two optional token counts; ``None`` means 'not reported' on that side.
+
+    ``None + None`` stays ``None`` (model never reported usage), while a real 0
+    contributes 0 (preserving zero counts rather than coercing them away).
+    """
+    if a is None and b is None:
+        return None
+    return (a or 0) + (b or 0)
+
+
+def _accumulate_turn_usage(acc: TurnUsage, call: TurnUsage, model: str | None) -> TurnUsage:
+    """Add a single LLM call's usage into the running per-turn total.
+
+    A LangGraph turn can make multiple LLM calls (e.g. text -> tool decision ->
+    final text); summing them avoids silently dropping all but the last call.
+    """
+    return TurnUsage(
+        model=model,
+        input_tokens=_add_optional(acc.input_tokens, call.input_tokens),
+        output_tokens=_add_optional(acc.output_tokens, call.output_tokens),
+        total_tokens=_add_optional(acc.total_tokens, call.total_tokens),
+        cached_input_tokens=_add_optional(acc.cached_input_tokens, call.cached_input_tokens),
+        reasoning_tokens=_add_optional(acc.reasoning_tokens, call.reasoning_tokens),
+    )
+
+
 class LangGraphTurn:
     """HarnessTurn wrapping a LangGraph ``astream()`` event stream.
 
@@ -89,7 +116,8 @@ class LangGraphTurn:
     option is needed.
 
     Usage data is captured lazily via the ``on_final_ai_message`` callback and
-    is only valid after ``events`` has been fully consumed.
+    is only valid after ``events`` has been fully consumed. Multi-step turns
+    (more than one LLM call) accumulate usage additively across calls.
     """
 
     def __init__(self, stream: Any, model: str | None = None) -> None:
@@ -105,15 +133,20 @@ class LangGraphTurn:
         def _capture(ai_msg: Any) -> None:
             usage_metadata = getattr(ai_msg, "usage_metadata", None)
             if usage_metadata is not None:
-                self._usage = langgraph_usage_to_turn_usage(usage_metadata, self._model)
+                call_usage = langgraph_usage_to_turn_usage(usage_metadata, self._model)
+                # Accumulate across LLM calls — the callback fires once per agent
+                # node invocation, so a multi-step turn reports usage more than
+                # once; overwriting would drop all but the last call.
+                self._usage = _accumulate_turn_usage(self._usage, call_usage, self._model)
 
         async for ev in convert_langgraph_to_agentex_events(self._stream, on_final_ai_message=_capture):
             yield ev
 
     def usage(self) -> TurnUsage:
-        """Return the usage captured from the last AIMessage in the stream.
+        """Return the usage accumulated across all AIMessages in the stream.
 
-        Valid only after ``events`` has been fully consumed.
-        Returns a zero-usage ``TurnUsage`` if the model did not report usage.
+        Multi-step turns sum each LLM call's usage. Valid only after ``events``
+        has been fully consumed. Returns a zero-usage ``TurnUsage`` if the model
+        did not report usage.
         """
         return self._usage

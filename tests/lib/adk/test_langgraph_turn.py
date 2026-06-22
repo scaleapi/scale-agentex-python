@@ -168,6 +168,47 @@ class TestLangGraphTurn:
         assert usage.total_tokens == 15
         assert usage.model == "gpt-4"
 
+    async def test_usage_accumulates_across_multiple_ai_messages(self):
+        """A multi-step turn (>1 LLM call) sums usage instead of keeping only the last."""
+        from langchain_core.messages import AIMessage
+
+        first = AIMessage(
+            content="thinking",
+            usage_metadata={
+                "input_tokens": 10,
+                "output_tokens": 5,
+                "total_tokens": 15,
+                "input_token_details": {"cache_read": 2},
+                "output_token_details": {"reasoning": 1},
+            },
+        )
+        second = AIMessage(
+            content="answer",
+            usage_metadata={
+                "input_tokens": 20,
+                "output_tokens": 7,
+                "total_tokens": 27,
+                "input_token_details": {"cache_read": 3},
+                "output_token_details": {"reasoning": 4},
+            },
+        )
+        stream = _make_stream(
+            [
+                ("updates", {"agent": {"messages": [first]}}),
+                ("updates", {"agent": {"messages": [second]}}),
+            ]
+        )
+        turn = LangGraphTurn(stream, model="gpt-4")
+        await _drain(turn)
+
+        usage = turn.usage()
+        assert usage.input_tokens == 30
+        assert usage.output_tokens == 12
+        assert usage.total_tokens == 42
+        assert usage.cached_input_tokens == 5
+        assert usage.reasoning_tokens == 5
+        assert usage.model == "gpt-4"
+
     async def test_usage_not_updated_when_no_usage_metadata(self):
         from langchain_core.messages import AIMessage
 
