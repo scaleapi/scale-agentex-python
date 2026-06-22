@@ -43,8 +43,8 @@ rather than calling adk.messages.create. This open+close approach is retained
 because:
   - StreamingTaskMessageContext.close() persists initial_content when no deltas
     have been streamed, so the message IS correctly persisted.
-  - It mirrors the pattern already used by the real _langgraph_async.py harness,
-    keeping behavioural parity.
+  - It mirrors the pattern already used by the real langgraph streaming helper
+    (now in _langgraph_turn.py), keeping behavioural parity.
   - Switching to adk.messages.create would require an additional injectable
     dependency, adding surface area for no observable benefit.
 The conformance test treats this as an ACCEPTABLE envelope difference: at the

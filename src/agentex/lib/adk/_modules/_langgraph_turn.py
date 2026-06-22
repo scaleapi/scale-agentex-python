@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any, AsyncIterator
 from collections.abc import AsyncGenerator
 
+from agentex.lib.utils.temporal import workflow_now_if_in_workflow
 from agentex.lib.core.harness.types import TurnUsage, StreamTaskMessage
 from agentex.lib.adk._modules._langgraph_sync import convert_langgraph_to_agentex_events
 
@@ -150,3 +151,50 @@ class LangGraphTurn:
         did not report usage.
         """
         return self._usage
+
+
+async def stream_langgraph_events(stream, task_id: str) -> str:
+    """Stream LangGraph events to Agentex via Redis.
+
+    Converts LangGraph ``graph.astream()`` events into Agentex streaming
+    updates and pushes them to Redis via ``adk.streaming`` contexts. For use
+    with async ACP agents that stream via Redis rather than HTTP yields.
+
+    Processes the stream from graph.astream() called with
+    stream_mode=["messages", "updates"] and pushes text, reasoning,
+    tool request, and tool response messages through Redis streaming
+    contexts.
+
+    Supports both regular models (chunk.content is a str) and reasoning
+    models like gpt-5/o1/o3 (chunk.content is a list of typed content blocks
+    in the Responses API responses/v1 format).
+
+    Implemented on ``UnifiedEmitter.auto_send_turn(LangGraphTurn(...))`` for
+    cross-harness consistency, the same surface used by every other harness
+    adapter (pydantic-ai, openai-agents, etc.). The public signature and
+    return type are preserved identically.
+
+    LangGraph emits tool requests as ``Full`` events (from "updates"), NOT
+    Start+Delta+Done like pydantic-ai. ``auto_send`` handles Full events
+    correctly; no coalescing wrapper is needed.
+
+    ``created_at`` is set from ``workflow.now()`` when called inside a
+    Temporal workflow, matching the pattern used by the openai/litellm providers.
+    Outside a workflow (plain async activities, sync agents) it is ``None`` and the
+    server's wall clock is used.
+
+    Args:
+        stream: Async iterator from graph.astream(..., stream_mode=["messages", "updates"])
+        task_id: The Agentex task ID to stream messages to.
+
+    Returns:
+        The accumulated final text output from the agent.
+    """
+    from agentex.lib.core.harness.emitter import UnifiedEmitter
+
+    # Stamp messages with workflow.now() inside Temporal for deterministic
+    # created_at ordering; falls back to None (server wall clock) outside a workflow.
+    turn = LangGraphTurn(stream, model=None)
+    emitter = UnifiedEmitter(task_id=task_id, trace_id=None, parent_span_id=None)
+    result = await emitter.auto_send_turn(turn, created_at=workflow_now_if_in_workflow())
+    return result.final_text

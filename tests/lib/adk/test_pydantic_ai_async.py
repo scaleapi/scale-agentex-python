@@ -36,7 +36,7 @@ from agentex.types.task_message_update import StreamTaskMessageDelta
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
-from agentex.lib.adk._modules._pydantic_ai_async import stream_pydantic_ai_events
+from agentex.lib.adk._modules._pydantic_ai_turn import stream_pydantic_ai_events
 
 TASK_ID = "task_test"
 

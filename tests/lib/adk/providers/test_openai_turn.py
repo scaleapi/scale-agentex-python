@@ -25,7 +25,7 @@ from agentex.types.task_message_update import (
 
 
 def _import_target():
-    from agentex.lib.adk.providers._modules.openai_turn import (
+    from agentex.lib.adk._modules._openai_turn import (
         OpenAITurn,
         _aggregate_usage,
         openai_usage_to_turn_usage,
@@ -219,7 +219,7 @@ async def test_turn_usage_populated_from_result_after_exhaustion():
             # monkeypatch that converter below so this can yield canonical events.
             return _canonical_stream(canonical)
 
-    import agentex.lib.adk.providers._modules.openai_turn as mod
+    import agentex.lib.adk._modules._openai_turn as mod
 
     async def _passthrough(stream):
         async for e in stream:
