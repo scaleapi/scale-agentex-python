@@ -1,16 +1,18 @@
-"""LangGraph conformance fixtures for the cross-channel span-derivation test.
+"""Cross-channel conformance fixtures for LangGraph harness tap.
 
-Registers 4 LangGraph event sequences as conformance fixtures:
-- text-only: a plain text response (no tool calls)
-- single-tool: one tool call + response
-- reasoning: a reasoning block + text
-- multi-step: two turns with tool calls
+Each fixture is built as a canonical sequence of ``StreamTaskMessage*`` events
+that matches what ``convert_langgraph_to_agentex_events`` (via ``LangGraphTurn``)
+emits for the given scenario.  The fixtures are registered with the shared
+conformance runner and exercised by both the cross-channel equivalence test
+(yield_events vs auto_send) and the backward-compatible span-derivation test.
 
-AGX1-377 note: LangGraph emits tool requests as ``StreamTaskMessageFull``
-(from "updates" events), NOT Start+Delta+Done like pydantic-ai. The SpanDeriver
-does not produce tool spans from Full events today; that gap is tracked in
-AGX1-373. The fixtures here document the current behavior and will be updated
-when AGX1-373 resolves.
+LangGraph-specific note
+-----------------------
+LangGraph emits tool *requests* as ``StreamTaskMessageFull`` events (from the
+"updates" stream), NOT as Start+Delta+Done like pydantic-ai.  ``auto_send``
+handles Full events by opening a streaming context with the full content and
+closing it immediately, so both channels deliver the same logical payload.
+No ``coalesce_tool_requests`` option is needed.
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
 
-from .runner import Fixture, register, derive_all
+from .runner import Fixture, register, derive_all, run_cross_channel_conformance
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -56,7 +58,7 @@ _TEXT_ONLY = Fixture(
 _SINGLE_TOOL = Fixture(
     name="langgraph-single-tool",
     events=[
-        # LangGraph tool request is a Full event (AGX1-377)
+        # LangGraph tool request is a Full event (from "updates" stream)
         StreamTaskMessageFull(
             type="full",
             index=0,
@@ -134,7 +136,7 @@ _REASONING = Fixture(
 _MULTI_STEP = Fixture(
     name="langgraph-multi-step",
     events=[
-        # Turn 1: text + tool call
+        # Turn 1: streaming text
         StreamTaskMessageStart(
             type="start",
             index=0,
@@ -146,7 +148,7 @@ _MULTI_STEP = Fixture(
             delta=TextDelta(type="text", text_delta="Let me search for that."),
         ),
         StreamTaskMessageDone(type="done", index=0),
-        # Tool request (Full — AGX1-377)
+        # Tool request (Full — from "updates" stream)
         StreamTaskMessageFull(
             type="full",
             index=1,
@@ -169,7 +171,7 @@ _MULTI_STEP = Fixture(
                 content="LangGraph is a framework for...",
             ),
         ),
-        # Turn 2: final text
+        # Turn 2: final streaming text
         StreamTaskMessageStart(
             type="start",
             index=3,
@@ -191,16 +193,37 @@ for _fixture in _LANGGRAPH_FIXTURES:
 
 
 # ---------------------------------------------------------------------------
-# Tests
+# Cross-channel conformance: logical equivalence + span equivalence
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("fixture", _LANGGRAPH_FIXTURES, ids=lambda f: f.name)
-def test_langgraph_span_derivation_is_deterministic(fixture: Fixture):
-    """Exercises the cross-channel guarantee: yield and auto-send observe the
-    same event stream, so span derivation must be deterministic/idempotent.
+@pytest.mark.asyncio
+async def test_cross_channel_equivalence(fixture: Fixture) -> None:
+    """Assert that yield_events and auto_send produce equivalent logical
+    deliveries and identical span signals for each LangGraph fixture.
 
-    Deriving twice over the same events yields identical signals (the property
-    that makes yield vs auto-send equivalent, since both observe the same stream).
+    See runner.py for the full contract.  The key LangGraph difference: tool
+    requests arrive as Full events rather than Start+Delta+Done, so auto_send
+    handles them by opening a streaming context with the full content and
+    closing it immediately — both channels produce the same LogicalDelivery.
     """
+    yield_deliveries, auto_deliveries, yield_spans, auto_spans = await run_cross_channel_conformance(fixture)
+
+    assert yield_deliveries == auto_deliveries, (
+        f"[{fixture.name}] logical deliveries differ:\n  yield:     {yield_deliveries}\n  auto_send: {auto_deliveries}"
+    )
+    assert yield_spans == auto_spans, (
+        f"[{fixture.name}] span signals differ:\n  yield:     {yield_spans}\n  auto_send: {auto_spans}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatible determinism guard
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("fixture", _LANGGRAPH_FIXTURES, ids=lambda f: f.name)
+def test_span_derivation_is_deterministic(fixture: Fixture) -> None:
+    """Span derivation over the same event list is idempotent."""
     assert derive_all(fixture.events) == derive_all(fixture.events)
