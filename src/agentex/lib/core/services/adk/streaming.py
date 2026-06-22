@@ -505,20 +505,23 @@ class StreamingTaskMessageContext:
                 await self._buffer.add(update)
                 return update
 
-        # Drain and stop the buffer BEFORE publishing the Full, so leftover
-        # deltas land in order (deltas -> Full); publishing them after the
-        # terminal Full would look like a stale duplicate tail. This also stops
-        # the ticker so it isn't orphaned past __aexit__'s close().
-        if isinstance(update, StreamTaskMessageFull) and self._buffer is not None:
+        # Terminal Done/Full updates must drain and stop the buffer BEFORE the
+        # terminal event reaches consumers, so leftover deltas land in order
+        # (deltas -> terminal) instead of trailing it as a stale duplicate tail.
+        # This also stops the ticker so it isn't orphaned past __aexit__'s close().
+        if isinstance(update, (StreamTaskMessageDone, StreamTaskMessageFull)) and self._buffer is not None:
             await self._buffer.close()
             self._buffer = None
 
-        result = await self._streaming_service.stream_update(update)
-
         if isinstance(update, StreamTaskMessageDone):
+            # close() publishes the single terminal Done, persists, and marks the
+            # context closed — don't publish here too, that would duplicate it.
             await self.close()
             return update
-        elif isinstance(update, StreamTaskMessageFull):
+
+        result = await self._streaming_service.stream_update(update)
+
+        if isinstance(update, StreamTaskMessageFull):
             await self._agentex_client.messages.update(
                 task_id=self.task_id,
                 message_id=update.parent_task_message.id,  # type: ignore[union-attr]

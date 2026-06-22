@@ -23,6 +23,7 @@ from agentex.types.task_message_delta import (
     ReasoningSummaryDelta,
 )
 from agentex.types.task_message_update import (
+    StreamTaskMessageDone,
     StreamTaskMessageFull,
     StreamTaskMessageDelta,
 )
@@ -619,6 +620,27 @@ class TestFullMessageClosesBuffer:
         )
         assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
             "expected the buffered deltas to be published before the Full"
+        )
+
+    @pytest.mark.asyncio
+    async def test_done_is_single_terminal_publish_no_trailing_deltas(self) -> None:
+        # Same guarantee as Full: buffered deltas publish BEFORE the terminal
+        # Done, and Done is published exactly once (not duplicated by close()).
+        ctx, svc, tm = await _make_context("coalesced")
+        # "alpha" flushes immediately; "beta" stays buffered in the window.
+        await ctx.stream_update(_text(tm, "alpha"))
+        await ctx.stream_update(_text(tm, "beta"))
+
+        await ctx.stream_update(StreamTaskMessageDone(parent_task_message=tm, type="done"))
+
+        published = [c.args[0] for c in svc.stream_update.await_args_list]
+        dones = [u for u in published if isinstance(u, StreamTaskMessageDone)]
+        assert len(dones) == 1, f"Done must publish exactly once, saw {len(dones)}"
+        assert isinstance(published[-1], StreamTaskMessageDone), (
+            f"Done must be the terminal publish; saw trailing {type(published[-1]).__name__}"
+        )
+        assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
+            "expected the buffered deltas to be published before the Done"
         )
 
     @pytest.mark.asyncio
