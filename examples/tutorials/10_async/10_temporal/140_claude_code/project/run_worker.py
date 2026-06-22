@@ -3,18 +3,15 @@
 Run as a separate long-lived process alongside the ACP HTTP server. The
 worker polls Temporal for workflow + activity tasks and executes them.
 
-Claude Code does not register custom activities here -- subprocess spawning
-happens directly in the workflow signal handler (workflow code) to keep
-the tutorial minimal. The built-in Agentex activities (state, messages,
-streaming, tracing) are registered via ``get_all_activities()``.
-
-For production use, move the subprocess spawn into a custom activity so
-it gets Temporal's retry + timeout guarantees.
+The Claude Code CLI subprocess runs in the ``run_claude_code_turn`` activity
+(registered below alongside the built-in Agentex activities), because
+subprocess I/O is not permitted on the Temporal workflow event loop.
 """
 
 import asyncio
 
 from project.workflow import At140ClaudeCodeWorkflow
+from project.activities import run_claude_code_turn
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
@@ -35,7 +32,7 @@ async def main():
     worker = AgentexWorker(task_queue=task_queue_name)
 
     await worker.run(
-        activities=get_all_activities(),
+        activities=[run_claude_code_turn, *get_all_activities()],
         workflow=At140ClaudeCodeWorkflow,
     )
 

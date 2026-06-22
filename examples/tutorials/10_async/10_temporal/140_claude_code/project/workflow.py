@@ -1,34 +1,32 @@
 """Temporal workflow for the Claude Code tutorial.
 
 Holds conversation state (session_id for multi-turn resume) durably across
-crashes. Each user message triggers ``on_task_event_send``, which spawns the
-Claude Code CLI locally as an asyncio subprocess, wraps the stdout line
-stream in ``ClaudeCodeTurn``, and delivers the turn via
+crashes. Each user message triggers ``on_task_event_send``, which delegates the
+turn to the ``run_claude_code_turn`` activity. The activity spawns the Claude
+Code CLI, wraps its stdout in ``ClaudeCodeTurn``, and delivers the turn via
 ``UnifiedEmitter.auto_send_turn`` (the async Redis push path).
 
 Note on subprocess inside Temporal
 ------------------------------------
-Temporal activities, not workflow code, should do I/O. However, this tutorial
-executes the subprocess directly in the signal handler (workflow code) to keep
-the example minimal. For production use, move the subprocess spawn into a
-dedicated activity so it benefits from Temporal's retry and timeout guarantees.
-See ``examples/tutorials/10_async/10_temporal/030_custom_activities/`` for
-the activity pattern.
+Subprocess (and all other) I/O must run in a Temporal *activity*, never in
+workflow code. Temporal runs workflow + signal-handler bodies on a
+deterministic sandbox event loop that does not implement ``subprocess_exec``
+(spawning the CLI there raises ``NotImplementedError``). The activity also gets
+Temporal's retry + timeout guarantees. See
+``examples/tutorials/10_async/10_temporal/030_custom_activities/`` for the
+activity pattern.
 """
 
 from __future__ import annotations
 
 import os
 import json
-import asyncio
-from typing import AsyncIterator
+from datetime import timedelta
 
 from temporalio import workflow
 
 from agentex.lib import adk
-from agentex.lib.adk import ClaudeCodeTurn
 from agentex.lib.types.acp import SendEventParams, CreateTaskParams
-from agentex.lib.core.harness import UnifiedEmitter
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
@@ -36,6 +34,9 @@ from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
+
+with workflow.unsafe.imports_passed_through():
+    from project.activities import RunClaudeCodeTurnParams, run_claude_code_turn
 
 add_tracing_processor_config(
     SGPTracingProcessorConfig(
@@ -53,80 +54,6 @@ if environment_variables.AGENT_NAME is None:
     raise ValueError("Environment variable AGENT_NAME is not set")
 
 logger = make_logger(__name__)
-
-
-async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIterator[str]:
-    """Spawn ``claude -p --output-format stream-json`` locally and yield stdout lines.
-
-    Pass ``session_id`` to resume a previous Claude Code session (multi-turn
-    memory via ``-r <session_id>``).
-
-    Injectable seam: tests monkeypatch this with a fake async iterator so no
-    real CLI invocation is needed offline.
-    """
-    cmd = [
-        "claude",
-        "-p",
-        "--output-format",
-        "stream-json",
-        "--verbose",
-    ]
-    if session_id:
-        cmd.extend(["-r", session_id])
-
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    assert proc.stdout is not None
-    assert proc.stdin is not None
-
-    proc.stdin.write(prompt.encode())
-    proc.stdin.close()
-
-    # Drain stderr concurrently. With --verbose, Claude Code can write enough to
-    # stderr to fill the OS pipe buffer; if we only read stdout, the CLI blocks
-    # on its stderr write while we block reading stdout — a deadlock. A
-    # background task keeps stderr flowing so stdout never stalls.
-    async def _drain_stderr() -> None:
-        assert proc.stderr is not None
-        async for _ in proc.stderr:
-            pass
-
-    stderr_task = asyncio.create_task(_drain_stderr())
-
-    try:
-        buffer = ""
-        async for chunk in proc.stdout:
-            buffer += chunk.decode("utf-8", errors="replace")
-            while "\n" in buffer:
-                line, buffer = buffer.split("\n", 1)
-                line = line.strip()
-                if line:
-                    yield line
-
-        if buffer.strip():
-            yield buffer.strip()
-
-        await proc.wait()
-    finally:
-        # Release the subprocess and stderr drain task even if the consumer
-        # abandons the generator early (task cancellation / client disconnect):
-        # cancel the drain task and terminate+reap the process if it is still
-        # running, so neither is leaked.
-        stderr_task.cancel()
-        try:
-            await stderr_task
-        except asyncio.CancelledError:
-            pass
-        if proc.returncode is None:
-            try:
-                proc.terminate()
-            except ProcessLookupError:
-                pass
-            await proc.wait()
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
@@ -161,29 +88,30 @@ class At140ClaudeCodeWorkflow(BaseWorkflow):
             name=f"Turn {self._turn_number}",
             input={"message": prompt},
         ) as span:
-            emitter = UnifiedEmitter(
-                task_id=task_id,
-                trace_id=task_id,
-                parent_span_id=span.id if span else None,
+            # Delegate the subprocess turn to an activity: subprocess I/O is not
+            # permitted on the Temporal workflow event loop. The activity streams
+            # events to the task and returns the final text + session_id.
+            # workflow.now() gives a deterministic timestamp under replay.
+            result = await workflow.execute_activity(
+                run_claude_code_turn,
+                RunClaudeCodeTurnParams(
+                    task_id=task_id,
+                    prompt=prompt,
+                    trace_id=task_id,
+                    parent_span_id=span.id if span else None,
+                    session_id=self._session_id,
+                    created_at=workflow.now(),
+                ),
+                start_to_close_timeout=timedelta(minutes=5),
             )
 
-            # Use workflow.now() for deterministic timestamps under Temporal replay.
-            created_at = workflow.now()
-
-            turn = ClaudeCodeTurn(_spawn_claude(prompt, session_id=self._session_id))
-            result = await emitter.auto_send_turn(turn, created_at=created_at)
-
-            # Capture session_id from result envelope to enable resume on next turn.
-            # ClaudeCodeTurn.usage() gives us access to the raw result envelope via
-            # TurnUsage -- but session_id is not part of TurnUsage. We extract it
-            # separately by looking at the turn's internal state post-exhaust.
-            if hasattr(turn, "_result_envelope") and turn._result_envelope:
-                sid = turn._result_envelope.get("session_id")
-                if sid:
-                    self._session_id = sid
+            # Capture session_id to enable Claude Code resume on the next turn.
+            sid = result.get("session_id")
+            if sid:
+                self._session_id = sid
 
             if span:
-                span.output = {"final_text": result.final_text}
+                span.output = {"final_text": result.get("final_text")}
 
     @workflow.run
     async def on_task_create(self, params: CreateTaskParams) -> str:
