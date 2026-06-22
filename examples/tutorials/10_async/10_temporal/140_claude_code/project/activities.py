@@ -136,8 +136,4 @@ async def run_claude_code_turn(params: RunClaudeCodeTurnParams) -> dict[str, Any
     turn = ClaudeCodeTurn(_spawn_claude(params.prompt, session_id=params.session_id))
     result = await emitter.auto_send_turn(turn, created_at=params.created_at)
 
-    session_id: str | None = None
-    if getattr(turn, "_result_envelope", None):
-        session_id = turn._result_envelope.get("session_id")
-
-    return RunClaudeCodeTurnResult(final_text=result.final_text, session_id=session_id).model_dump()
+    return RunClaudeCodeTurnResult(final_text=result.final_text, session_id=turn.session_id).model_dump()

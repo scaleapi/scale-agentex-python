@@ -64,7 +64,10 @@ class TurnUsage(BaseModel):
     total_tokens: int | None = None
     cost_usd: float | None = None
     duration_ms: int | None = None
-    num_llm_calls: int = 0
+    # num_llm_calls is provider-reported and may be absent (None = "not
+    # reported"). num_tool_calls / num_reasoning_blocks are counted locally from
+    # the observed stream, so 0 is always a real count.
+    num_llm_calls: int | None = None
     num_tool_calls: int = 0
     num_reasoning_blocks: int = 0
 

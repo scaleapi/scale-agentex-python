@@ -84,7 +84,7 @@ class TestClaudeCodeUsageToTurnUsage:
         assert usage.total_tokens is None
         assert usage.cost_usd is None
         assert usage.duration_ms is None
-        assert usage.num_llm_calls == 0
+        assert usage.num_llm_calls is None
 
     def test_real_zeros_preserved(self):
         result = {

@@ -81,8 +81,11 @@ def claude_code_usage_to_turn_usage(result_envelope: dict[str, Any]) -> TurnUsag
     cost_usd = _float(result_envelope, "cost_usd", "total_cost_usd")
     duration_ms = _int(result_envelope, "duration_ms")
 
+    # num_llm_calls is provider-reported (from num_turns): default None ("not
+    # reported") rather than 0 so callers can distinguish it from a real zero,
+    # matching the None convention used for the token fields above.
     num_turns = result_envelope.get("num_turns")
-    num_llm_calls = 0
+    num_llm_calls: int | None = None
     if num_turns is not None:
         try:
             num_llm_calls = int(num_turns)
@@ -128,6 +131,18 @@ class ClaudeCodeTurn:
                 on_result=self._on_result,
             )
         return self._events_stream
+
+    @property
+    def session_id(self) -> str | None:
+        """The Claude Code session id, for resuming a multi-turn session.
+
+        Valid only after ``events`` has been fully consumed (populated by the
+        ``result`` envelope). Returns ``None`` if the stream was truncated or
+        Claude Code reported no session id.
+        """
+        if not self._result_envelope:
+            return None
+        return self._result_envelope.get("session_id")
 
     def usage(self) -> TurnUsage:
         """Return normalised usage for this turn.

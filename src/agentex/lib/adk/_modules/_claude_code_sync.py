@@ -341,7 +341,6 @@ async def convert_claude_code_to_agentex_events(
 
             elif se_type == "content_block_stop":
                 if _thinking_open:
-                    full_text = _thinking_buf
                     _thinking_open = False
                     _thinking_buf = ""
                     _pending_thinking_block_index = None
