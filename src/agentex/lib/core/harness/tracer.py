@@ -74,6 +74,12 @@ class SpanTracer:
                     #   end_span(trace_id, span, start_to_close_timeout, heartbeat_timeout, retry_policy)
                     # It does not accept an output= kwarg.
                     span.output = signal.output
+                    # Tool failure status (ToolResponseContent.is_error) is recorded
+                    # on span.data when the harness reports one; Span has no dedicated
+                    # error field. None means no status was reported, so leave data alone.
+                    if signal.is_error is not None:
+                        data = span.data if isinstance(span.data, dict) else {}
+                        span.data = {**data, "is_error": signal.is_error}
                     await self._tracing.end_span(
                         trace_id=self.trace_id,
                         span=span,

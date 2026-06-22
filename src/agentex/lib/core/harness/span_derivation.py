@@ -124,7 +124,14 @@ class SpanDeriver:
             tcid = content.tool_call_id
             if tcid in self._open_tool_ids:
                 self._open_tool_ids.pop(tcid, None)
-                return [CloseSpan(key=tcid, output=content.content, is_complete=True)]
+                return [
+                    CloseSpan(
+                        key=tcid,
+                        output=content.content,
+                        is_complete=True,
+                        is_error=content.is_error,
+                    )
+                ]
         return []
 
     def _on_done(self, event: StreamTaskMessageDone) -> list[SpanSignal]:

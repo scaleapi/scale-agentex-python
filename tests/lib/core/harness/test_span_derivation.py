@@ -57,6 +57,35 @@ def test_single_tool_opens_on_done_closes_on_response():
         OpenSpan(key="call_1", kind="tool", name="Bash", input={"cmd": "ls"}),
         CloseSpan(key="call_1", output="files", is_complete=True),
     ]
+    # No status reported -> CloseSpan carries is_error=None.
+    assert sigs[1].is_error is None
+
+
+def test_tool_response_is_error_propagates_to_close_span():
+    """ToolResponseContent.is_error flows onto the CloseSpan so a derived tool
+    span can be marked as a failure (AGX1-371)."""
+    d = SpanDeriver()
+    events = [
+        _tool_req(0, "call_err", "Bash", {"cmd": "false"}),
+        StreamTaskMessageDone(type="done", index=0),
+        StreamTaskMessageFull(
+            type="full",
+            index=1,
+            content=ToolResponseContent(
+                type="tool_response",
+                author="agent",
+                tool_call_id="call_err",
+                name="Bash",
+                content="boom",
+                is_error=True,
+            ),
+        ),
+    ]
+    sigs = _signals(d, events)
+    assert sigs == [
+        OpenSpan(key="call_err", kind="tool", name="Bash", input={"cmd": "false"}),
+        CloseSpan(key="call_err", output="boom", is_complete=True, is_error=True),
+    ]
 
 
 def test_reasoning_opens_on_start_closes_on_done():

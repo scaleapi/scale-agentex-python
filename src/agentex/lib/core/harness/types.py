@@ -42,6 +42,7 @@ class CloseSpan:
     key: str
     output: Any = None
     is_complete: bool = True  # False when closed by flush() without a result
+    is_error: bool | None = None  # tool failure status; None when the harness reports no status
 
 
 SpanSignal = Union[OpenSpan, CloseSpan]
