@@ -17,6 +17,15 @@ from agentex.types.task_message_update import (
 )
 from agentex.lib.core.harness.span_derivation import SpanDeriver
 
+try:
+    from agentex.lib.utils.logging import make_logger
+
+    logger = make_logger(__name__)
+except Exception:  # ddtrace may be absent in some envs; fall back to stdlib
+    import logging
+
+    logger = logging.getLogger(__name__)
+
 
 async def auto_send(
     events: AsyncIterator[StreamTaskMessage],
@@ -65,8 +74,14 @@ async def auto_send(
     ctx_map: dict[int, Any] = {}
 
     async def _close_all() -> None:
+        # Guard each close independently: a failure on one context (e.g. a
+        # backend hiccup during teardown) must not abandon the remaining open
+        # contexts, otherwise their task messages would never be finalized.
         for ctx in list(ctx_map.values()):
-            await ctx.close()
+            try:
+                await ctx.close()
+            except Exception as exc:
+                logger.warning("[harness.auto_send] context close failed during teardown: %s", exc)
         ctx_map.clear()
 
     try:
