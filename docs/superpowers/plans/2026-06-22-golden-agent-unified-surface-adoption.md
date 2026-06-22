@@ -33,13 +33,17 @@ Paths under `teams/sgp/agents/golden_agent/project/`.
 The golden agent runs under Temporal, so delivery uses the **auto_send** channel from inside the activity (the SDK `UnifiedEmitter.auto_send_turn`, which already runs correctly in an activity).
 
 ```
-execute_agent_turn (activity):
+# workflow side: capture the timestamp in workflow context and pass it in,
+# because workflow.now() is NOT available inside an activity.
+execute_agent_turn(ActivityParams(..., created_at=workflow.now()))
+
+execute_agent_turn (activity, receives created_at via ActivityParams):
   1. Acquire/reconnect sandbox (pool), resolve secrets, render MCP config   # KEEP — SGP-coupled
   2. Emit sandbox-setup steps as ToolRequestContent/ToolResponseContent      # KEEP — now agentex content
   3. Spawn `claude -p --output-format stream-json` / `codex exec` in sandbox # KEEP — CLI spawn
   4. turn = ClaudeCodeTurn(chain(setup_events, convert_claude_code_to_agentex_events(sandbox.stdout_lines)))  # NEW — SDK tap + Turn
   5. result = await UnifiedEmitter(task_id, trace_id, parent_span_id)\
-                      .auto_send_turn(turn, created_at=workflow.now())        # NEW — SDK delivery
+                      .auto_send_turn(turn, created_at=params.created_at)     # NEW — SDK delivery
   6. emit per-turn metrics from result.usage (TurnUsage)                      # KEEP — DogStatsD, now fed by TurnUsage
 ```
 
@@ -47,7 +51,7 @@ execute_agent_turn (activity):
 Today the provider yields sandbox provisioning steps (reconnect / find / create / configure-git / clone) as `ToolStarted`/`ToolCompleted` `HarnessEvent`s that flow through the adapter so they appear in the UI + trace. Under the unified surface these become agent-produced `ToolRequestContent`/`ToolResponseContent` `StreamTaskMessage*` messages, **chained before** the harness tap's stream into one canonical stream for the turn (`chain(setup_events, convert_claude_code_to_agentex_events(stdout))`). `UnifiedEmitter` then delivers and traces the whole turn uniformly — setup steps keep showing in the UI and span tree.
 
 ### Determinism / timestamps
-Pass `created_at=workflow.now()` to `auto_send_turn` (AGX1-378) so the turn's messages carry deterministic Temporal timestamps, matching the prior dispenser behavior.
+Capture the timestamp in the **workflow** with `workflow.now()` and pass it into `execute_agent_turn` as an activity parameter (`created_at`); the activity forwards `params.created_at` to `auto_send_turn` (AGX1-378) so the turn's messages carry deterministic Temporal timestamps, matching the prior dispenser behavior. Do NOT call `workflow.now()` inside the activity (it is only valid in workflow context and raises otherwise).
 
 ### Usage / metrics
 `auto_send_turn` returns a `TurnResult` with a normalized `TurnUsage`. The golden agent's per-turn DogStatsD metrics (`metrics.py`) read from `TurnUsage` instead of the old `TurnCompleted` event — one shape for traces + metrics.
@@ -61,7 +65,7 @@ Pass `created_at=workflow.now()` to `auto_send_turn` (AGX1-378) so the turn's me
 
 **Phase 1 — claude-code provider**
 - In `ClaudeProvider`, keep sandbox acquisition, secret/MCP injection, and the `claude -p` spawn. Replace the `_StreamJsonProcessor` + `HarnessEvent` yielding with: produce the CLI's stdout as an async line iterator and wrap it in `ClaudeCodeTurn`.
-- In `execute_agent_turn`, replace the `AgentexStreamAdapter` loop with `UnifiedEmitter(...).auto_send_turn(turn, created_at=workflow.now())`; chain the sandbox-setup content before the tap stream.
+- In `execute_agent_turn`, replace the `AgentexStreamAdapter` loop with `UnifiedEmitter(...).auto_send_turn(turn, created_at=params.created_at)` (the calling workflow passes `workflow.now()` into the activity params; see "Determinism / timestamps"); chain the sandbox-setup content before the tap stream.
 - Delete `_StreamJsonProcessor`.
 - Verify against the golden agent's existing turn tests + a live claude-code turn in a dev sandbox: UI streaming, tool spans, reasoning, usage/metrics all intact.
 
