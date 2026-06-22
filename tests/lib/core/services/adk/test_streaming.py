@@ -400,6 +400,35 @@ class TestCoalescingBufferClose:
         await buf.add(_text(task_message, "after"))
         assert flushed == []
 
+    @pytest.mark.asyncio
+    async def test_cancelled_close_does_not_drop_in_flight_batch(self, task_message: TaskMessage) -> None:
+        """If close() is cancelled while the ticker is mid-flush, the already-
+        drained batch must still publish — not be lost to a force-cancel."""
+        flushed: list[StreamTaskMessageDelta] = []
+        gate = asyncio.Event()
+        entered = asyncio.Event()
+
+        async def on_flush(u: StreamTaskMessageDelta) -> None:
+            entered.set()
+            await gate.wait()  # block mid-flush, before the item is recorded
+            flushed.append(u)
+
+        buf = CoalescingBuffer(on_flush=on_flush)
+        buf.start()
+        await buf.add(_text(task_message, "hi"))  # first delta → immediate flush
+        await entered.wait()  # ticker is now blocked inside on_flush
+
+        close_task = asyncio.create_task(buf.close())
+        await asyncio.sleep(0)  # let close() reach `await self._task`
+        close_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await close_task
+
+        gate.set()  # release the in-flight flush
+        assert buf._task is not None
+        await buf._task  # ticker finishes the batch and exits on _closed
+        assert len(flushed) == 1, "in-flight batch was dropped on cancelled close()"
+
 
 class TestCoalescingBufferCloseDuringFlush:
     @pytest.mark.asyncio
@@ -625,20 +654,24 @@ class TestFullMessageClosesBuffer:
     @pytest.mark.asyncio
     async def test_done_is_single_terminal_publish_no_trailing_deltas(self) -> None:
         # Same guarantee as Full: buffered deltas publish BEFORE the terminal
-        # Done, and Done is published exactly once (not duplicated by close()).
+        # Done, Done is published exactly once (not duplicated by close()), and
+        # the caller's Done is published as-is so its metadata (index) survives.
         ctx, svc, tm = await _make_context("coalesced")
         # "alpha" flushes immediately; "beta" stays buffered in the window.
         await ctx.stream_update(_text(tm, "alpha"))
         await ctx.stream_update(_text(tm, "beta"))
 
-        await ctx.stream_update(StreamTaskMessageDone(parent_task_message=tm, type="done"))
+        done = StreamTaskMessageDone(parent_task_message=tm, type="done", index=7)
+        await ctx.stream_update(done)
 
         published = [c.args[0] for c in svc.stream_update.await_args_list]
         dones = [u for u in published if isinstance(u, StreamTaskMessageDone)]
         assert len(dones) == 1, f"Done must publish exactly once, saw {len(dones)}"
-        assert isinstance(published[-1], StreamTaskMessageDone), (
-            f"Done must be the terminal publish; saw trailing {type(published[-1]).__name__}"
+        assert published[-1] is done, (
+            f"the caller's Done must be the terminal publish (metadata preserved); "
+            f"saw trailing {type(published[-1]).__name__}"
         )
+        assert dones[0].index == 7, "caller's Done index must be preserved, not synthesized away"
         assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
             "expected the buffered deltas to be published before the Done"
         )

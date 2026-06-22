@@ -235,12 +235,12 @@ class CoalescingBuffer:
         if self._task is not None:
             self._wake.set()
             self._flush_now.set()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                # Outer cancel: force-cancel the ticker so it isn't orphaned.
-                self._task.cancel()
-                raise
+            # Shield the ticker: if close() is cancelled, awaiting the task bare
+            # would propagate the cancel into the ticker mid-flush, and _run
+            # swallows CancelledError — silently dropping an already-drained
+            # batch. Shielded, the ticker finishes its in-flight flush and exits
+            # on _closed; the cancel still propagates to our caller.
+            await asyncio.shield(self._task)
             self._task = None
         async with self._lock:
             drained = self._drain_locked()
@@ -434,8 +434,14 @@ class StreamingTaskMessageContext:
 
         return self
 
-    async def close(self) -> TaskMessage:
-        """Close the streaming context."""
+    async def close(self, done_event: StreamTaskMessageDone | None = None) -> TaskMessage:
+        """Close the streaming context.
+
+        ``done_event`` is the caller-provided terminal update when close is
+        driven by a streamed ``StreamTaskMessageDone`` — published as-is so its
+        ``index``/``parent_task_message`` survive. An implicit close (``__aexit__``)
+        passes nothing and a terminal Done is synthesized.
+        """
         if not self.task_message:
             raise ValueError("Context not properly initialized - no task message")
 
@@ -448,12 +454,10 @@ class StreamingTaskMessageContext:
         if self._is_closed:
             return self.task_message  # Already done (buffer reaped above)
 
-        # Send the DONE event
-        done_event = StreamTaskMessageDone(
-            parent_task_message=self.task_message,
-            type="done",
+        # Send the DONE event (the caller's, if provided, so its metadata survives).
+        await self._streaming_service.stream_update(
+            done_event or StreamTaskMessageDone(parent_task_message=self.task_message, type="done")
         )
-        await self._streaming_service.stream_update(done_event)
 
         # Update the task message with the final content
         has_deltas = (
@@ -505,19 +509,18 @@ class StreamingTaskMessageContext:
                 await self._buffer.add(update)
                 return update
 
-        # Terminal Done/Full updates must drain and stop the buffer BEFORE the
-        # terminal event reaches consumers, so leftover deltas land in order
-        # (deltas -> terminal) instead of trailing it as a stale duplicate tail.
-        # This also stops the ticker so it isn't orphaned past __aexit__'s close().
-        if isinstance(update, (StreamTaskMessageDone, StreamTaskMessageFull)) and self._buffer is not None:
+        if isinstance(update, StreamTaskMessageDone):
+            # close() drains the buffer first, then publishes this exact Done
+            # once (preserving its index/parent), persists, and marks closed.
+            await self.close(done_event=update)
+            return update
+
+        # Full publishes below, so drain and stop the buffer first → leftover
+        # deltas land in order (deltas -> Full) instead of trailing the terminal
+        # Full as a stale duplicate tail. Also stops the ticker.
+        if isinstance(update, StreamTaskMessageFull) and self._buffer is not None:
             await self._buffer.close()
             self._buffer = None
-
-        if isinstance(update, StreamTaskMessageDone):
-            # close() publishes the single terminal Done, persists, and marks the
-            # context closed — don't publish here too, that would duplicate it.
-            await self.close()
-            return update
 
         result = await self._streaming_service.stream_update(update)
 
