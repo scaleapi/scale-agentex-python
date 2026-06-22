@@ -64,12 +64,12 @@ verifies it is delivered on both.
 from __future__ import annotations
 
 import json
-import types as _types
 from typing import Any, NamedTuple, override
 from dataclasses import dataclass
 
 from agentex.types.text_delta import TextDelta
 from agentex.types.task_message import TaskMessage
+from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import SpanSignal, StreamTaskMessage
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message_update import (
@@ -296,30 +296,6 @@ class _FakeStreaming:
         return _FakeCtx(self.sink, ctype, initial_content)
 
 
-class _FakeTracing:
-    """Minimal tracing backend: records started/ended span names + outputs."""
-
-    def __init__(self) -> None:
-        self.started: list[str] = []
-        self.ended: list[Any] = []
-
-    async def start_span(
-        self,
-        *,
-        trace_id: str,
-        name: str,
-        input: Any = None,
-        parent_id: Any = None,
-        data: Any = None,
-        task_id: Any = None,
-    ) -> Any:
-        self.started.append(name)
-        return _types.SimpleNamespace()
-
-    async def end_span(self, *, trace_id: str, span: Any) -> None:
-        self.ended.append(getattr(span, "output", None))
-
-
 class _RecordingTracer(SpanTracer):
     """SpanTracer that records every SpanSignal it actually receives.
 
@@ -486,7 +462,7 @@ async def run_cross_channel_conformance(
     from agentex.lib.core.harness.yield_delivery import yield_events
 
     # --- yield channel ---
-    tracer_yield = _RecordingTracer(tracing=_FakeTracing())
+    tracer_yield = _RecordingTracer(tracing=FakeTracing())
     yield_out = [e async for e in yield_events(_gen(fixture.events), tracer=tracer_yield)]
 
     # Span signals the yield channel actually emitted to its tracer
@@ -496,7 +472,7 @@ async def run_cross_channel_conformance(
     yield_deliveries = _yield_text_reasoning_seq(_yield_logical_deliveries(yield_out))
 
     # --- auto_send channel ---
-    tracer_auto = _RecordingTracer(tracing=_FakeTracing())
+    tracer_auto = _RecordingTracer(tracing=FakeTracing())
     fake_streaming = _FakeStreaming()
     await auto_send(
         _gen(fixture.events),

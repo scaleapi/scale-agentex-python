@@ -25,6 +25,7 @@ from pydantic_ai.messages import (
 )
 
 from agentex.lib.core.harness import UnifiedEmitter
+from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 
 
@@ -35,25 +36,6 @@ async def _aiter(events: list[Any]) -> AsyncIterator[Any]:
 
 async def _collect(stream: AsyncIterator[Any]) -> list[Any]:
     return [e async for e in stream]
-
-
-class _FakeSpan:
-    def __init__(self, name: str):
-        self.name = name
-        self.output: Any = None
-
-
-class _FakeTracing:
-    def __init__(self) -> None:
-        self.started: list[tuple[str, str | None, Any]] = []
-        self.ended: list[tuple[str, Any]] = []
-
-    async def start_span(self, *, trace_id, name, input=None, parent_id=None, data=None, task_id=None):
-        self.started.append((name, parent_id, input))
-        return _FakeSpan(name)
-
-    async def end_span(self, *, trace_id, span):
-        self.ended.append((span.name, span.output))
 
 
 def _make_result_event(usage: RunUsage | None = None) -> AgentRunResultEvent:
@@ -129,7 +111,7 @@ class TestUnifiedSyncPathSpanDerivation:
             ),
         ]
 
-        fake = _FakeTracing()
+        fake = FakeTracing()
         turn = PydanticAITurn(_aiter(tool_events), model="openai:gpt-4o")
         emitter = UnifiedEmitter(task_id="t", trace_id="tr", parent_span_id="p", tracing=fake)
 
@@ -152,7 +134,7 @@ class TestUnifiedSyncPathSpanDerivation:
             PartEndEvent(index=0, part=ThinkingPart(content="let me think")),
         ]
 
-        fake = _FakeTracing()
+        fake = FakeTracing()
         turn = PydanticAITurn(_aiter(reasoning_events), model="openai:gpt-4o")
         emitter = UnifiedEmitter(task_id="t", trace_id="tr", parent_span_id="p", tracing=fake)
 
@@ -177,7 +159,7 @@ class TestUnifiedSyncPathSpanDerivation:
             ),
         ]
 
-        fake = _FakeTracing()
+        fake = FakeTracing()
         turn = PydanticAITurn(_aiter(raw_events), model="openai:gpt-4o")
         emitter = UnifiedEmitter(task_id="t", trace_id=None, parent_span_id=None, tracing=fake)
 
@@ -199,7 +181,7 @@ class TestUnifiedSyncPathSpanDerivation:
             ),
         ]
 
-        fake = _FakeTracing()
+        fake = FakeTracing()
         turn = PydanticAITurn(_aiter(raw_events), model="openai:gpt-4o")
         emitter = UnifiedEmitter(task_id="t", trace_id="tr", parent_span_id="p", tracer=False, tracing=fake)
 

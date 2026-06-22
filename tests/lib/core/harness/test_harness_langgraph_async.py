@@ -39,6 +39,7 @@ import pytest
 
 from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
+from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import TurnResult
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
@@ -103,30 +104,6 @@ class _FakeStreaming:
 
 
 # ---------------------------------------------------------------------------
-# Fake tracing backend
-# ---------------------------------------------------------------------------
-
-
-class _FakeSpan:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.output: Any = None
-
-
-class _FakeTracing:
-    def __init__(self) -> None:
-        self.started: list[tuple[str, Any]] = []
-        self.ended: list[tuple[str, Any]] = []
-
-    async def start_span(self, *, trace_id: str, name: str, **kw: Any) -> _FakeSpan:
-        self.started.append((name, kw.get("parent_id")))
-        return _FakeSpan(name)
-
-    async def end_span(self, *, trace_id: str, span: _FakeSpan) -> None:
-        self.ended.append((span.name, span.output))
-
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -142,9 +119,9 @@ def _make_stream(events: list[tuple[str, Any]]):
 async def _run_auto_send_turn(
     stream_events: list[tuple[str, Any]],
     trace_id: str | None = None,
-) -> tuple[TurnResult, _FakeStreaming, _FakeTracing | None]:
+) -> tuple[TurnResult, _FakeStreaming, FakeTracing | None]:
     fake_streaming = _FakeStreaming()
-    fake_tracing = _FakeTracing() if trace_id else None
+    fake_tracing = FakeTracing() if trace_id else None
 
     tracer: SpanTracer | bool = False
     if trace_id and fake_tracing is not None:

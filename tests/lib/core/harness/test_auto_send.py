@@ -9,13 +9,13 @@ The fake mirrors the real StreamingTaskMessageContext API exactly:
 This mirrors _langgraph_async.py lines 62-78 and 100-127.
 """
 
-import types as _types
 from datetime import datetime
 
 import pytest
 
 from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
+from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.tool_request_delta import ToolRequestDelta
@@ -181,21 +181,9 @@ async def test_auto_send_posts_full_tool_messages():
 # ---------------------------------------------------------------------------
 
 
-class _RecordTracing:
-    def __init__(self):
-        self.started, self.ended = [], []
-
-    async def start_span(self, *, trace_id, name, input=None, parent_id=None, data=None, task_id=None):
-        self.started.append(name)
-        return _types.SimpleNamespace()
-
-    async def end_span(self, *, trace_id, span):
-        self.ended.append(getattr(span, "output", None))
-
-
 @pytest.mark.asyncio
 async def test_auto_send_derives_tool_spans_via_tracer():
-    fake_tracing = _RecordTracing()
+    fake_tracing = FakeTracing()
     tracer = SpanTracer(trace_id="t", parent_span_id="p", tracing=fake_tracing)
     streaming = _FakeStreaming()
 
@@ -228,8 +216,8 @@ async def test_auto_send_derives_tool_spans_via_tracer():
     result = await auto_send(_gen(events), task_id="task1", tracer=tracer, streaming=streaming)
 
     assert result.final_text == ""
-    assert fake_tracing.started == ["Bash"]
-    assert fake_tracing.ended == ["ok"]
+    assert fake_tracing.started_names == ["Bash"]
+    assert fake_tracing.ended_outputs == ["ok"]
 
 
 # ---------------------------------------------------------------------------

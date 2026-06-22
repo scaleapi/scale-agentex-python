@@ -44,6 +44,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
 from agentex.types.task_message import TaskMessage
+from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import TurnResult
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
@@ -121,39 +122,6 @@ class _FakeStreaming:
 
 
 # ---------------------------------------------------------------------------
-# Fake tracing backend
-# ---------------------------------------------------------------------------
-
-
-class _FakeSpan:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.output: Any = None
-
-
-class _FakeTracing:
-    def __init__(self) -> None:
-        self.started: list[tuple[str, str | None]] = []
-        self.ended: list[tuple[str, Any]] = []
-
-    async def start_span(
-        self,
-        *,
-        trace_id: str,
-        name: str,
-        input: Any = None,
-        parent_id: Any = None,
-        data: Any = None,
-        task_id: Any = None,
-    ) -> _FakeSpan:
-        self.started.append((name, parent_id))
-        return _FakeSpan(name)
-
-    async def end_span(self, *, trace_id: str, span: _FakeSpan) -> None:
-        self.ended.append((span.name, span.output))
-
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -163,7 +131,7 @@ async def _run_auto_send_turn(
     user_msg: str = "What is the weather in Paris?",
     trace_id: str | None = None,
     parent_span_id: str | None = None,
-    fake_tracing: _FakeTracing | None = None,
+    fake_tracing: FakeTracing | None = None,
 ) -> tuple[TurnResult, _FakeStreaming]:
     """Drive the async (auto_send) path and return the TurnResult + fake streaming state."""
     fake_streaming = _FakeStreaming()
@@ -314,7 +282,7 @@ class TestAsyncAutoSendSpanDerivation:
         on the async/auto_send path when auto_send delivers the streamed
         Start+ToolRequestDelta+Done sequence."""
         agent = _make_agent()
-        fake_tracing = _FakeTracing()
+        fake_tracing = FakeTracing()
         tracer = SpanTracer(
             trace_id="trace1",
             parent_span_id="parent",
