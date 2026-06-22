@@ -68,6 +68,17 @@ async def _spawn_claude(prompt: str) -> AsyncIterator[str]:
     proc.stdin.write(prompt.encode())
     proc.stdin.close()
 
+    # Drain stderr concurrently. With --verbose, Claude Code can write enough to
+    # stderr to fill the OS pipe buffer; if we only read stdout, the CLI blocks
+    # on its stderr write while we block reading stdout — a deadlock. A
+    # background task keeps stderr flowing so stdout never stalls.
+    async def _drain_stderr() -> None:
+        assert proc.stderr is not None
+        async for _ in proc.stderr:
+            pass
+
+    stderr_task = asyncio.create_task(_drain_stderr())
+
     buffer = ""
     async for chunk in proc.stdout:
         buffer += chunk.decode("utf-8", errors="replace")
@@ -81,6 +92,7 @@ async def _spawn_claude(prompt: str) -> AsyncIterator[str]:
         yield buffer.strip()
 
     await proc.wait()
+    await stderr_task
 
 
 @acp.on_message_send
