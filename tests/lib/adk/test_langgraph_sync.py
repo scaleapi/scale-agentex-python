@@ -101,6 +101,10 @@ class TestTextStreaming:
         starts = [e for e in out if isinstance(e, StreamTaskMessageStart)]
         assert len(starts) == 1
         assert isinstance(starts[0].content, ReasoningContent), "reasoning Start must wrap ReasoningContent"
+        # `style` must be a non-null MessageStyle: the AgentEx server's
+        # StreamTaskMessageStartEntity rejects `reasoning.style=None` (enum), which
+        # would kill the stream. Match the conformance fixture's canonical value.
+        assert starts[0].content.style == "active", "reasoning Start must set a non-null style ('active')"
         # Pull content_delta inside the comprehension so the isinstance narrows the
         # delta union (narrowing would not survive a later attribute access).
         reasoning_delta_texts = [

@@ -149,7 +149,9 @@ async def convert_langgraph_to_agentex_events(
                             yield StreamTaskMessageStart(
                                 type="start",
                                 index=message_index,
-                                content=ReasoningContent(type="reasoning", author="agent", summary=[], content=[]),
+                                content=ReasoningContent(
+                                    type="reasoning", author="agent", summary=[], content=[], style="active"
+                                ),
                             )
                             reasoning_streaming = True
                             reasoning_content_index = 0

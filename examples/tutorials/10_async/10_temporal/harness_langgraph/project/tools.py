@@ -15,9 +15,22 @@ def get_weather(city: str) -> str:
     return f"The weather in {city} is sunny and 72°F"
 
 
+async def aget_weather(city: str) -> str:
+    """Native async tool entrypoint.
+
+    ``tools_node`` runs inline in the Temporal workflow and invokes tools via
+    ``tool.ainvoke``. A sync-only tool forces LangChain to bridge through
+    ``run_in_executor`` (a thread pool), which the deterministic Temporal
+    workflow event loop forbids (``NotImplementedError``). Providing a real
+    coroutine keeps tool execution on the workflow loop.
+    """
+    return get_weather(city)
+
+
 weather_tool = Tool(
     name="get_weather",
     func=get_weather,
+    coroutine=aget_weather,
     description="Get the current weather for a city. Input should be a city name.",
 )
 
