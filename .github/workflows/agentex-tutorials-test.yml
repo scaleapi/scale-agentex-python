@@ -52,13 +52,18 @@ jobs:
       # Subprocess-CLI harnesses: install the relevant CLI only for the
       # claude-code / codex tutorials (no-op for every other tutorial). npm is
       # preinstalled on ubuntu runners. Versions mirror the golden agent's
-      # sandbox image.
+      # sandbox image (teams/sgp/agents/golden_agent/sandbox/Dockerfile): claude-code
+      # is pinned to the same CLAUDE_CODE_VERSION; codex is left unpinned there,
+      # so it is left unpinned here too. Bump CLAUDE_CODE_VERSION in lockstep
+      # with the sandbox Dockerfile.
       - name: Install harness CLI (claude-code / codex only)
         if: ${{ contains(matrix.tutorial, 'claude_code') || contains(matrix.tutorial, 'codex') }}
+        env:
+          CLAUDE_CODE_VERSION: "2.1.142"
         run: |
           if [[ "${{ matrix.tutorial }}" == *claude_code* ]]; then
-            echo "📦 Installing Claude Code CLI..."
-            npm install -g @anthropic-ai/claude-code
+            echo "📦 Installing Claude Code CLI (v${CLAUDE_CODE_VERSION})..."
+            npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
             claude --version || true
           fi
           if [[ "${{ matrix.tutorial }}" == *codex* ]]; then
