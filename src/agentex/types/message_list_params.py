@@ -466,6 +466,19 @@ class MessageListParams(TypedDict, total=False):
               "default": null,
               "description": "The result of the tool.",
               "title": "Content"
+            },
+            "is_error": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Whether the tool call resulted in an error. `None` when the harness does not report a status.",
+              "title": "Is Error"
             }
           },
           "title": "ToolResponseContentEntityOptional",
