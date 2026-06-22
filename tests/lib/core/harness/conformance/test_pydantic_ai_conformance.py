@@ -1,22 +1,17 @@
 """Cross-channel conformance fixtures derived from real pydantic-ai event sequences.
 
 Each fixture is built by running a pydantic_ai event stream through PydanticAITurn
-(default coalesce_tool_requests=False) and collecting the canonical StreamTaskMessage*
-output. These canonical event lists are then registered with the conformance runner and
-exercised by the cross-channel test (yield_events vs auto_send).
+and collecting the canonical StreamTaskMessage* output. These canonical event lists are
+then registered with the conformance runner and exercised by the cross-channel test
+(yield_events vs auto_send).
 
-AGX1-377 NOTE
--------------
+Streamed tool requests
+----------------------
 The pydantic-ai stream emits a tool REQUEST as Start + ToolRequestDelta + Done (not a
-Full event). The runner's current normalization does NOT produce a logical delivery for
-Start+Delta+Done(tool_request): _yield_logical_deliveries only produces a delivery for
-Full(tool_request) or Full(tool_response), and Start+Done for text/reasoning content.
-auto_send likewise drops the Start+Delta+Done(tool_request) shape. Both channels handle
-it consistently (both ignore it), so the cross-channel test PASSES, but it does NOT yet
-assert that the streamed tool-request is actually delivered. Full delivery-equivalence
-coverage for streamed tool requests will land once AGX1-377 fixes the normalization.
-The fixtures below retain the ToolRequestDelta events so they become valid test inputs
-automatically once AGX1-377 lands.
+Full event). AGX1-377 has landed: both the conformance runner and auto_send now deliver
+the Start+Delta+Done(tool_request) shape, so the cross-channel test asserts full
+delivery-equivalence for streamed tool requests. The fixtures below retain the
+ToolRequestDelta events as the streamed tool-request inputs.
 """
 
 from __future__ import annotations
@@ -61,8 +56,7 @@ async def _aiter(events: list[Any]) -> AsyncIterator[Any]:
 async def _canonical(pydantic_events: list[Any]) -> list[Any]:
     """Run pydantic_ai events through PydanticAITurn and collect the output.
 
-    Default coalesce_tool_requests=False means the output equals the bare
-    convert_pydantic_ai_to_agentex_events output.
+    The output equals the bare convert_pydantic_ai_to_agentex_events output.
     """
     turn = PydanticAITurn(_aiter(pydantic_events), model=None)
     return [e async for e in turn.events]

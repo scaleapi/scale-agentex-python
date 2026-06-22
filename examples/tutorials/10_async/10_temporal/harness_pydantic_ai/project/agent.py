@@ -88,15 +88,15 @@ async def event_handler(
 
     The UnifiedEmitter is constructed from ``deps`` (task_id + parent_span_id),
     so tool spans nest under the workflow's per-turn span and messages auto-send
-    to the task stream. ``coalesce_tool_requests=True`` is required on the
-    auto_send path until AGX1-377 lands.
+    to the task stream. The auto_send path delivers streamed tool requests
+    natively, so no coalescing workaround is needed.
     """
     emitter = UnifiedEmitter(
         task_id=run_context.deps.task_id,
         trace_id=run_context.deps.task_id,
         parent_span_id=run_context.deps.parent_span_id,
     )
-    turn = PydanticAITurn(events, model=MODEL_NAME, coalesce_tool_requests=True)
+    turn = PydanticAITurn(events, model=MODEL_NAME)
     await emitter.auto_send_turn(turn)
 
 

@@ -85,8 +85,8 @@ async def handle_message_send(
         )
 
         async with agent.run_stream_events(user_message) as stream:
-            # Default coalesce_tool_requests=False preserves token-by-token
-            # tool-call argument streaming on the sync/HTTP channel.
+            # PydanticAITurn preserves token-by-token tool-call argument
+            # streaming (Start+Delta+Done) on the sync/HTTP channel.
             turn = PydanticAITurn(stream, model=MODEL_NAME)
             async for ev in emitter.yield_turn(turn):
                 yield ev

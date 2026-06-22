@@ -1,7 +1,7 @@
 """ACP handler for the async harness Pydantic AI test agent.
 
 This agent exercises the UNIFIED HARNESS SURFACE on the async (Redis-streaming)
-channel — ``UnifiedEmitter.auto_send_turn(PydanticAITurn(..., coalesce_tool_requests=True))``
+channel — ``UnifiedEmitter.auto_send_turn(PydanticAITurn(...))``
 — calling it directly rather than via the ``stream_pydantic_ai_events`` helper
 (which the ``110_pydantic_ai`` tutorial uses). This makes the unified-surface
 wiring explicit at the agent-author level.
@@ -132,13 +132,11 @@ async def handle_task_event_send(params: SendEventParams):
                 yield event
 
         async with agent.run_stream_events(user_message, message_history=previous_messages) as stream:
-            # coalesce_tool_requests=True is required on the async/auto_send
-            # path until AGX1-377 lands: tool requests are delivered as a single
-            # Full(tool_request) rather than streamed Start+Delta+Done.
+            # The unified auto_send path delivers streamed tool requests natively
+            # (Start+Delta+Done), so no coalescing workaround is needed.
             turn = PydanticAITurn(
                 tee_messages(stream),
                 model=MODEL_NAME,
-                coalesce_tool_requests=True,
             )
             result = await emitter.auto_send_turn(turn)
 
