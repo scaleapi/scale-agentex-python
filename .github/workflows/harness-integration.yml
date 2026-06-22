@@ -8,6 +8,7 @@ on:
       - "src/agentex/lib/core/harness/**"
       - "src/agentex/lib/adk/_modules/**"
       - "tests/lib/core/harness/test_harness_pydantic_ai_*.py"
+      - "tests/lib/core/harness/test_harness_langgraph_*.py"
       - ".github/workflows/harness-integration.yml"
 
 jobs:
@@ -32,17 +33,18 @@ jobs:
       - name: Conformance suite
         run: ./scripts/test tests/lib/core/harness/ -v
 
-  # Offline pydantic-ai integration tests (sync / async / temporal channels).
-  # These use pydantic-ai TestModel + fake streaming/tracing and require no live
-  # infrastructure. Enabled here for PR 4 (pydantic-ai migration). Future harness
-  # migration PRs (5-8) should add their integration-test paths to this matrix.
+  # Offline harness integration tests (sync / async / temporal channels) for each
+  # migrated harness. These use fake streams / TestModel + fake streaming/tracing
+  # and require no live infrastructure. Future harness migration PRs (6-8) add
+  # their harness to the matrix below and their test paths to the triggers above.
   live-matrix:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        harness: [pydantic_ai, langgraph]
         channel: [sync, async, temporal]
       fail-fast: false
-    name: pydantic-ai-${{ matrix.channel }}
+    name: ${{ matrix.harness }}-${{ matrix.channel }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -54,6 +56,6 @@ jobs:
       - name: Bootstrap
         run: ./scripts/bootstrap
 
-      - name: pydantic-ai ${{ matrix.channel }} integration tests (offline, TestModel)
+      - name: ${{ matrix.harness }} ${{ matrix.channel }} integration tests (offline)
         run: |
-          ./scripts/test tests/lib/core/harness/test_harness_pydantic_ai_${{ matrix.channel }}.py -v
+          ./scripts/test tests/lib/core/harness/test_harness_${{ matrix.harness }}_${{ matrix.channel }}.py -v
