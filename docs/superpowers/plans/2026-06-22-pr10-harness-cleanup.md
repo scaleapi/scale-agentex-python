@@ -24,6 +24,8 @@ These were superseded by `SpanTracer`/`UnifiedEmitter` (which derive spans from 
 - Any openai bespoke tracing shim deprecated in #416 (`sync_provider.py` `SyncStreamingModel`/`SyncStreamingProvider` if applicable).
 Remove the modules (or the deprecated symbols), their `adk/__init__.py` exports, and all references/tests that only existed to exercise the deprecated path. Keep any genuinely-shared helpers they used if still referenced elsewhere.
 
+**Note — these symbols still have tutorial consumers (see item 13):** the pre-unified example agents (`examples/tutorials/.../030_langgraph`, `100_langgraph`, `040_pydantic_ai`, `110_pydantic_ai`, etc.) import `create_langgraph_tracing_handler` / `create_pydantic_ai_tracing_handler`. Deleting the symbols breaks those tutorials, so item 13 (retire/migrate them) is a hard prerequisite of this removal, not optional polish.
+
 ### 2. Remove resolved-workaround markers and transitional comments
 Now that AGX1-377/378 are fixed in the foundation and the migrations dropped their workarounds, delete the leftover transitional breadcrumbs:
 - Any remaining `# AGX1-377`/`# AGX1-378` "workaround/limitation" comments in `auto_send.py`, the per-harness turns/async helpers, and the conformance runner (the coalescing is gone; `created_at` is restored; streamed tool delivery works).
@@ -75,7 +77,25 @@ The 15 tutorial projects (5 harnesses × sync/async/temporal) are intentionally 
 
 Only pydantic-ai (#415) and langgraph (#417) ship `test_harness_*_{sync,async,temporal}` integration suites + CI live-matrix rows; openai/claude/codex (#416/#420/#421) ship only conformance + turn tests. Either add the missing suites (and their matrix rows — note #415's matrix comment already invites PRs 5–8 to do so) or document the intentional difference. The two existing matrix-job definitions are near-identical and should collapse to one matrix once item 6's shared fakes land.
 
-> **Sequencing note:** items 6–9 and 11–12 are **non-breaking refactors** (tests, internal helpers, examples) — they only need the stack merged (precondition 1), NOT the deprecation window / consumer-migration gates that items 1–2 require. They can land as their own earlier cleanup PR if PR 10's breaking removals are blocked on the version-bump policy. Item 10 rides with item 3.
+### 13. Retire the duplicate pre-unified framework tutorials
+
+The migrations added a **second** set of framework tutorials alongside the ones already on `next`, so langgraph / pydantic-ai / openai now each have two demonstrations of the same framework:
+
+| Framework | Pre-existing (pre-unified, on `next`) | New (unified surface, harness PRs) |
+| --- | --- | --- |
+| langgraph | `00_sync/030_langgraph`, `10_async/00_base/100_langgraph`, `10_async/10_temporal/130_langgraph` | `harness_langgraph` ×3 (#417) |
+| pydantic-ai | `00_sync/040_pydantic_ai`, `10_async/00_base/110_pydantic_ai`, `10_async/10_temporal/110_pydantic_ai` | `harness_pydantic_ai` ×3 (#415) |
+| openai | `00_sync/050_openai_agents_local_sandbox`, `10_async/00_base/120_…`, `10_async/10_temporal/120_…` | `060/130/140_harness_openai` (#416) |
+
+The old ones demonstrate the **deprecated pre-unified path** — verified: `040_pydantic_ai` imports `create_pydantic_ai_tracing_handler` + `convert_*(tracing_handler=...)`; `030_langgraph`/`100_langgraph` import `create_langgraph_tracing_handler` (+ `stream_langgraph_events`). The new `harness_*` agents are their unified-surface (`UnifiedEmitter` + `<Harness>Turn`) replacements. So this is the tutorial-facing half of item 1's removal.
+
+**Decision needed — which set survives:**
+- **(a) Replace in place (preferred):** port the unified-surface implementation into the existing numbered slots (`040_pydantic_ai`, `030_langgraph`, …) and delete the new `harness_*` dirs. Keeps the established numbered tutorial sequence and resolves item 11's naming inconsistency for free.
+- **(b) Keep the new dirs, delete the old:** simpler diff, but leaves the `harness_*` vs numbered naming split (then settle naming per item 11) and orphans the old numbers.
+
+Either way: pick one set per framework, delete the other, fix any tutorial index/README that links the removed dirs, and confirm the surviving agents don't import the item-1 deprecated symbols. claude-code and codex are net-new (the existing `090_claude_agents_sdk_mvp` is the Claude **Agents SDK**, not the claude-code CLI harness) — nothing to retire there.
+
+> **Sequencing note:** items 6–9 and 11–12 are **non-breaking refactors** (tests, internal helpers, examples) — they only need the stack merged (precondition 1), NOT the deprecation window / consumer-migration gates that items 1–2 require. They can land as their own earlier cleanup PR if PR 10's breaking removals are blocked on the version-bump policy. Item 10 rides with item 3; **item 13 is gated with item 1** (the old tutorials import the symbols item 1 removes), so do them in the same PR.
 
 (Also noted, no action: #417 already carries a `tests/lib/adk/test_pydantic_ai_async.py` change via a shared tracing-handler fix — recorded here only so it isn't mistaken for stray duplication during cleanup.)
 
@@ -83,6 +103,7 @@ Only pydantic-ai (#415) and langgraph (#417) ship `test_harness_*_{sync,async,te
 - Grep the whole repo (and confirm with the golden agent / known consumers) for each removed symbol — zero references before deletion.
 - After the test-scaffolding consolidation (items 6–7): the shared `_fakes` module / fixture is the only definition of `_FakeTracing`/`_FakeSpan`, and the determinism test exists once — grep confirms no per-file/per-harness copies remain.
 - After the turn/sync consolidation (items 8–9): the five turn modules import the shared usage helper and the sync path follows one convention; harness conformance + integration suites stay green.
+- After the tutorial retirement (item 13): exactly one tutorial agent per framework per tier remains, none import the item-1 deprecated symbols, and the tutorial CI/test job + any index/README links resolve (no references to deleted dirs).
 - Full `./scripts/test` on Python 3.12 AND 3.13 (run the two versions separately or in shorter scoped batches — the dual-version `./scripts/test` in one shot has tripped a 600s no-output watchdog; prefer scoped runs or background with periodic output).
 - `./scripts/lint` clean (whole-repo ruff + pyright).
 - Changelog / release note documenting the removal of the deprecated public symbols.
