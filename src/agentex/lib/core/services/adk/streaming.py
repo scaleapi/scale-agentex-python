@@ -215,9 +215,9 @@ class CoalescingBuffer:
                 async with self._lock:
                     self._flush_now.clear()
                     drained = self._drain_locked()
-                    # Data that arrived during the flush keeps the ticker running.
-                    if self._buf:
-                        self._wake.set()
+                # Deltas that arrive after this drain (e.g. during the _on_flush
+                # awaits below) re-arm the ticker via add()'s empty->non-empty
+                # _wake.set(), so the loop re-runs to flush them.
                 for u in drained:
                     try:
                         await self._on_flush(u)
@@ -450,14 +450,16 @@ class StreamingTaskMessageContext:
         if not self.task_message:
             raise ValueError("Context not properly initialized - no task message")
 
-        if self._is_closed:
-            return self.task_message  # Already done
-
-        # Drain any buffered deltas before announcing DONE so consumers see the
-        # full sequence in order.
+        # Always reap the buffer ticker first, even if the context was already
+        # marked done by a Full/Done update on another path. close() is the last
+        # line of defense against an orphaned, forever-polling ticker, so it must
+        # never be short-circuited before stopping it.
         if self._buffer is not None:
             await self._buffer.close()
             self._buffer = None
+
+        if self._is_closed:
+            return self.task_message  # Already done (buffer reaped above)
 
         # Send the DONE event
         done_event = StreamTaskMessageDone(
@@ -522,6 +524,15 @@ class StreamingTaskMessageContext:
             await self.close()
             return update
         elif isinstance(update, StreamTaskMessageFull):
+            # A full message supersedes any buffered deltas and ends the stream.
+            # Close the coalescing buffer (stopping its ticker) BEFORE marking
+            # the context done — otherwise __aexit__'s close() early-returns on
+            # _is_closed and the ticker is never stopped, polling forever and
+            # leaking CPU (mirrors the StreamTaskMessageDone branch, which closes
+            # via self.close()).
+            if self._buffer is not None:
+                await self._buffer.close()
+                self._buffer = None
             await self._agentex_client.messages.update(
                 task_id=self.task_id,
                 message_id=update.parent_task_message.id,  # type: ignore[union-attr]

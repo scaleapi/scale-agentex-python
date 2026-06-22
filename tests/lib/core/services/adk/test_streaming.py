@@ -22,7 +22,10 @@ from agentex.types.task_message_delta import (
     ToolResponseDelta,
     ReasoningSummaryDelta,
 )
-from agentex.types.task_message_update import StreamTaskMessageDelta
+from agentex.types.task_message_update import (
+    StreamTaskMessageDelta,
+    StreamTaskMessageFull,
+)
 from agentex.lib.core.services.adk.streaming import (
     CoalescingBuffer,
     StreamingTaskMessageContext,
@@ -574,3 +577,54 @@ class TestStreamingTaskMessageContextCreatedAt:
 
         kwargs = client.messages.create.call_args.kwargs
         assert kwargs["created_at"] is omit
+
+
+class TestFullMessageClosesBuffer:
+    """Regression: a StreamTaskMessageFull must stop the coalescing-buffer ticker.
+
+    A ``StreamTaskMessageFull`` ends the stream and marks the context done. If it
+    marks ``_is_closed`` without closing the buffer, ``__aexit__``'s ``close()``
+    early-returns on the ``_is_closed`` guard and the ticker is never stopped —
+    it polls every ``FLUSH_INTERVAL_S`` forever, one orphaned task per stream
+    (the OneEdge worker CPU leak). These tests pin both halves of the fix:
+    the Full branch closes the buffer, and ``close()`` reaps it even if the
+    context was already marked closed by another path.
+    """
+
+    @pytest.mark.asyncio
+    async def test_full_message_stops_ticker(self) -> None:
+        ctx, _svc, tm = await _make_context("coalesced")
+        # Stream a delta so the buffer and its background ticker are live.
+        await ctx.stream_update(_text(tm, "hello"))
+        buf = ctx._buffer
+        assert buf is not None
+        task = buf._task
+        assert task is not None and not task.done()
+
+        # End-of-turn full message (OneEdge's pattern).
+        await ctx.stream_update(
+            StreamTaskMessageFull(
+                parent_task_message=tm,
+                content=TextContent(author="agent", content="final", format="markdown"),
+                type="full",
+            )
+        )
+
+        assert ctx._buffer is None, "Full message left the buffer un-closed"
+        assert task.done(), "coalescing-buffer ticker still running after Full (orphaned)"
+
+    @pytest.mark.asyncio
+    async def test_close_reaps_buffer_even_if_already_marked_closed(self) -> None:
+        # Defense-in-depth: if any path marks the context closed without closing
+        # the buffer, close() must still stop the ticker rather than short-circuit.
+        ctx, _svc, tm = await _make_context("coalesced")
+        await ctx.stream_update(_text(tm, "hi"))
+        buf = ctx._buffer
+        assert buf is not None
+        task = buf._task
+        assert task is not None and not task.done()
+
+        ctx._is_closed = True  # stray "already done" mark with a live buffer
+        await ctx.close()
+
+        assert task.done(), "close() must reap the buffer even when already marked closed"
