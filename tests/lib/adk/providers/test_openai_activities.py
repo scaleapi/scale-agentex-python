@@ -335,23 +335,61 @@ class TestOpenAIActivities:
         expected_params.tools = [CodeInterpreterTool(tool_config={"type": "code_interpreter"})]
         self._assert_starting_agent_params(starting_agent, expected_params)
 
-        # Verify streaming context received tool request and response updates
-        # Should have been called twice - once for tool request, once for response
-        assert mock_streaming_context.stream_update.call_count == 2
+        # Under the unified harness, the OpenAI events are converted to canonical
+        # StreamTaskMessageFull events and auto_send posts each full tool message
+        # by opening a streaming context with the content as initial_content and
+        # closing it (no stream_update). So assert on the opened contents.
+        opened = mock_streaming_context.opened_contents
+        tool_contents = [c for c in opened if getattr(c, "type", None) in ("tool_request", "tool_response")]
+        assert len(tool_contents) == 2
 
-        # First call should be tool request
-        first_call = mock_streaming_context.stream_update.call_args_list[0]
-        first_update = first_call[1]["update"]  # keyword argument
-        assert hasattr(first_update, "content")
-        assert first_update.content.name == "code_interpreter"
-        assert first_update.content.tool_call_id == "code_interpreter_call_123"
+        # First opened context is the tool request.
+        first = tool_contents[0]
+        assert first.type == "tool_request"
+        assert first.name == "code_interpreter"
+        assert first.tool_call_id == "code_interpreter_call_123"
 
-        # Second call should be tool response
-        second_call = mock_streaming_context.stream_update.call_args_list[1]
-        second_update = second_call[1]["update"]  # keyword argument
-        assert hasattr(second_update, "content")
-        assert second_update.content.name == "code_interpreter_call"
-        assert second_update.content.tool_call_id == "code_interpreter_call_123"
+        # Second opened context is the tool response.
+        second = tool_contents[1]
+        assert second.type == "tool_response"
+        assert second.tool_call_id == "code_interpreter_call_123"
+
+    @patch("agents.Runner.run_streamed")
+    async def test_run_agent_streamed_auto_send_forwards_previous_response_id(self, mock_runner_run_streamed):
+        """previous_response_id must reach Runner.run_streamed so a Responses-API
+        conversation continues instead of silently starting fresh."""
+        from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+            RunAgentStreamedAutoSendParams,
+        )
+
+        mock_streaming_result = self._create_streaming_result_mock()
+
+        async def _no_events():
+            return
+            yield
+
+        mock_streaming_result.stream_events = _no_events
+        mock_runner_run_streamed.return_value = mock_streaming_result
+
+        mock_tracer = self._create_mock_tracer()
+        openai_service, openai_activities, env = self._create_test_setup(mock_tracer)
+        self._setup_streaming_service_mocks(openai_service)
+
+        params = RunAgentStreamedAutoSendParams(
+            input_list=[{"role": "user", "content": "continue"}],
+            mcp_server_params=[],
+            agent_name="test_agent",
+            agent_instructions="You are a helpful assistant",
+            trace_id="test-trace-id",
+            parent_span_id="test-span-id",
+            task_id="test-task-id",
+            previous_response_id="response_123",
+        )
+
+        await env.run(openai_activities.run_agent_streamed_auto_send, params)
+
+        mock_runner_run_streamed.assert_called_once()
+        assert mock_runner_run_streamed.call_args.kwargs.get("previous_response_id") == "response_123"
 
     def _create_mock_tracer(self):
         """Helper method to create a properly mocked tracer with async context manager support."""
@@ -613,6 +651,60 @@ class TestOpenAIActivities:
         else:
             raise ValueError(f"Unknown tools_case: {tools_case}")
 
+    @patch("agents.Runner.run_streamed")
+    async def test_run_agent_streamed_auto_send_forwards_created_at(self, mock_runner_run_streamed):
+        """created_at is forwarded to every streaming context opened by auto_send_turn (AGX1-378)."""
+        from datetime import datetime, timezone
+
+        from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+            RunAgentStreamedAutoSendParams,
+        )
+
+        deterministic_ts = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+
+        mock_streaming_result = self._create_streaming_result_mock()
+
+        # Emit a tool call + tool response so auto_send actually opens streaming
+        # contexts; an empty stream opens none, making the assertion below
+        # vacuously true and unable to catch a created_at regression.
+        async def mock_stream_events():
+            tool_call_event = Mock()
+            tool_call_event.type = "run_item_stream_event"
+            tool_call_event.item = self._create_tool_call_item_mock(self._create_code_interpreter_tool_call_mock())
+            yield tool_call_event
+
+            tool_response_event = Mock()
+            tool_response_event.type = "run_item_stream_event"
+            tool_response_event.item = self._create_tool_output_item_mock()
+            yield tool_response_event
+
+        mock_streaming_result.stream_events = mock_stream_events
+        mock_runner_run_streamed.return_value = mock_streaming_result
+
+        mock_tracer = self._create_mock_tracer()
+        openai_service, openai_activities, env = self._create_test_setup(mock_tracer)
+        mock_ctx, recorded_created_ats = self._setup_streaming_service_mocks_with_created_at(openai_service)
+
+        params = RunAgentStreamedAutoSendParams(
+            input_list=[{"role": "user", "content": "hello"}],
+            mcp_server_params=[],
+            agent_name="test_agent",
+            agent_instructions="You are a helpful assistant",
+            trace_id="test-trace-id",
+            parent_span_id="test-span-id",
+            task_id="test-task-id",
+            created_at=deterministic_ts,
+        )
+
+        await env.run(openai_activities.run_agent_streamed_auto_send, params)
+
+        # Guard against a vacuous pass: at least one streaming context must have
+        # been opened so the per-context created_at assertion is meaningful.
+        assert recorded_created_ats, "expected at least one streaming context to be opened"
+        assert all(ts == deterministic_ts for ts in recorded_created_ats), (
+            f"Expected all streaming contexts to receive created_at={deterministic_ts!r}, got: {recorded_created_ats!r}"
+        )
+
     def _setup_streaming_service_mocks(self, openai_service):
         """Helper method to setup streaming service mocks for run_agent_auto_send."""
         from unittest.mock import AsyncMock
@@ -635,20 +727,63 @@ class TestOpenAIActivities:
         mock_streaming_context.task_message = mock_task_message
         mock_streaming_context.stream_update = AsyncMock()
 
+        # Record the initial_content passed to each opened streaming context.
+        # The unified harness auto_send path posts full tool messages by opening
+        # a context with initial_content and closing it (no stream_update), so
+        # assertions inspect the opened contents rather than stream_update calls.
+        opened_contents: list = []
+
         # Create a proper async context manager mock
         from contextlib import asynccontextmanager
         from unittest.mock import AsyncMock
 
         @asynccontextmanager
-        async def mock_streaming_context_manager(*_args, **_kwargs):
+        async def mock_streaming_context_manager(*_args, **kwargs):
+            if "initial_content" in kwargs:
+                opened_contents.append(kwargs["initial_content"])
             yield mock_streaming_context
 
         mock_streaming_service.streaming_task_message_context = mock_streaming_context_manager
+        # Expose the recorded contents on the returned context mock for assertions.
+        mock_streaming_context.opened_contents = opened_contents
 
         openai_service.streaming_service = mock_streaming_service
         openai_service.agentex_client = mock_agentex_client
 
         return mock_streaming_context
+
+    def _setup_streaming_service_mocks_with_created_at(self, openai_service):
+        """Like _setup_streaming_service_mocks but also records every created_at kwarg."""
+        from contextlib import asynccontextmanager
+        from unittest.mock import AsyncMock
+
+        from agentex.types.task_message import TaskMessage
+
+        mock_streaming_service = AsyncMock()
+        mock_agentex_client = AsyncMock()
+
+        mock_streaming_context = AsyncMock()
+        mock_task_message = Mock(spec=TaskMessage)
+        mock_task_message.id = "test-task-message-id"
+        mock_task_message.task_id = "test-task-id"
+        mock_task_message.content = {"type": "text", "content": "test"}
+        mock_streaming_context.task_message = mock_task_message
+        mock_streaming_context.stream_update = AsyncMock()
+
+        recorded_created_ats: list = []
+
+        @asynccontextmanager
+        async def mock_ctx_manager(*_args, **kwargs):
+            recorded_created_ats.append(kwargs.get("created_at"))
+            yield mock_streaming_context
+
+        mock_streaming_service.streaming_task_message_context = mock_ctx_manager
+        mock_streaming_context.opened_contents = []
+
+        openai_service.streaming_service = mock_streaming_service
+        openai_service.agentex_client = mock_agentex_client
+
+        return mock_streaming_context, recorded_created_ats
 
     def _create_code_interpreter_tool_call_mock(self, call_id="code_interpreter_call_123"):
         """Helper to create ResponseCodeInterpreterToolCall mock objects."""
@@ -680,6 +815,9 @@ class TestOpenAIActivities:
         mock_streaming_result = Mock(spec=RunResultStreaming)
         mock_streaming_result.final_output = final_output
         mock_streaming_result.new_items = []
+        # OpenAITurn reads raw_responses after stream exhaustion to aggregate
+        # usage; provide an empty list so usage normalizes to model-only.
+        mock_streaming_result.raw_responses = []
         mock_streaming_result.final_input_list = [
             {"role": "user", "content": "Run some Python code"},
             {"role": "assistant", "content": final_output},
