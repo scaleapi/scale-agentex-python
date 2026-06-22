@@ -140,6 +140,30 @@ class TestTextContent:
         text_starts = [e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, TextContent)]
         assert len(text_starts) == 1, "Text block must not be emitted twice"
 
+    async def test_later_turn_non_streamed_text_not_dropped(self):
+        """A non-streamed text block in a later turn must not be dropped because an
+        earlier turn streamed a block at the same index."""
+        envelopes = [
+            # Turn 1: streamed text at index 0 (dedup'd against the materialised msg).
+            {
+                "type": "stream_event",
+                "event": {"type": "content_block_start", "index": 0, "content_block": {"type": "text"}},
+            },
+            {
+                "type": "stream_event",
+                "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "first"}},
+            },
+            {"type": "stream_event", "event": {"type": "content_block_stop", "index": 0}},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "first"}]}},
+            # Turn 2: a NON-streamed text block, also at index 0.
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "second"}]}},
+        ]
+        out = await _collect(convert_claude_code_to_agentex_events(_aiter(envelopes)))
+        deltas = [
+            e.delta.text_delta for e in out if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, TextDelta)
+        ]
+        assert deltas == ["first", "second"], "Later turn's non-streamed text must still be delivered"
+
 
 # ---------------------------------------------------------------------------
 # Thinking / reasoning content

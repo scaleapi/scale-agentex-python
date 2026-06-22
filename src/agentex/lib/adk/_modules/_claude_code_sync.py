@@ -100,9 +100,11 @@ async def convert_claude_code_to_agentex_events(
     _text_index: int | None = None
     # Track which assistant-message block indices were already streamed via
     # stream_event triples. Those blocks must not be re-emitted when the full
-    # assistant message arrives.
+    # assistant message arrives. Reset at each message boundary (see below) so a
+    # later turn's block indices don't collide with an earlier turn's.
     _streamed_block_indexes: set[int] = set()
-    _saw_text_stream = False
+    # Once-guard so a thinking block's pending index is claimed on its first
+    # thinking_delta only. Reset per turn alongside _streamed_block_indexes.
     _saw_thinking_stream = False
     # For deferred ReasoningStarted: if a content_block_start(thinking) arrives
     # but no thinking_delta ever follows, the final assistant block's thinking
@@ -142,8 +144,9 @@ async def convert_claude_code_to_agentex_events(
                 block_type = block.get("type", "")
 
                 if block_type == "text":
-                    # Skip if already delivered via stream_event deltas
-                    if _saw_text_stream or idx in _streamed_block_indexes:
+                    # Skip only the specific blocks already delivered via
+                    # stream_event deltas (per-block, not a turn-wide latch).
+                    if idx in _streamed_block_indexes:
                         continue
                     text = block.get("text", "")
                     if text:
@@ -166,8 +169,9 @@ async def convert_claude_code_to_agentex_events(
                         yield StreamTaskMessageDone(type="done", index=msg_index)
 
                 elif block_type == "thinking":
-                    # Skip if already delivered via stream_event deltas
-                    if _saw_thinking_stream or idx in _streamed_block_indexes:
+                    # Skip only the specific blocks already delivered via
+                    # stream_event deltas (per-block, not a turn-wide latch).
+                    if idx in _streamed_block_indexes:
                         continue
                     thinking_text = block.get("thinking", "")
                     if thinking_text:
@@ -239,6 +243,13 @@ async def convert_claude_code_to_agentex_events(
                         ),
                     )
 
+            # End of a materialised message: reset per-turn streaming dedup state
+            # so the next turn's stream_event indices start clean. Without this,
+            # a block index streamed in an earlier turn would linger in the set
+            # and silently drop a later turn's non-streamed block at that index.
+            _streamed_block_indexes = set()
+            _saw_thinking_stream = False
+
         # -----------------------------------------------------------------------
         # stream_event — incremental streaming deltas
         # -----------------------------------------------------------------------
@@ -277,7 +288,6 @@ async def convert_claude_code_to_agentex_events(
                 elif btype == "text":
                     _text_open = True
                     _text_buf = ""
-                    _saw_text_stream = True
                     if isinstance(block_index, int):
                         _streamed_block_indexes.add(block_index)
                     msg_index = next_index

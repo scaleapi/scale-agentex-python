@@ -29,6 +29,8 @@ self-contained regardless of global registry ordering (see runner.py docstring).
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from agentex.lib.adk._modules._claude_code_sync import convert_claude_code_to_agentex_events
@@ -151,16 +153,27 @@ async def _build_fixture(name: str, envelopes: list[dict]) -> Fixture:
     return Fixture(name=name, events=events)
 
 
-# We need to run the async conversion synchronously at module import time so
-# that fixtures are ready before pytest collects. Use asyncio.run() carefully —
-# this is safe in a test module since no event loop is running at import time.
-import asyncio as _asyncio
+# Fixtures must exist before pytest collects (they parametrize the test below),
+# so they are built at import time. The conversion only iterates in-memory
+# envelopes — it never suspends on a real future — so we drive the coroutine to
+# completion by hand instead of asyncio.run(). asyncio.run() at import raises
+# RuntimeError when an event loop is already running (programmatic pytest, a
+# Jupyter kernel, or session-scoped asyncio loops); the loop-free driver below
+# is unaffected by the ambient loop state.
+def _run_pure_async(coro: Any) -> Any:
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError("conformance fixture build unexpectedly suspended on real I/O")
+
 
 _FIXTURES: list[Fixture] = [
-    _asyncio.run(_build_fixture("claude-code-text-only", _TEXT_ENVELOPES)),
-    _asyncio.run(_build_fixture("claude-code-tool-call-result", _TOOL_ENVELOPES)),
-    _asyncio.run(_build_fixture("claude-code-thinking-block", _THINKING_ENVELOPES)),
-    _asyncio.run(_build_fixture("claude-code-multi-step", _MULTI_STEP_ENVELOPES)),
+    _run_pure_async(_build_fixture("claude-code-text-only", _TEXT_ENVELOPES)),
+    _run_pure_async(_build_fixture("claude-code-tool-call-result", _TOOL_ENVELOPES)),
+    _run_pure_async(_build_fixture("claude-code-thinking-block", _THINKING_ENVELOPES)),
+    _run_pure_async(_build_fixture("claude-code-multi-step", _MULTI_STEP_ENVELOPES)),
 ]
 
 # Register into the shared registry so all_fixtures() can enumerate them
