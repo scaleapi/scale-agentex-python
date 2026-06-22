@@ -39,8 +39,50 @@ All harnesses now register into the cross-channel conformance runner (#414). If,
 ### 5. De-duplicate per-harness `_*_sync` / `_*_async` if anything remains
 The async helpers (`stream_pydantic_ai_events`, `stream_langgraph_events`, `run_agent_streamed_auto_send`) now delegate to `UnifiedEmitter.auto_send_turn`. Confirm no hand-rolled `adk.streaming` streaming loops remain in those modules post-merge; remove any leftover dead branches.
 
+### 6. Consolidate duplicated test scaffolding (cross-PR review finding)
+
+The migration PRs were reviewed independently, so each re-introduced the same test doubles instead of sharing them. After merge these are the concrete duplicates:
+
+- **`_FakeTracing` / `_FakeSpan`** are defined ~9 times: the foundation tests already carry three copies (`tests/lib/core/harness/test_tracer.py`, `test_emitter.py`, `conformance/runner.py`), and the integration suites add six more — `tests/lib/core/harness/test_harness_pydantic_ai_{sync,async,temporal}.py` (#415) and `test_harness_langgraph_{sync,async,temporal}.py` (#417) each redefine them.
+- **`_run_yield_turn`** is duplicated between the pydantic-ai and langgraph integration suites.
+
+Extract a single shared module — `tests/lib/core/harness/_fakes.py` (`FakeSpan`, `FakeTracing`, `run_yield_turn`) or a `conftest.py` `fake_tracing` fixture — and have every harness test import it. Delete the per-file copies.
+
+### 7. Parametrize the generic conformance determinism test once
+
+`test_span_derivation_is_deterministic` is copy-pasted into every per-harness conformance module (`conformance/test_<harness>_conformance.py`) on top of the copy already in the shared `conformance/test_conformance.py`. It is harness-agnostic — it only re-derives over registered fixtures. Keep ONE parametrized version in the shared conformance module driven by `all_fixtures()`, and delete the per-harness copies (the per-harness modules keep only their fixture registration + cross-channel assertions).
+
+### 8. Extract a shared harness-turn usage-normalization helper
+
+The five `HarnessTurn` implementations — `_pydantic_ai_turn.py`, `_langgraph_turn.py`, `providers/_modules/openai_turn.py`, `_claude_code_turn.py`, `_codex_turn.py` (134–214 lines each) — are not copy-paste, but they repeat the same shape: wrap a tap's event stream and normalize provider usage into `TurnUsage`. Pull the common normalization into a shared primitive in the foundation (e.g. `core/harness/usage.py` `normalize_usage(...)` or a `HarnessTurnBase` mixin), leaving each module only its provider-specific mapping. Do NOT force-fit harnesses whose usage shape genuinely diverges (codex is the largest for a reason — check before collapsing).
+
+### 9. Converge the three sync-path structures
+
+"Sync delivery" was implemented three different ways across the migrations: openai modifies `providers/_modules/sync_provider.py` + adds `openai_turn.py`; pydantic-ai/langgraph modify their existing `_*_sync.py`; claude/codex add new `_claude_code_sync.py` / `_codex_sync.py`. Pick one structural convention and align the five harnesses to it so the sync path reads the same everywhere. (Overlaps item 5 — do them together.)
+
+### 10. Reconcile the competing `adk/__init__.py` edits
+
+`src/agentex/lib/adk/__init__.py` is edited by three PRs — claude (#420, +9), codex (#421, +6), and the facade (#423, +22). Once merged, the facade in #423 should be the single source of the public surface; fold the claude/codex ad-hoc export additions into it and drop the duplicates. (Subsumed by the facade work in item 3 — track here so it isn't missed.)
+
+### 11. Tutorial-agent consistency pass
+
+The 15 tutorial projects (5 harnesses × sync/async/temporal) are intentionally tailored per harness, so there is no code to dedupe — but the scaffolding drifted and should be standardized:
+- **Naming:** `harness_<x>` (pydantic-ai, langgraph, codex) vs numeric prefixes `060_/130_/140_` (openai, claude_code). Pick one convention and rename.
+- **`.dockerignore`:** byte-identical in pydantic-ai/openai/claude, **absent in langgraph and codex**. Add the shared file everywhere (or none).
+- **`conftest.py`:** present only in codex (one per tier). Either promote it to the shared tutorial test setup or remove if unneeded.
+
+### 12. Decide integration-test coverage parity
+
+Only pydantic-ai (#415) and langgraph (#417) ship `test_harness_*_{sync,async,temporal}` integration suites + CI live-matrix rows; openai/claude/codex (#416/#420/#421) ship only conformance + turn tests. Either add the missing suites (and their matrix rows — note #415's matrix comment already invites PRs 5–8 to do so) or document the intentional difference. The two existing matrix-job definitions are near-identical and should collapse to one matrix once item 6's shared fakes land.
+
+> **Sequencing note:** items 6–9 and 11–12 are **non-breaking refactors** (tests, internal helpers, examples) — they only need the stack merged (precondition 1), NOT the deprecation window / consumer-migration gates that items 1–2 require. They can land as their own earlier cleanup PR if PR 10's breaking removals are blocked on the version-bump policy. Item 10 rides with item 3.
+
+(Also noted, no action: #417 already carries a `tests/lib/adk/test_pydantic_ai_async.py` change via a shared tracing-handler fix — recorded here only so it isn't mistaken for stray duplication during cleanup.)
+
 ## Verification
 - Grep the whole repo (and confirm with the golden agent / known consumers) for each removed symbol — zero references before deletion.
+- After the test-scaffolding consolidation (items 6–7): the shared `_fakes` module / fixture is the only definition of `_FakeTracing`/`_FakeSpan`, and the determinism test exists once — grep confirms no per-file/per-harness copies remain.
+- After the turn/sync consolidation (items 8–9): the five turn modules import the shared usage helper and the sync path follows one convention; harness conformance + integration suites stay green.
 - Full `./scripts/test` on Python 3.12 AND 3.13 (run the two versions separately or in shorter scoped batches — the dual-version `./scripts/test` in one shot has tripped a 600s no-output watchdog; prefer scoped runs or background with periodic output).
 - `./scripts/lint` clean (whole-repo ruff + pyright).
 - Changelog / release note documenting the removal of the deprecated public symbols.
