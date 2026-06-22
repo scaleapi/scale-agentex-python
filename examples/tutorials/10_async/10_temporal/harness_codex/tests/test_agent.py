@@ -124,12 +124,49 @@ class TestOfflineCodexWorkflow:
         assert turn._result["session_id"] == "thread-temporal-1"
 
     @pytest.mark.asyncio
-    async def test_signal_handler_increments_turn_and_captures_thread_id(self):
-        """Workflow signal handler increments turn counter and captures thread ID."""
-        from agentex.lib.core.harness import UnifiedEmitter
+    async def test_signal_handler_delegates_to_activity_and_captures_thread_id(self):
+        """Signal handler runs the turn via execute_activity, increments the turn
+        counter, and captures the codex thread ID returned by the activity."""
+        captured: dict[str, Any] = {}
 
-        class _FakeTurnResult:
-            final_text = "Hello from Temporal!"
+        async def _fake_execute_activity(_activity, params, **_kw):
+            captured["params"] = params
+            return {
+                "session_id": "thread-temporal-1",
+                "final_text": "Hello from Temporal!",
+                "model": "o4-mini",
+            }
+
+        with patch("project.workflow.adk.messages.create", new=AsyncMock()), patch(
+            "project.workflow.adk.tracing.span"
+        ) as mock_span, patch(
+            "project.workflow.workflow.execute_activity", new=_fake_execute_activity
+        ), patch("project.workflow.workflow.now", return_value=None):
+            mock_span.return_value = _FakeSpan()
+
+            from project.workflow import AtHarnessCodexWorkflow
+
+            wf = AtHarnessCodexWorkflow.__new__(AtHarnessCodexWorkflow)
+            wf._turn_number = 0
+            wf._codex_thread_id = None
+            wf._complete_task = False
+            wf._display_name = "test"
+
+            params = MagicMock()
+            params.task.id = "task-temporal-offline-1"
+            params.event.content.content = "say hello temporal"
+
+            await wf.on_task_event_send(params)
+
+        assert wf._turn_number == 1
+        assert wf._codex_thread_id == "thread-temporal-1"
+        assert captured["params"].prompt == "say hello temporal"
+        assert captured["params"].thread_id is None
+
+    @pytest.mark.asyncio
+    async def test_run_codex_turn_activity_streams_and_returns_thread_id(self):
+        """The run_codex_turn activity drives the turn and returns the thread id."""
+        from agentex.lib.core.harness import UnifiedEmitter
 
         async def _fake_spawn(model, thread_id=None):  # noqa: ARG001
             fake_stdin = MagicMock()
@@ -145,36 +182,29 @@ class TestOfflineCodexWorkflow:
             for evt in SAMPLE_EVENTS:
                 yield json.dumps(evt)
 
-        with patch("project.workflow._spawn_codex", new=_fake_spawn), patch(
-            "project.workflow._process_stdout", new=_fake_process_stdout
-        ), patch("project.workflow.adk.messages.create", new=AsyncMock()), patch(
-            "project.workflow.adk.tracing.span"
-        ) as mock_span:
-            mock_span.return_value = _FakeSpan()
+        class _FakeTurnResult:
+            final_text = "Hello from Temporal!"
 
-            async def _auto_send(_self, turn, *_a, **_kw):
-                async for _ in turn.events:
-                    pass
-                return _FakeTurnResult()
+        async def _auto_send(_self, turn, *_a, **_kw):
+            async for _ in turn.events:
+                pass
+            return _FakeTurnResult()
 
-            with patch.object(UnifiedEmitter, "auto_send_turn", new=_auto_send):
-                with patch("project.workflow.workflow.now", return_value=None):
-                    from project.workflow import AtHarnessCodexWorkflow
+        with patch("project.activities._spawn_codex", new=_fake_spawn), patch(
+            "project.activities._process_stdout", new=_fake_process_stdout
+        ), patch.object(UnifiedEmitter, "auto_send_turn", new=_auto_send):
+            from project.activities import RunCodexTurnParams, run_codex_turn
 
-                    wf = AtHarnessCodexWorkflow.__new__(AtHarnessCodexWorkflow)
-                    wf._turn_number = 0
-                    wf._codex_thread_id = None
-                    wf._complete_task = False
-                    wf._display_name = "test"
+            result = await run_codex_turn(
+                RunCodexTurnParams(
+                    task_id="task-temporal-offline-1",
+                    prompt="say hello temporal",
+                    model="o4-mini",
+                )
+            )
 
-                    params = MagicMock()
-                    params.task.id = "task-temporal-offline-1"
-                    params.event.content.content = "say hello temporal"
-
-                    await wf.on_task_event_send(params)
-
-        assert wf._turn_number == 1
-        assert wf._codex_thread_id == "thread-temporal-1"
+        assert result["session_id"] == "thread-temporal-1"
+        assert result["final_text"] == "Hello from Temporal!"
 
 
 # ---------------------------------------------------------------------------

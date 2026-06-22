@@ -3,13 +3,15 @@
 Run as a separate long-lived process alongside the ACP HTTP server. The
 worker polls Temporal for workflow + activity tasks and executes them.
 
-Codex subprocess calls happen inside signal handler bodies (not activities),
-so no extra activity registrations are needed beyond the standard Agentex set.
+The codex CLI subprocess runs in the ``run_codex_turn`` activity (registered
+below alongside the built-in Agentex activities), because subprocess I/O is not
+permitted on the Temporal workflow event loop.
 """
 
 import asyncio
 
 from project.workflow import AtHarnessCodexWorkflow
+from project.activities import run_codex_turn
 from agentex.lib.utils.debug import setup_debug_if_enabled
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
@@ -30,7 +32,7 @@ async def main():
     worker = AgentexWorker(task_queue=task_queue_name)
 
     await worker.run(
-        activities=get_all_activities(),
+        activities=[run_codex_turn, *get_all_activities()],
         workflow=AtHarnessCodexWorkflow,
     )
 

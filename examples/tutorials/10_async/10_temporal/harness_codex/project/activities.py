@@ -1,0 +1,135 @@
+"""Temporal activity for the Codex harness tutorial.
+
+Subprocess spawning (and any other I/O) must run inside a Temporal *activity*,
+not in workflow code. Temporal runs workflow + signal-handler bodies on a
+deterministic sandbox event loop that does not implement ``subprocess_exec``
+(or threads / sockets), so spawning ``codex exec`` directly in the signal
+handler raises ``NotImplementedError``. This activity runs codex, drives the
+``CodexTurn`` through ``UnifiedEmitter.auto_send_turn`` (the async Redis push
+path), and returns the turn result to the workflow.
+
+The ``_spawn_codex`` / ``_process_stdout`` seams are injectable: offline tests
+replace them with fakes that yield pre-recorded event lines so no real CLI
+runs.
+"""
+
+from __future__ import annotations
+
+import os
+import asyncio
+from typing import Any
+from datetime import datetime
+from collections.abc import AsyncIterator
+
+from temporalio import activity
+
+from agentex.lib.adk import CodexTurn
+from agentex.lib.core.harness import UnifiedEmitter
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.model_utils import BaseModel
+
+logger = make_logger(__name__)
+
+RUN_CODEX_TURN_ACTIVITY = "run_codex_turn"
+
+
+class RunCodexTurnParams(BaseModel):
+    """Arguments for one codex turn run inside an activity."""
+
+    task_id: str
+    prompt: str
+    model: str
+    trace_id: str | None = None
+    parent_span_id: str | None = None
+    thread_id: str | None = None
+    created_at: datetime | None = None
+
+
+class RunCodexTurnResult(BaseModel):
+    """Result returned from the activity to the workflow."""
+
+    final_text: str
+    session_id: str | None = None
+    model: str | None = None
+
+
+async def _spawn_codex(
+    model: str,
+    thread_id: str | None = None,
+) -> asyncio.subprocess.Process:
+    """Spawn ``codex exec --json`` locally and return the live process.
+
+    Injection seam: tests replace this function with a fake that returns a
+    mock process whose stdout yields pre-recorded event lines.
+
+    The caller writes the prompt to stdin after the process starts, then
+    closes stdin so codex knows input is complete.
+    """
+    base_flags = [
+        "--json",
+        "--skip-git-repo-check",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--model",
+        model,
+    ]
+
+    if thread_id:
+        cmd = ["codex", "exec", *base_flags, "resume", thread_id, "-"]
+    else:
+        cmd = ["codex", "exec", *base_flags, "-"]
+
+    return await asyncio.create_subprocess_exec(
+        *cmd,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env={**os.environ},
+    )
+
+
+async def _process_stdout(process: asyncio.subprocess.Process) -> AsyncIterator[str]:
+    """Yield newline-delimited JSON lines from the process stdout."""
+    assert process.stdout is not None
+    buffer = ""
+    while True:
+        chunk = await process.stdout.read(4096)
+        if not chunk:
+            break
+        buffer += chunk.decode("utf-8", errors="replace")
+        while "\n" in buffer:
+            line, buffer = buffer.split("\n", 1)
+            line = line.strip()
+            if line:
+                yield line
+    if buffer.strip():
+        yield buffer.strip()
+
+
+@activity.defn(name=RUN_CODEX_TURN_ACTIVITY)
+async def run_codex_turn(params: RunCodexTurnParams) -> dict[str, Any]:
+    """Run one codex turn end-to-end and stream events to the task.
+
+    Runs in an activity (real asyncio loop) so subprocess I/O is permitted.
+    """
+    process = await _spawn_codex(params.model, thread_id=params.thread_id)
+
+    assert process.stdin is not None
+    process.stdin.write(params.prompt.encode("utf-8"))
+    await process.stdin.drain()
+    process.stdin.close()
+
+    turn = CodexTurn(events=_process_stdout(process), model=params.model)
+    emitter = UnifiedEmitter(
+        task_id=params.task_id,
+        trace_id=params.trace_id,
+        parent_span_id=params.parent_span_id,
+    )
+    result = await emitter.auto_send_turn(turn, created_at=params.created_at)
+
+    await process.wait()
+
+    return RunCodexTurnResult(
+        final_text=result.final_text,
+        session_id=turn.session_id,
+        model=turn.usage().model,
+    ).model_dump()
