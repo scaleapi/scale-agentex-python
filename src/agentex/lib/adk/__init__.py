@@ -13,6 +13,11 @@ from agentex.lib.adk._modules._langgraph_sync import convert_langgraph_to_agente
 from agentex.lib.adk._modules._pydantic_ai_async import stream_pydantic_ai_events
 from agentex.lib.adk._modules._pydantic_ai_sync import convert_pydantic_ai_to_agentex_events
 from agentex.lib.adk._modules._pydantic_ai_tracing import create_pydantic_ai_tracing_handler
+from agentex.lib.adk._modules._claude_code_sync import convert_claude_code_to_agentex_events
+from agentex.lib.adk._modules._claude_code_turn import (
+    ClaudeCodeTurn,
+    claude_code_usage_to_turn_usage,
+)
 from agentex.lib.adk._modules.events import EventsModule
 from agentex.lib.adk._modules.messages import MessagesModule
 from agentex.lib.adk._modules.state import StateModule
@@ -54,6 +59,10 @@ __all__ = [
     "stream_pydantic_ai_events",
     "convert_pydantic_ai_to_agentex_events",
     "create_pydantic_ai_tracing_handler",
+    # Claude Code
+    "convert_claude_code_to_agentex_events",
+    "ClaudeCodeTurn",
+    "claude_code_usage_to_turn_usage",
     # Providers
     "providers",
     # Utils
