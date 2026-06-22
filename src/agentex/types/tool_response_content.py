@@ -1,5 +1,6 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
+from typing import Optional
 from typing_extensions import Literal
 
 from .._models import BaseModel
@@ -24,6 +25,12 @@ class ToolResponseContent(BaseModel):
 
     tool_call_id: str
     """The ID of the tool call that is being responded to."""
+
+    is_error: Optional[bool] = None
+    """Whether the tool call resulted in an error.
+
+    `None` when the harness does not report a status.
+    """
 
     style: MessageStyle = "static"
     """The style of the message.

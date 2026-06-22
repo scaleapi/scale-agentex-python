@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.2 (2026-06-22)
+
+Full Changelog: [agentex-sdk-v0.13.1...agentex-sdk-v0.13.2](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.13.1...agentex-sdk-v0.13.2)
+
 ## 0.13.1 (2026-06-17)
 
 Full Changelog: [agentex-sdk-v0.13.0...agentex-sdk-v0.13.1](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.13.0...agentex-sdk-v0.13.1)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Optional
 from typing_extensions import Literal, Required, TypedDict
 
 from .message_style import MessageStyle
@@ -25,6 +26,12 @@ class ToolResponseContentParam(TypedDict, total=False):
 
     tool_call_id: Required[str]
     """The ID of the tool call that is being responded to."""
+
+    is_error: Optional[bool]
+    """Whether the tool call resulted in an error.
+
+    `None` when the harness does not report a status.
+    """
 
     style: MessageStyle
     """The style of the message.
