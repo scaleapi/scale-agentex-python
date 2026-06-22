@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "s040-pydantic-ai"
 version = "0.1.0"
-description = "A sync Pydantic AI agent with tool calling and streaming"
+description = "A sync Pydantic AI harness test agent using the unified emitter surface"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

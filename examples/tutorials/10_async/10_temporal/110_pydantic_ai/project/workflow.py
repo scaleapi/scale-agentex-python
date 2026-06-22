@@ -1,16 +1,16 @@
-"""Temporal workflow for the Pydantic AI tutorial.
+"""Temporal workflow for the harness Pydantic AI test agent.
 
 The workflow holds task state durably across crashes. Its signal handler
-delegates the actual agent run to ``temporal_agent.run(...)`` — which
-internally schedules model and tool activities, each independently
-durable. The ``event_stream_handler`` registered on ``temporal_agent``
-pushes streaming deltas to Redis while the model activity runs.
+delegates the actual agent run to ``temporal_agent.run(...)`` — which internally
+schedules model and tool activities, each independently durable. The
+``event_stream_handler`` registered on ``temporal_agent`` (see project.agent)
+pushes streaming deltas through the unified harness surface while the model
+activity runs.
 
 Multi-turn memory is kept on the workflow instance itself
-(``self._message_history``). Temporal's workflow state is already durable
-and replay-safe, so unlike the async-base tutorial we don't need an
-external ``adk.state`` round-trip — the message list survives crashes
-because Temporal replays activity results that produced it.
+(``self._message_history``). Temporal's workflow state is already durable and
+replay-safe, so unlike the async-base agent we don't need an external
+``adk.state`` round-trip.
 """
 
 from __future__ import annotations
@@ -56,14 +56,14 @@ logger = make_logger(__name__)
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
-class At110PydanticAiWorkflow(BaseWorkflow):
+class HarnessPydanticAiWorkflow(BaseWorkflow):
     """Long-running Temporal workflow that delegates each turn to a Pydantic AI TemporalAgent.
 
     The ``__pydantic_ai_agents__`` attribute is the marker the
     ``PydanticAIPlugin`` looks for at worker startup: it pulls
-    ``temporal_agent.temporal_activities`` off this list and registers them
-    on the worker automatically — so we don't have to list activities by
-    hand in ``run_worker.py``.
+    ``temporal_agent.temporal_activities`` off this list and registers them on
+    the worker automatically — so we don't have to list activities by hand in
+    ``run_worker.py``.
     """
 
     __pydantic_ai_agents__ = [temporal_agent]
@@ -74,8 +74,8 @@ class At110PydanticAiWorkflow(BaseWorkflow):
         self._turn_number = 0
         # Conversation history accumulated across turns. Each entry is a
         # pydantic-ai ``ModelMessage``. Temporal replays the activity that
-        # produced these messages, so the list is rebuilt deterministically
-        # if the workflow ever recovers from a crash.
+        # produced these messages, so the list is rebuilt deterministically if
+        # the workflow ever recovers from a crash.
         self._message_history: list["ModelMessage"] = []
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
@@ -93,17 +93,10 @@ class At110PydanticAiWorkflow(BaseWorkflow):
             name=f"Turn {self._turn_number}",
             input={"message": params.event.content.content},
         ) as span:
-            # temporal_agent.run() is the magic line. From the outside it
-            # looks like a regular async call. Internally it schedules:
-            #   1. A model activity (LLM HTTP call recorded by Temporal)
-            #   2. For each tool the model invokes, a tool activity
-            #   3. Each activity is retried, observable, and durable
-            # While the model activity runs, the event_stream_handler on
-            # temporal_agent pushes deltas to Redis so the UI sees tokens.
-            #
-            # Passing ``message_history`` makes the run remember prior turns:
-            # without it the agent would respond to each user message as if
-            # it had never seen the conversation before.
+            # temporal_agent.run() schedules a model activity, per-tool
+            # activities, and the event_stream_handler activity (which pushes
+            # deltas through the unified surface). Passing ``message_history``
+            # makes the run remember prior turns.
             result = await temporal_agent.run(
                 params.event.content.content,
                 message_history=self._message_history,
@@ -112,8 +105,8 @@ class At110PydanticAiWorkflow(BaseWorkflow):
                     parent_span_id=span.id if span else None,
                 ),
             )
-            # Persist the new full history (user + assistant + any tool
-            # rounds) so the next turn picks up from here.
+            # Persist the new full history (user + assistant + any tool rounds)
+            # so the next turn picks up from here.
             self._message_history = list(result.all_messages())
             if span:
                 span.output = {"final_output": result.output}

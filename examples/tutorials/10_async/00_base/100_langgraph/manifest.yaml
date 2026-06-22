@@ -17,7 +17,7 @@ local_development:
 agent:
   acp_type: async
   name: ab100-langgraph
-  description: An async LangGraph agent with tool calling and Redis streaming
+  description: An async LangGraph agent using the unified harness surface (LangGraphTurn + UnifiedEmitter.auto_send_turn)
 
   temporal:
     enabled: false
@@ -47,7 +47,7 @@ deployment:
   global:
     agent:
       name: "ab100-langgraph"
-      description: "An async LangGraph agent with tool calling and Redis streaming"
+      description: "An async LangGraph agent using the unified harness surface"
     replicaCount: 1
     resources:
       requests:

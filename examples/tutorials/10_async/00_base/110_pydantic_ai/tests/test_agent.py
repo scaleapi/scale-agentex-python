@@ -1,8 +1,10 @@
-"""Tests for the async Pydantic AI agent.
+"""Live tests for the async Pydantic AI agent.
 
-This test suite validates:
-- Non-streaming event sending and polling
-- Streaming event sending
+These tests require a running agent (server + deployed agent) and exercise the
+unified-surface async handler end-to-end over the wire.
+
+Offline coverage of the same wiring (TestModel + fake streaming/tracing) lives
+in the SDK repo under ``tests/lib/core/harness/`` (the pydantic-ai async suite).
 
 To run these tests:
 1. Make sure the agent is running (via docker-compose or `agentex agents run`)
@@ -53,14 +55,12 @@ async def agent_id(client, agent_name):
 
 
 class TestNonStreamingEvents:
-    """Test non-streaming event sending and polling."""
+    """Test non-streaming event sending through the unified auto_send_turn path."""
 
     @pytest.mark.asyncio
     async def test_send_event(self, client: AsyncAgentex, agent_id: str):
-        """Test sending an event to the async Pydantic AI agent."""
-        task_response = await client.agents.create_task(
-            agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex)
-        )
+        """Test sending an event to the async harness Pydantic AI agent."""
+        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
         assert task is not None
 
@@ -77,9 +77,7 @@ class TestNonStreamingEvents:
     @pytest.mark.asyncio
     async def test_tool_calling(self, client: AsyncAgentex, agent_id: str):
         """Test that the agent can use tools (e.g., weather tool)."""
-        task_response = await client.agents.create_task(
-            agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex)
-        )
+        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
         assert task is not None
 
@@ -100,9 +98,7 @@ class TestStreamingEvents:
     @pytest.mark.asyncio
     async def test_send_event_and_stream(self, client: AsyncAgentex, agent_id: str):
         """Test sending an event and streaming the response."""
-        task_response = await client.agents.create_task(
-            agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex)
-        )
+        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
         assert task is not None
 

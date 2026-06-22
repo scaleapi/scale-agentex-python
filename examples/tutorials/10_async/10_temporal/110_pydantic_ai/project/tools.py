@@ -1,9 +1,8 @@
-"""Tool definitions for the Temporal Pydantic AI agent.
+"""Tool definitions for the Temporal harness Pydantic AI agent.
 
 These functions are registered on the base Pydantic AI agent. When the agent
 is wrapped in ``TemporalAgent``, each tool call becomes its own Temporal
-activity automatically — independently retryable and observable in the
-Temporal UI.
+activity automatically — independently retryable and observable.
 
 Tools must be ``async`` because Pydantic AI's Temporal integration requires
 it: non-async tools would run in threads, which is non-deterministic and

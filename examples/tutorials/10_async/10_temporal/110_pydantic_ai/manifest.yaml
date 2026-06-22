@@ -18,7 +18,7 @@ local_development:
 agent:
   acp_type: async
   name: at110-pydantic-ai
-  description: A Temporal-backed Pydantic AI agent with tool calling and Redis streaming
+  description: A Temporal-backed Pydantic AI harness test agent using the unified emitter surface
 
   temporal:
     enabled: true
@@ -42,8 +42,6 @@ agent:
     - env_var_name: SGP_CLIENT_BASE_URL
       secret_name: sgp-client-base-url
       secret_key: url
-  # env:
-  #   OPENAI_BASE_URL: "https://your-litellm-proxy/v1"
 
 deployment:
   image:
@@ -53,7 +51,7 @@ deployment:
   global:
     agent:
       name: "at110-pydantic-ai"
-      description: "A Temporal-backed Pydantic AI agent"
+      description: "A Temporal-backed Pydantic AI harness test agent using the unified emitter surface"
     replicaCount: 1
     resources:
       requests:
