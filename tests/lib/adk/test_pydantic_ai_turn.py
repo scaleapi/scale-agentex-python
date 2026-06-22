@@ -122,7 +122,7 @@ class TestPydanticAITurn:
         assert pre_usage.model == "openai:gpt-4o"
         assert pre_usage.input_tokens is None
         assert pre_usage.output_tokens is None
-        assert pre_usage.num_llm_calls == 0
+        assert pre_usage.num_llm_calls is None
 
     async def test_turn_events_and_usage(self):
         """Driving events to exhaustion populates usage from the terminal event."""
@@ -227,7 +227,7 @@ class TestPydanticAITurn:
         usage = turn.usage()
         assert usage.model == "openai:gpt-4o"
         assert usage.input_tokens is None
-        assert usage.num_llm_calls == 0
+        assert usage.num_llm_calls is None
 
 
 class TestToolRequestStreaming:
