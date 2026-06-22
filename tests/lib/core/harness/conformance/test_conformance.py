@@ -165,6 +165,74 @@ _FIXTURES: list[Fixture] = [
             ),
         ],
     ),
+    # fixture 5: parallel tool calls + a tool that errors (AGX1-373 review,
+    # danielmillerp). The earlier fixtures only exercise one tool at a time, so
+    # equivalence is proven over trivially-orderable streams. This stresses the
+    # representative case: two tool spans open SIMULTANEOUSLY (p-ls opens via the
+    # streamed Start+Done path, p-read opens via Full while p-ls is still open),
+    # then close in a different order than they opened, and one of them returns
+    # an error. It guards against the two channels agreeing with each other while
+    # both mishandling interleaved/parallel spans or a failing tool.
+    #
+    # The tool error is represented the way the harness encodes it today — an
+    # "Error: ..." string in ToolResponseContent.content (see
+    # claude_agents/hooks/hooks.py post_tool_use_failure_hook). Once the deferred
+    # ToolResponseContent.is_error field lands (AGX1-371), extend this fixture to
+    # assert the error status propagates onto the closed tool span.
+    Fixture(
+        name="parallel-tools-with-error",
+        events=[
+            # p-ls: streamed tool_request (opens its span at Done).
+            StreamTaskMessageStart(
+                type="start",
+                index=0,
+                content=ToolRequestContent(
+                    type="tool_request",
+                    author="agent",
+                    tool_call_id="p-ls",
+                    name="Bash",
+                    arguments={"command": "ls /nope"},
+                ),
+            ),
+            StreamTaskMessageDone(type="done", index=0),
+            # p-read: Full tool_request opens a second span while p-ls is open.
+            StreamTaskMessageFull(
+                type="full",
+                index=1,
+                content=ToolRequestContent(
+                    type="tool_request",
+                    author="agent",
+                    tool_call_id="p-read",
+                    name="Read",
+                    arguments={"path": "/etc/hosts"},
+                ),
+            ),
+            # p-ls errors and closes first (close order != open order).
+            StreamTaskMessageFull(
+                type="full",
+                index=2,
+                content=ToolResponseContent(
+                    type="tool_response",
+                    author="agent",
+                    tool_call_id="p-ls",
+                    name="Bash",
+                    content="Error: ls: /nope: No such file or directory",
+                ),
+            ),
+            # p-read succeeds and closes second.
+            StreamTaskMessageFull(
+                type="full",
+                index=3,
+                content=ToolResponseContent(
+                    type="tool_response",
+                    author="agent",
+                    tool_call_id="p-read",
+                    name="Read",
+                    content="127.0.0.1 localhost",
+                ),
+            ),
+        ],
+    ),
 ]
 
 # Register all fixtures for backward-compatible use via all_fixtures()
