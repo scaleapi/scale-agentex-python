@@ -161,7 +161,7 @@ Spans are derived from the canonical stream by `SpanDeriver` (pure, no `adk` dep
 
 ```python
 import agentex.lib.adk as adk
-from agentex.lib.adk import UnifiedEmitter, convert_pydantic_ai_to_agentex_events, create_pydantic_ai_tracing_handler
+from agentex.lib.adk import UnifiedEmitter, convert_pydantic_ai_to_agentex_events
 
 @acp.on_message_send
 async def handle(params):
