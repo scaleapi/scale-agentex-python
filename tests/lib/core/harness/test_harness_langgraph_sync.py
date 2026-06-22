@@ -14,8 +14,9 @@ What is tested
 - The sync handler correctly yields StreamTaskMessage* events in order:
   Full(ToolRequest) then Full(ToolResponse) then text Start+Delta+Done.
 - With trace_id + fake tracing, the SpanDeriver fires for text events.
-- AGX1-377: tool calls are Full events (not Start+Done), so the SpanDeriver
-  does NOT produce tool spans for LangGraph (documented gap, tracked in AGX1-373).
+- LangGraph emits tool calls as Full events (not Start+Done); the SpanDeriver
+  opens a tool span on Full(ToolRequestContent) and closes it on the matching
+  Full(ToolResponseContent) (see test_tracer_produces_tool_spans_for_full_events).
 - Final text is accumulated via yield mode.
 
 What is NOT covered without live infrastructure

@@ -84,6 +84,32 @@ class TestTextStreaming:
         out = await _collect(convert_langgraph_to_agentex_events(_make_stream(events)))
         assert out == []
 
+    async def test_reasoning_block_start_wraps_reasoning_content(self):
+        """A Responses-API reasoning block opens a Start wrapping ReasoningContent,
+        not TextContent (the deltas are ReasoningContentDelta)."""
+        from langchain_core.messages import AIMessageChunk
+
+        from agentex.types.reasoning_content import ReasoningContent
+        from agentex.types.task_message_update import StreamTaskMessageDelta, StreamTaskMessageStart
+        from agentex.types.reasoning_content_delta import ReasoningContentDelta
+
+        chunk = AIMessageChunk(
+            content=[{"type": "reasoning", "summary": [{"type": "summary_text", "text": "thinking hard"}]}]
+        )
+        events = [("messages", (chunk, {}))]
+        out = await _collect(convert_langgraph_to_agentex_events(_make_stream(events)))
+        starts = [e for e in out if isinstance(e, StreamTaskMessageStart)]
+        assert len(starts) == 1
+        assert isinstance(starts[0].content, ReasoningContent), "reasoning Start must wrap ReasoningContent"
+        # Pull content_delta inside the comprehension so the isinstance narrows the
+        # delta union (narrowing would not survive a later attribute access).
+        reasoning_delta_texts = [
+            e.delta.content_delta
+            for e in out
+            if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ReasoningContentDelta)
+        ]
+        assert reasoning_delta_texts == ["thinking hard"]
+
 
 class TestToolCallEmission:
     async def test_tool_call_emits_full_message(self):

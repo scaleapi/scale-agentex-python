@@ -67,6 +67,7 @@ async def convert_langgraph_to_agentex_events(
     from langchain_core.messages import ToolMessage, AIMessageChunk
 
     from agentex.types.text_content import TextContent
+    from agentex.types.reasoning_content import ReasoningContent
     from agentex.types.task_message_delta import TextDelta
     from agentex.types.task_message_update import (
         StreamTaskMessageDone,
@@ -148,7 +149,7 @@ async def convert_langgraph_to_agentex_events(
                             yield StreamTaskMessageStart(
                                 type="start",
                                 index=message_index,
-                                content=TextContent(type="text", author="agent", content=""),
+                                content=ReasoningContent(type="reasoning", author="agent", summary=[], content=[]),
                             )
                             reasoning_streaming = True
                             reasoning_content_index = 0
