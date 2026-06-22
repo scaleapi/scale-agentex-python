@@ -16,6 +16,7 @@ runs.
 from __future__ import annotations
 
 import os
+import codecs
 import asyncio
 from typing import Any
 from datetime import datetime
@@ -82,25 +83,34 @@ async def _spawn_codex(
         *cmd,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+        # Discard stderr: codex --json writes events to stdout; its stderr is
+        # progress/debug noise. Capturing it with PIPE but never reading it
+        # would deadlock once codex fills the OS pipe buffer (~64 KB).
+        stderr=asyncio.subprocess.DEVNULL,
         env={**os.environ},
     )
 
 
 async def _process_stdout(process: asyncio.subprocess.Process) -> AsyncIterator[str]:
-    """Yield newline-delimited JSON lines from the process stdout."""
+    """Yield newline-delimited JSON lines from the process stdout.
+
+    Uses an incremental UTF-8 decoder so a multibyte character split across two
+    4 KB reads is decoded correctly instead of being corrupted at the boundary.
+    """
     assert process.stdout is not None
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     buffer = ""
     while True:
         chunk = await process.stdout.read(4096)
         if not chunk:
             break
-        buffer += chunk.decode("utf-8", errors="replace")
+        buffer += decoder.decode(chunk)
         while "\n" in buffer:
             line, buffer = buffer.split("\n", 1)
             line = line.strip()
             if line:
                 yield line
+    buffer += decoder.decode(b"", final=True)
     if buffer.strip():
         yield buffer.strip()
 
