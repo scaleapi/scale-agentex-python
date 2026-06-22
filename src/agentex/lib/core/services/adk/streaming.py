@@ -216,17 +216,21 @@ class CoalescingBuffer:
                         await self._on_flush(u)
                     except Exception as e:
                         logger.exception(f"CoalescingBuffer flush failed: {e}")
-                # Check _closed *after* draining so close() gets a final flush
-                # pass and each item is published exactly once.
+                # Check _closed *after* draining so close() always gets a final
+                # in-loop flush pass. Exiting here (instead of being cancelled
+                # mid-flush) guarantees each in-flight item is published exactly
+                # once — close()'s final drain then only picks up items added
+                # after the last lock release.
                 if self._closed:
                     return
         except asyncio.CancelledError:
             pass
 
     async def close(self) -> None:
-        # Let the ticker exit after its next drain rather than cancelling
-        # mid-flush, which could re-publish a delta whose Redis write already
-        # completed (the duplicate-tail symptom seen on the UI stream).
+        # Signal the ticker to stop and let it exit naturally after its next
+        # drain. Cancelling mid-flush would risk re-publishing a delta whose
+        # Redis write already completed but whose await had not yet returned,
+        # producing the duplicate-tail symptom seen on the UI stream.
         self._closed = True
         if self._task is not None:
             self._wake.set()
