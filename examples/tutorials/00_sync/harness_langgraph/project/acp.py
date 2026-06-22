@@ -33,6 +33,7 @@ from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.core.harness.emitter import UnifiedEmitter
+from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import TaskMessageUpdate
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
@@ -93,8 +94,14 @@ async def handle_message_send(
             parent_span_id=turn_span.id if turn_span else None,
         )
 
+        final_text = ""
         async for event in emitter.yield_turn(turn):
+            # Accumulate text deltas so the span's final_output is the assistant
+            # text (matching the async tutorial), not the usage metrics.
+            delta = getattr(event, "delta", None)
+            if isinstance(delta, TextDelta) and delta.text_delta:
+                final_text += delta.text_delta
             yield event
 
         if turn_span:
-            turn_span.output = {"final_output": turn.usage().model_dump()}
+            turn_span.output = {"final_output": final_text, "usage": turn.usage().model_dump()}
