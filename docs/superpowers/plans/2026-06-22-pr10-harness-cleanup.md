@@ -69,7 +69,12 @@ The five `HarnessTurn` implementations — `_pydantic_ai_turn.py`, `_langgraph_t
 ### 11. Tutorial-agent consistency pass
 
 The 15 tutorial projects (5 harnesses × sync/async/temporal) are intentionally tailored per harness, so there is no code to dedupe — but the scaffolding drifted and should be standardized:
-- **Naming:** `harness_<x>` (pydantic-ai, langgraph, codex) vs numeric prefixes `060_/130_/140_` (openai, claude_code). Pick one convention and rename.
+- **Naming — standardize on the numbered `NNN_<name>` paradigm** (matches every pre-existing tutorial). Rename the new harness agents off the bare `harness_*` scheme:
+  - `harness_pydantic_ai` and `harness_langgraph` (the bare-named sync/async/temporal dirs) → take the numbered slots of the pre-unified tutorials they replace (`040_pydantic_ai`, `110_pydantic_ai`; `030_langgraph`, `100_langgraph`, `130_langgraph`). This is the same move as item 13's replace-in-place — do the rename and the old-tutorial retirement as one step rather than twice.
+  - `060_harness_openai` / `130_harness_openai` / `140_harness_openai` → drop the `harness_` infix so they read `NNN_openai_*` like the rest, again folding into the openai retirement in item 13.
+  - `harness_codex` → assign fresh `NNN_codex` numbers consistent with the sequence (net-new; no old slot to reuse).
+  - `claude_code` (`060/130/140_claude_code`) already follows the numbered paradigm — no rename.
+  - Because the tutorials job discovers by `manifest.yaml` glob, the renames don't need a CI/allowlist change, but update any tutorial index / README / cross-links that reference the old paths (see item 13 verification).
 - **`.dockerignore`:** byte-identical in pydantic-ai/openai/claude, **absent in langgraph and codex**. Add the shared file everywhere (or none).
 - **`conftest.py`:** present only in codex (one per tier). Either promote it to the shared tutorial test setup or remove if unneeded.
 
@@ -89,11 +94,9 @@ The migrations added a **second** set of framework tutorials alongside the ones 
 
 The old ones demonstrate the **deprecated pre-unified path** — verified: `040_pydantic_ai` imports `create_pydantic_ai_tracing_handler` + `convert_*(tracing_handler=...)`; `030_langgraph`/`100_langgraph` import `create_langgraph_tracing_handler` (+ `stream_langgraph_events`). The new `harness_*` agents are their unified-surface (`UnifiedEmitter` + `<Harness>Turn`) replacements. So this is the tutorial-facing half of item 1's removal.
 
-**Decision needed — which set survives:**
-- **(a) Replace in place (preferred):** port the unified-surface implementation into the existing numbered slots (`040_pydantic_ai`, `030_langgraph`, …) and delete the new `harness_*` dirs. Keeps the established numbered tutorial sequence and resolves item 11's naming inconsistency for free.
-- **(b) Keep the new dirs, delete the old:** simpler diff, but leaves the `harness_*` vs numbered naming split (then settle naming per item 11) and orphans the old numbers.
+**Decision — replace in place, numbered paradigm (settled):** port each unified-surface (`harness_*`) implementation into the numbered slot of the pre-unified tutorial it supersedes (`harness_pydantic_ai` → `040_pydantic_ai` / `110_pydantic_ai`; `harness_langgraph` → `030_langgraph` / `100_langgraph` / `130_langgraph`; `*_harness_openai` → the `NNN_openai_*` slots) and delete the old deprecated dirs. This keeps the established numbered sequence and is the same operation as item 11's rename — execute them together (the rename *is* the retirement). codex is net-new, so it takes fresh `NNN_codex` numbers; claude-code is already numbered. The rejected alternative (keep the bare `harness_*` dirs, delete the old) is not taken — it would orphan the existing numbers and leave the naming split.
 
-Either way: pick one set per framework, delete the other, fix any tutorial index/README that links the removed dirs, and confirm the surviving agents don't import the item-1 deprecated symbols. claude-code and codex are net-new (the existing `090_claude_agents_sdk_mvp` is the Claude **Agents SDK**, not the claude-code CLI harness) — nothing to retire there.
+For every framework: confirm the surviving agent does not import the item-1 deprecated symbols, and fix any tutorial index/README that links the removed dirs. The existing `090_claude_agents_sdk_mvp` is the Claude **Agents SDK** (not the claude-code CLI harness), so it stays.
 
 > **Sequencing note:** items 6–9 and 11–12 are **non-breaking refactors** (tests, internal helpers, examples) — they only need the stack merged (precondition 1), NOT the deprecation window / consumer-migration gates that items 1–2 require. They can land as their own earlier cleanup PR if PR 10's breaking removals are blocked on the version-bump policy. Item 10 rides with item 3; **item 13 is gated with item 1** (the old tutorials import the symbols item 1 removes), so do them in the same PR.
 
