@@ -136,11 +136,9 @@ async def handle_message_send(
         await process.stdin.drain()
         process.stdin.close()
 
-        duration_ms = int(time.monotonic() * 1000) - start_ms
         turn = CodexTurn(
             events=_process_stdout(process),
             model=MODEL,
-            duration_ms=duration_ms,
         )
 
         emitter = UnifiedEmitter(
@@ -153,6 +151,10 @@ async def handle_message_send(
             yield event
 
         await process.wait()
+
+        # Record the real wall-clock duration AFTER streaming completes; setting
+        # it before the stream ran would capture only subprocess spawn overhead.
+        turn.duration_ms = int(time.monotonic() * 1000) - start_ms
 
         if turn_span:
             usage = turn.usage()

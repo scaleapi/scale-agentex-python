@@ -152,8 +152,11 @@ class CodexTurn:
     ) -> None:
         self._raw_events = events
         self._model = model
-        self._duration_ms = duration_ms
-        self._cost_usd = cost_usd
+        # Public + mutable: the true wall-clock duration (and cost) is usually
+        # only known after the stream is consumed, so callers may set these
+        # after construction and before calling usage().
+        self.duration_ms = duration_ms
+        self.cost_usd = cost_usd
 
         # Populated by the on_result callback once the stream is exhausted.
         self._result: dict[str, Any] | None = None
@@ -196,6 +199,6 @@ class CodexTurn:
             model=self._model,
             tool_call_count=self._result.get("tool_call_count", 0),
             reasoning_count=self._result.get("reasoning_count", 0),
-            duration_ms=self._duration_ms,
-            cost_usd=self._cost_usd,
+            duration_ms=self.duration_ms,
+            cost_usd=self.cost_usd,
         )
