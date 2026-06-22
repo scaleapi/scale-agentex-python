@@ -79,20 +79,36 @@ async def _spawn_claude(prompt: str) -> AsyncIterator[str]:
 
     stderr_task = asyncio.create_task(_drain_stderr())
 
-    buffer = ""
-    async for chunk in proc.stdout:
-        buffer += chunk.decode("utf-8", errors="replace")
-        while "\n" in buffer:
-            line, buffer = buffer.split("\n", 1)
-            line = line.strip()
-            if line:
-                yield line
+    try:
+        buffer = ""
+        async for chunk in proc.stdout:
+            buffer += chunk.decode("utf-8", errors="replace")
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                if line:
+                    yield line
 
-    if buffer.strip():
-        yield buffer.strip()
+        if buffer.strip():
+            yield buffer.strip()
 
-    await proc.wait()
-    await stderr_task
+        await proc.wait()
+    finally:
+        # Release the subprocess and stderr drain task even if the consumer
+        # abandons the generator early (task cancellation / client disconnect):
+        # cancel the drain task and terminate+reap the process if it is still
+        # running, so neither is leaked.
+        stderr_task.cancel()
+        try:
+            await stderr_task
+        except asyncio.CancelledError:
+            pass
+        if proc.returncode is None:
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                pass
+            await proc.wait()
 
 
 @acp.on_message_send
