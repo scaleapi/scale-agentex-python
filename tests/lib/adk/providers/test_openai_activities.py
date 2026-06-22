@@ -340,11 +340,7 @@ class TestOpenAIActivities:
         # by opening a streaming context with the content as initial_content and
         # closing it (no stream_update). So assert on the opened contents.
         opened = mock_streaming_context.opened_contents
-        tool_contents = [
-            c
-            for c in opened
-            if getattr(c, "type", None) in ("tool_request", "tool_response")
-        ]
+        tool_contents = [c for c in opened if getattr(c, "type", None) in ("tool_request", "tool_response")]
         assert len(tool_contents) == 2
 
         # First opened context is the tool request.
@@ -631,11 +627,21 @@ class TestOpenAIActivities:
 
         mock_streaming_result = self._create_streaming_result_mock()
 
-        async def _no_events():
-            return
-            yield  # make it an async generator
+        # Emit a tool call + tool response so auto_send actually opens streaming
+        # contexts; an empty stream opens none, making the assertion below
+        # vacuously true and unable to catch a created_at regression.
+        async def mock_stream_events():
+            tool_call_event = Mock()
+            tool_call_event.type = "run_item_stream_event"
+            tool_call_event.item = self._create_tool_call_item_mock(self._create_code_interpreter_tool_call_mock())
+            yield tool_call_event
 
-        mock_streaming_result.stream_events = _no_events
+            tool_response_event = Mock()
+            tool_response_event.type = "run_item_stream_event"
+            tool_response_event.item = self._create_tool_output_item_mock()
+            yield tool_response_event
+
+        mock_streaming_result.stream_events = mock_stream_events
         mock_runner_run_streamed.return_value = mock_streaming_result
 
         mock_tracer = self._create_mock_tracer()
@@ -655,9 +661,11 @@ class TestOpenAIActivities:
 
         await env.run(openai_activities.run_agent_streamed_auto_send, params)
 
+        # Guard against a vacuous pass: at least one streaming context must have
+        # been opened so the per-context created_at assertion is meaningful.
+        assert recorded_created_ats, "expected at least one streaming context to be opened"
         assert all(ts == deterministic_ts for ts in recorded_created_ats), (
-            f"Expected all streaming contexts to receive created_at={deterministic_ts!r}, "
-            f"got: {recorded_created_ats!r}"
+            f"Expected all streaming contexts to receive created_at={deterministic_ts!r}, got: {recorded_created_ats!r}"
         )
 
     def _setup_streaming_service_mocks(self, openai_service):
