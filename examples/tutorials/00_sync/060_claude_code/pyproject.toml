@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "s060-claude-code"
+version = "0.1.0"
+description = "A sync Claude Code agent streaming the unified harness surface via a local CLI subprocess"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "agentex-sdk",
+    "scale-gp",
+    "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["project"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
