@@ -64,11 +64,17 @@ class UnifiedEmitter:
         turn's messages with a deterministic timestamp; it is forwarded to the
         streaming contexts. Default None preserves server-side timestamps.
         """
-        return await auto_send(
+        # `turn.usage()` is only valid AFTER `turn.events` is exhausted (the
+        # HarnessTurn single-pass contract: real turns populate usage while the
+        # stream is consumed). So drive delivery first, then read usage — do NOT
+        # pass `usage=turn.usage()` eagerly here (that would capture the empty
+        # default before the stream runs).
+        result = await auto_send(
             turn.events,
             task_id=self.task_id,
             tracer=self.tracer,
             streaming=self._streaming,
-            usage=turn.usage(),
             created_at=created_at,
         )
+        result.usage = turn.usage()
+        return result

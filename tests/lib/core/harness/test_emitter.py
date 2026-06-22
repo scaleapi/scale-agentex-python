@@ -108,3 +108,41 @@ async def test_emitter_auto_send_turn_returns_usage():
     result = await emitter.auto_send_turn(turn)
     assert result.usage == usage
     assert result.final_text == "Hello"
+
+
+class _ContractTurn:
+    """A turn that honors the single-pass contract: usage() is the empty default
+    UNTIL `events` is exhausted, then the real usage (this is how real harness
+    turns behave — they populate usage while the stream is consumed)."""
+
+    def __init__(self, events_list, real_usage):
+        self._events_list = events_list
+        self._real_usage = real_usage
+        self._exhausted = False
+
+    @property
+    async def events(self):
+        for e in self._events_list:
+            yield e
+        self._exhausted = True
+
+    def usage(self):
+        return self._real_usage if self._exhausted else TurnUsage(model="m")
+
+
+@pytest.mark.asyncio
+async def test_emitter_auto_send_turn_reads_usage_after_exhaustion():
+    # Regression: auto_send_turn must read turn.usage() AFTER consuming the
+    # stream, not eagerly when building the auto_send call (which would capture
+    # the empty default and lose real token usage on the auto_send path).
+    real_usage = TurnUsage(model="m", input_tokens=11, output_tokens=22, total_tokens=33, num_llm_calls=2)
+    events = [
+        StreamTaskMessageStart(type="start", index=0, content=TextContent(type="text", author="agent", content="")),
+        StreamTaskMessageDelta(type="delta", index=0, delta=TextDelta(type="text", text_delta="hi")),
+        StreamTaskMessageDone(type="done", index=0),
+    ]
+    turn = _ContractTurn(events, real_usage)
+    emitter = UnifiedEmitter(task_id="t", trace_id=None, parent_span_id=None, streaming=_FakeStreaming())
+    result = await emitter.auto_send_turn(turn)
+    assert result.usage == real_usage
+    assert result.usage.input_tokens == 11 and result.usage.total_tokens == 33
