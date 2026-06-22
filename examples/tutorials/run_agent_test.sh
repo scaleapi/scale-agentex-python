@@ -126,18 +126,26 @@ start_agent() {
 
     if [ "$BUILD_CLI" = true ]; then
 
-        # Use wheel from dist directory at repo root
-        local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
-        if [[ -z "$wheel_file" ]]; then
-            echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"
-            echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"
-            echo -e "${YELLOW}💡 From the repo root directory${NC}"
+        # uv workspace builds both wheels into the root dist/ (slim + heavy ADK).
+        # We need both: heavy pins agentex-client which isn't on PyPI yet,
+        # so uv must resolve both from local wheels rather than the registry.
+        local heavy_wheel=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+        local slim_wheel=$(ls /home/runner/work/*/*/dist/agentex_client-*.whl 2>/dev/null | head -n1)
+        if [[ -z "$heavy_wheel" ]]; then
+            echo -e "${RED}❌ No built heavy wheel found in dist/agentex_sdk-*.whl${NC}"
+            echo -e "${YELLOW}💡 Build it first: uv build --all-packages --wheel${NC}"
+            cd "$original_dir"
+            return 1
+        fi
+        if [[ -z "$slim_wheel" ]]; then
+            echo -e "${RED}❌ No built slim wheel found in dist/agentex_client-*.whl${NC}"
+            echo -e "${YELLOW}💡 Build it first: uv build --wheel${NC}"
             cd "$original_dir"
             return 1
         fi
 
-        # Use the built wheel
-        uv run --with "$wheel_file" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
+        # Pass both wheels so the local heavy resolves its slim dep locally
+        uv run --with "$heavy_wheel" --with "$slim_wheel" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
     else
         uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
     fi
@@ -269,14 +277,20 @@ run_test() {
     # robust across all tutorials regardless of how each declares test deps.
     local -a pytest_cmd=("uv" "run" "--with" "pytest" "--with" "pytest-asyncio" "pytest")
     if [ "$BUILD_CLI" = true ]; then
-        local wheel_file
-        wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
-        if [[ -z "$wheel_file" ]]; then
-            wheel_file=$(ls "${SCRIPT_DIR}/../../dist/agentex_sdk-*.whl" 2>/dev/null | head -n1)
+        local heavy_wheel slim_wheel
+        heavy_wheel=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+        if [[ -z "$heavy_wheel" ]]; then
+            heavy_wheel=$(ls "${SCRIPT_DIR}"/../../dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
         fi
-        if [[ -n "$wheel_file" ]]; then
-            pytest_cmd=("uv" "run" "--with" "$wheel_file" "--with" "pytest" "--with" "pytest-asyncio" "pytest")
+        slim_wheel=$(ls /home/runner/work/*/*/dist/agentex_client-*.whl 2>/dev/null | head -n1)
+        if [[ -z "$slim_wheel" ]]; then
+            slim_wheel=$(ls "${SCRIPT_DIR}"/../../dist/agentex_client-*.whl 2>/dev/null | head -n1)
         fi
+        if [[ -z "$heavy_wheel" || -z "$slim_wheel" ]]; then
+            echo -e "${RED}❌ BUILD_CLI=true but a wheel is missing (heavy='${heavy_wheel}' slim='${slim_wheel}'); refusing to test against the pre-installed SDK${NC}"
+            return 1
+        fi
+        pytest_cmd=("uv" "run" "--with" "$heavy_wheel" "--with" "$slim_wheel" "--with" "pytest" "--with" "pytest-asyncio" "pytest")
     fi
 
     local max_retries=5
@@ -350,7 +364,7 @@ execute_tutorial_test() {
     fi
 }
 
-# Function to check if built wheel is available
+# Function to check if both built wheels are available
 check_built_wheel() {
 
     # Navigate to the repo root (two levels up from examples/tutorials)
@@ -362,19 +376,26 @@ check_built_wheel() {
         return 1
     }
 
-    # Check if wheel exists in dist directory at repo root
-    local wheel_file=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
-    if [[ -z "$wheel_file" ]]; then
-        echo -e "${RED}❌ No built wheel found in dist/agentex_sdk-*.whl${NC}"
-        echo -e "${YELLOW}💡 Please build the local SDK first by running: uv build${NC}"
-        echo -e "${YELLOW}💡 From the repo root directory${NC}"
+    # Heavy ADK wheel + slim client wheel — we need both because heavy pins
+    # agentex-client which isn't on PyPI yet.
+    local heavy_wheel=$(ls /home/runner/work/*/*/dist/agentex_sdk-*.whl 2>/dev/null | head -n1)
+    local slim_wheel=$(ls /home/runner/work/*/*/dist/agentex_client-*.whl 2>/dev/null | head -n1)
+    if [[ -z "$heavy_wheel" ]]; then
+        echo -e "${RED}❌ No built heavy wheel found in dist/agentex_sdk-*.whl${NC}"
+        echo -e "${YELLOW}💡 Build it first: uv build --all-packages --wheel${NC}"
+        cd "$original_dir"
+        return 1
+    fi
+    if [[ -z "$slim_wheel" ]]; then
+        echo -e "${RED}❌ No built slim wheel found in dist/agentex_client-*.whl${NC}"
+        echo -e "${YELLOW}💡 Build it first: uv build --wheel${NC}"
         cd "$original_dir"
         return 1
     fi
 
-    # Test the wheel by running agentex --help
-    if ! uv run --with "$wheel_file" agentex --help >/dev/null 2>&1; then
-        echo -e "${RED}❌ Failed to run agentex with built wheel${NC}"
+    # Test the heavy wheel by running agentex --help (uses both wheels for resolution)
+    if ! uv run --with "$heavy_wheel" --with "$slim_wheel" agentex --help >/dev/null 2>&1; then
+        echo -e "${RED}❌ Failed to run agentex with built wheels${NC}"
         cd "$original_dir"
         return 1
     fi

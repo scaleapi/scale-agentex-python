@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 
+# Publish slim (root) before heavy (adk/): heavy pins slim, so a slim-first
+# failure aborts before shipping a heavy that needs an unreleased client.
+
 set -eux
-mkdir -p dist
-rye build --clean
-rye publish --yes --token=$PYPI_TOKEN
+
+rm -rf dist
+# --wheel: the heavy's cross-dir force-include can't build via sdist.
+uv build --all-packages --wheel
+
+# --check-url makes the per-component-tag double-trigger idempotent.
+uv publish --check-url https://pypi.org/simple/ --token="${AGENTEX_CLIENT_PYPI_TOKEN:-$PYPI_TOKEN}" dist/agentex_client-*.whl
+uv publish --check-url https://pypi.org/simple/ --token="${AGENTEX_PYPI_TOKEN:-$PYPI_TOKEN}" dist/agentex_sdk-*.whl

@@ -4,8 +4,8 @@ import json
 import base64
 from typing import Any, Dict
 
-from agentex.lib.sdk.config.agent_manifest import AgentManifest
-from agentex.lib.sdk.config.environment_config import AgentAuthConfig
+from agentex.config.agent_manifest import AgentManifest
+from agentex.config.environment_config import AgentAuthConfig
 
 
 # DEPRECATED: Old function for backward compatibility

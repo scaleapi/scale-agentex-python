@@ -33,6 +33,7 @@ from agentex.lib.environment_variables import EnvironmentVariables, refreshed_en
 from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.lib.core.tracing.span_queue import shutdown_default_span_queue
+from agentex.lib.core.compat.version_guard import assert_backend_compatible
 from agentex.lib.sdk.fastacp.base.constants import (
     FASTACP_HEADER_SKIP_EXACT,
     FASTACP_HEADER_SKIP_PREFIXES,
@@ -104,6 +105,9 @@ class BaseACPServer(FastAPI):
         async def lifespan_context(app: FastAPI):  # noqa: ARG001
             env_vars = EnvironmentVariables.refresh()
             if env_vars.AGENTEX_BASE_URL:
+                # Runtime SDK<->backend contract guard: fail fast if the backend is older
+                # than this SDK supports, instead of opaque 500s later. See compat.version_guard.
+                await assert_backend_compatible(env_vars.AGENTEX_BASE_URL)
                 await register_agent(env_vars, agent_card=self._agent_card)
                 self.agent_id = env_vars.AGENT_ID
             else:

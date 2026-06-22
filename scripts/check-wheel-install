@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Smoke: agentex-client + agentex-sdk must install together into one working
+# agentex.* namespace. Builds + installs in a clean temp dir to avoid stale dist/.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+work="$(mktemp -d)"
+echo "==> building both wheels into $work/dist"
+uv build --all-packages --wheel --out-dir "$work/dist"
+
+venv="$work/venv"
+uv venv "$venv" >/dev/null
+echo "==> installing both wheels into a fresh venv"
+uv pip install --python "$venv" "$work"/dist/agentex_client-*.whl "$work"/dist/agentex_sdk-*.whl
+
+echo "==> importing the merged namespace from the installed wheels"
+"$venv/bin/python" - <<'PY'
+import agentex.lib.adk  # ADK overlay — ships in agentex-sdk
+from agentex.types import Event  # client surface — ships in agentex-client
+from agentex.resources import states  # client surface that "didn't land" in the incident
+
+print("agentex namespace OK:", Event.__name__, states.__name__)
+PY

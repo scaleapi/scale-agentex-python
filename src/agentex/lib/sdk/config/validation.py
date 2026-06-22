@@ -11,7 +11,8 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.sdk.config.environment_config import AgentEnvironmentConfig, AgentEnvironmentsConfig
+from agentex.config.environment_config import AgentEnvironmentConfig, AgentEnvironmentsConfig
+from agentex.lib.sdk.config.environment_config import load_environments_config
 
 logger = make_logger(__name__)
 
@@ -166,7 +167,7 @@ def validate_environments_yaml_file(file_path: str) -> AgentEnvironmentsConfig:
         EnvironmentsValidationError: If file is invalid
     """
     try:
-        environments_config = AgentEnvironmentsConfig.from_yaml(file_path)
+        environments_config = load_environments_config(file_path)
         validate_environments_config(environments_config)
         return environments_config
     except FileNotFoundError:
