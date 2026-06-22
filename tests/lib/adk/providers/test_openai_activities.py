@@ -354,6 +354,43 @@ class TestOpenAIActivities:
         assert second.type == "tool_response"
         assert second.tool_call_id == "code_interpreter_call_123"
 
+    @patch("agents.Runner.run_streamed")
+    async def test_run_agent_streamed_auto_send_forwards_previous_response_id(self, mock_runner_run_streamed):
+        """previous_response_id must reach Runner.run_streamed so a Responses-API
+        conversation continues instead of silently starting fresh."""
+        from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (
+            RunAgentStreamedAutoSendParams,
+        )
+
+        mock_streaming_result = self._create_streaming_result_mock()
+
+        async def _no_events():
+            return
+            yield
+
+        mock_streaming_result.stream_events = _no_events
+        mock_runner_run_streamed.return_value = mock_streaming_result
+
+        mock_tracer = self._create_mock_tracer()
+        openai_service, openai_activities, env = self._create_test_setup(mock_tracer)
+        self._setup_streaming_service_mocks(openai_service)
+
+        params = RunAgentStreamedAutoSendParams(
+            input_list=[{"role": "user", "content": "continue"}],
+            mcp_server_params=[],
+            agent_name="test_agent",
+            agent_instructions="You are a helpful assistant",
+            trace_id="test-trace-id",
+            parent_span_id="test-span-id",
+            task_id="test-task-id",
+            previous_response_id="response_123",
+        )
+
+        await env.run(openai_activities.run_agent_streamed_auto_send, params)
+
+        mock_runner_run_streamed.assert_called_once()
+        assert mock_runner_run_streamed.call_args.kwargs.get("previous_response_id") == "response_123"
+
     def _create_mock_tracer(self):
         """Helper method to create a properly mocked tracer with async context manager support."""
         mock_tracer = Mock()

@@ -678,7 +678,7 @@ class OpenAIService:
         input_guardrails: list[InputGuardrail] | None = None,
         output_guardrails: list[OutputGuardrail] | None = None,
         max_turns: int | None = None,
-        previous_response_id: str | None = None,  # noqa: ARG002
+        previous_response_id: str | None = None,
         created_at: datetime | None = None,
     ) -> RunResultStreaming:
         """
@@ -785,9 +785,23 @@ class OpenAIService:
 
                 agent = Agent(**agent_kwargs)
 
-                # Run with streaming
-                if max_turns is not None:
+                # Run with streaming. Forward previous_response_id so callers that
+                # continue a Responses-API conversation resume the prior response
+                # instead of silently starting a fresh one (mirrors the non-auto-send
+                # run_agent_streamed path).
+                if max_turns is not None and previous_response_id is not None:
+                    result = Runner.run_streamed(
+                        starting_agent=agent,
+                        input=input_list,
+                        max_turns=max_turns,
+                        previous_response_id=previous_response_id,
+                    )
+                elif max_turns is not None:
                     result = Runner.run_streamed(starting_agent=agent, input=input_list, max_turns=max_turns)
+                elif previous_response_id is not None:
+                    result = Runner.run_streamed(
+                        starting_agent=agent, input=input_list, previous_response_id=previous_response_id
+                    )
                 else:
                     result = Runner.run_streamed(starting_agent=agent, input=input_list)
 
