@@ -37,4 +37,4 @@ jobs:
     runs-on: ubuntu-latest
     if: false  # enabled once the first harness's test agents land
     steps:
-      - run: echo "populated by migration PRs"  # TODO(harness-migration): enable per-harness; see docs/superpowers/plans migration PRs 4-8
+      - run: echo "populated by migration PRs"  # TODO(harness-migration): enable per-harness; see migration PRs 4-8
