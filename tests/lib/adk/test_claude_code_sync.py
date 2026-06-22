@@ -247,6 +247,47 @@ class TestThinkingContent:
         assert deltas[1].delta.content_delta == " step two"
         assert len(dones) == 1
 
+    async def test_two_streamed_thinking_blocks_not_re_emitted(self):
+        """A turn that streams two thinking blocks must claim both indices, so the
+        final assistant envelope does not re-emit the second one."""
+
+        def _thinking_block(idx: int, text: str) -> list:
+            return [
+                {
+                    "type": "stream_event",
+                    "event": {"type": "content_block_start", "index": idx, "content_block": {"type": "thinking"}},
+                },
+                {
+                    "type": "stream_event",
+                    "event": {
+                        "type": "content_block_delta",
+                        "index": idx,
+                        "delta": {"type": "thinking_delta", "thinking": text},
+                    },
+                },
+                {"type": "stream_event", "event": {"type": "content_block_stop", "index": idx}},
+            ]
+
+        envelopes = [
+            *_thinking_block(0, "first thought"),
+            *_thinking_block(1, "second thought"),
+            # Final assistant envelope repeats both thinking blocks — neither should re-emit.
+            {
+                "type": "assistant",
+                "message": {
+                    "content": [
+                        {"type": "thinking", "thinking": "first thought"},
+                        {"type": "thinking", "thinking": "second thought"},
+                    ]
+                },
+            },
+        ]
+        out = await _collect(convert_claude_code_to_agentex_events(_aiter(envelopes)))
+        reasoning_starts = [
+            e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, ReasoningContent)
+        ]
+        assert len(reasoning_starts) == 2, "each streamed thinking block emitted exactly once (no duplicate)"
+
     async def test_thinking_block_start_with_no_deltas_allows_assistant_to_fill(self):
         """A thinking block_start without any deltas leaves the final assistant block
         free to emit the thinking text (the block index is not claimed as streamed)."""

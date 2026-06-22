@@ -345,6 +345,11 @@ async def convert_claude_code_to_agentex_events(
                     _thinking_open = False
                     _thinking_buf = ""
                     _pending_thinking_block_index = None
+                    # Reset the once-guard per thinking block: a turn can stream a
+                    # second thinking block, and without this the guard stays True,
+                    # the second block's index is never claimed, and the final
+                    # assistant envelope re-emits it (duplicate Start/Delta/Done).
+                    _saw_thinking_stream = False
                     if _thinking_index is not None:
                         yield StreamTaskMessageDone(type="done", index=_thinking_index)
                     _thinking_index = None
