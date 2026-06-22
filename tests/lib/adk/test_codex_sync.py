@@ -219,6 +219,28 @@ class TestToolCallStreaming:
         assert resp_content["result"] == "hello"
         assert fulls[0].content.tool_call_id == "t1"
 
+    async def test_empty_item_id_request_response_ids_match(self) -> None:
+        """A tool with an empty item_id must use the SAME fallback tool_call_id
+        on the request (started) and response (completed) halves."""
+        events = [
+            {"type": "item.started", "item": {"id": "", "type": "command_execution", "command": "ls"}},
+            {
+                "type": "item.completed",
+                "item": {
+                    "id": "",
+                    "type": "command_execution",
+                    "command": "ls",
+                    "aggregated_output": ".",
+                    "exit_code": 0,
+                },
+            },
+        ]
+        out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
+        req = [e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, ToolRequestContent)]
+        resp = [e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ToolResponseContent)]
+        assert len(req) == 1 and len(resp) == 1
+        assert req[0].content.tool_call_id == resp[0].content.tool_call_id
+
     async def test_file_change_synthesizes_start(self) -> None:
         """file_change items may only emit item.completed (no started)."""
         events = [

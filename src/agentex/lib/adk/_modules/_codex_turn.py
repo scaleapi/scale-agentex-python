@@ -157,6 +157,11 @@ class CodexTurn:
 
         # Populated by the on_result callback once the stream is exhausted.
         self._result: dict[str, Any] | None = None
+        # The events generator is created at most once: ``_raw_events`` is a
+        # single-consumption AsyncIterator, so re-wrapping it would yield an
+        # already-exhausted stream that fires on_result with zeros and clobbers
+        # ``_result``. Cache the generator and hand back the same instance.
+        self._events_gen: AsyncIterator[StreamTaskMessage] | None = None
 
     @property
     def events(self) -> AsyncIterator[StreamTaskMessage]:
@@ -164,12 +169,15 @@ class CodexTurn:
 
         The ``on_result`` callback populates ``_result`` when the underlying
         codex stream ends, so ``usage()`` returns meaningful data after
-        exhaustion.
+        exhaustion. Returns the same generator on every access so the underlying
+        stream is consumed (and ``on_result`` fires) exactly once.
         """
-        return convert_codex_to_agentex_events(
-            self._raw_events,
-            on_result=self._on_result,
-        )
+        if self._events_gen is None:
+            self._events_gen = convert_codex_to_agentex_events(
+                self._raw_events,
+                on_result=self._on_result,
+            )
+        return self._events_gen
 
     def _on_result(self, result: dict[str, Any]) -> None:
         self._result = result

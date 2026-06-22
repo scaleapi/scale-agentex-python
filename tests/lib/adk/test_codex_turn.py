@@ -206,6 +206,33 @@ class TestCodexTurnEvents:
         await _collect(turn)
         assert turn.usage().num_tool_calls == 1
 
+    async def test_events_property_stable_across_accesses(self) -> None:
+        """`.events` returns the same generator; usage survives a second access."""
+        events = [
+            {
+                "type": "item.started",
+                "item": {"id": "t1", "type": "command_execution", "command": "ls"},
+            },
+            {
+                "type": "item.completed",
+                "item": {
+                    "id": "t1",
+                    "type": "command_execution",
+                    "command": "ls",
+                    "aggregated_output": ".",
+                    "exit_code": 0,
+                },
+            },
+            {"type": "turn.completed", "usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}},
+        ]
+        turn = CodexTurn(_aiter(events), model="o4-mini")
+        assert turn.events is turn.events  # same generator, not a fresh wrapper
+        await _collect(turn)
+        # A second access must NOT re-wrap the exhausted iterator and reset usage.
+        _ = turn.events
+        assert turn.usage().total_tokens == 15
+        assert turn.usage().num_tool_calls == 1
+
     async def test_reasoning_count_in_usage(self) -> None:
         events = [
             {"type": "item.started", "item": {"id": "r1", "type": "reasoning", "text": ""}},

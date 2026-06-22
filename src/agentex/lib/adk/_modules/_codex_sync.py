@@ -141,6 +141,11 @@ def _tool_args_for(item_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         return {"query": payload.get("query", "")}
     if item_type == "todo_list":
         return {"items": payload.get("items") or []}
+    if item_type == "collab_tool_call":
+        # Surface an arguments dict if the payload carries one (mirrors
+        # mcp_tool_call); otherwise no args rather than fabricating a shape.
+        args = payload.get("arguments")
+        return args if isinstance(args, dict) else {}
     return {}
 
 
@@ -219,6 +224,10 @@ class _CodexStreamProcessor:
         # tool tracking
         self._tool_open: set[str] = set()
         self._tool_item_types: dict[str, str] = {}
+        # Remember the tool_call_id assigned per item so the request and response
+        # halves agree even when item_id is empty (a recomputed fallback would
+        # drift as tool_call_count advances between started and completed).
+        self._tool_call_ids: dict[str, str] = {}
 
         # counters for on_result callback
         self.tool_call_count: int = 0
@@ -413,7 +422,11 @@ class _CodexStreamProcessor:
             "todo_list",
             "collab_tool_call",
         ):
-            tool_call_id = item_id or f"codex_tool_{self.tool_call_count + 1}"
+            # Resolve a stable id once per item; reuse it for both halves.
+            tool_call_id = self._tool_call_ids.get(item_id)
+            if tool_call_id is None:
+                tool_call_id = item_id or f"codex_tool_{self.tool_call_count + 1}"
+                self._tool_call_ids[item_id] = tool_call_id
 
             if evt_type == "item.started":
                 self.tool_call_count += 1
@@ -480,6 +493,9 @@ class _CodexStreamProcessor:
                     )
                 )
                 self._tool_open.discard(item_id)
+                # Free the id mapping so a later item reusing an empty id gets a
+                # fresh fallback rather than colliding with this one.
+                self._tool_call_ids.pop(item_id, None)
 
         elif item_type == "error":
             if evt_type == "item.completed":
