@@ -12,7 +12,7 @@ produce a fixed text reply.
 
 The async path uses the bare PydanticAITurn (no coalescing): the foundation
 auto_send delivers streamed tool-request Start+ToolRequestDelta+Done messages
-natively (AGX1-377 fix), so no coalescing wrapper is needed.
+natively, so no coalescing wrapper is needed.
 
 What is tested
 --------------
@@ -272,9 +272,9 @@ class TestAsyncAutoSendFinalText:
 class TestAsyncAutoSendSpanDerivation:
     """Span derivation on the async path now works for streamed tool requests.
 
-    The foundation auto_send delivers Start+ToolRequestDelta+Done natively
-    (AGX1-377 fix). The SpanDeriver opens a tool span on Done(tool_request),
-    so the async path now derives spans just like the sync path.
+    The foundation auto_send delivers Start+ToolRequestDelta+Done natively.
+    The SpanDeriver opens a tool span on Done(tool_request), so the async path
+    derives spans just like the sync path.
     """
 
     async def test_tool_span_derived_on_async_path(self) -> None:

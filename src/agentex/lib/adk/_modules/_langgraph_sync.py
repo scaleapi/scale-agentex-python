@@ -48,8 +48,8 @@ async def convert_langgraph_to_agentex_events(
     Supports both regular models (chunk.content is a str) and reasoning models
     like gpt-5/o1/o3 (chunk.content is a list of typed content blocks).
 
-    AGX1-377 note: LangGraph emits tool requests as ``StreamTaskMessageFull`` (from
-    "updates" events), NOT Start+Delta+Done like pydantic-ai. No coalesce_tool_requests
+    LangGraph emits tool requests as ``StreamTaskMessageFull`` (from "updates"
+    events), NOT Start+Delta+Done like pydantic-ai. No coalesce_tool_requests
     option is needed for LangGraph.
 
     Args:

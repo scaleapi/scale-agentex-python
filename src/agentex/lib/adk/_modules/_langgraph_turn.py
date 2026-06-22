@@ -4,9 +4,9 @@ Provides ``LangGraphTurn`` (a ``HarnessTurn`` implementation) and the
 ``langgraph_usage_to_turn_usage`` helper that maps LangGraph's
 ``AIMessage.usage_metadata`` onto the framework-agnostic ``TurnUsage`` model.
 
-AGX1-377 note: LangGraph emits tool requests as ``StreamTaskMessageFull`` events
-(from "updates" events), NOT Start+Delta+Done like pydantic-ai. ``auto_send``
-handles Full events correctly; no coalescing wrapper is needed.
+LangGraph emits tool requests as ``StreamTaskMessageFull`` events (from
+"updates" events), NOT Start+Delta+Done like pydantic-ai. ``auto_send`` handles
+Full events correctly; no coalescing wrapper is needed.
 """
 
 from __future__ import annotations
@@ -111,9 +111,9 @@ class LangGraphTurn:
         # Async / temporal
         result = await emitter.auto_send_turn(turn)
 
-    AGX1-377 note: LangGraph tool requests are ``StreamTaskMessageFull`` (from
-    "updates"), NOT Start+Delta+Done like pydantic-ai. No ``coalesce_tool_requests``
-    option is needed.
+    LangGraph tool requests are ``StreamTaskMessageFull`` (from "updates"), NOT
+    Start+Delta+Done like pydantic-ai. No ``coalesce_tool_requests`` option is
+    needed.
 
     Usage data is captured lazily via the ``on_final_ai_message`` callback and
     is only valid after ``events`` has been fully consumed. Multi-step turns

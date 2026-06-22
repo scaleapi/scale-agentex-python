@@ -15,13 +15,14 @@ if _litellm_key:
     os.environ["OPENAI_API_KEY"] = _litellm_key
 
 import agentex.lib.adk as adk
-from agentex.lib.adk import create_langgraph_tracing_handler, stream_langgraph_events
+from agentex.lib.core.harness import UnifiedEmitter
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.protocol.acp import SendEventParams, CancelTaskParams, CreateTaskParams
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
 
 from project.graph import create_graph
 
@@ -67,24 +68,23 @@ async def handle_task_event_send(params: SendEventParams):
         input={"message": user_message},
         data={"__span_type__": "AGENT_WORKFLOW"},
     ) as turn_span:
-        callback = create_langgraph_tracing_handler(
+        stream = graph.astream(
+            {"messages": [{"role": "user", "content": user_message}]},
+            config={"configurable": {"thread_id": task_id}},
+            stream_mode=["messages", "updates"],
+        )
+
+        turn = LangGraphTurn(stream, model=None)
+        emitter = UnifiedEmitter(
+            task_id=task_id,
             trace_id=task_id,
             parent_span_id=turn_span.id if turn_span else None,
         )
 
-        stream = graph.astream(
-            {"messages": [{"role": "user", "content": user_message}]},
-            config={
-                "configurable": {"thread_id": task_id},
-                "callbacks": [callback],
-            },
-            stream_mode=["messages", "updates"],
-        )
-
-        final_output = await stream_langgraph_events(stream, task_id)
+        result = await emitter.auto_send_turn(turn)
 
         if turn_span:
-            turn_span.output = {"final_output": final_output}
+            turn_span.output = {"final_output": result.final_text}
 
 
 @acp.on_task_create

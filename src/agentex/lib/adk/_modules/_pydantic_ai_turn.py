@@ -15,7 +15,7 @@ Typical usage::
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import Any, AsyncIterator
 
 from pydantic_ai.run import AgentRunResultEvent
 
@@ -27,9 +27,6 @@ from agentex.types.task_message_update import (
     StreamTaskMessageStart,
 )
 from agentex.lib.adk._modules._pydantic_ai_sync import convert_pydantic_ai_to_agentex_events
-
-if TYPE_CHECKING:
-    from agentex.lib.adk._modules._pydantic_ai_tracing import AgentexPydanticAITracingHandler
 
 StreamTaskMessage = StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone
 
@@ -83,19 +80,17 @@ class PydanticAITurn:
     ``events`` is identical to the bare ``convert_pydantic_ai_to_agentex_events``
     output (tool calls stream as ``Start + ToolRequestDelta + Done``, preserving
     argument-token streaming on the sync/yield channel). The foundation
-    ``auto_send`` delivers the streamed tool-request shape natively (AGX1-377),
-    so no coalescing is needed on either channel.
+    ``auto_send`` delivers the streamed tool-request shape natively, so no
+    coalescing is needed on either channel.
     """
 
     def __init__(
         self,
         stream: AsyncIterator[Any],
         model: str | None = None,
-        tracing_handler: "AgentexPydanticAITracingHandler | None" = None,
     ) -> None:
         self._stream = stream
         self._model = model
-        self._tracing_handler = tracing_handler
         self._usage = TurnUsage(model=model)
 
     @property
@@ -119,7 +114,6 @@ class PydanticAITurn:
 
         raw_stream = convert_pydantic_ai_to_agentex_events(
             self._stream,
-            tracing_handler=self._tracing_handler,
             on_result=_capture,
         )
         async for ev in raw_stream:

@@ -53,12 +53,9 @@ Start(content)+Done from auto_send are equivalent. The recorded span signals are
 identical because both adapters drive the same SpanDeriver.observe() call
 sequence and forward every signal to their tracer.
 
-AGX1-377 fix: auto_send now DELIVERS streamed tool-request messages (Start+Done)
-instead of dropping them. The conformance normaliser previously suppressed the
-delivery for Start(tool_request)+Done on the yield channel to match auto_send's
-old drop behaviour. That suppression is now removed: both channels produce a
-LogicalDelivery for a streamed tool_request, and the cross-channel assertion
-verifies it is delivered on both.
+auto_send DELIVERS streamed tool-request messages (Start+Done): both channels
+produce a LogicalDelivery for a streamed tool_request, and the cross-channel
+assertion verifies it is delivered on both.
 """
 
 from __future__ import annotations
@@ -145,8 +142,8 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
     - reasoning: initial_content.summary joined (from Start) prepended to
       accumulated reasoning-content deltas (this catches a channel that drops
       the summary)
-    - tool_request: JSON-sorted arguments from the Start content (AGX1-377: now
-      delivered on both channels, no longer suppressed)
+    - tool_request: JSON-sorted arguments from the Start content (delivered on
+      both channels)
     - tool_response: str(content) from Full event
     """
     from agentex.types.text_content import TextContent
@@ -191,9 +188,9 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
                         )
                     )
                 elif ctype == "tool_request" and isinstance(content, ToolRequestContent):
-                    # AGX1-377 fix: auto_send now delivers streamed tool-request
-                    # messages. Emit a delivery here so the cross-channel
-                    # assertion verifies it is present on both channels.
+                    # auto_send delivers streamed tool-request messages. Emit a
+                    # delivery here so the cross-channel assertion verifies it is
+                    # present on both channels.
                     deliveries.append(
                         LogicalDelivery(
                             content_type=ctype,

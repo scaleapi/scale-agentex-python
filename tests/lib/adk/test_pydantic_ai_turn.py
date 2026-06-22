@@ -233,8 +233,8 @@ class TestPydanticAITurn:
 class TestToolRequestStreaming:
     """PydanticAITurn.events equals the bare converter output unconditionally.
 
-    The foundation auto_send delivers Start+ToolRequestDelta+Done natively
-    (AGX1-377), so no coalescing is needed on either channel.
+    The foundation auto_send delivers Start+ToolRequestDelta+Done natively, so
+    no coalescing is needed on either channel.
     """
 
     async def test_events_match_bare_converter_for_streamed_tool_call(self):

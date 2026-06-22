@@ -3,8 +3,6 @@
 Covers:
 - Basic text, tool call, and tool response emission
 - on_final_ai_message callback for usage capture
-- create_langgraph_tracing_handler symbol is importable and functional
-  (runtime DeprecationWarning removed; deprecation is docstring-only)
 
 NOTE: langchain_core imports must be deferred to test-function scope because
 conftest.py stubs out ``langchain_core.messages`` with MagicMock for ADK
@@ -225,23 +223,3 @@ class TestOnFinalAiMessageCallback:
 
         # The tool call Full event is emitted before the callback fires
         assert yield_order.index("event") < yield_order.index("callback")
-
-
-class TestLangGraphTracingHandlerBackwardCompat:
-    def test_create_langgraph_tracing_handler_no_runtime_warning(self):
-        """Deprecated symbol remains importable and emits no runtime DeprecationWarning.
-
-        The runtime warnings.warn was removed (docstring-only deprecation) to
-        align with PR 4/6 and avoid breaking callers under warnings-as-errors.
-        Using ``warnings.simplefilter("error", DeprecationWarning)`` verifies
-        that calling the function is safe under -W error conditions.
-        """
-        import warnings
-
-        from agentex.lib.adk._modules._langgraph_tracing import create_langgraph_tracing_handler
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("error", DeprecationWarning)
-            create_langgraph_tracing_handler(trace_id="t1", parent_span_id="p1")
-
-        assert w == [], "create_langgraph_tracing_handler must NOT emit a runtime DeprecationWarning"

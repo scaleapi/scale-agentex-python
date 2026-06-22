@@ -19,21 +19,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from project.agent import create_agent
+from project.agent import MODEL_NAME, create_agent
 from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 import agentex.lib.adk as adk
-from agentex.lib.adk import (
-    stream_pydantic_ai_events,
-    create_pydantic_ai_tracing_handler,
-)
 from agentex.protocol.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.lib.core.harness import UnifiedEmitter
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
 
 logger = make_logger(__name__)
@@ -125,15 +123,17 @@ async def handle_task_event_send(params: SendEventParams):
         input={"message": user_message},
         data={"__span_type__": "AGENT_WORKFLOW"},
     ) as turn_span:
-        tracing_handler = create_pydantic_ai_tracing_handler(
+        # Construct the UnifiedEmitter from the ACP context so tracing is
+        # automatic and messages are auto-sent to the task stream (Redis).
+        emitter = UnifiedEmitter(
+            task_id=task_id,
             trace_id=task_id,
             parent_span_id=turn_span.id if turn_span else None,
-            task_id=task_id,
         )
 
         # Wrap the pydantic-ai event stream so we can capture the final
         # AgentRunResultEvent (which carries the full message list for the
-        # next turn) without changing the streaming-helper's signature.
+        # next turn) before forwarding events to the emitter.
         captured_messages: list[Any] = []
 
         async def tee_messages(upstream) -> AsyncIterator[Any]:
@@ -143,9 +143,8 @@ async def handle_task_event_send(params: SendEventParams):
                 yield event
 
         async with agent.run_stream_events(user_message, message_history=previous_messages) as stream:
-            final_output = await stream_pydantic_ai_events(
-                tee_messages(stream), task_id, tracing_handler=tracing_handler
-            )
+            turn = PydanticAITurn(tee_messages(stream), model=MODEL_NAME)
+            result = await emitter.auto_send_turn(turn)
 
         # Save the updated message history so the next turn picks up here.
         if captured_messages:
@@ -158,7 +157,7 @@ async def handle_task_event_send(params: SendEventParams):
             )
 
         if turn_span:
-            turn_span.output = {"final_output": final_output}
+            turn_span.output = {"final_output": result.final_text}
 
 
 @acp.on_task_cancel

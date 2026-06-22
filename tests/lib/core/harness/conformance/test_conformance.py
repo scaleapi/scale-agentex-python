@@ -24,11 +24,9 @@ Raw wire-level event shapes are NOT compared (that would fail by design: the
 Full vs Start+Done envelope difference is a documented, acceptable choice in
 auto_send — see runner.py for the rationale).
 
-AGX1-377 fix: auto_send now delivers streamed tool-request messages. The
-suppression that previously prevented the yield normaliser from emitting a
-LogicalDelivery for Start(tool_request)+Done is removed. Both channels now
-produce a delivery for streamed tool_request, verified by the
-"streamed-tool-request" fixture.
+auto_send delivers streamed tool-request messages: both channels produce a
+delivery for streamed tool_request, verified by the "streamed-tool-request"
+fixture.
 """
 
 from __future__ import annotations
@@ -134,9 +132,8 @@ _FIXTURES: list[Fixture] = [
             StreamTaskMessageDone(type="done", index=0),
         ],
     ),
-    # fixture 4: streamed tool_request (AGX1-377 fix) — tool_request delivered
-    # via Start+Done (no Full). auto_send now delivers this instead of dropping
-    # it. Both channels must produce a LogicalDelivery for this fixture.
+    # fixture 4: streamed tool_request — tool_request delivered via Start+Done
+    # (no Full). Both channels must produce a LogicalDelivery for this fixture.
     Fixture(
         name="streamed-tool-request",
         events=[

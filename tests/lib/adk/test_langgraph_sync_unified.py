@@ -150,12 +150,11 @@ class TestSpanDerivation:
         return tracer, backend
 
     async def test_tool_span_derived_from_full_events(self, fake_tracer):
-        """AGX1-377: SpanDeriver now handles Full tool events for LangGraph.
+        """SpanDeriver handles Full tool events for LangGraph.
 
         Full(ToolRequestContent) opens a tool span keyed by tool_call_id;
-        Full(ToolResponseContent) closes it. This bridges the previous gap where
-        LangGraph's Full-event path produced no spans, aligning it with
-        Start+Done harnesses (pydantic-ai, openai-agents).
+        Full(ToolResponseContent) closes it, aligning LangGraph's Full-event
+        path with the Start+Done harnesses (pydantic-ai, openai-agents).
         """
         from langchain_core.messages import AIMessage, ToolMessage
 

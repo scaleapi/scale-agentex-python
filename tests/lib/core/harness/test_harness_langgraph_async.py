@@ -13,10 +13,10 @@ What is tested
 --------------
 - The async handler pushes the correct sequence of messages to the fake streaming
   backend: Full(ToolRequest) + Full(ToolResponse) + text Start/Delta/Done.
-- final_text accumulates all text (not just last segment — AGX1-377 unified behavior).
+- final_text accumulates all text (not just last segment — unified behavior).
 - Tool messages go through streaming_task_message_context (not messages.create).
-- With a SpanTracer, no tool spans are produced (AGX1-377: Full events are not
-  handled by SpanDeriver today).
+- With a SpanTracer, Full tool events produce tool spans (request opens, response
+  closes), aligning LangGraph tracing with the Start+Done harnesses.
 
 What is NOT covered without live infrastructure
 -----------------------------------------------
@@ -252,7 +252,7 @@ class TestAsyncAutoSendChannel:
         assert usage.total_tokens == 15
 
     async def test_tracer_produces_tool_spans_for_full_events(self):
-        """AGX1-377: SpanDeriver now handles Full tool events (request opens, response closes).
+        """SpanDeriver handles Full tool events (request opens, response closes).
 
         Full(ToolRequestContent) opens a tool span; Full(ToolResponseContent) closes it.
         This aligns LangGraph tracing with Start+Done harnesses (pydantic-ai, openai-agents).

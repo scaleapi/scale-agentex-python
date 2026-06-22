@@ -166,7 +166,7 @@ class TestSyncYieldChannel:
         assert out == []
 
     async def test_tracer_produces_tool_spans_for_full_events(self):
-        """AGX1-377: SpanDeriver now handles Full tool events (request opens, response closes).
+        """SpanDeriver handles Full tool events (request opens, response closes).
 
         Full(ToolRequestContent) opens a tool span; Full(ToolResponseContent) closes it.
         This aligns LangGraph tracing with Start+Done harnesses (pydantic-ai, openai-agents).

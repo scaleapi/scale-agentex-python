@@ -41,14 +41,9 @@ from __future__ import annotations
 
 import json
 import inspect
-from typing import TYPE_CHECKING, Any, Callable, AsyncIterator
+from typing import Any, Callable, AsyncIterator
 
 from pydantic_ai.run import AgentRunResultEvent
-
-if TYPE_CHECKING:
-    from agentex.lib.adk._modules._pydantic_ai_tracing import (
-        AgentexPydanticAITracingHandler,
-    )
 from pydantic_ai.messages import (
     TextPart,
     PartEndEvent,
@@ -124,7 +119,6 @@ def _tool_return_content(result: ToolReturnPart | Any) -> Any:
 
 async def convert_pydantic_ai_to_agentex_events(
     stream_response: AsyncIterator[Any],
-    tracing_handler: "AgentexPydanticAITracingHandler | None" = None,
     on_result: Callable[[AgentRunResultEvent], Any] | None = None,
 ) -> AsyncIterator[StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone]:
     """Convert a Pydantic AI agent event stream into Agentex stream events.
@@ -148,11 +142,6 @@ async def convert_pydantic_ai_to_agentex_events(
         stream_response: The async iterator yielded by Pydantic AI's
             ``agent.run_stream_events(...)`` context manager (or a stream of
             ``AgentStreamEvent`` items received in an ``event_stream_handler``).
-        tracing_handler: Optional handler from
-            ``create_pydantic_ai_tracing_handler(...)``. When provided, each
-            tool call in the run is also recorded as an Agentex child span
-            beneath the handler's configured ``parent_span_id``. Streaming
-            behavior is unchanged when omitted.
         on_result: Optional callback invoked with the terminal
             ``AgentRunResultEvent`` when the run completes. Both sync and
             async callables are accepted. No ``StreamTaskMessage*`` events are
@@ -306,26 +295,6 @@ async def convert_pydantic_ai_to_agentex_events(
             if message_index is None:
                 continue
             yield StreamTaskMessageDone(type="done", index=message_index)
-            # Tool-call parts end with the model's full args known. Open a
-            # tracing child span for the tool execution now; close it when
-            # FunctionToolResultEvent arrives below.
-            if tracing_handler is not None and isinstance(event.part, ToolCallPart) and event.part.tool_call_id:
-                args: dict[str, Any] | str | None
-                raw_args = event.part.args
-                if isinstance(raw_args, dict):
-                    args = dict(raw_args)
-                elif isinstance(raw_args, str):
-                    try:
-                        args = json.loads(raw_args) if raw_args else {}
-                    except json.JSONDecodeError:
-                        args = {"_raw": raw_args}
-                else:
-                    args = {}
-                await tracing_handler.on_tool_start(
-                    tool_call_id=event.part.tool_call_id,
-                    tool_name=event.part.tool_name,
-                    arguments=args,
-                )
 
         elif isinstance(event, FunctionToolResultEvent):
             result = event.part
@@ -345,11 +314,6 @@ async def convert_pydantic_ai_to_agentex_events(
                     content=content_payload,
                 ),
             )
-            if tracing_handler is not None and tool_call_id:
-                await tracing_handler.on_tool_end(
-                    tool_call_id=tool_call_id,
-                    result=content_payload,
-                )
 
         elif isinstance(event, (FunctionToolCallEvent, FinalResultEvent, AgentRunResultEvent)):
             # Already covered by PartStart/PartDelta/PartEnd events above, or

@@ -11,9 +11,9 @@ This module is now implemented on top of ``LangGraphTurn`` and
 harness adapter (pydantic-ai, openai-agents, etc.). The public signature
 and return type are preserved identically.
 
-AGX1-377 note: LangGraph emits tool requests as ``StreamTaskMessageFull`` events
-(from "updates" events), NOT Start+Delta+Done like pydantic-ai. ``auto_send``
-handles Full events correctly; no coalescing wrapper is needed.
+LangGraph emits tool requests as ``StreamTaskMessageFull`` events (from
+"updates" events), NOT Start+Delta+Done like pydantic-ai. ``auto_send`` handles
+Full events correctly; no coalescing wrapper is needed.
 """
 
 from agentex.lib.utils.temporal import workflow_now_if_in_workflow
@@ -35,11 +35,11 @@ async def stream_langgraph_events(stream, task_id: str) -> str:
     cross-harness consistency. Behavior is identical to the previous bespoke
     implementation (verified by characterization tests in test_langgraph_async.py).
 
-    AGX1-377 note: LangGraph emits tool requests as ``Full`` events (from "updates"),
-    NOT Start+Delta+Done like pydantic-ai. ``auto_send`` handles Full events
+    LangGraph emits tool requests as ``Full`` events (from "updates"), NOT
+    Start+Delta+Done like pydantic-ai. ``auto_send`` handles Full events
     correctly; no coalescing wrapper is needed.
 
-    AGX1-378 note: ``created_at`` is set from ``workflow.now()`` when called inside a
+    ``created_at`` is set from ``workflow.now()`` when called inside a
     Temporal workflow, matching the pattern used by the openai/litellm providers.
     Outside a workflow (plain async activities, sync agents) it is ``None`` and the
     server's wall clock is used.
@@ -54,10 +54,10 @@ async def stream_langgraph_events(stream, task_id: str) -> str:
     from agentex.lib.core.harness.emitter import UnifiedEmitter
     from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
 
-    # AGX1-377 note: LangGraph emits tool requests as Full events (from "updates"),
-    # NOT Start+Delta+Done like pydantic-ai. auto_send handles Full events correctly;
+    # LangGraph emits tool requests as Full events (from "updates"), NOT
+    # Start+Delta+Done like pydantic-ai. auto_send handles Full events correctly;
     # no coalescing wrapper is needed.
-    # AGX1-378: stamp messages with workflow.now() inside Temporal for deterministic
+    # Stamp messages with workflow.now() inside Temporal for deterministic
     # created_at ordering; falls back to None (server wall clock) outside a workflow.
     turn = LangGraphTurn(stream, model=None)
     emitter = UnifiedEmitter(task_id=task_id, trace_id=None, parent_span_id=None)

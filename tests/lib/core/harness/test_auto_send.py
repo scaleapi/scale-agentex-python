@@ -289,13 +289,13 @@ async def test_open_context_closed_on_midstream_error():
 
 
 # ---------------------------------------------------------------------------
-# Test 6: streamed tool_request delivered (AGX1-377 core)
+# Test 6: streamed tool_request delivered
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_auto_send_streams_tool_request():
-    """A Start(ToolRequestContent) MUST open a streaming context (AGX1-377)."""
+    """A Start(ToolRequestContent) MUST open a streaming context."""
     streaming = _FakeStreaming()
     events = [
         StreamTaskMessageStart(
@@ -445,7 +445,7 @@ async def test_auto_send_full_text_content_sets_final_text():
 
 
 # ---------------------------------------------------------------------------
-# Test 10: created_at is forwarded to streaming context (AGX1-378)
+# Test 10: created_at is forwarded to streaming context
 # ---------------------------------------------------------------------------
 
 
