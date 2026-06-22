@@ -518,21 +518,23 @@ class StreamingTaskMessageContext:
                 await self._buffer.add(update)
                 return update
 
+        # A full message supersedes the streamed deltas and ends the stream.
+        # Drain and stop the coalescing buffer BEFORE publishing the Full, so any
+        # leftover buffered deltas land on the stream in order (deltas -> Full)
+        # rather than after the terminal Full — a consumer treating Full as the
+        # final message would otherwise see those trailing deltas as a stale
+        # duplicate tail. Closing here also stops the ticker, so it can't be
+        # orphaned when __aexit__'s close() later short-circuits on _is_closed.
+        if isinstance(update, StreamTaskMessageFull) and self._buffer is not None:
+            await self._buffer.close()
+            self._buffer = None
+
         result = await self._streaming_service.stream_update(update)
 
         if isinstance(update, StreamTaskMessageDone):
             await self.close()
             return update
         elif isinstance(update, StreamTaskMessageFull):
-            # A full message supersedes any buffered deltas and ends the stream.
-            # Close the coalescing buffer (stopping its ticker) BEFORE marking
-            # the context done — otherwise __aexit__'s close() early-returns on
-            # _is_closed and the ticker is never stopped, polling forever and
-            # leaking CPU (mirrors the StreamTaskMessageDone branch, which closes
-            # via self.close()).
-            if self._buffer is not None:
-                await self._buffer.close()
-                self._buffer = None
             await self._agentex_client.messages.update(
                 task_id=self.task_id,
                 message_id=update.parent_task_message.id,  # type: ignore[union-attr]

@@ -614,6 +614,35 @@ class TestFullMessageClosesBuffer:
         assert task.done(), "coalescing-buffer ticker still running after Full (orphaned)"
 
     @pytest.mark.asyncio
+    async def test_full_is_terminal_publish_no_trailing_deltas(self) -> None:
+        # Leftover buffered deltas must be drained BEFORE the Full hits the
+        # stream (deltas -> Full), never after it — a consumer treating Full as
+        # the final message would see a trailing delta as a stale duplicate tail.
+        ctx, svc, tm = await _make_context("coalesced")
+        # First delta flushes immediately; the second stays in the coalescing
+        # window, so it is still buffered when the Full arrives.
+        await ctx.stream_update(_text(tm, "alpha"))
+        await ctx.stream_update(_text(tm, "beta"))
+
+        full = StreamTaskMessageFull(
+            parent_task_message=tm,
+            content=TextContent(author="agent", content="alphabeta", format="markdown"),
+            type="full",
+        )
+        await ctx.stream_update(full)
+
+        # Every publish (delta flushes + the Full) goes through the service mock.
+        published = [c.args[0] for c in svc.stream_update.await_args_list]
+        assert published, "nothing was published"
+        assert published[-1] is full, (
+            f"Full must be the terminal publish; saw trailing "
+            f"{type(published[-1]).__name__} after it (stale duplicate tail)"
+        )
+        assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
+            "expected the buffered deltas to be published before the Full"
+        )
+
+    @pytest.mark.asyncio
     async def test_close_reaps_buffer_even_if_already_marked_closed(self) -> None:
         # Defense-in-depth: if any path marks the context closed without closing
         # the buffer, close() must still stop the ticker rather than short-circuit.
