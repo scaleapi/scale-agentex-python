@@ -166,10 +166,9 @@ class CoalescingBuffer:
         self._first_flushed = False
         self._closed = False
         self._lock = asyncio.Lock()
-        # Two events so the ticker can park at zero CPU when idle:
-        #   _wake      — buffer went empty -> non-empty; the ticker should run
-        #   _flush_now — flush immediately (first delta / size threshold / close),
-        #                bypassing the coalescing window
+        # _wake lets the ticker park at zero CPU when idle (set on empty ->
+        # non-empty); _flush_now bypasses the coalescing window (first delta /
+        # size threshold / close).
         self._wake = asyncio.Event()
         self._flush_now = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
@@ -188,25 +187,20 @@ class CoalescingBuffer:
             if not self._first_flushed or self._buf_chars >= self.MAX_BUFFERED_CHARS:
                 self._first_flushed = True
                 self._flush_now.set()
-            # Wake the (possibly parked) ticker when the buffer goes from empty
-            # to non-empty; it then applies the coalescing window itself.
+            # Unpark the ticker; it applies the coalescing window itself.
             if was_empty:
                 self._wake.set()
 
     async def _run(self) -> None:
         try:
             while True:
-                # Park at zero CPU until there is data to flush (or close()).
-                # This is the key change from a fixed-interval ticker: an idle
-                # or orphaned buffer blocks here instead of waking every
-                # FLUSH_INTERVAL_S forever — the latter leaked CPU when a buffer
-                # outlived its stream without close() running (one spinning task
-                # per such stream).
+                # Park at zero CPU until there is data (or close()). A
+                # fixed-interval ticker instead leaked CPU on buffers orphaned
+                # without close() — one task spinning every FLUSH_INTERVAL_S.
                 await self._wake.wait()
                 self._wake.clear()
-                # First delta / size threshold / close flush immediately;
-                # otherwise coalesce for up to FLUSH_INTERVAL_S so consecutive
-                # deltas batch into a single publish.
+                # Coalesce for up to FLUSH_INTERVAL_S unless an immediate flush
+                # is already pending.
                 if not self._flush_now.is_set() and not self._closed:
                     try:
                         await asyncio.wait_for(self._flush_now.wait(), timeout=self.FLUSH_INTERVAL_S)
@@ -215,41 +209,32 @@ class CoalescingBuffer:
                 async with self._lock:
                     self._flush_now.clear()
                     drained = self._drain_locked()
-                # Deltas that arrive after this drain (e.g. during the _on_flush
-                # awaits below) re-arm the ticker via add()'s empty->non-empty
-                # _wake.set(), so the loop re-runs to flush them.
+                # Deltas arriving during the _on_flush awaits below re-arm the
+                # ticker via add(), so they get flushed on the next loop.
                 for u in drained:
                     try:
                         await self._on_flush(u)
                     except Exception as e:
                         logger.exception(f"CoalescingBuffer flush failed: {e}")
-                # Check _closed *after* draining so close() always gets a final
-                # in-loop flush pass. Exiting here (instead of being cancelled
-                # mid-flush) guarantees each in-flight item is published exactly
-                # once — close()'s final drain then only picks up items added
-                # after the last lock release.
+                # Check _closed *after* draining so close() gets a final flush
+                # pass and each item is published exactly once.
                 if self._closed:
                     return
         except asyncio.CancelledError:
             pass
 
     async def close(self) -> None:
-        # Signal the ticker to stop and let it exit naturally after its next
-        # drain. Cancelling mid-flush would risk re-publishing a delta whose
-        # Redis write already completed but whose await had not yet returned,
-        # producing the duplicate-tail symptom seen on the UI stream.
+        # Let the ticker exit after its next drain rather than cancelling
+        # mid-flush, which could re-publish a delta whose Redis write already
+        # completed (the duplicate-tail symptom seen on the UI stream).
         self._closed = True
         if self._task is not None:
-            # Wake the parked ticker so it sees _closed and exits after its
-            # next drain.
             self._wake.set()
             self._flush_now.set()
             try:
                 await self._task
             except asyncio.CancelledError:
-                # Our caller is being cancelled. Force-cancel the ticker so it
-                # can never be orphaned into a parked/looping task, then
-                # propagate the cancellation.
+                # Outer cancel: force-cancel the ticker so it isn't orphaned.
                 self._task.cancel()
                 raise
             self._task = None
@@ -450,10 +435,8 @@ class StreamingTaskMessageContext:
         if not self.task_message:
             raise ValueError("Context not properly initialized - no task message")
 
-        # Always reap the buffer ticker first, even if the context was already
-        # marked done by a Full/Done update on another path. close() is the last
-        # line of defense against an orphaned, forever-polling ticker, so it must
-        # never be short-circuited before stopping it.
+        # Reap the buffer ticker before the _is_closed short-circuit, so a
+        # context already marked done by another path can't orphan it.
         if self._buffer is not None:
             await self._buffer.close()
             self._buffer = None
@@ -518,13 +501,10 @@ class StreamingTaskMessageContext:
                 await self._buffer.add(update)
                 return update
 
-        # A full message supersedes the streamed deltas and ends the stream.
-        # Drain and stop the coalescing buffer BEFORE publishing the Full, so any
-        # leftover buffered deltas land on the stream in order (deltas -> Full)
-        # rather than after the terminal Full — a consumer treating Full as the
-        # final message would otherwise see those trailing deltas as a stale
-        # duplicate tail. Closing here also stops the ticker, so it can't be
-        # orphaned when __aexit__'s close() later short-circuits on _is_closed.
+        # Drain and stop the buffer BEFORE publishing the Full, so leftover
+        # deltas land in order (deltas -> Full); publishing them after the
+        # terminal Full would look like a stale duplicate tail. This also stops
+        # the ticker so it isn't orphaned past __aexit__'s close().
         if isinstance(update, StreamTaskMessageFull) and self._buffer is not None:
             await self._buffer.close()
             self._buffer = None

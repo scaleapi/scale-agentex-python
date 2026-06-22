@@ -307,16 +307,12 @@ class TestCoalescingBufferTimeWindow:
 
 
 class TestCoalescingBufferIdleParks:
-    """Regression: the ticker must park (block on its wake event) when there is
-    no buffered data, instead of waking every FLUSH_INTERVAL_S. The old
-    fixed-interval ticker spun at 1/FLUSH_INTERVAL forever, so a buffer that
-    outlived its stream (orphaned, close() not run) pinned worker CPU — one
-    spinning task per such stream.
-    """
+    """The ticker must park on its wake event when idle, not poll every
+    FLUSH_INTERVAL_S — a buffer orphaned without close() otherwise pins CPU."""
 
     @staticmethod
     def _count_drains(buf: CoalescingBuffer) -> list[int]:
-        """Instrument _drain_locked to count ticker wake/drain cycles."""
+        """Instrument _drain_locked to count drain cycles."""
         n = [0]
         orig = buf._drain_locked
 
@@ -329,14 +325,11 @@ class TestCoalescingBufferIdleParks:
 
     @pytest.mark.asyncio
     async def test_idle_buffer_does_not_spin(self) -> None:
-        """With no data ever added, the ticker must not drain at all over many
-        FLUSH_INTERVAL_S windows."""
         buf = CoalescingBuffer(on_flush=AsyncMock())
         drains = self._count_drains(buf)
         buf.start()
         try:
-            # ~8 windows at FLUSH_INTERVAL_S=0.050; a polling ticker would have
-            # woken ~8 times. A parked ticker drains 0 times.
+            # ~8 FLUSH_INTERVAL_S windows; a polling ticker would drain ~8x.
             await asyncio.sleep(0.4)
             assert drains[0] == 0, f"idle ticker woke {drains[0]}x (must park at 0)"
         finally:
@@ -344,20 +337,17 @@ class TestCoalescingBufferIdleParks:
 
     @pytest.mark.asyncio
     async def test_orphaned_buffer_parks_after_flush(self, task_message: TaskMessage) -> None:
-        """A buffer whose close() never runs (orphaned on an abnormal stream
-        exit) must still park at zero CPU once its data is drained — not spin.
-        This is the exact condition that previously leaked worker CPU."""
+        """An orphaned buffer (close() never runs) must still park once drained."""
         buf = CoalescingBuffer(on_flush=AsyncMock())
         buf.start()
         try:
-            await buf.add(_text(task_message, "hi"))  # one immediate flush
-            await asyncio.sleep(0.020)  # let it flush and park
-            drains = self._count_drains(buf)
-            # Deliberately do NOT close — simulate an orphaned buffer.
+            await buf.add(_text(task_message, "hi"))
+            await asyncio.sleep(0.020)  # let the immediate flush land and park
+            drains = self._count_drains(buf)  # count only post-flush cycles
             await asyncio.sleep(0.4)
             assert drains[0] == 0, f"orphaned ticker woke {drains[0]}x (must park at 0)"
         finally:
-            await buf.close()  # cleanup only
+            await buf.close()
 
 
 class TestCoalescingBufferClose:
@@ -580,28 +570,20 @@ class TestStreamingTaskMessageContextCreatedAt:
 
 
 class TestFullMessageClosesBuffer:
-    """Regression: a StreamTaskMessageFull must stop the coalescing-buffer ticker.
-
-    A ``StreamTaskMessageFull`` ends the stream and marks the context done. If it
-    marks ``_is_closed`` without closing the buffer, ``__aexit__``'s ``close()``
-    early-returns on the ``_is_closed`` guard and the ticker is never stopped —
-    it polls every ``FLUSH_INTERVAL_S`` forever, one orphaned task per stream
-    (the OneEdge worker CPU leak). These tests pin both halves of the fix:
-    the Full branch closes the buffer, and ``close()`` reaps it even if the
-    context was already marked closed by another path.
-    """
+    """A StreamTaskMessageFull must stop the buffer ticker. If it marks the
+    context done without closing the buffer, close()'s _is_closed short-circuit
+    leaves the ticker orphaned (the worker CPU leak)."""
 
     @pytest.mark.asyncio
     async def test_full_message_stops_ticker(self) -> None:
         ctx, _svc, tm = await _make_context("coalesced")
-        # Stream a delta so the buffer and its background ticker are live.
+        # A delta makes the buffer and its ticker live.
         await ctx.stream_update(_text(tm, "hello"))
         buf = ctx._buffer
         assert buf is not None
         task = buf._task
         assert task is not None and not task.done()
 
-        # End-of-turn full message (OneEdge's pattern).
         await ctx.stream_update(
             StreamTaskMessageFull(
                 parent_task_message=tm,
@@ -615,12 +597,10 @@ class TestFullMessageClosesBuffer:
 
     @pytest.mark.asyncio
     async def test_full_is_terminal_publish_no_trailing_deltas(self) -> None:
-        # Leftover buffered deltas must be drained BEFORE the Full hits the
-        # stream (deltas -> Full), never after it — a consumer treating Full as
-        # the final message would see a trailing delta as a stale duplicate tail.
+        # Buffered deltas must publish BEFORE the Full, never after (a trailing
+        # delta after the terminal Full reads as a stale duplicate tail).
         ctx, svc, tm = await _make_context("coalesced")
-        # First delta flushes immediately; the second stays in the coalescing
-        # window, so it is still buffered when the Full arrives.
+        # "alpha" flushes immediately; "beta" stays buffered in the window.
         await ctx.stream_update(_text(tm, "alpha"))
         await ctx.stream_update(_text(tm, "beta"))
 
@@ -631,7 +611,6 @@ class TestFullMessageClosesBuffer:
         )
         await ctx.stream_update(full)
 
-        # Every publish (delta flushes + the Full) goes through the service mock.
         published = [c.args[0] for c in svc.stream_update.await_args_list]
         assert published, "nothing was published"
         assert published[-1] is full, (
@@ -644,8 +623,7 @@ class TestFullMessageClosesBuffer:
 
     @pytest.mark.asyncio
     async def test_close_reaps_buffer_even_if_already_marked_closed(self) -> None:
-        # Defense-in-depth: if any path marks the context closed without closing
-        # the buffer, close() must still stop the ticker rather than short-circuit.
+        # close() must stop the ticker even when _is_closed is already set.
         ctx, _svc, tm = await _make_context("coalesced")
         await ctx.stream_update(_text(tm, "hi"))
         buf = ctx._buffer
