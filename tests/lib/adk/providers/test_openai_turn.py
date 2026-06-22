@@ -65,7 +65,9 @@ def test_usage_mapping_none_usage():
     turn_usage = openai_usage_to_turn_usage(None, model="gpt-4o")
 
     assert turn_usage.model == "gpt-4o"
-    assert turn_usage.num_llm_calls == 0
+    # num_llm_calls is None ("not reported") when no usage is present, matching
+    # the token fields below; a real 0 is only reported when the provider says so.
+    assert turn_usage.num_llm_calls is None
     assert turn_usage.input_tokens is None
     assert turn_usage.output_tokens is None
     assert turn_usage.total_tokens is None
