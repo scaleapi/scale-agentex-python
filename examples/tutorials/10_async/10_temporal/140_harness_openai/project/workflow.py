@@ -17,7 +17,11 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 from agentex.lib import adk
-from project.activities import RUN_HARNESS_AGENT_ACTIVITY, RunHarnessAgentParams
+from project.activities import (
+    RUN_HARNESS_AGENT_ACTIVITY,
+    RunHarnessAgentParams,
+    RunHarnessAgentResult,
+)
 from agentex.lib.types.acp import SendEventParams, CreateTaskParams
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
@@ -53,6 +57,9 @@ class At140HarnessOpenaiWorkflow(BaseWorkflow):
         super().__init__(display_name=environment_variables.AGENT_NAME)
         self._complete_task = False
         self._turn_number = 0
+        # Running conversation (OpenAI Agents SDK input items) so each turn sees
+        # the full history, not just the latest user message.
+        self._messages: list = []
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
@@ -69,19 +76,23 @@ class At140HarnessOpenaiWorkflow(BaseWorkflow):
             name=f"Turn {self._turn_number}",
             input={"message": params.event.content.content},
         ) as span:
-            final_text = await workflow.execute_activity(
+            turn_result = await workflow.execute_activity(
                 RUN_HARNESS_AGENT_ACTIVITY,
                 RunHarnessAgentParams(
                     task_id=params.task.id,
                     user_message=params.event.content.content,
+                    input_list=self._messages,
                     trace_id=params.task.id,
                     parent_span_id=span.id if span else None,
                 ),
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=RetryPolicy(maximum_attempts=3),
+                result_type=RunHarnessAgentResult,
             )
+            # Carry the updated conversation into the next turn.
+            self._messages = turn_result.input_list
             if span:
-                span.output = {"final_output": final_text}
+                span.output = {"final_output": turn_result.final_text}
 
     @workflow.run
     async def on_task_create(self, params: CreateTaskParams) -> str:
