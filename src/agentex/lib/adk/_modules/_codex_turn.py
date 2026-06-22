@@ -185,6 +185,16 @@ class CodexTurn:
     def _on_result(self, result: dict[str, Any]) -> None:
         self._result = result
 
+    @property
+    def session_id(self) -> str | None:
+        """The codex session id, for resuming a multi-turn session.
+
+        Valid only after ``events`` has been fully consumed (populated by the
+        ``on_result`` callback). Returns ``None`` if the stream is not yet
+        exhausted or codex reported no session id.
+        """
+        return self._result.get("session_id") if self._result else None
+
     def usage(self) -> TurnUsage:
         """Return normalized ``TurnUsage`` for this turn.
 

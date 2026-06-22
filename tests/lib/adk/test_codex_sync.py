@@ -236,10 +236,20 @@ class TestToolCallStreaming:
             },
         ]
         out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
-        req = [e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, ToolRequestContent)]
-        resp = [e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ToolResponseContent)]
-        assert len(req) == 1 and len(resp) == 1
-        assert req[0].content.tool_call_id == resp[0].content.tool_call_id
+        # Pull tool_call_id inside the comprehension so the isinstance narrows the
+        # content union (the narrowing would not survive a later attribute access).
+        req_ids = [
+            e.content.tool_call_id
+            for e in out
+            if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, ToolRequestContent)
+        ]
+        resp_ids = [
+            e.content.tool_call_id
+            for e in out
+            if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ToolResponseContent)
+        ]
+        assert len(req_ids) == 1 and len(resp_ids) == 1
+        assert req_ids[0] == resp_ids[0]
 
     async def test_file_change_synthesizes_start(self) -> None:
         """file_change items may only emit item.completed (no started)."""

@@ -196,10 +196,10 @@ async def handle_task_event_send(params: SendEventParams):
         if usage.model:
             # usage() is valid now that the stream is exhausted
             pass
-        # CodexTurn exposes the session_id via its on_result callback; we access
-        # it via the underlying processor through the result dict stored on the turn.
-        if turn._result and turn._result.get("session_id"):
-            state.codex_thread_id = turn._result["session_id"]
+        # Persist the codex session id (public accessor; valid post-stream) so the
+        # next turn resumes the same session.
+        if turn.session_id:
+            state.codex_thread_id = turn.session_id
 
         await adk.state.update(
             state_id=task_state.id,

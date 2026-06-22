@@ -173,8 +173,8 @@ class AtHarnessCodexWorkflow(BaseWorkflow):
 
             await process.wait()
 
-            if turn._result and turn._result.get("session_id"):
-                self._codex_thread_id = turn._result["session_id"]
+            if turn.session_id:
+                self._codex_thread_id = turn.session_id
 
             if span:
                 span.output = {
