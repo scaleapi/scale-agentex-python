@@ -174,11 +174,10 @@ _FIXTURES: list[Fixture] = [
     # an error. It guards against the two channels agreeing with each other while
     # both mishandling interleaved/parallel spans or a failing tool.
     #
-    # The tool error is represented the way the harness encodes it today — an
-    # "Error: ..." string in ToolResponseContent.content (see
-    # claude_agents/hooks/hooks.py post_tool_use_failure_hook). Once the deferred
-    # ToolResponseContent.is_error field lands (AGX1-371), extend this fixture to
-    # assert the error status propagates onto the closed tool span.
+    # The failing tool sets ToolResponseContent.is_error=True (AGX1-371), which
+    # the span deriver threads onto the closed tool span's CloseSpan.is_error.
+    # Both channels feed the same deriver, so the recorded span signals — error
+    # status included — must match.
     Fixture(
         name="parallel-tools-with-error",
         events=[
@@ -217,6 +216,7 @@ _FIXTURES: list[Fixture] = [
                     tool_call_id="p-ls",
                     name="Bash",
                     content="Error: ls: /nope: No such file or directory",
+                    is_error=True,
                 ),
             ),
             # p-read succeeds and closes second.
