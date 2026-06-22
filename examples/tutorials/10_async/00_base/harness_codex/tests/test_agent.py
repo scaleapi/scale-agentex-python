@@ -145,19 +145,44 @@ class TestLiveCodexAgent:
 
         return Agentex(base_url=AGENTEX_API_BASE_URL)
 
-    def test_send_simple_message(self, client):
-        from agentex.types import TextContentParam
-        from agentex.types.agent_rpc_params import ParamsSendMessageRequest
+    @pytest.fixture
+    def agent_id(self, client):
+        for agent in client.agents.list():
+            if agent.name == AGENT_NAME:
+                return agent.id
+        raise ValueError(f"Agent {AGENT_NAME!r} not found.")
 
-        response = client.agents.send_message(
-            agent_name=AGENT_NAME,
-            params=ParamsSendMessageRequest(
+    def test_send_simple_message(self, client, agent_id: str):
+        """Async agents process events out of band, so create a task, send an
+        event, and poll the task's messages for the agent's response."""
+        import time
+        import uuid
+
+        from agentex.types import TextContentParam
+        from agentex.types.agent_rpc_params import ParamsSendEventRequest, ParamsCreateTaskRequest
+
+        task = client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex)).result
+        assert task is not None
+
+        client.agents.send_event(
+            agent_id=agent_id,
+            params=ParamsSendEventRequest(
+                task_id=task.id,
                 content=TextContentParam(
                     author="user",
                     content="What is 3+3? Reply with just the number.",
                     type="text",
-                )
+                ),
             ),
         )
-        assert response.result is not None
-        assert len(response.result) >= 1
+
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            msgs = client.messages.list(task_id=task.id)
+            agent_msgs = [m for m in msgs if getattr(m.content, "author", None) == "agent"]
+            if agent_msgs:
+                assert len(agent_msgs) >= 1
+                return
+            time.sleep(2)
+
+        raise AssertionError("No agent response received within 60 s")

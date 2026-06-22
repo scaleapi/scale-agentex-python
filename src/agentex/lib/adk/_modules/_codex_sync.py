@@ -156,7 +156,10 @@ def _tool_output_for(item_type: str, payload: dict[str, Any]) -> tuple[str, bool
         exit_code = payload.get("exit_code")
         is_error = exit_code is not None and exit_code != 0
         return _truncate(out), is_error
-    if item_type == "mcp_tool_call":
+    if item_type in ("mcp_tool_call", "collab_tool_call"):
+        # collab_tool_call mirrors mcp_tool_call's error/result convention
+        # (see _tool_args_for); without this branch a failed collab call would
+        # fall through to the generic path and be reported as a success.
         err = payload.get("error")
         if err:
             msg = err.get("message", "") if isinstance(err, dict) else str(err)
