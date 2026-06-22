@@ -23,8 +23,8 @@ from agentex.types.task_message_delta import (
     ReasoningSummaryDelta,
 )
 from agentex.types.task_message_update import (
-    StreamTaskMessageDelta,
     StreamTaskMessageFull,
+    StreamTaskMessageDelta,
 )
 from agentex.lib.core.services.adk.streaming import (
     CoalescingBuffer,
