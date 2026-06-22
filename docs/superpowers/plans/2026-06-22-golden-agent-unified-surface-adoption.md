@@ -22,7 +22,7 @@ Paths under `teams/sgp/agents/golden_agent/project/`.
 | claude-code parser | `harness/providers/claude.py` `_StreamJsonProcessor` | **Delete** — replaced by SDK `convert_claude_code_to_agentex_events` + `ClaudeCodeTurn`. Keep the sandbox/CLI-spawn parts of `ClaudeProvider`. |
 | codex parser | `harness/providers/codex.py` `_CodexEventProcessor` | **Delete** — replaced by SDK `convert_codex_to_agentex_events` + `CodexTurn`. Keep sandbox/CLI-spawn. |
 | Turn dispatch activity | `harness/activity.py` (`execute_agent_turn`) | **Simplify** — keep provider selection + heartbeat + metrics; replace the `provider→HarnessEvent→adapter` loop with `tap → <Harness>Turn → UnifiedEmitter.auto_send_turn`. |
-| In-process OpenAI-Agents harness | `harness/oai_mcp.py`, `oai_hooks.py`, `oai_streaming_model.py` | **Phase 2 (optional)** — could adopt the SDK openai tap; trickiest, deferred. |
+| In-process OpenAI-Agents harness | `harness/oai_mcp.py`, `oai_hooks.py`, `oai_streaming_model.py` | **Phase 4 (optional)** — could adopt the SDK openai tap; trickiest, deferred. |
 | Sandbox pool / setup / config / data-plane | `sandbox_pool.py`, `sandbox_setup.py`, `sandbox_config.py`, `sandbox_client_oai.py`, `pool_activities.py` | **Keep unchanged** (SGP-coupled; out of SDK scope). |
 | Secret / MCP reauth | `secrets.py`, `internal-packages/sgp_secrets_client` | **Keep unchanged** (SGP/identity-service-coupled). |
 | Capabilities / catalog / prompts / workflow / cron | `capabilities/*`, `prompts/*`, `workflow.py`, `cron.py`, `meta_activities.py` | **Keep unchanged.** |
@@ -37,7 +37,7 @@ execute_agent_turn (activity):
   1. Acquire/reconnect sandbox (pool), resolve secrets, render MCP config   # KEEP — SGP-coupled
   2. Emit sandbox-setup steps as ToolRequestContent/ToolResponseContent      # KEEP — now agentex content
   3. Spawn `claude -p --output-format stream-json` / `codex exec` in sandbox # KEEP — CLI spawn
-  4. turn = ClaudeCodeTurn(chain(setup_events, sandbox.stdout_lines))         # NEW — SDK tap + Turn
+  4. turn = ClaudeCodeTurn(chain(setup_events, convert_claude_code_to_agentex_events(sandbox.stdout_lines)))  # NEW — SDK tap + Turn
   5. result = await UnifiedEmitter(task_id, trace_id, parent_span_id)\
                       .auto_send_turn(turn, created_at=workflow.now())        # NEW — SDK delivery
   6. emit per-turn metrics from result.usage (TurnUsage)                      # KEEP — DogStatsD, now fed by TurnUsage
