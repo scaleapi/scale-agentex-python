@@ -211,11 +211,13 @@ class TestClaudeCodeLive:
     def test_send_simple_message(self, client, agent_id: str):
         """Create a task, send a message, and poll until a response appears."""
         import time
+        import uuid
 
         from agentex.types import TextContentParam
-        from agentex.types.agent_rpc_params import ParamsSendEventRequest
+        from agentex.types.agent_rpc_params import ParamsSendEventRequest, ParamsCreateTaskRequest
 
-        task = client.tasks.create(agent_id=agent_id)
+        task = client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex)).result
+        assert task is not None
         task_id = task.id
 
         client.agents.send_event(
