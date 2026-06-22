@@ -1,5 +1,29 @@
 """Tracing handler that records Agentex spans for tool calls in a pydantic-ai agent run.
 
+.. deprecated::
+    ``AgentexPydanticAITracingHandler`` and ``create_pydantic_ai_tracing_handler``
+    are superseded by the unified harness surface (``UnifiedEmitter`` in
+    ``agentex.lib.core.harness``). The unified surface derives tool and
+    reasoning spans directly from the canonical ``StreamTaskMessage*`` stream,
+    so no separate handler is required. Both symbols remain fully importable
+    and functional; they will be removed in a future release. New code should
+    construct a ``UnifiedEmitter`` with a ``trace_id`` instead:
+
+        from agentex.lib.core.harness import UnifiedEmitter
+        from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
+
+        emitter = UnifiedEmitter(task_id=task_id, trace_id=trace_id, parent_span_id=parent_span_id)
+        turn = PydanticAITurn(agent.run_stream_events(prompt), model="openai:gpt-4o")
+        async for event in emitter.yield_turn(turn):
+            yield event
+
+# NOTE: A runtime ``warnings.warn(..., DeprecationWarning)`` is intentionally
+# omitted here. The repo's pyproject ``filterwarnings = ["error"]`` would turn
+# it into a test/caller failure, and the async helper (``stream_pydantic_ai_events``)
+# still threads this handler through for existing callers that lack a ``trace_id``
+# on the async path. The runtime warning and caller migration are deferred until
+# ``trace_id`` threading lands on the async helper in a future API-versioning change.
+
 Mirrors the LangGraph tracing handler pattern: the caller creates a handler
 bound to a ``trace_id`` and a ``parent_span_id``, then hands it to
 ``stream_pydantic_ai_events(..., tracing_handler=handler)``. The streamer
@@ -62,6 +86,14 @@ def _tool_span_id(trace_id: str, tool_call_id: str) -> str:
 
 class AgentexPydanticAITracingHandler:
     """Records Agentex tracing spans for tool calls observed in a pydantic-ai event stream.
+
+    .. deprecated::
+        Superseded by ``UnifiedEmitter`` (``agentex.lib.core.harness``), which
+        derives tool and reasoning spans from the canonical ``StreamTaskMessage*``
+        stream automatically when ``trace_id`` is provided. This class remains
+        fully functional but will be removed in a future release. New code should
+        use ``UnifiedEmitter`` with a trace context instead of constructing this
+        handler directly.
 
     Pass an instance to ``stream_pydantic_ai_events(..., tracing_handler=...)``
     or call ``on_tool_start`` / ``on_tool_end`` yourself if you're consuming
@@ -164,6 +196,13 @@ def create_pydantic_ai_tracing_handler(
     task_id: str | None = None,
 ) -> AgentexPydanticAITracingHandler:
     """Create a tracing handler that records Agentex spans for pydantic-ai tool calls.
+
+    .. deprecated::
+        Superseded by ``UnifiedEmitter`` (``agentex.lib.core.harness``), which
+        derives tool and reasoning spans from the canonical ``StreamTaskMessage*``
+        stream automatically when ``trace_id`` is provided. This function remains
+        fully functional but will be removed in a future release. New code should
+        construct a ``UnifiedEmitter`` with a trace context instead.
 
     Args:
         trace_id: The trace ID. Typically the Agentex task ID.
