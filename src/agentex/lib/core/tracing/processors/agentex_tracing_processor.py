@@ -70,9 +70,15 @@ def _create_kwargs(span: Span) -> Dict[str, Any]:
 class AgentexSyncTracingProcessor(SyncTracingProcessor):
     def __init__(self, config: AgentexTracingProcessorConfig):  # noqa: ARG002
         self.client = Agentex()
+        # Capture the skip decision once at init: both halves of a span's
+        # lifecycle MUST agree, otherwise a start-skip + end-update lands on a
+        # non-existent row (404) — or the reverse double-creates. Re-reading the
+        # env per event would let a mid-span toggle (tests, config reload) split
+        # the decision. Deploy-time flag, so a single read is correct.
+        self._skip_span_start = _skip_span_start_enabled()
         logger.info(
             "Agentex tracing span-start write %s (%s)",
-            "disabled — end-only ingest" if _skip_span_start_enabled() else "enabled",
+            "disabled — end-only ingest" if self._skip_span_start else "enabled",
             _SKIP_SPAN_START_ENV,
         )
 
@@ -80,7 +86,7 @@ class AgentexSyncTracingProcessor(SyncTracingProcessor):
     def on_span_start(self, span: Span) -> None:
         # End-only ingest: by default the start write is skipped (see
         # _skip_span_start_enabled) so each span is persisted once, on end.
-        if _skip_span_start_enabled():
+        if self._skip_span_start:
             return
         self.client.spans.create(**_create_kwargs(span))
 
@@ -88,7 +94,7 @@ class AgentexSyncTracingProcessor(SyncTracingProcessor):
     def on_span_end(self, span: Span) -> None:
         # End-only ingest: the start create was skipped, so persist the complete
         # span as a single INSERT here (a bare spans.update would 404 — no row).
-        if _skip_span_start_enabled():
+        if self._skip_span_start:
             self.client.spans.create(**_create_kwargs(span))
             return
 
@@ -138,9 +144,15 @@ class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
         self._clients_by_loop: weakref.WeakKeyDictionary[
             asyncio.AbstractEventLoop, "AsyncAgentex"
         ] = weakref.WeakKeyDictionary()
+        # Capture the skip decision once at init: both halves of a span's
+        # lifecycle MUST agree, otherwise a start-skip + end-update lands on a
+        # non-existent row (404) — or the reverse double-creates. Re-reading the
+        # env per event would let a mid-span toggle (tests, config reload) split
+        # the decision. Deploy-time flag, so a single read is correct.
+        self._skip_span_start = _skip_span_start_enabled()
         logger.info(
             "Agentex tracing span-start write %s (%s)",
-            "disabled — end-only ingest" if _skip_span_start_enabled() else "enabled",
+            "disabled — end-only ingest" if self._skip_span_start else "enabled",
             _SKIP_SPAN_START_ENV,
         )
 
@@ -174,7 +186,7 @@ class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
     async def on_span_start(self, span: Span) -> None:
         # End-only ingest: by default the start write is skipped (see
         # _skip_span_start_enabled) so each span is persisted once, on end.
-        if _skip_span_start_enabled():
+        if self._skip_span_start:
             return
         await self.client.spans.create(**_create_kwargs(span))
 
@@ -182,7 +194,7 @@ class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
     async def on_span_end(self, span: Span) -> None:
         # End-only ingest: the start create was skipped, so persist the complete
         # span as a single INSERT here (a bare spans.update would 404 — no row).
-        if _skip_span_start_enabled():
+        if self._skip_span_start:
             await self.client.spans.create(**_create_kwargs(span))
             return
 
