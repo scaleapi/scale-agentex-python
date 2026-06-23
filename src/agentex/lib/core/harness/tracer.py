@@ -24,7 +24,7 @@ class SpanTracer:
 
     The real TracingModule.end_span does NOT accept an output kwarg — output is
     recorded by mutating span.output before calling end_span, matching the pattern
-    used throughout the codebase (see _langgraph_tracing.py on_tool_end etc.).
+    used throughout the codebase.
 
     Span-lifecycle contract: the `_open` dict (span key -> span object) is scoped
     to a single turn. Pairing is by `key`:
