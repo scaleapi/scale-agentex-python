@@ -20,6 +20,10 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/**
 
+# Install the codex CLI: the activity shells out to `codex` on every turn, so
+# the binary must be present in the runtime image.
+RUN npm install -g @openai/codex
+
 # Install tctl (Temporal CLI)
 RUN ARCH="$(uname -m)" && \
     case "$ARCH" in x86_64) TCTL_ARCH=amd64 ;; aarch64|arm64) TCTL_ARCH=arm64 ;; *) TCTL_ARCH=amd64 ;; esac && \
