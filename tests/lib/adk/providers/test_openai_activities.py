@@ -653,7 +653,7 @@ class TestOpenAIActivities:
 
     @patch("agents.Runner.run_streamed")
     async def test_run_agent_streamed_auto_send_forwards_created_at(self, mock_runner_run_streamed):
-        """created_at is forwarded to every streaming context opened by auto_send_turn (AGX1-378)."""
+        """created_at is forwarded to every streaming context opened by auto_send_turn."""
         from datetime import datetime, timezone
 
         from agentex.lib.core.temporal.activities.adk.providers.openai_activities import (

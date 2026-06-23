@@ -13,6 +13,8 @@ from agentex.lib.adk._modules._langgraph_sync import (
 )
 from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn, stream_pydantic_ai_events
 from agentex.lib.adk._modules._pydantic_ai_sync import convert_pydantic_ai_to_agentex_events
+from agentex.lib.adk._modules._openai_sync import convert_openai_to_agentex_events
+from agentex.lib.adk._modules._openai_turn import OpenAITurn, openai_usage_to_turn_usage
 from agentex.lib.adk._modules._claude_code_sync import convert_claude_code_to_agentex_events
 from agentex.lib.adk._modules._claude_code_turn import (
     ClaudeCodeTurn,
@@ -74,6 +76,10 @@ __all__ = [
     "stream_pydantic_ai_events",
     "convert_pydantic_ai_to_agentex_events",
     "PydanticAITurn",
+    # OpenAI Agents
+    "convert_openai_to_agentex_events",
+    "OpenAITurn",
+    "openai_usage_to_turn_usage",
     # Claude Code
     "convert_claude_code_to_agentex_events",
     "ClaudeCodeTurn",
