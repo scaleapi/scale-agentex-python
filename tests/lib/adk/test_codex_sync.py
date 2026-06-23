@@ -35,6 +35,7 @@ from agentex.lib.adk._modules._codex_sync import (
     convert_codex_to_agentex_events,
 )
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
+from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 
 
 async def _aiter(items: list[Any]) -> AsyncIterator[Any]:
@@ -365,7 +366,15 @@ class TestToolCallStreaming:
 
 
 class TestReasoningStreaming:
-    async def test_reasoning_start_full(self) -> None:
+    async def test_reasoning_start_deltas_done(self) -> None:
+        """A reasoning block opens with a Start, streams the final text as
+        summary + content deltas, and closes with a Done.
+
+        It must NOT emit a Full at the open Start's index: auto_send routes a
+        Full into a throwaway streaming context (ignoring the index), which
+        would leave the Start context dangling and persist a duplicate, empty
+        reasoning message (AGX1 codex reasoning duplicate bug).
+        """
         events = [
             {"type": "item.started", "item": {"id": "r1", "type": "reasoning", "text": ""}},
             {
@@ -380,31 +389,34 @@ class TestReasoningStreaming:
         out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
 
         starts = [e for e in out if isinstance(e, StreamTaskMessageStart)]
-        fulls = [e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ReasoningContent)]
+        dones = [e for e in out if isinstance(e, StreamTaskMessageDone)]
+        reasoning_fulls = [
+            e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ReasoningContent)
+        ]
+        content_deltas = [
+            e for e in out if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ReasoningContentDelta)
+        ]
+        summary_deltas = [
+            e for e in out if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ReasoningSummaryDelta)
+        ]
 
+        # Exactly one message: Start + deltas + Done, all on the same index, no Full.
         assert len(starts) == 1
         assert isinstance(starts[0].content, ReasoningContent)
-        assert len(fulls) == 1
-        assert isinstance(fulls[0].content, ReasoningContent)
-        reasoning_content = fulls[0].content.content
-        assert reasoning_content is not None
-        assert any("thinking... done" in s for s in reasoning_content)
+        assert reasoning_fulls == []
+        assert len(content_deltas) == 1
+        assert content_deltas[0].delta.content_delta == "thinking... done"
+        assert len(summary_deltas) == 1
+        assert summary_deltas[0].delta.summary_delta == "thinking... done"
+        assert len(dones) == 1
+        idx = starts[0].index
+        assert content_deltas[0].index == idx
+        assert summary_deltas[0].index == idx
+        assert dones[0].index == idx
 
-    async def test_reasoning_initial_text_emits_delta(self) -> None:
-        events = [
-            {
-                "type": "item.started",
-                "item": {"id": "r1", "type": "reasoning", "text": "seed"},
-            },
-        ]
-        out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
-        deltas = [e for e in out if isinstance(e, StreamTaskMessageDelta)]
-        assert len(deltas) == 1
-        assert isinstance(deltas[0].delta, ReasoningContentDelta)
-        assert deltas[0].delta.content_delta == "seed"
-
-    async def test_reasoning_no_started_emits_standalone_full(self) -> None:
-        """If item.completed arrives without item.started, emit a standalone Full."""
+    async def test_reasoning_no_started_opens_and_closes_one_message(self) -> None:
+        """If item.completed arrives without item.started, the converter opens a
+        Start lazily and closes it with a Done (still one clean message, no Full)."""
         events = [
             {
                 "type": "item.completed",
@@ -412,12 +424,23 @@ class TestReasoningStreaming:
             }
         ]
         out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
-        fulls = [e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ReasoningContent)]
-        assert len(fulls) == 1
-        assert isinstance(fulls[0].content, ReasoningContent)
-        orphan_content = fulls[0].content.content
-        assert orphan_content is not None
-        assert any("orphan thought" in s for s in orphan_content)
+
+        starts = [e for e in out if isinstance(e, StreamTaskMessageStart)]
+        dones = [e for e in out if isinstance(e, StreamTaskMessageDone)]
+        reasoning_fulls = [
+            e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ReasoningContent)
+        ]
+        content_deltas = [
+            e for e in out if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ReasoningContentDelta)
+        ]
+
+        assert len(starts) == 1
+        assert isinstance(starts[0].content, ReasoningContent)
+        assert reasoning_fulls == []
+        assert len(content_deltas) == 1
+        assert content_deltas[0].delta.content_delta == "orphan thought"
+        assert len(dones) == 1
+        assert dones[0].index == starts[0].index
 
     async def test_reasoning_summary_is_first_line(self) -> None:
         events = [
@@ -428,9 +451,27 @@ class TestReasoningStreaming:
             },
         ]
         out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
-        full = next(e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ReasoningContent))
-        assert isinstance(full.content, ReasoningContent)
-        assert full.content.summary == ["line one"]
+        summary_delta = next(
+            e for e in out if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ReasoningSummaryDelta)
+        )
+        assert summary_delta.delta.summary_delta == "line one"
+
+    async def test_reasoning_empty_block_closes_with_done_only(self) -> None:
+        """A reasoning block that completes with no text still closes its Start."""
+        events = [
+            {"type": "item.started", "item": {"id": "r3", "type": "reasoning", "text": ""}},
+            {"type": "item.completed", "item": {"id": "r3", "type": "reasoning", "text": ""}},
+        ]
+        out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
+
+        starts = [e for e in out if isinstance(e, StreamTaskMessageStart)]
+        dones = [e for e in out if isinstance(e, StreamTaskMessageDone)]
+        deltas = [e for e in out if isinstance(e, StreamTaskMessageDelta)]
+
+        assert len(starts) == 1
+        assert deltas == []
+        assert len(dones) == 1
+        assert dones[0].index == starts[0].index
 
 
 # ---------------------------------------------------------------------------

@@ -48,7 +48,9 @@ Item sub-types (item.started / item.updated / item.completed)
   reasoning               -> reasoning:
                                item.started                 -> StreamTaskMessageStart(ReasoningContent)
                                item.updated                 -> (no-op; final text arrives on completed)
-                               item.completed               -> StreamTaskMessageFull(ReasoningContent)
+                               item.completed               -> StreamTaskMessageDelta(ReasoningSummaryDelta)
+                                                              + StreamTaskMessageDelta(ReasoningContentDelta)
+                                                              + StreamTaskMessageDone
   command_execution       -> tool request + response:
                                item.started                 -> StreamTaskMessageStart(ToolRequestContent)
                                                               + StreamTaskMessageDone
@@ -96,6 +98,7 @@ from agentex.types.task_message_content import TextContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
+from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 
 logger = make_logger(__name__)
 
@@ -366,18 +369,6 @@ class _CodexStreamProcessor:
                         ),
                     )
                 )
-                if current:
-                    out.append(
-                        StreamTaskMessageDelta(
-                            type="delta",
-                            index=idx,
-                            delta=ReasoningContentDelta(
-                                type="reasoning_content",
-                                content_index=0,
-                                content_delta=current,
-                            ),
-                        )
-                    )
 
             elif evt_type == "item.updated":
                 # Accumulate silently; final text arrives on item.completed.
@@ -389,30 +380,53 @@ class _CodexStreamProcessor:
                 if text:
                     self.reasoning_count += 1
                     summary = text.strip().split("\n", 1)[0][:300]
-                    final_content = ReasoningContent(
-                        type="reasoning",
-                        author="agent",
-                        summary=[summary],
-                        content=[text],
-                        style="static",
-                    )
-                    if idx is not None:
+                    if idx is None:
+                        # No started event was seen; open the message now.
+                        idx = self._alloc()
                         out.append(
-                            StreamTaskMessageFull(
-                                type="full",
+                            StreamTaskMessageStart(
+                                type="start",
                                 index=idx,
-                                content=final_content,
+                                content=ReasoningContent(
+                                    type="reasoning",
+                                    author="agent",
+                                    summary=[],
+                                    content=[],
+                                    style="active",
+                                ),
                             )
                         )
-                    else:
-                        # No started event was seen; emit a standalone Full.
-                        out.append(
-                            StreamTaskMessageFull(
-                                type="full",
-                                index=self._alloc(),
-                                content=final_content,
-                            )
+                    # Deliver the reasoning as deltas, then close with a Done.
+                    # Emitting a Full here instead would leave the open Start
+                    # context dangling: auto_send routes Full into its own
+                    # throwaway streaming context (ignoring the index), so the
+                    # Start context survives until end-of-turn teardown and
+                    # persists a second, near-empty reasoning message. Streaming
+                    # the content as deltas lets the open context accumulate the
+                    # final ReasoningContent and close cleanly as one message.
+                    out.append(
+                        StreamTaskMessageDelta(
+                            type="delta",
+                            index=idx,
+                            delta=ReasoningSummaryDelta(
+                                type="reasoning_summary",
+                                summary_index=0,
+                                summary_delta=summary,
+                            ),
                         )
+                    )
+                    out.append(
+                        StreamTaskMessageDelta(
+                            type="delta",
+                            index=idx,
+                            delta=ReasoningContentDelta(
+                                type="reasoning_content",
+                                content_index=0,
+                                content_delta=text,
+                            ),
+                        )
+                    )
+                    out.append(StreamTaskMessageDone(type="done", index=idx))
                 elif idx is not None:
                     # Empty reasoning block — still need to close with a Done.
                     out.append(StreamTaskMessageDone(type="done", index=idx))
