@@ -49,6 +49,8 @@ from agentex.types.task_message_update import (
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 
+from ._fakes import FakeTracing
+
 # ---------------------------------------------------------------------------
 # Minimal agent under test
 # ---------------------------------------------------------------------------
@@ -75,39 +77,6 @@ def _make_agent() -> Agent:
 
 
 # ---------------------------------------------------------------------------
-# Fake tracing backend (no network calls)
-# ---------------------------------------------------------------------------
-
-
-class _FakeSpan:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.output: Any = None
-
-
-class _FakeTracing:
-    def __init__(self) -> None:
-        self.started: list[tuple[str, str | None]] = []
-        self.ended: list[tuple[str, Any]] = []
-
-    async def start_span(
-        self,
-        *,
-        trace_id: str,
-        name: str,
-        input: Any = None,
-        parent_id: Any = None,
-        data: Any = None,
-        task_id: Any = None,
-    ) -> _FakeSpan:
-        self.started.append((name, parent_id))
-        return _FakeSpan(name)
-
-    async def end_span(self, *, trace_id: str, span: _FakeSpan) -> None:
-        self.ended.append((span.name, span.output))
-
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -117,7 +86,7 @@ async def _run_yield_turn(
     user_msg: str = "What is the weather in Paris?",
     trace_id: str | None = None,
     parent_span_id: str | None = None,
-    fake_tracing: _FakeTracing | None = None,
+    fake_tracing: FakeTracing | None = None,
 ) -> list[Any]:
     """Drive the sync (yield) path and collect all yielded events."""
     tracer: SpanTracer | bool | None = None
@@ -245,7 +214,7 @@ class TestSyncYieldSpanDerivation:
     async def test_tool_span_opened_and_closed(self) -> None:
         """One tool span is opened and closed per tool call."""
         agent = _make_agent()
-        fake_tracing = _FakeTracing()
+        fake_tracing = FakeTracing()
         tracer = SpanTracer(
             trace_id="trace1",
             parent_span_id="parent-span",
@@ -266,14 +235,14 @@ class TestSyncYieldSpanDerivation:
 
         assert len(fake_tracing.started) == 1, "Expected exactly one tool span opened"
         assert len(fake_tracing.ended) == 1, "Expected exactly one tool span closed"
-        span_name, parent_id = fake_tracing.started[0]
+        span_name, parent_id, _ = fake_tracing.started[0]
         assert span_name == "get_weather"
         assert parent_id == "parent-span"
 
     async def test_tool_span_output_is_tool_result(self) -> None:
         """The closed tool span's output equals the tool's return value."""
         agent = _make_agent()
-        fake_tracing = _FakeTracing()
+        fake_tracing = FakeTracing()
         tracer = SpanTracer(
             trace_id="trace1",
             parent_span_id="parent-span",
@@ -299,7 +268,7 @@ class TestSyncYieldSpanDerivation:
     async def test_no_trace_id_means_no_spans(self) -> None:
         """With trace_id=None, no spans are derived (emitter disables tracing)."""
         agent = _make_agent()
-        fake_tracing = _FakeTracing()
+        fake_tracing = FakeTracing()
 
         async with agent.run_stream_events("What is the weather in Paris?") as stream:
             turn = PydanticAITurn(stream, model="test")
@@ -317,7 +286,7 @@ class TestSyncYieldSpanDerivation:
     async def test_tracer_false_suppresses_spans(self) -> None:
         """tracer=False disables span derivation regardless of trace_id."""
         agent = _make_agent()
-        fake_tracing = _FakeTracing()
+        fake_tracing = FakeTracing()
 
         async with agent.run_stream_events("What is the weather in Paris?") as stream:
             turn = PydanticAITurn(stream, model="test")
@@ -345,7 +314,7 @@ class TestSyncYieldSpanDerivation:
                 received_signals.append(signal)
                 await super().handle(signal)
 
-        fake_tracing = _FakeTracing()
+        fake_tracing = FakeTracing()
         tracer = _RecordingTracer(
             trace_id="trace1",
             parent_span_id="parent",
