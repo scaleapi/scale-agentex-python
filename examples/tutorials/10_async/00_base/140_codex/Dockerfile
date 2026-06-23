@@ -15,8 +15,14 @@ RUN apt-get update && apt-get install -y \
     gcc \
     cmake \
     netcat-openbsd \
+    nodejs \
+    npm \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install the codex CLI: the agent spawns `codex exec --json`, so the binary
+# must be present on PATH in the image.
+RUN npm install -g @openai/codex
 
 RUN uv pip install --system --upgrade pip setuptools wheel
 
