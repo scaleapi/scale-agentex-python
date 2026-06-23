@@ -29,6 +29,7 @@ class TemplateType(str, Enum):
     DEFAULT = "default"
     DEFAULT_LANGGRAPH = "default-langgraph"
     DEFAULT_PYDANTIC_AI = "default-pydantic-ai"
+    DEFAULT_OPENAI_AGENTS = "default-openai-agents"
     SYNC = "sync"
     SYNC_OPENAI_AGENTS = "sync-openai-agents"
     SYNC_OPENAI_AGENTS_LOCAL_SANDBOX = "sync-openai-agents-local-sandbox"
@@ -69,6 +70,7 @@ def create_project_structure(
         TemplateType.DEFAULT: ["acp.py"],
         TemplateType.DEFAULT_LANGGRAPH: ["acp.py", "graph.py", "tools.py"],
         TemplateType.DEFAULT_PYDANTIC_AI: ["acp.py", "agent.py", "tools.py"],
+        TemplateType.DEFAULT_OPENAI_AGENTS: ["acp.py"],
         TemplateType.SYNC: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS_LOCAL_SANDBOX: ["acp.py", "agent.py", "tools.py"],
@@ -184,6 +186,7 @@ def init():
             "Which Async template would you like to use?",
             choices=[
                 {"name": "Basic Async ACP", "value": TemplateType.DEFAULT},
+                {"name": "Async ACP + OpenAI Agents SDK", "value": TemplateType.DEFAULT_OPENAI_AGENTS},
                 {"name": "Async ACP + LangGraph", "value": TemplateType.DEFAULT_LANGGRAPH},
                 {"name": "Async ACP + Pydantic AI", "value": TemplateType.DEFAULT_PYDANTIC_AI},
             ],
