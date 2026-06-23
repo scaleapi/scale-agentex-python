@@ -134,9 +134,15 @@ async def run_codex_turn(params: RunCodexTurnParams) -> dict[str, Any]:
         trace_id=params.trace_id,
         parent_span_id=params.parent_span_id,
     )
-    result = await emitter.auto_send_turn(turn, created_at=params.created_at)
-
-    await process.wait()
+    # Guarantee the subprocess is reaped even if auto_send_turn raises;
+    # otherwise codex stays blocked writing to a full stdout pipe buffer and the
+    # OS process leaks until the worker restarts.
+    try:
+        result = await emitter.auto_send_turn(turn, created_at=params.created_at)
+    finally:
+        if process.returncode is None:
+            process.kill()
+        await process.wait()
 
     return RunCodexTurnResult(
         final_text=result.final_text,

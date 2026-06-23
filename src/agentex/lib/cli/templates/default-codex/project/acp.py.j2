@@ -192,9 +192,15 @@ async def handle_task_event_send(params: SendEventParams):
             parent_span_id=turn_span.id if turn_span else None,
         )
 
-        result = await emitter.auto_send_turn(turn)
-
-        await process.wait()
+        # Guarantee the subprocess is reaped even if auto_send_turn raises
+        # (e.g. a Redis error); otherwise codex stays blocked writing to a full
+        # stdout pipe buffer and the OS process leaks until the server restarts.
+        try:
+            result = await emitter.auto_send_turn(turn)
+        finally:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
 
         # Record the real wall-clock duration AFTER streaming completes; setting
         # it before the stream ran would capture only subprocess spawn overhead.

@@ -156,10 +156,16 @@ async def handle_message_send(
             parent_span_id=turn_span.id if turn_span else None,
         )
 
-        async for event in emitter.yield_turn(turn):
-            yield event
-
-        await process.wait()
+        # Guarantee the subprocess is reaped even if the generator is abandoned
+        # (client disconnect / GC) or yield_turn raises; otherwise codex stays
+        # blocked writing to a full stdout pipe buffer and the process leaks.
+        try:
+            async for event in emitter.yield_turn(turn):
+                yield event
+        finally:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
 
         # Record the real wall-clock duration AFTER streaming completes; setting
         # it before the stream ran would capture only subprocess spawn overhead.
