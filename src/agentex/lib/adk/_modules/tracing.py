@@ -6,7 +6,9 @@ from contextlib import asynccontextmanager
 from datetime import timedelta
 from typing import Any
 
+from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError, TimeoutError as TemporalTimeoutError, is_cancelled_exception
 
 from agentex import AsyncAgentex  # noqa: F401
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
@@ -26,6 +28,18 @@ from agentex.lib.utils.temporal import in_temporal_workflow
 logger = make_logger(__name__)
 
 DEFAULT_RETRY_POLICY = RetryPolicy(maximum_attempts=1)
+TEMPORAL_SPAN_ACTIVITY_DROPPED_METRIC = "agentex.tracing.temporal_span_activity.dropped"
+
+
+def _record_temporal_span_activity_dropped(event_type: str) -> None:
+    try:
+        workflow.metric_meter().create_counter(
+            TEMPORAL_SPAN_ACTIVITY_DROPPED_METRIC,
+            description="Temporal tracing span activities dropped after fail-open",
+            unit="1",
+        ).add(1, {"event_type": event_type})
+    except Exception:
+        pass
 
 
 class TracingModule:
@@ -180,14 +194,26 @@ class TracingModule:
             task_id=task_id,
         )
         if in_temporal_workflow():
-            return await ActivityHelpers.execute_activity(
-                activity_name=TracingActivityName.START_SPAN,
-                request=params,
-                response_type=Span,
-                start_to_close_timeout=start_to_close_timeout,
-                retry_policy=retry_policy,
-                heartbeat_timeout=heartbeat_timeout,
-            )
+            try:
+                return await ActivityHelpers.execute_activity(
+                    activity_name=TracingActivityName.START_SPAN,
+                    request=params,
+                    response_type=Span,
+                    start_to_close_timeout=start_to_close_timeout,
+                    retry_policy=retry_policy,
+                    heartbeat_timeout=heartbeat_timeout,
+                )
+            except (ActivityError, TemporalTimeoutError) as err:
+                if is_cancelled_exception(err):
+                    raise
+                workflow.logger.warning(
+                    "Failed to start tracing span %r for trace_id=%r; continuing without tracing",
+                    name,
+                    trace_id,
+                    exc_info=True,
+                )
+                _record_temporal_span_activity_dropped("start")
+                return None
         else:
             return await self._tracing_service.start_span(
                 trace_id=trace_id,
@@ -224,14 +250,26 @@ class TracingModule:
             span=span,
         )
         if in_temporal_workflow():
-            return await ActivityHelpers.execute_activity(
-                activity_name=TracingActivityName.END_SPAN,
-                request=params,
-                response_type=Span,
-                start_to_close_timeout=start_to_close_timeout,
-                retry_policy=retry_policy,
-                heartbeat_timeout=heartbeat_timeout,
-            )
+            try:
+                return await ActivityHelpers.execute_activity(
+                    activity_name=TracingActivityName.END_SPAN,
+                    request=params,
+                    response_type=Span,
+                    start_to_close_timeout=start_to_close_timeout,
+                    retry_policy=retry_policy,
+                    heartbeat_timeout=heartbeat_timeout,
+                )
+            except (ActivityError, TemporalTimeoutError) as err:
+                if is_cancelled_exception(err):
+                    raise
+                workflow.logger.warning(
+                    "Failed to end tracing span %r for trace_id=%r; continuing without closing trace",
+                    span.id,
+                    trace_id,
+                    exc_info=True,
+                )
+                _record_temporal_span_activity_dropped("end")
+                return span
         else:
             return await self._tracing_service.end_span(
                 trace_id=trace_id,
