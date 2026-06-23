@@ -32,6 +32,7 @@ from openai.types.responses.response_reasoning_summary_text_done_event import Re
 from agentex import AsyncAgentex
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import (
     StreamTaskMessageDone,
@@ -560,14 +561,20 @@ async def convert_openai_to_agentex_events(stream_response):
                         item_id_to_index[item_id] = message_index
                         item_id_to_type[item_id] = "reasoning_summary"
 
-                        # Send a start event for this new reasoning summary message
+                        # Send a start event for this new reasoning summary message.
+                        # The start content must be ReasoningContent (not TextContent)
+                        # so consumers that branch on the start event's content type
+                        # render a reasoning/thinking indicator; the final persisted
+                        # content is rebuilt from the reasoning deltas regardless.
                         yield StreamTaskMessageStart(
                             type="start",
                             index=item_id_to_index[item_id],
-                            content=TextContent(
-                                type="text",
+                            content=ReasoningContent(
+                                type="reasoning",
                                 author="agent",
-                                content="",  # Start with empty content
+                                summary=[],
+                                content=[],
+                                style="active",
                             ),
                         )
 
@@ -604,14 +611,20 @@ async def convert_openai_to_agentex_events(stream_response):
                         item_id_to_index[item_id] = message_index
                         item_id_to_type[item_id] = "reasoning_content"
 
-                        # Send a start event for this new reasoning content message
+                        # Send a start event for this new reasoning content message.
+                        # The start content must be ReasoningContent (not TextContent)
+                        # so consumers that branch on the start event's content type
+                        # render a reasoning/thinking indicator; the final persisted
+                        # content is rebuilt from the reasoning deltas regardless.
                         yield StreamTaskMessageStart(
                             type="start",
                             index=item_id_to_index[item_id],
-                            content=TextContent(
-                                type="text",
+                            content=ReasoningContent(
+                                type="reasoning",
                                 author="agent",
-                                content="",  # Start with empty content
+                                summary=[],
+                                content=[],
+                                style="active",
                             ),
                         )
 
