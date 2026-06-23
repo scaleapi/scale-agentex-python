@@ -35,12 +35,24 @@ from ._base_client import (
 )
 
 if TYPE_CHECKING:
-    from .resources import spans, tasks, agents, events, states, tracker, messages, checkpoints, deployment_history
+    from .resources import (
+        spans,
+        tasks,
+        agents,
+        events,
+        states,
+        tracker,
+        messages,
+        webhooks,
+        checkpoints,
+        deployment_history,
+    )
     from .resources.spans import SpansResource, AsyncSpansResource
     from .resources.tasks import TasksResource, AsyncTasksResource
     from .resources.events import EventsResource, AsyncEventsResource
     from .resources.states import StatesResource, AsyncStatesResource
     from .resources.tracker import TrackerResource, AsyncTrackerResource
+    from .resources.webhooks import WebhooksResource, AsyncWebhooksResource
     from .resources.checkpoints import CheckpointsResource, AsyncCheckpointsResource
     from .resources.agents.agents import AgentsResource, AsyncAgentsResource
     from .resources.messages.messages import MessagesResource, AsyncMessagesResource
@@ -201,6 +213,12 @@ class Agentex(SyncAPIClient):
         from .resources.checkpoints import CheckpointsResource
 
         return CheckpointsResource(self)
+
+    @cached_property
+    def webhooks(self) -> WebhooksResource:
+        from .resources.webhooks import WebhooksResource
+
+        return WebhooksResource(self)
 
     @cached_property
     def with_raw_response(self) -> AgentexWithRawResponse:
@@ -458,6 +476,12 @@ class AsyncAgentex(AsyncAPIClient):
         return AsyncCheckpointsResource(self)
 
     @cached_property
+    def webhooks(self) -> AsyncWebhooksResource:
+        from .resources.webhooks import AsyncWebhooksResource
+
+        return AsyncWebhooksResource(self)
+
+    @cached_property
     def with_raw_response(self) -> AsyncAgentexWithRawResponse:
         return AsyncAgentexWithRawResponse(self)
 
@@ -634,6 +658,12 @@ class AgentexWithRawResponse:
 
         return CheckpointsResourceWithRawResponse(self._client.checkpoints)
 
+    @cached_property
+    def webhooks(self) -> webhooks.WebhooksResourceWithRawResponse:
+        from .resources.webhooks import WebhooksResourceWithRawResponse
+
+        return WebhooksResourceWithRawResponse(self._client.webhooks)
+
 
 class AsyncAgentexWithRawResponse:
     _client: AsyncAgentex
@@ -694,6 +724,12 @@ class AsyncAgentexWithRawResponse:
         from .resources.checkpoints import AsyncCheckpointsResourceWithRawResponse
 
         return AsyncCheckpointsResourceWithRawResponse(self._client.checkpoints)
+
+    @cached_property
+    def webhooks(self) -> webhooks.AsyncWebhooksResourceWithRawResponse:
+        from .resources.webhooks import AsyncWebhooksResourceWithRawResponse
+
+        return AsyncWebhooksResourceWithRawResponse(self._client.webhooks)
 
 
 class AgentexWithStreamedResponse:
@@ -756,6 +792,12 @@ class AgentexWithStreamedResponse:
 
         return CheckpointsResourceWithStreamingResponse(self._client.checkpoints)
 
+    @cached_property
+    def webhooks(self) -> webhooks.WebhooksResourceWithStreamingResponse:
+        from .resources.webhooks import WebhooksResourceWithStreamingResponse
+
+        return WebhooksResourceWithStreamingResponse(self._client.webhooks)
+
 
 class AsyncAgentexWithStreamedResponse:
     _client: AsyncAgentex
@@ -816,6 +858,12 @@ class AsyncAgentexWithStreamedResponse:
         from .resources.checkpoints import AsyncCheckpointsResourceWithStreamingResponse
 
         return AsyncCheckpointsResourceWithStreamingResponse(self._client.checkpoints)
+
+    @cached_property
+    def webhooks(self) -> webhooks.AsyncWebhooksResourceWithStreamingResponse:
+        from .resources.webhooks import AsyncWebhooksResourceWithStreamingResponse
+
+        return AsyncWebhooksResourceWithStreamingResponse(self._client.webhooks)
 
 
 Client = Agentex
