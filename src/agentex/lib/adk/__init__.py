@@ -27,6 +27,19 @@ from agentex.lib.adk._modules.streaming import StreamingModule
 from agentex.lib.adk._modules.tasks import TasksModule
 from agentex.lib.adk._modules.tracing import TracingModule
 
+# Unified harness surface (AGX1-375)
+from agentex.lib.core.harness import (
+    UnifiedEmitter,
+    SpanTracer,
+    OpenSpan,
+    CloseSpan,
+    SpanSignal,
+    StreamTaskMessage,
+    TurnUsage,
+    TurnResult,
+    HarnessTurn,
+)
+
 from agentex.lib.adk import providers
 from agentex.lib.adk import utils
 
@@ -69,6 +82,16 @@ __all__ = [
     "convert_codex_to_agentex_events",
     "CodexTurn",
     "codex_usage_to_turn_usage",
+    # Unified harness surface (AGX1-375)
+    "UnifiedEmitter",
+    "SpanTracer",
+    "OpenSpan",
+    "CloseSpan",
+    "SpanSignal",
+    "StreamTaskMessage",
+    "TurnUsage",
+    "TurnResult",
+    "HarnessTurn",
     # Providers
     "providers",
     # Utils
