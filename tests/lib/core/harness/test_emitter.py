@@ -11,13 +11,7 @@ from agentex.types.task_message_update import (
     StreamTaskMessageStart,
 )
 
-
-class _FakeTracing:
-    async def start_span(self, **kw):
-        return None
-
-    async def end_span(self, **kw):
-        pass
+from ._fakes import FakeTracing
 
 
 class _FakeCtx:
@@ -84,7 +78,7 @@ async def test_emitter_yield_mode_passes_through():
 async def test_emitter_tracing_default_on_when_trace_id_present():
     # Inject a fake tracing backend so the test env doesn't need temporalio.
     # This exercises the default-on path (tracer=None) when trace_id is truthy.
-    emitter = UnifiedEmitter(task_id="t", trace_id="trace1", parent_span_id="p", tracing=_FakeTracing())
+    emitter = UnifiedEmitter(task_id="t", trace_id="trace1", parent_span_id="p", tracing=FakeTracing())
     assert emitter.tracer is not None
 
 

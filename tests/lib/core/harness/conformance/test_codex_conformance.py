@@ -11,7 +11,6 @@ them, to guarantee determinism regardless of pytest collection order.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, AsyncIterator
 
 import pytest
@@ -19,7 +18,7 @@ import pytest
 from agentex.lib.core.harness.types import StreamTaskMessage
 from agentex.lib.adk._modules._codex_sync import convert_codex_to_agentex_events
 
-from .runner import Fixture, register, derive_all
+from .runner import Fixture, register, run_pure_async
 
 
 async def _aiter(items: list[Any]) -> AsyncIterator[Any]:
@@ -32,7 +31,9 @@ async def _collect(events: list[Any]) -> list[StreamTaskMessage]:
 
 
 def _build(events: list[Any]) -> list[StreamTaskMessage]:
-    return asyncio.run(_collect(events))
+    # Loop-free driver: this runs at import time, where asyncio.run() would raise
+    # under an already-running loop (programmatic pytest, notebooks).
+    return run_pure_async(_collect(events))
 
 
 # ---------------------------------------------------------------------------
@@ -206,17 +207,6 @@ register(_CODEX_MULTI)
 # ---------------------------------------------------------------------------
 
 _LOCAL_FIXTURES = [_CODEX_TEXT, _CODEX_TOOL, _CODEX_REASONING, _CODEX_MULTI]
-
-
-@pytest.mark.parametrize("fixture", _LOCAL_FIXTURES, ids=lambda f: f.name)
-def test_codex_span_derivation_is_deterministic(fixture: Fixture) -> None:
-    """Span derivation over codex events is deterministic (cross-channel guarantee).
-
-    Deriving twice over the same events yields identical signals. This is the
-    invariant that makes ``yield`` and ``auto_send`` delivery equivalent: both
-    observe the same event stream, so their tracing side effects are identical.
-    """
-    assert derive_all(fixture.events) == derive_all(fixture.events)
 
 
 @pytest.mark.parametrize("fixture", _LOCAL_FIXTURES, ids=lambda f: f.name)

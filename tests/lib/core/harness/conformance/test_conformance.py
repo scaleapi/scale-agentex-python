@@ -24,11 +24,9 @@ Raw wire-level event shapes are NOT compared (that would fail by design: the
 Full vs Start+Done envelope difference is a documented, acceptable choice in
 auto_send — see runner.py for the rationale).
 
-AGX1-377 fix: auto_send now delivers streamed tool-request messages. The
-suppression that previously prevented the yield normaliser from emitting a
-LogicalDelivery for Start(tool_request)+Done is removed. Both channels now
-produce a delivery for streamed tool_request, verified by the
-"streamed-tool-request" fixture.
+auto_send delivers streamed tool-request messages: both channels produce a
+delivery for streamed tool_request, verified by the "streamed-tool-request"
+fixture.
 """
 
 from __future__ import annotations
@@ -134,9 +132,8 @@ _FIXTURES: list[Fixture] = [
             StreamTaskMessageDone(type="done", index=0),
         ],
     ),
-    # fixture 4: streamed tool_request (AGX1-377 fix) — tool_request delivered
-    # via Start+Done (no Full). auto_send now delivers this instead of dropping
-    # it. Both channels must produce a LogicalDelivery for this fixture.
+    # fixture 4: streamed tool_request — tool_request delivered via Start+Done
+    # (no Full). Both channels must produce a LogicalDelivery for this fixture.
     Fixture(
         name="streamed-tool-request",
         events=[
@@ -275,11 +272,28 @@ async def test_cross_channel_equivalence(fixture: Fixture) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("fixture", all_fixtures(), ids=lambda f: f.name)
-def test_span_derivation_is_deterministic(fixture: Fixture) -> None:
-    """Span derivation over the same event list is idempotent.
+def test_span_derivation_is_deterministic() -> None:
+    """Span derivation over the same event list is idempotent, for EVERY
+    registered fixture across all harnesses.
+
+    ``all_fixtures()`` is read at run time (not at collection/parametrize time)
+    so it sees fixtures registered by every conformance module, regardless of
+    import/collection order. The per-harness conformance modules are imported
+    eagerly via ``conftest.py`` in this directory, so this test covers the full
+    cross-harness fixture set even when run in isolation. (Parametrizing on
+    ``all_fixtures()`` at import time would freeze the set to whatever happened
+    to be registered before this module was collected.)
 
     Retained as a lightweight regression guard. The primary cross-channel
     guarantee is asserted in test_cross_channel_equivalence above.
     """
-    assert derive_all(fixture.events) == derive_all(fixture.events)
+    fixtures = all_fixtures()
+    assert len(fixtures) > len(_FIXTURES), (
+        "expected per-harness fixtures to be registered in addition to the "
+        f"{len(_FIXTURES)} generic ones; got {len(fixtures)} total — a conformance "
+        "module's fixtures are not being registered (check conftest imports)"
+    )
+    for fixture in fixtures:
+        assert derive_all(fixture.events) == derive_all(fixture.events), (
+            f"[{fixture.name}] span derivation is not deterministic"
+        )

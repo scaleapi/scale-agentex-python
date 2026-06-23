@@ -9,7 +9,6 @@ The fake mirrors the real StreamingTaskMessageContext API exactly:
 This mirrors _langgraph_async.py lines 62-78 and 100-127.
 """
 
-import types as _types
 from datetime import datetime
 
 import pytest
@@ -28,6 +27,8 @@ from agentex.types.task_message_update import (
 from agentex.lib.core.harness.auto_send import auto_send
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
+
+from ._fakes import FakeTracing
 
 
 class _FakeCtx:
@@ -181,21 +182,9 @@ async def test_auto_send_posts_full_tool_messages():
 # ---------------------------------------------------------------------------
 
 
-class _RecordTracing:
-    def __init__(self):
-        self.started, self.ended = [], []
-
-    async def start_span(self, *, trace_id, name, input=None, parent_id=None, data=None, task_id=None):
-        self.started.append(name)
-        return _types.SimpleNamespace()
-
-    async def end_span(self, *, trace_id, span):
-        self.ended.append(getattr(span, "output", None))
-
-
 @pytest.mark.asyncio
 async def test_auto_send_derives_tool_spans_via_tracer():
-    fake_tracing = _RecordTracing()
+    fake_tracing = FakeTracing()
     tracer = SpanTracer(trace_id="t", parent_span_id="p", tracing=fake_tracing)
     streaming = _FakeStreaming()
 
@@ -228,8 +217,8 @@ async def test_auto_send_derives_tool_spans_via_tracer():
     result = await auto_send(_gen(events), task_id="task1", tracer=tracer, streaming=streaming)
 
     assert result.final_text == ""
-    assert fake_tracing.started == ["Bash"]
-    assert fake_tracing.ended == ["ok"]
+    assert fake_tracing.started_names == ["Bash"]
+    assert fake_tracing.ended_outputs == ["ok"]
 
 
 # ---------------------------------------------------------------------------
@@ -301,13 +290,13 @@ async def test_open_context_closed_on_midstream_error():
 
 
 # ---------------------------------------------------------------------------
-# Test 6: streamed tool_request delivered (AGX1-377 core)
+# Test 6: streamed tool_request delivered
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_auto_send_streams_tool_request():
-    """A Start(ToolRequestContent) MUST open a streaming context (AGX1-377)."""
+    """A Start(ToolRequestContent) MUST open a streaming context."""
     streaming = _FakeStreaming()
     events = [
         StreamTaskMessageStart(
@@ -457,7 +446,7 @@ async def test_auto_send_full_text_content_sets_final_text():
 
 
 # ---------------------------------------------------------------------------
-# Test 10: created_at is forwarded to streaming context (AGX1-378)
+# Test 10: created_at is forwarded to streaming context
 # ---------------------------------------------------------------------------
 
 

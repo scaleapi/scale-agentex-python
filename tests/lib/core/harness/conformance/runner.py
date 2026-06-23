@@ -43,8 +43,8 @@ rather than calling adk.messages.create. This open+close approach is retained
 because:
   - StreamingTaskMessageContext.close() persists initial_content when no deltas
     have been streamed, so the message IS correctly persisted.
-  - It mirrors the pattern already used by the real _langgraph_async.py harness,
-    keeping behavioural parity.
+  - It mirrors the pattern already used by the real langgraph streaming helper
+    (now in _langgraph_turn.py), keeping behavioural parity.
   - Switching to adk.messages.create would require an additional injectable
     dependency, adding surface area for no observable benefit.
 The conformance test treats this as an ACCEPTABLE envelope difference: at the
@@ -53,18 +53,14 @@ Start(content)+Done from auto_send are equivalent. The recorded span signals are
 identical because both adapters drive the same SpanDeriver.observe() call
 sequence and forward every signal to their tracer.
 
-AGX1-377 fix: auto_send now DELIVERS streamed tool-request messages (Start+Done)
-instead of dropping them. The conformance normaliser previously suppressed the
-delivery for Start(tool_request)+Done on the yield channel to match auto_send's
-old drop behaviour. That suppression is now removed: both channels produce a
-LogicalDelivery for a streamed tool_request, and the cross-channel assertion
-verifies it is delivered on both.
+auto_send DELIVERS streamed tool-request messages (Start+Done): both channels
+produce a LogicalDelivery for a streamed tool_request, and the cross-channel
+assertion verifies it is delivered on both.
 """
 
 from __future__ import annotations
 
 import json
-import types as _types
 from typing import Any, NamedTuple, override
 from dataclasses import dataclass
 
@@ -80,6 +76,8 @@ from agentex.types.task_message_update import (
 )
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
 from agentex.lib.core.harness.span_derivation import SpanDeriver
+
+from .._fakes import FakeTracing
 
 
 @dataclass
@@ -97,6 +95,25 @@ def register(fixture: Fixture) -> None:
 
 def all_fixtures() -> list[Fixture]:
     return list(_REGISTRY)
+
+
+def run_pure_async(coro: Any) -> Any:
+    """Drive a *pure* (I/O-free) coroutine to completion without an event loop.
+
+    Conformance fixtures are built at import time so they can parametrize the
+    tests below. The fixture-building coroutines only iterate in-memory events
+    and never suspend on a real future, so we step them by hand instead of
+    ``asyncio.run()``. ``asyncio.run()`` at import raises ``RuntimeError`` when a
+    loop is already running (programmatic pytest, a Jupyter kernel, or a
+    session-scoped asyncio loop); this driver is unaffected by ambient loop
+    state. It raises if the coroutine ever suspends on real I/O.
+    """
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError("conformance fixture build unexpectedly suspended on real I/O")
 
 
 def derive_all(events: list[StreamTaskMessage]) -> list[SpanSignal]:
@@ -145,8 +162,8 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
     - reasoning: initial_content.summary joined (from Start) prepended to
       accumulated reasoning-content deltas (this catches a channel that drops
       the summary)
-    - tool_request: JSON-sorted arguments from the Start content (AGX1-377: now
-      delivered on both channels, no longer suppressed)
+    - tool_request: JSON-sorted arguments from the Start content (delivered on
+      both channels)
     - tool_response: str(content) from Full event
     """
     from agentex.types.text_content import TextContent
@@ -191,9 +208,9 @@ def _yield_logical_deliveries(events: list[StreamTaskMessage]) -> list[LogicalDe
                         )
                     )
                 elif ctype == "tool_request" and isinstance(content, ToolRequestContent):
-                    # AGX1-377 fix: auto_send now delivers streamed tool-request
-                    # messages. Emit a delivery here so the cross-channel
-                    # assertion verifies it is present on both channels.
+                    # auto_send delivers streamed tool-request messages. Emit a
+                    # delivery here so the cross-channel assertion verifies it is
+                    # present on both channels.
                     deliveries.append(
                         LogicalDelivery(
                             content_type=ctype,
@@ -294,30 +311,6 @@ class _FakeStreaming:
         ctype = getattr(initial_content, "type", None) or ""
         self.sink.append(("ctx", ctype, initial_content))
         return _FakeCtx(self.sink, ctype, initial_content)
-
-
-class _FakeTracing:
-    """Minimal tracing backend: records started/ended span names + outputs."""
-
-    def __init__(self) -> None:
-        self.started: list[str] = []
-        self.ended: list[Any] = []
-
-    async def start_span(
-        self,
-        *,
-        trace_id: str,
-        name: str,
-        input: Any = None,
-        parent_id: Any = None,
-        data: Any = None,
-        task_id: Any = None,
-    ) -> Any:
-        self.started.append(name)
-        return _types.SimpleNamespace()
-
-    async def end_span(self, *, trace_id: str, span: Any) -> None:
-        self.ended.append(getattr(span, "output", None))
 
 
 class _RecordingTracer(SpanTracer):
@@ -486,7 +479,7 @@ async def run_cross_channel_conformance(
     from agentex.lib.core.harness.yield_delivery import yield_events
 
     # --- yield channel ---
-    tracer_yield = _RecordingTracer(tracing=_FakeTracing())
+    tracer_yield = _RecordingTracer(tracing=FakeTracing())
     yield_out = [e async for e in yield_events(_gen(fixture.events), tracer=tracer_yield)]
 
     # Span signals the yield channel actually emitted to its tracer
@@ -496,7 +489,7 @@ async def run_cross_channel_conformance(
     yield_deliveries = _yield_text_reasoning_seq(_yield_logical_deliveries(yield_out))
 
     # --- auto_send channel ---
-    tracer_auto = _RecordingTracer(tracing=_FakeTracing())
+    tracer_auto = _RecordingTracer(tracing=FakeTracing())
     fake_streaming = _FakeStreaming()
     await auto_send(
         _gen(fixture.events),
