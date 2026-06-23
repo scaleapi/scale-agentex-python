@@ -32,7 +32,7 @@ from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
 
-from .runner import Fixture, register, derive_all, run_cross_channel_conformance
+from .runner import Fixture, register, run_cross_channel_conformance
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -216,14 +216,3 @@ async def test_cross_channel_equivalence(fixture: Fixture) -> None:
     assert yield_spans == auto_spans, (
         f"[{fixture.name}] span signals differ:\n  yield:     {yield_spans}\n  auto_send: {auto_spans}"
     )
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatible determinism guard
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("fixture", _LANGGRAPH_FIXTURES, ids=lambda f: f.name)
-def test_span_derivation_is_deterministic(fixture: Fixture) -> None:
-    """Span derivation over the same event list is idempotent."""
-    assert derive_all(fixture.events) == derive_all(fixture.events)

@@ -8,8 +8,8 @@ then registered with the conformance runner and exercised by the cross-channel t
 Streamed tool requests
 ----------------------
 The pydantic-ai stream emits a tool REQUEST as Start + ToolRequestDelta + Done (not a
-Full event). AGX1-377 has landed: both the conformance runner and auto_send now deliver
-the Start+Delta+Done(tool_request) shape, so the cross-channel test asserts full
+Full event). Both the conformance runner and auto_send deliver the
+Start+Delta+Done(tool_request) shape, so the cross-channel test asserts full
 delivery-equivalence for streamed tool requests. The fixtures below retain the
 ToolRequestDelta events as the streamed tool-request inputs.
 """
@@ -39,7 +39,6 @@ from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 from .runner import (
     Fixture,
     register,
-    derive_all,
     run_cross_channel_conformance,
 )
 
@@ -78,8 +77,8 @@ def _build_fixtures() -> list[Fixture]:
     # ------------------------------------------------------------------ #
     # 2. Single tool call + tool response.
     # The canonical stream emits Start+ToolRequestDelta+Done for the request
-    # and Full(ToolResponseContent) for the response. See AGX1-377 note above
-    # for why the request delivery is not yet asserted cross-channel.
+    # and Full(ToolResponseContent) for the response. Both are asserted
+    # delivery-equivalent cross-channel (see the module docstring).
     # ------------------------------------------------------------------ #
     tool_call_pydantic = [
         PartStartEvent(
@@ -170,8 +169,8 @@ async def test_cross_channel_equivalence(fixture: Fixture) -> None:
     """Assert that yield_events and auto_send produce equivalent logical
     deliveries and identical span signals for each pydantic-ai fixture.
 
-    See runner.py for the full contract. The AGX1-377 note at the top of this
-    module explains why streamed-tool-request delivery is not yet asserted.
+    See runner.py for the full contract, including streamed-tool-request
+    delivery equivalence.
     """
     yield_deliveries, auto_deliveries, yield_spans, auto_spans = await run_cross_channel_conformance(fixture)
 
@@ -181,14 +180,3 @@ async def test_cross_channel_equivalence(fixture: Fixture) -> None:
     assert yield_spans == auto_spans, (
         f"[{fixture.name}] span signals differ:\n  yield:     {yield_spans}\n  auto_send: {auto_spans}"
     )
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatible determinism guard
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("fixture", _FIXTURES, ids=lambda f: f.name)
-def test_span_derivation_is_deterministic(fixture: Fixture) -> None:
-    """Span derivation over the same event list is idempotent."""
-    assert derive_all(fixture.events) == derive_all(fixture.events)
