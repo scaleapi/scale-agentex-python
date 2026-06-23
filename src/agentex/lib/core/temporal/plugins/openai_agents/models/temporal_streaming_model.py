@@ -66,7 +66,7 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.types.task_message_delta import TextDelta, ToolRequestDelta, ReasoningContentDelta, ReasoningSummaryDelta
 from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
-from agentex.types.task_message_content import TextContent, ReasoningContent, ToolRequestContent
+from agentex.types.task_message_content import TextContent, ReasoningContent, ToolRequestContent, ToolResponseContent
 from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     streaming_task_id,
@@ -121,6 +121,90 @@ def _serialize_item(item: Any) -> dict[str, Any]:
                     # Skip attributes that can't be accessed
                     pass
         return item_dict
+
+
+# Responses-API output items for server-side / hosted tools. These execute inside
+# the Responses API, so they never become function_call items AND the SDK's
+# RunHooks (on_tool_start/on_tool_end) never fire for them. The streaming loop
+# must surface them explicitly, as a tool request + response pair, when the item
+# completes (by then it carries the full query/result).
+_HOSTED_TOOL_TYPES = frozenset(
+    {
+        "web_search_call",
+        "file_search_call",
+        "code_interpreter_call",
+        "image_generation_call",
+        "mcp_call",
+        "computer_call",
+        "local_shell_call",
+    }
+)
+
+# Cap on the rendered hosted-tool result string (UI / trace readability).
+_HOSTED_TOOL_RESULT_CAP = 2000
+
+
+def _coerce_args(raw: Any) -> dict[str, Any]:
+    """Best-effort coerce a hosted-tool's arguments to a dict for the UI."""
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else {"value": parsed}
+        except (json.JSONDecodeError, ValueError):
+            return {"raw": raw}
+    serialized = _serialize_item(raw)
+    return serialized if isinstance(serialized, dict) else {"value": str(raw)}
+
+
+def _hosted_tool_request(item: Any) -> tuple[str, str, dict[str, Any]]:
+    """Extract (call_id, display_name, arguments) from a hosted-tool item."""
+    itype = getattr(item, "type", "") or ""
+    call_id = (
+        getattr(item, "id", "")
+        or getattr(item, "call_id", "")
+        or f"hosted_{uuid.uuid4().hex[:8]}"
+    )
+    name = itype[:-5] if itype.endswith("_call") else itype  # web_search_call -> web_search
+    args: dict[str, Any] = {}
+    if itype == "web_search_call":
+        action = getattr(item, "action", None)
+        if action is not None:
+            args = _coerce_args(action)
+    elif itype == "file_search_call":
+        args = {"queries": list(getattr(item, "queries", []) or [])}
+    elif itype == "code_interpreter_call":
+        args = {"code": getattr(item, "code", "") or ""}
+    elif itype == "mcp_call":
+        mcp_name = getattr(item, "name", None) or "mcp"
+        server = getattr(item, "server_label", None)
+        name = f"{server}.{mcp_name}" if server else mcp_name
+        args = _coerce_args(getattr(item, "arguments", None))
+    return call_id, name, args
+
+
+def _hosted_tool_result(item: Any) -> str:
+    """Extract a short result string from a completed hosted-tool item."""
+    itype = getattr(item, "type", "") or ""
+    if itype == "mcp_call":
+        err = getattr(item, "error", None)
+        if err:
+            return f"error: {err}"
+        out = getattr(item, "output", None)
+        if out:
+            return str(out)
+    elif itype == "code_interpreter_call":
+        outputs = getattr(item, "outputs", None)
+        if outputs:
+            return json.dumps([_serialize_item(o) for o in outputs])[:_HOSTED_TOOL_RESULT_CAP]
+    elif itype == "file_search_call":
+        results = getattr(item, "results", None)
+        if results:
+            return json.dumps([_serialize_item(r) for r in results])[:_HOSTED_TOOL_RESULT_CAP]
+    return str(getattr(item, "status", "completed") or "completed")
 
 
 class TemporalStreamingModel(Model):
@@ -480,6 +564,31 @@ class TemporalStreamingModel(Model):
         else:
             # Pass through as-is for other types
             return tool_choice
+
+    async def _post_tool_message(self, task_id: str, content: Any) -> None:
+        """Post a one-shot tool request/response message (no deltas).
+
+        Used for hosted/server-side tool calls (web_search, file_search,
+        code_interpreter, image generation, server-side mcp, ...) that execute
+        inside the Responses API and so never produce function_call items or fire
+        RunHooks. Each completed hosted tool is surfaced as a ToolRequestContent +
+        ToolResponseContent pair. Posting full (no deltas) means the coalescing
+        path that the streamed reasoning/text contexts use does not apply here.
+        """
+        try:
+            async with adk.streaming.streaming_task_message_context(
+                task_id=task_id,
+                initial_content=content,
+            ) as ctx:
+                await ctx.stream_update(
+                    StreamTaskMessageFull(
+                        parent_task_message=ctx.task_message,
+                        content=content,
+                        type="full",
+                    )
+                )
+        except Exception as e:  # noqa: BLE001 - UI surfacing must never break a turn
+            logger.warning(f"[TemporalStreamingModel] failed to post hosted-tool message: {e}")
 
     @override
     async def get_response(
@@ -941,6 +1050,33 @@ class TemporalStreamingModel(Model):
                                         logger.warning(f"Failed to close tool request context: {e}")
                                     finally:
                                         call_data['context'] = None
+
+                        elif item and getattr(item, 'type', None) in _HOSTED_TOOL_TYPES:
+                            # Hosted / server-side tool call (web_search, file_search,
+                            # code_interpreter, image generation, server-side mcp, ...).
+                            # These run inside the Responses API: no function_call item
+                            # and no RunHooks fire, so surface the completed call as a
+                            # tool request + response pair (it carries the full
+                            # query/result by the time it's done).
+                            call_id, name, args = _hosted_tool_request(item)
+                            await self._post_tool_message(
+                                task_id,
+                                ToolRequestContent(
+                                    author="agent",
+                                    tool_call_id=call_id,
+                                    name=name,
+                                    arguments=args,
+                                ),
+                            )
+                            await self._post_tool_message(
+                                task_id,
+                                ToolResponseContent(
+                                    author="agent",
+                                    tool_call_id=call_id,
+                                    name=name,
+                                    content={"result": _hosted_tool_result(item)[:_HOSTED_TOOL_RESULT_CAP]},
+                                ),
+                            )
 
                     elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
                         # New reasoning part/summary started - reset accumulator
