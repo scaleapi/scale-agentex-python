@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import weakref
-from unittest.mock import MagicMock, patch
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -24,9 +25,161 @@ import agentex.lib.core.tracing.processors.agentex_tracing_processor  # noqa: E4
 MODULE = "agentex.lib.core.tracing.processors.agentex_tracing_processor"
 
 
+SKIP_ENV = "AGENTEX_TRACING_SKIP_AGENTEX_SPAN_START"
+
+
 def _make_config() -> MagicMock:
     """Empty config — AgentexTracingProcessorConfig is unused by __init__."""
     return MagicMock()
+
+
+def _make_span():
+    from agentex.types.span import Span
+
+    now = datetime.now(timezone.utc)
+    return Span(
+        id="span-1",
+        trace_id="trace-1",
+        name="test-span",
+        start_time=now,
+        end_time=now,
+        input={"in": 1},
+        output={"out": 2},
+    )
+
+
+class TestAgentexSyncSkipSpanStart:
+    """The Agentex backend writes create-on-start + update-on-end by default.
+    End-only ingest (default) skips the start write and makes the END a single
+    create — verify the start is a no-op and end does an INSERT, not an UPDATE.
+    """
+
+    def test_start_skipped_and_end_creates_by_default(self, monkeypatch):
+        monkeypatch.delenv(SKIP_ENV, raising=False)  # default ON
+        with patch(f"{MODULE}.Agentex") as MockAgentex:
+            from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
+                AgentexSyncTracingProcessor,
+            )
+
+            processor = AgentexSyncTracingProcessor(_make_config())
+            client = MockAgentex.return_value
+            span = _make_span()
+
+            processor.on_span_start(span)
+            client.spans.create.assert_not_called()  # start skipped
+            client.spans.update.assert_not_called()
+
+            processor.on_span_end(span)
+            client.spans.create.assert_called_once()  # single INSERT on end
+            client.spans.update.assert_not_called()  # never a 404-prone UPDATE
+
+    def test_start_creates_and_end_updates_when_skip_disabled(self, monkeypatch):
+        monkeypatch.setenv(SKIP_ENV, "0")
+        with patch(f"{MODULE}.Agentex") as MockAgentex:
+            from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
+                AgentexSyncTracingProcessor,
+            )
+
+            processor = AgentexSyncTracingProcessor(_make_config())
+            client = MockAgentex.return_value
+            span = _make_span()
+
+            processor.on_span_start(span)
+            client.spans.create.assert_called_once()  # start write restored
+
+            processor.on_span_end(span)
+            client.spans.update.assert_called_once()  # end is the UPDATE
+
+    def test_skip_decision_captured_at_init_not_per_call(self, monkeypatch):
+        """The two halves of a span MUST use the same skip decision. A flag
+        toggled after construction must not split it (start-skip + end-update
+        would 404). The decision is captured once at init.
+        """
+        monkeypatch.delenv(SKIP_ENV, raising=False)  # construct with skip ON
+        with patch(f"{MODULE}.Agentex") as MockAgentex:
+            from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
+                AgentexSyncTracingProcessor,
+            )
+
+            processor = AgentexSyncTracingProcessor(_make_config())
+            client = MockAgentex.return_value
+            span = _make_span()
+
+            processor.on_span_start(span)  # skipped (cached ON)
+            monkeypatch.setenv(SKIP_ENV, "0")  # toggle mid-span — must be ignored
+            processor.on_span_end(span)
+
+            client.spans.create.assert_called_once()  # still end-only INSERT
+            client.spans.update.assert_not_called()  # NOT a 404-prone UPDATE
+
+
+class TestAgentexAsyncSkipSpanStart:
+    async def test_start_skipped_and_end_creates_by_default(self, monkeypatch):
+        monkeypatch.delenv(SKIP_ENV, raising=False)  # default ON
+        with patch(f"{MODULE}.create_async_agentex_client") as mock_factory:
+            client = MagicMock()
+            client.spans.create = AsyncMock()
+            client.spans.update = AsyncMock()
+            mock_factory.return_value = client
+
+            from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
+                AgentexAsyncTracingProcessor,
+            )
+
+            processor = AgentexAsyncTracingProcessor(_make_config())
+            span = _make_span()
+
+            await processor.on_span_start(span)
+            client.spans.create.assert_not_called()  # start skipped
+            client.spans.update.assert_not_called()
+
+            await processor.on_span_end(span)
+            client.spans.create.assert_awaited_once()  # single INSERT on end
+            client.spans.update.assert_not_called()
+
+    async def test_start_creates_and_end_updates_when_skip_disabled(self, monkeypatch):
+        monkeypatch.setenv(SKIP_ENV, "0")
+        with patch(f"{MODULE}.create_async_agentex_client") as mock_factory:
+            client = MagicMock()
+            client.spans.create = AsyncMock()
+            client.spans.update = AsyncMock()
+            mock_factory.return_value = client
+
+            from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
+                AgentexAsyncTracingProcessor,
+            )
+
+            processor = AgentexAsyncTracingProcessor(_make_config())
+            span = _make_span()
+
+            await processor.on_span_start(span)
+            client.spans.create.assert_awaited_once()  # start write restored
+
+            await processor.on_span_end(span)
+            client.spans.update.assert_awaited_once()  # end is the UPDATE
+
+    async def test_skip_decision_captured_at_init_not_per_call(self, monkeypatch):
+        """A flag toggled after construction must not split a span's lifecycle."""
+        monkeypatch.delenv(SKIP_ENV, raising=False)  # construct with skip ON
+        with patch(f"{MODULE}.create_async_agentex_client") as mock_factory:
+            client = MagicMock()
+            client.spans.create = AsyncMock()
+            client.spans.update = AsyncMock()
+            mock_factory.return_value = client
+
+            from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
+                AgentexAsyncTracingProcessor,
+            )
+
+            processor = AgentexAsyncTracingProcessor(_make_config())
+            span = _make_span()
+
+            await processor.on_span_start(span)  # skipped (cached ON)
+            monkeypatch.setenv(SKIP_ENV, "0")  # toggle mid-span — must be ignored
+            await processor.on_span_end(span)
+
+            client.spans.create.assert_awaited_once()  # still end-only INSERT
+            client.spans.update.assert_not_called()  # NOT a 404-prone UPDATE
 
 
 class TestAgentexAsyncTracingProcessor:

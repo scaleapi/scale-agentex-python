@@ -1,7 +1,7 @@
-"""ACP server for the Temporal Pydantic AI tutorial.
+"""ACP server for the Temporal harness Pydantic AI test agent.
 
-This file is intentionally thin. When ``acp_type="async"`` is combined
-with ``TemporalACPConfig(type="temporal", ...)``, FastACP auto-wires:
+This file is intentionally thin. When ``acp_type="async"`` is combined with
+``TemporalACPConfig(type="temporal", ...)``, FastACP auto-wires:
 
     HTTP task/create       → @workflow.run on the workflow class
     HTTP task/event/send   → @workflow.signal(SignalName.RECEIVE_EVENT)

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "at110-pydantic-ai"
 version = "0.1.0"
-description = "A Temporal-backed Pydantic AI agent with tool calling and Redis streaming"
+description = "A Temporal-backed Pydantic AI harness test agent using the unified emitter surface"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

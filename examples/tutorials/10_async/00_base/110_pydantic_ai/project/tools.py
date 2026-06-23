@@ -1,8 +1,8 @@
-"""Tool definitions for the async Pydantic AI agent.
+"""Tool definitions for the async harness Pydantic AI agent.
 
 Pydantic AI tools are registered directly on the Agent via decorators
-(see project.agent). This module hosts the bare functions so they're
-easy to unit-test in isolation.
+(see project.agent). This module hosts the bare function so it is easy to
+unit-test in isolation.
 """
 
 from __future__ import annotations

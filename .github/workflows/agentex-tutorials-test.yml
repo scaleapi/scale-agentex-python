@@ -49,6 +49,29 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      # Subprocess-CLI harnesses: install the relevant CLI only for the
+      # claude-code / codex tutorials (no-op for every other tutorial). npm is
+      # preinstalled on ubuntu runners. Versions mirror the golden agent's
+      # sandbox image (teams/sgp/agents/golden_agent/sandbox/Dockerfile): claude-code
+      # is pinned to the same CLAUDE_CODE_VERSION; codex is left unpinned there,
+      # so it is left unpinned here too. Bump CLAUDE_CODE_VERSION in lockstep
+      # with the sandbox Dockerfile.
+      - name: Install harness CLI (claude-code / codex only)
+        if: ${{ contains(matrix.tutorial, 'claude_code') || contains(matrix.tutorial, 'codex') }}
+        env:
+          CLAUDE_CODE_VERSION: "2.1.142"
+        run: |
+          if [[ "${{ matrix.tutorial }}" == *claude_code* ]]; then
+            echo "📦 Installing Claude Code CLI (v${CLAUDE_CODE_VERSION})..."
+            npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+            claude --version || true
+          fi
+          if [[ "${{ matrix.tutorial }}" == *codex* ]]; then
+            echo "📦 Installing Codex CLI..."
+            npm install -g @openai/codex
+            codex --version || true
+          fi
+
       - name: Pull latest AgentEx image
         run: |
           echo "🐳 Pulling latest Scale AgentEx Docker image..."
@@ -136,6 +159,11 @@ jobs:
         working-directory: ./examples/tutorials
         env:
           OPENAI_API_KEY: ${{ secrets.TUTORIAL_OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.TUTORIAL_ANTHROPIC_API_KEY }}
+          # Enable the gated live tests only for the matching subprocess-CLI
+          # harness tutorial (the CLI is installed for it in the step above).
+          CLAUDE_LIVE_TESTS: ${{ contains(matrix.tutorial, 'claude_code') && '1' || '' }}
+          CODEX_LIVE_TESTS: ${{ contains(matrix.tutorial, 'codex') && '1' || '' }}
           HEALTH_CHECK_PORT: 8080 # Use non-privileged port for temporal worker health checks
         run: |
           echo "Testing tutorial: ${{ matrix.tutorial }}"

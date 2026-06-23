@@ -554,6 +554,7 @@ class TasksResource(SyncAPIResource):
         self,
         task_id: str,
         *,
+        merge_params: Optional[Dict[str, object]] | Omit = omit,
         task_metadata: Optional[Dict[str, object]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -578,7 +579,13 @@ class TasksResource(SyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `task_id` but received {task_id!r}")
         return self._put(
             path_template("/tasks/{task_id}", task_id=task_id),
-            body=maybe_transform({"task_metadata": task_metadata}, task_update_by_id_params.TaskUpdateByIDParams),
+            body=maybe_transform(
+                {
+                    "merge_params": merge_params,
+                    "task_metadata": task_metadata,
+                },
+                task_update_by_id_params.TaskUpdateByIDParams,
+            ),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -589,6 +596,7 @@ class TasksResource(SyncAPIResource):
         self,
         task_name: str,
         *,
+        merge_params: Optional[Dict[str, object]] | Omit = omit,
         task_metadata: Optional[Dict[str, object]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -613,7 +621,13 @@ class TasksResource(SyncAPIResource):
             raise ValueError(f"Expected a non-empty value for `task_name` but received {task_name!r}")
         return self._put(
             path_template("/tasks/name/{task_name}", task_name=task_name),
-            body=maybe_transform({"task_metadata": task_metadata}, task_update_by_name_params.TaskUpdateByNameParams),
+            body=maybe_transform(
+                {
+                    "merge_params": merge_params,
+                    "task_metadata": task_metadata,
+                },
+                task_update_by_name_params.TaskUpdateByNameParams,
+            ),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -1136,6 +1150,7 @@ class AsyncTasksResource(AsyncAPIResource):
         self,
         task_id: str,
         *,
+        merge_params: Optional[Dict[str, object]] | Omit = omit,
         task_metadata: Optional[Dict[str, object]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -1161,7 +1176,11 @@ class AsyncTasksResource(AsyncAPIResource):
         return await self._put(
             path_template("/tasks/{task_id}", task_id=task_id),
             body=await async_maybe_transform(
-                {"task_metadata": task_metadata}, task_update_by_id_params.TaskUpdateByIDParams
+                {
+                    "merge_params": merge_params,
+                    "task_metadata": task_metadata,
+                },
+                task_update_by_id_params.TaskUpdateByIDParams,
             ),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
@@ -1173,6 +1192,7 @@ class AsyncTasksResource(AsyncAPIResource):
         self,
         task_name: str,
         *,
+        merge_params: Optional[Dict[str, object]] | Omit = omit,
         task_metadata: Optional[Dict[str, object]] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -1198,7 +1218,11 @@ class AsyncTasksResource(AsyncAPIResource):
         return await self._put(
             path_template("/tasks/name/{task_name}", task_name=task_name),
             body=await async_maybe_transform(
-                {"task_metadata": task_metadata}, task_update_by_name_params.TaskUpdateByNameParams
+                {
+                    "merge_params": merge_params,
+                    "task_metadata": task_metadata,
+                },
+                task_update_by_name_params.TaskUpdateByNameParams,
             ),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout

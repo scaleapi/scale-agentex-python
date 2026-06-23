@@ -32,6 +32,7 @@ from openai.types.responses.response_reasoning_summary_text_done_event import Re
 from agentex import AsyncAgentex
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import (
     StreamTaskMessageDone,
@@ -55,24 +56,28 @@ def _serialize_item(item: Any) -> dict[str, Any]:
     Uses model_dump() for Pydantic models, otherwise extracts attributes manually.
     Filters out internal Pydantic fields that can't be serialized.
     """
-    if hasattr(item, 'model_dump'):
+    if hasattr(item, "model_dump"):
         # Pydantic model - use model_dump for proper serialization
         try:
-            return item.model_dump(mode='json', exclude_unset=True)
+            return item.model_dump(mode="json", exclude_unset=True)
         except Exception:
             # Fallback to dict conversion
-            return dict(item) if hasattr(item, '__iter__') else {}
+            return dict(item) if hasattr(item, "__iter__") else {}
     else:
         # Not a Pydantic model - extract attributes manually
         item_dict = {}
         for attr_name in dir(item):
-            if not attr_name.startswith('_') and attr_name not in ('model_fields', 'model_config', 'model_computed_fields'):
+            if not attr_name.startswith("_") and attr_name not in (
+                "model_fields",
+                "model_config",
+                "model_computed_fields",
+            ):
                 try:
                     attr_value = getattr(item, attr_name, None)
                     # Skip methods and None values
                     if attr_value is not None and not callable(attr_value):
                         # Convert to JSON-serializable format
-                        if hasattr(attr_value, 'model_dump'):
+                        if hasattr(attr_value, "model_dump"):
                             item_dict[attr_name] = attr_value.model_dump()
                         elif isinstance(attr_value, (str, int, float, bool, list, dict)):
                             item_dict[attr_name] = attr_value
@@ -85,9 +90,26 @@ def _serialize_item(item: Any) -> dict[str, Any]:
 
 
 class SyncStreamingModel(Model):
-    """Simple model wrapper that adds logging to stream_response and supports tracing."""
+    """Simple model wrapper that adds logging to stream_response and supports tracing.
 
-    def __init__(self, original_model: Model, trace_id: str | None = None, parent_span_id: str | None = None, tracer: AsyncTracer | None = None):
+    .. deprecated::
+        Prefer the unified harness surface for new OpenAI Agents integrations:
+        wrap a ``Runner.run_streamed`` result in
+        ``agentex.lib.adk.providers._modules.openai_turn.OpenAITurn`` and drive
+        delivery + tracing through ``UnifiedEmitter`` (see the
+        ``060_harness_openai`` / ``130_harness_openai`` / ``140_harness_openai``
+        tutorials). This per-model tracing wrapper predates the harness and is
+        retained only for backwards compatibility; it will be removed in a
+        future release. No runtime warning is emitted.
+    """
+
+    def __init__(
+        self,
+        original_model: Model,
+        trace_id: str | None = None,
+        parent_span_id: str | None = None,
+        tracer: AsyncTracer | None = None,
+    ):
         """Initialize with the original OpenAI model to wrap.
         Args:
             original_model: The OpenAI model instance to wrap
@@ -147,7 +169,7 @@ class SyncStreamingModel(Model):
                 }
 
                 # Only add conversation_id if the model supports it
-                if hasattr(self.original_model, 'supports_conversation_id'):
+                if hasattr(self.original_model, "supports_conversation_id"):
                     kwargs["conversation_id"] = conversation_id
 
                 response = await self.original_model.get_response(**kwargs)
@@ -158,12 +180,12 @@ class SyncStreamingModel(Model):
                     final_output = None
 
                     # Extract final output text from response
-                    response_final_output = getattr(response, 'final_output', None)
+                    response_final_output = getattr(response, "final_output", None)
                     if response_final_output:
                         final_output = response_final_output
 
                     # Extract items from the response output
-                    response_output = getattr(response, 'output', None)
+                    response_output = getattr(response, "output", None)
                     if response_output:
                         output_items = response_output if isinstance(response_output, list) else [response_output]
 
@@ -174,12 +196,12 @@ class SyncStreamingModel(Model):
                                     new_items.append(item_dict)
 
                                     # Extract final_output from message type if available
-                                    if item_dict.get('type') == 'message' and not final_output:
-                                        content = item_dict.get('content', [])
+                                    if item_dict.get("type") == "message" and not final_output:
+                                        content = item_dict.get("content", [])
                                         if content and isinstance(content, list):
                                             for content_part in content:
-                                                if isinstance(content_part, dict) and 'text' in content_part:
-                                                    final_output = content_part['text']
+                                                if isinstance(content_part, dict) and "text" in content_part:
+                                                    final_output = content_part["text"]
                                                     break
                             except Exception as e:
                                 logger.warning(f"Failed to serialize item in get_response: {e}")
@@ -207,7 +229,7 @@ class SyncStreamingModel(Model):
             }
 
             # Only add conversation_id if the model supports it
-            if hasattr(self.original_model, 'supports_conversation_id'):
+            if hasattr(self.original_model, "supports_conversation_id"):
                 kwargs["conversation_id"] = conversation_id
 
             return await self.original_model.get_response(**kwargs)
@@ -266,7 +288,7 @@ class SyncStreamingModel(Model):
                 }
 
                 # Only add conversation_id if the model supports it
-                if hasattr(self.original_model, 'supports_conversation_id'):
+                if hasattr(self.original_model, "supports_conversation_id"):
                     stream_kwargs["conversation_id"] = conversation_id
 
                 # Get the stream response from the original model and yield each event
@@ -277,11 +299,11 @@ class SyncStreamingModel(Model):
                 final_response_text = ""
 
                 async for event in stream_response:
-                    event_type = getattr(event, 'type', 'no-type')
+                    event_type = getattr(event, "type", "no-type")
 
                     # Handle response.output_item.done events which contain completed items
-                    if event_type == 'response.output_item.done':
-                        item = getattr(event, 'item', None)
+                    if event_type == "response.output_item.done":
+                        item = getattr(event, "item", None)
                         if item is not None:
                             try:
                                 item_dict = _serialize_item(item)
@@ -289,12 +311,12 @@ class SyncStreamingModel(Model):
                                     new_items.append(item_dict)
 
                                     # Update final_response_text from message type if available
-                                    if item_dict.get('type') == 'message':
-                                        content = item_dict.get('content', [])
+                                    if item_dict.get("type") == "message":
+                                        content = item_dict.get("content", [])
                                         if content and isinstance(content, list):
                                             for content_part in content:
-                                                if isinstance(content_part, dict) and 'text' in content_part:
-                                                    final_response_text = content_part['text']
+                                                if isinstance(content_part, dict) and "text" in content_part:
+                                                    final_response_text = content_part["text"]
                                                     break
                             except Exception as e:
                                 logger.warning(f"Failed to serialize item in stream_response: {e}")
@@ -326,7 +348,7 @@ class SyncStreamingModel(Model):
             }
 
             # Only add conversation_id if the model supports it
-            if hasattr(self.original_model, 'supports_conversation_id'):
+            if hasattr(self.original_model, "supports_conversation_id"):
                 stream_kwargs["conversation_id"] = conversation_id
 
             # Get the stream response from the original model and yield each event
@@ -336,8 +358,17 @@ class SyncStreamingModel(Model):
             async for event in stream_response:
                 yield event
 
+
 class SyncStreamingProvider(OpenAIProvider):
-    """Simple OpenAI provider wrapper that adds logging to streaming and supports tracing."""
+    """Simple OpenAI provider wrapper that adds logging to streaming and supports tracing.
+
+    .. deprecated::
+        Prefer the unified harness surface for new OpenAI Agents integrations
+        (see :class:`SyncStreamingModel` and the ``OpenAITurn`` +
+        ``UnifiedEmitter`` pattern). This provider wrapper predates the harness
+        and is retained only for backwards compatibility; it will be removed in
+        a future release. No runtime warning is emitted.
+    """
 
     def __init__(self, trace_id: str | None = None, parent_span_id: str | None = None, *args, **kwargs):
         """Initialize the provider with tracing support.
@@ -405,6 +436,7 @@ def _extract_tool_call_info(tool_call_item: Any) -> tuple[str, str, dict[str, An
         if tool_call_item.arguments:
             if isinstance(tool_call_item.arguments, str):
                 import json
+
                 tool_arguments = json.loads(tool_call_item.arguments) if tool_call_item.arguments else {}
             else:
                 tool_arguments = tool_call_item.arguments
@@ -418,6 +450,7 @@ def _extract_tool_call_info(tool_call_item: Any) -> tuple[str, str, dict[str, An
             arguments = tool_call_item.arguments
             if isinstance(arguments, str):
                 import json
+
                 tool_arguments = json.loads(arguments) if arguments else {}
             elif arguments is None:
                 tool_arguments = {}
@@ -466,11 +499,11 @@ def _extract_tool_response_info(tool_map: dict[str, Any], tool_output_item: Any)
 
 async def convert_openai_to_agentex_events(stream_response):
     """Convert OpenAI streaming events to AgentEx TaskMessageUpdate events with reasoning support.
-    
+
     This is an enhanced version of the base converter that includes support for:
     - Reasoning content deltas (for o1 models)
     - Reasoning summary deltas (for o1 models)
-    
+
     Args:
         stream_response: An async iterator of OpenAI streaming events
     Yields:
@@ -488,8 +521,8 @@ async def convert_openai_to_agentex_events(stream_response):
         event_count += 1
 
         # Check for raw response events which contain the actual OpenAI streaming events
-        if hasattr(event, 'type') and event.type == 'raw_response_event':
-            if hasattr(event, 'data'):
+        if hasattr(event, "type") and event.type == "raw_response_event":
+            if hasattr(event, "data"):
                 raw_event = event.data
 
                 # Check for ResponseOutputItemAddedEvent which signals a new message starting
@@ -504,7 +537,7 @@ async def convert_openai_to_agentex_events(stream_response):
                     if item_id in item_id_to_index:
                         # Get the message type to decide whether to send done event
                         message_type = item_id_to_type.get(item_id, "text")
-                        
+
                         # Don't send done events for reasoning content/summary
                         # They just end with their last delta
                         if message_type not in ("reasoning_content", "reasoning_summary"):
@@ -528,14 +561,20 @@ async def convert_openai_to_agentex_events(stream_response):
                         item_id_to_index[item_id] = message_index
                         item_id_to_type[item_id] = "reasoning_summary"
 
-                        # Send a start event for this new reasoning summary message
+                        # Send a start event for this new reasoning summary message.
+                        # The start content must be ReasoningContent (not TextContent)
+                        # so consumers that branch on the start event's content type
+                        # render a reasoning/thinking indicator; the final persisted
+                        # content is rebuilt from the reasoning deltas regardless.
                         yield StreamTaskMessageStart(
                             type="start",
                             index=item_id_to_index[item_id],
-                            content=TextContent(
-                                type="text",
+                            content=ReasoningContent(
+                                type="reasoning",
                                 author="agent",
-                                content="",  # Start with empty content
+                                summary=[],
+                                content=[],
+                                style="active",
                             ),
                         )
 
@@ -572,14 +611,20 @@ async def convert_openai_to_agentex_events(stream_response):
                         item_id_to_index[item_id] = message_index
                         item_id_to_type[item_id] = "reasoning_content"
 
-                        # Send a start event for this new reasoning content message
+                        # Send a start event for this new reasoning content message.
+                        # The start content must be ReasoningContent (not TextContent)
+                        # so consumers that branch on the start event's content type
+                        # render a reasoning/thinking indicator; the final persisted
+                        # content is rebuilt from the reasoning deltas regardless.
                         yield StreamTaskMessageStart(
                             type="start",
                             index=item_id_to_index[item_id],
-                            content=TextContent(
-                                type="text",
+                            content=ReasoningContent(
+                                type="reasoning",
                                 author="agent",
-                                content="",  # Start with empty content
+                                summary=[],
+                                content=[],
+                                style="active",
                             ),
                         )
 
@@ -608,7 +653,7 @@ async def convert_openai_to_agentex_events(stream_response):
                 # Check if this is a text delta event from OpenAI
                 elif isinstance(raw_event, ResponseTextDeltaEvent):
                     # Check if this event has an item_id
-                    item_id = getattr(raw_event, 'item_id', None)
+                    item_id = getattr(raw_event, "item_id", None)
 
                     # If this is a new item_id we haven't seen, it's a new message
                     if item_id and item_id not in item_id_to_index:
@@ -647,13 +692,13 @@ async def convert_openai_to_agentex_events(stream_response):
                     )
                     yield delta_message
 
-        elif hasattr(event, 'type') and event.type == 'run_item_stream_event':
+        elif hasattr(event, "type") and event.type == "run_item_stream_event":
             # Skip reasoning_item events - they're handled via raw_response_event above
-            if hasattr(event, 'item') and event.item.type == 'reasoning_item':
+            if hasattr(event, "item") and event.item.type == "reasoning_item":
                 continue
 
             # Check for tool_call_item type (this is when a tool is being called)
-            elif hasattr(event, 'item') and event.item.type == 'tool_call_item':
+            elif hasattr(event, "item") and event.item.type == "tool_call_item":
                 # Extract tool call information using the helper method
                 call_id, tool_name, tool_arguments = _extract_tool_call_info(event.item.raw_item)
                 tool_map[call_id] = tool_name
@@ -671,7 +716,7 @@ async def convert_openai_to_agentex_events(stream_response):
                 )
 
             # Check for tool_call_output_item type (this is when a tool returns output)
-            elif hasattr(event, 'item') and event.item.type == 'tool_call_output_item':
+            elif hasattr(event, "item") and event.item.type == "tool_call_output_item":
                 # Extract tool response information using the helper method
                 call_id, tool_name, content = _extract_tool_response_info(tool_map, event.item.raw_item)
                 tool_response_content = ToolResponseContent(
@@ -687,4 +732,3 @@ async def convert_openai_to_agentex_events(stream_response):
                     index=message_index,
                     content=tool_response_content,
                 )
-

@@ -1,8 +1,10 @@
-"""Tests for the sync Pydantic AI agent.
+"""Live tests for the sync Pydantic AI agent.
 
-This test suite validates:
-- Non-streaming message sending with tool-calling Pydantic AI agent
-- Streaming message sending with token-by-token output
+These tests require a running agent (server + deployed agent) and exercise the
+unified-surface sync handler end-to-end over the wire.
+
+Offline coverage of the same wiring (TestModel + fake streaming/tracing) lives
+in the SDK repo under ``tests/lib/core/harness/`` (the pydantic-ai sync suite).
 
 To run these tests:
 1. Make sure the agent is running (via docker-compose or `agentex agents run`)
@@ -50,7 +52,7 @@ def agent_id(client, agent_name):
 
 
 class TestNonStreamingMessages:
-    """Test non-streaming message sending with Pydantic AI agent."""
+    """Test non-streaming message sending with the unified-surface sync agent."""
 
     def test_send_simple_message(self, client: Agentex, agent_name: str):
         """Test sending a simple message and receiving a response."""
@@ -86,7 +88,7 @@ class TestNonStreamingMessages:
 
 
 class TestStreamingMessages:
-    """Test streaming message sending with Pydantic AI agent."""
+    """Test streaming message sending through the unified yield_turn path."""
 
     def test_stream_simple_message(self, client: Agentex, agent_name: str):
         """Test streaming a simple message response."""
@@ -107,10 +109,10 @@ class TestStreamingMessages:
         assert len(chunks) > 1, "No chunks received in streaming response."
 
     def test_stream_tool_calling(self, client: Agentex, agent_name: str):
-        """Test streaming with tool calls.
+        """Test streaming with tool calls through the unified surface.
 
-        This exercises the headline Pydantic AI converter feature:
-        tool-call argument tokens streaming through as ToolRequestDelta.
+        Exercises token-by-token tool-call argument streaming (coalesce off),
+        which the unified yield_turn path preserves on the sync channel.
         """
         stream = client.agents.send_message_stream(
             agent_name=agent_name,

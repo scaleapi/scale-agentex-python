@@ -1,9 +1,10 @@
-"""Tests for the Temporal Pydantic AI agent.
+"""Live tests for the Temporal Pydantic AI agent.
 
-This test suite validates:
-- The agent responds to a basic message
-- Tool calls are visible in the message history (proving each tool call
-  ran as its own Temporal activity)
+These tests require a running agent (Temporal + Redis + ACP server + worker) and
+exercise the unified-surface event_stream_handler end-to-end over the wire.
+
+Offline coverage of the same wiring (TestModel + fake streaming/tracing) lives
+in the SDK repo under ``tests/lib/core/harness/`` (the pydantic-ai temporal suite).
 
 To run these tests:
 1. Make sure the agent is running (worker + ACP server)
@@ -16,10 +17,7 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from test_utils.async_utils import (
-    poll_messages,
-    send_event_and_poll_yielding,
-)
+from test_utils.async_utils import poll_messages, send_event_and_poll_yielding
 
 from agentex import AsyncAgentex
 from agentex.types.task_message import TaskMessage
@@ -51,14 +49,12 @@ async def agent_id(client, agent_name):
 
 
 class TestNonStreamingEvents:
-    """Test that the Temporal-backed Pydantic AI agent responds and uses tools."""
+    """Test that the Temporal-backed harness agent responds and uses tools."""
 
     @pytest.mark.asyncio
     async def test_send_event_and_poll(self, client: AsyncAgentex, agent_id: str):
         """Drive a full turn: create task, send a weather question, verify tool round-trip."""
-        task_response = await client.agents.create_task(
-            agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex)
-        )
+        task_response = await client.agents.create_task(agent_id, params=ParamsCreateTaskRequest(name=uuid.uuid1().hex))
         task = task_response.result
         assert task is not None
 
@@ -71,11 +67,7 @@ class TestNonStreamingEvents:
             sleep_interval=1.0,
         ):
             assert isinstance(message, TaskMessage)
-            if (
-                message.content
-                and message.content.type == "text"
-                and message.content.author == "agent"
-            ):
+            if message.content and message.content.type == "text" and message.content.author == "agent":
                 task_creation_found = True
                 break
         assert task_creation_found, "Task creation welcome message not found"
@@ -101,11 +93,7 @@ class TestNonStreamingEvents:
                 if final_message and getattr(final_message, "streaming_status", None) == "DONE":
                     break
 
-            if (
-                message.content
-                and message.content.type == "text"
-                and message.content.author == "agent"
-            ):
+            if message.content and message.content.type == "text" and message.content.author == "agent":
                 final_message = message
                 content_length = len(getattr(message.content, "content", "") or "")
                 if message.streaming_status == "DONE" and content_length > 0:
@@ -115,9 +103,7 @@ class TestNonStreamingEvents:
         assert seen_tool_request, "Expected a tool_request (agent calling get_weather)"
         assert seen_tool_response, "Expected a tool_response (get_weather result)"
         assert final_message is not None, "Expected a final agent text message"
-        final_text = (
-            getattr(final_message.content, "content", None) if final_message.content else None
-        )
+        final_text = getattr(final_message.content, "content", None) if final_message.content else None
         assert isinstance(final_text, str) and len(final_text) > 0
         # The get_weather tool always returns "72°F" — the response should mention it.
         assert "72" in final_text, "Expected weather response to mention 72°F"

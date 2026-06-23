@@ -9,4 +9,6 @@ __all__ = ["TaskUpdateByIDParams"]
 
 
 class TaskUpdateByIDParams(TypedDict, total=False):
+    merge_params: Optional[Dict[str, object]]
+
     task_metadata: Optional[Dict[str, object]]

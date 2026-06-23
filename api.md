@@ -245,3 +245,15 @@ Methods:
 - <code title="post /checkpoints/get-tuple">client.checkpoints.<a href="./src/agentex/resources/checkpoints.py">get_tuple</a>(\*\*<a href="src/agentex/types/checkpoint_get_tuple_params.py">params</a>) -> <a href="./src/agentex/types/checkpoint_get_tuple_response.py">Optional[CheckpointGetTupleResponse]</a></code>
 - <code title="post /checkpoints/put">client.checkpoints.<a href="./src/agentex/resources/checkpoints.py">put</a>(\*\*<a href="src/agentex/types/checkpoint_put_params.py">params</a>) -> <a href="./src/agentex/types/checkpoint_put_response.py">CheckpointPutResponse</a></code>
 - <code title="post /checkpoints/put-writes">client.checkpoints.<a href="./src/agentex/resources/checkpoints.py">put_writes</a>(\*\*<a href="src/agentex/types/checkpoint_put_writes_params.py">params</a>) -> None</code>
+
+# Webhooks
+
+Types:
+
+```python
+from agentex.types import WebhookCreateWebhookTriggerResponse
+```
+
+Methods:
+
+- <code title="post /agent_api_keys/webhook-trigger">client.webhooks.<a href="./src/agentex/resources/webhooks.py">create_webhook_trigger</a>(\*\*<a href="src/agentex/types/webhook_create_webhook_trigger_params.py">params</a>) -> <a href="./src/agentex/types/webhook_create_webhook_trigger_response.py">WebhookCreateWebhookTriggerResponse</a></code>

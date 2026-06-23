@@ -17,7 +17,7 @@ local_development:
 agent:
   acp_type: sync
   name: s040-pydantic-ai
-  description: A sync Pydantic AI agent with tool calling and streaming
+  description: A sync Pydantic AI harness test agent using the unified emitter surface
 
   temporal:
     enabled: false
@@ -47,7 +47,7 @@ deployment:
   global:
     agent:
       name: "s040-pydantic-ai"
-      description: "A sync Pydantic AI agent with tool calling and streaming"
+      description: "A sync Pydantic AI harness test agent using the unified emitter surface"
     replicaCount: 1
     resources:
       requests:

@@ -1,8 +1,7 @@
-"""
-LangGraph graph definition.
+"""LangGraph graph definition for the 030_langgraph sync agent.
 
-Defines the state, nodes, edges, and compiles the graph.
-The compiled graph is the boundary between this module and the API layer.
+Identical to ``030_langgraph/project/graph.py`` — the graph definition is not
+affected by the harness migration. Only ``acp.py`` changes.
 """
 
 from __future__ import annotations
@@ -35,15 +34,12 @@ Guidelines:
 
 class AgentState(TypedDict):
     """State schema for the agent graph."""
+
     messages: Annotated[list[Any], add_messages]
 
 
 async def create_graph():
-    """Create and compile the agent graph with checkpointer.
-
-    Returns:
-        A compiled LangGraph StateGraph ready for invocation.
-    """
+    """Create and compile the agent graph with checkpointer."""
     llm = ChatOpenAI(
         model=MODEL_NAME,
         reasoning={"effort": "high", "summary": "auto"},
@@ -56,9 +52,7 @@ async def create_graph():
         """Process the current state and generate a response."""
         messages = state["messages"]
         if not messages or not isinstance(messages[0], SystemMessage):
-            system_content = SYSTEM_PROMPT.format(
-                timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            )
+            system_content = SYSTEM_PROMPT.format(timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             messages = [SystemMessage(content=system_content)] + messages
         response = llm_with_tools.invoke(messages)
         return {"messages": [response]}
