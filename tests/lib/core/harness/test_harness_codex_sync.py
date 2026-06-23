@@ -18,11 +18,9 @@ event shapes used here are copied verbatim from the codex turn test
 
 Reasoning note
 --------------
-The codex converter emits reasoning as Start(ReasoningContent) + Full(ReasoningContent)
-with NO Done event. The SpanDeriver opens a reasoning span on Start but only
-closes it on a Done; with no Done, the reasoning span is closed by flush() at
-end of stream (is_complete=False). This is asserted explicitly below rather than
-glossed over — it is a real codex-specific quirk, not a missing channel.
+The codex converter emits reasoning as Start(ReasoningContent) + deltas + Done.
+The SpanDeriver opens a reasoning span on Start and closes it normally when the
+Done event is observed (is_complete=True).
 
 What is tested
 --------------
@@ -31,7 +29,7 @@ What is tested
 - The tool_response carries the command output, keyed by item id.
 - With a trace_id + fake tracing, a tool span is opened on Done(tool_request)
   and closed on the matching Full(tool_response), and a reasoning span is
-  opened (closed-by-flush) for a reasoning item.
+  opened and closed normally for a reasoning item.
 
 What is NOT covered without live infrastructure
 -----------------------------------------------
@@ -227,9 +225,9 @@ class TestSyncYieldSpanDerivation:
         _name, output = fake_tracing.ended[0]
         assert "72F" in str(output)
 
-    async def test_reasoning_span_opened_then_flush_closed(self) -> None:
-        """A codex reasoning item emits Start+Full (no Done): the reasoning span
-        opens and is closed by flush() at end of stream (is_complete=False)."""
+    async def test_reasoning_span_opened_then_done_closed(self) -> None:
+        """A codex reasoning item emits Start+Delta+Done: the reasoning span
+        opens and is closed normally when the Done event is observed."""
         received_signals: list[Any] = []
 
         class _RecordingTracer(SpanTracer):
@@ -252,8 +250,8 @@ class TestSyncYieldSpanDerivation:
         opens = [s for s in received_signals if isinstance(s, OpenSpan) and s.kind == "reasoning"]
         closes = [s for s in received_signals if isinstance(s, CloseSpan) and str(s.key).startswith("reasoning:")]
         assert len(opens) == 1, "Reasoning Start must open exactly one reasoning span"
-        assert len(closes) == 1, "Reasoning span must be closed (by flush) at end of stream"
-        assert closes[0].is_complete is False, "No Done event, so the reasoning span is flush-closed as incomplete"
+        assert len(closes) == 1, "Reasoning span must close exactly once"
+        assert closes[0].is_complete is True, "Done event closes the reasoning span as complete"
 
     async def test_no_trace_id_means_no_spans(self) -> None:
         fake_tracing = FakeTracing()
