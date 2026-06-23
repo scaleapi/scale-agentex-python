@@ -38,7 +38,6 @@ from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
 from agentex.types.text_delta import TextDelta
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import OpenSpan, CloseSpan
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
@@ -49,6 +48,8 @@ from agentex.types.task_message_update import (
 )
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
+
+from ._fakes import FakeTracing
 
 # ---------------------------------------------------------------------------
 # Minimal agent under test

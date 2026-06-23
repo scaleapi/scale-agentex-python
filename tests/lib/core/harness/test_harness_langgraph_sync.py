@@ -36,7 +36,6 @@ from typing import Any
 
 import pytest
 
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.types.task_message_update import (
@@ -46,6 +45,8 @@ from agentex.types.task_message_update import (
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
+
+from ._fakes import FakeTracing
 
 # ---------------------------------------------------------------------------
 # Remove conftest stubs so real langchain_core types are used

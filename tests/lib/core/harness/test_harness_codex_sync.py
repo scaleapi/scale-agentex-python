@@ -46,7 +46,6 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator, override
 
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import OpenSpan, CloseSpan
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
@@ -57,6 +56,8 @@ from agentex.types.task_message_update import (
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._codex_turn import CodexTurn
+
+from ._fakes import FakeTracing
 
 # ---------------------------------------------------------------------------
 # Native codex event fixtures (copied from the turn + conformance tests)

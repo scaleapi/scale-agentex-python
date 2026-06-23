@@ -1,6 +1,5 @@
 import pytest
 
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message_update import (
     StreamTaskMessageDone,
@@ -10,6 +9,8 @@ from agentex.types.task_message_update import (
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.core.harness.yield_delivery import yield_events
+
+from ._fakes import FakeTracing
 
 
 async def _gen(events):

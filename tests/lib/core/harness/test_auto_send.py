@@ -15,7 +15,6 @@ import pytest
 
 from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.tool_request_delta import ToolRequestDelta
@@ -28,6 +27,8 @@ from agentex.types.task_message_update import (
 from agentex.lib.core.harness.auto_send import auto_send
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
+
+from ._fakes import FakeTracing
 
 
 class _FakeCtx:

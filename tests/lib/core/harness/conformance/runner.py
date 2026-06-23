@@ -66,7 +66,6 @@ from dataclasses import dataclass
 
 from agentex.types.text_delta import TextDelta
 from agentex.types.task_message import TaskMessage
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import SpanSignal, StreamTaskMessage
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.task_message_update import (
@@ -77,6 +76,8 @@ from agentex.types.task_message_update import (
 )
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
 from agentex.lib.core.harness.span_derivation import SpanDeriver
+
+from .._fakes import FakeTracing
 
 
 @dataclass

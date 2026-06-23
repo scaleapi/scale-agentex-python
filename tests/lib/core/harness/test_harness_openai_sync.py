@@ -41,7 +41,6 @@ from typing import Any, override
 
 from agentex.types.text_delta import TextDelta
 from agentex.types.text_content import TextContent
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import OpenSpan, CloseSpan, StreamTaskMessage
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.types.reasoning_content import ReasoningContent
@@ -56,6 +55,8 @@ from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._openai_turn import OpenAITurn
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
+
+from ._fakes import FakeTracing
 
 # ---------------------------------------------------------------------------
 # Canonical event fixtures (copied from the OpenAI converter contract)

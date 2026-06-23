@@ -39,7 +39,6 @@ from agents.usage import Usage
 from agentex.types.text_delta import TextDelta
 from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import TurnResult, StreamTaskMessage
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
@@ -52,6 +51,8 @@ from agentex.types.task_message_update import (
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._openai_turn import OpenAITurn
+
+from ._fakes import FakeTracing
 
 # ---------------------------------------------------------------------------
 # Canonical event fixtures (copied from the OpenAI converter contract)

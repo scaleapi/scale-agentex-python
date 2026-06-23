@@ -2,9 +2,10 @@ from typing import override
 
 import pytest
 
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import OpenSpan, CloseSpan
 from agentex.lib.core.harness.tracer import SpanTracer
+
+from ._fakes import FakeTracing
 
 
 @pytest.mark.asyncio

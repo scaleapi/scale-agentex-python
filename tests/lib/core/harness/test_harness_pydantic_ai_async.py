@@ -44,13 +44,14 @@ from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 
 from agentex.types.task_message import TaskMessage
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import TurnResult
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
+
+from ._fakes import FakeTracing
 
 # ---------------------------------------------------------------------------
 # Minimal agent under test

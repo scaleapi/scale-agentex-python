@@ -2,7 +2,6 @@ import pytest
 
 from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.lib.core.harness.types import TurnUsage
 from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.types.task_message_delta import TextDelta
@@ -11,6 +10,8 @@ from agentex.types.task_message_update import (
     StreamTaskMessageDelta,
     StreamTaskMessageStart,
 )
+
+from ._fakes import FakeTracing
 
 
 class _FakeCtx:

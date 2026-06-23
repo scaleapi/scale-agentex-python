@@ -34,7 +34,6 @@ from pydantic_ai.messages import (
 )
 
 from agentex.lib.core.harness import UnifiedEmitter
-from tests.lib.core.harness._fakes import FakeTracing
 from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.tool_request_delta import ToolRequestDelta
@@ -53,6 +52,8 @@ from agentex.lib.adk._modules._pydantic_ai_sync import (
     convert_pydantic_ai_to_agentex_events,
 )
 from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
+
+from ..core.harness._fakes import FakeTracing
 
 
 async def _aiter(events: list[Any]) -> AsyncIterator[Any]:
