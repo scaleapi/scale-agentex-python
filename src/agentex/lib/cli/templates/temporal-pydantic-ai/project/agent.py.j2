@@ -11,9 +11,9 @@ moves into recorded activities.
 
 Streaming back to Agentex happens via ``event_stream_handler``, which
 receives Pydantic AI ``AgentStreamEvent``s from inside the model activity
-and forwards them to Redis using the ``stream_pydantic_ai_events`` helper.
-The ``task_id`` and tracing parent span ID are threaded into the handler
-via ``deps``.
+and forwards them through the unified harness surface
+(``UnifiedEmitter.auto_send_turn`` + ``PydanticAITurn``). The ``task_id`` and
+tracing parent span ID are threaded into the handler via ``deps``.
 """
 
 from __future__ import annotations
@@ -27,10 +27,8 @@ from project.tools import get_weather
 from pydantic_ai.messages import AgentStreamEvent
 from pydantic_ai.durable_exec.temporal import TemporalAgent
 
-from agentex.lib.adk import (
-    stream_pydantic_ai_events,
-    create_pydantic_ai_tracing_handler,
-)
+from agentex.lib.core.harness import UnifiedEmitter
+from agentex.lib.adk import PydanticAITurn
 
 # Swap this for any Pydantic AI-supported model identifier
 # (e.g. "anthropic:claude-3-5-sonnet-latest", "openai:gpt-4o").
@@ -92,17 +90,18 @@ async def event_handler(
     activity (not the workflow), it can freely make non-deterministic Redis
     writes — including the tracing HTTP calls that record per-tool-call
     spans under the workflow's per-turn span (when ``parent_span_id`` is set).
+
+    The UnifiedEmitter is constructed from ``deps`` (task_id + parent_span_id),
+    so tool spans nest under the workflow's per-turn span and messages auto-send
+    to the task stream.
     """
-    tracing_handler = create_pydantic_ai_tracing_handler(
+    emitter = UnifiedEmitter(
+        task_id=run_context.deps.task_id,
         trace_id=run_context.deps.task_id,
         parent_span_id=run_context.deps.parent_span_id,
-        task_id=run_context.deps.task_id,
     )
-    await stream_pydantic_ai_events(
-        events,
-        run_context.deps.task_id,
-        tracing_handler=tracing_handler,
-    )
+    turn = PydanticAITurn(events, model=MODEL_NAME)
+    await emitter.auto_send_turn(turn)
 
 
 # Construct the durable agent at module load time so that the

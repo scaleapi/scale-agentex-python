@@ -8,12 +8,13 @@ tokens and tool calls from the LangGraph graph to the Agentex frontend.
 from typing import AsyncGenerator
 
 import agentex.lib.adk as adk
-from agentex.lib.adk import create_langgraph_tracing_handler, convert_langgraph_to_agentex_events
+from agentex.lib.core.harness import UnifiedEmitter
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.protocol.acp import SendMessageParams
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.adk import LangGraphTurn
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import TaskMessageUpdate
@@ -72,22 +73,21 @@ async def handle_message_send(
         input={"message": user_message},
         data={"__span_type__": "AGENT_WORKFLOW"},
     ) as turn_span:
-        callback = create_langgraph_tracing_handler(
+        stream = graph.astream(
+            {"messages": [{"role": "user", "content": user_message}]},
+            config={"configurable": {"thread_id": thread_id}},
+            stream_mode=["messages", "updates"],
+        )
+
+        turn = LangGraphTurn(stream, model=None)
+        emitter = UnifiedEmitter(
+            task_id=thread_id,
             trace_id=thread_id,
             parent_span_id=turn_span.id if turn_span else None,
         )
 
-        stream = graph.astream(
-            {"messages": [{"role": "user", "content": user_message}]},
-            config={
-                "configurable": {"thread_id": thread_id},
-                "callbacks": [callback],
-            },
-            stream_mode=["messages", "updates"],
-        )
-
         final_text = ""
-        async for event in convert_langgraph_to_agentex_events(stream):
+        async for event in emitter.yield_turn(turn):
             # Accumulate text deltas for span output
             delta = getattr(event, "delta", None)
             if isinstance(delta, TextDelta) and delta.text_delta:
