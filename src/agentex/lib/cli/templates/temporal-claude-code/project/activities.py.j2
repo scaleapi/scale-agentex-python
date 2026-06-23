@@ -78,6 +78,7 @@ async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIter
     assert proc.stdin is not None
 
     proc.stdin.write(prompt.encode())
+    await proc.stdin.drain()
     proc.stdin.close()
 
     # Drain stderr concurrently. With --verbose, Claude Code can write enough to
