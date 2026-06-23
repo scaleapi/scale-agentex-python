@@ -30,6 +30,11 @@ agent:
     - env_var_name: REDIS_URL
       secret_name: redis-url-secret
       secret_key: url
+    # graph.py builds ChatOpenAI(model=MODEL_NAME); a deployed worker needs the
+    # model credential or the first activity call fails.
+    - env_var_name: OPENAI_API_KEY
+      secret_name: openai-api-key
+      secret_key: api-key
 
   env: {}
 
@@ -41,6 +46,9 @@ deployment:
   imagePullSecrets: []
 
   global:
+    agent:
+      name: "at130-langgraph"
+      description: "A Temporal-backed LangGraph agent (harness variant) whose nodes run as Temporal activities"
     replicaCount: 1
     resources:
       requests:
