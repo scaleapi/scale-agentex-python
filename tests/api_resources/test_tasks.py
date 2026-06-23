@@ -656,6 +656,7 @@ class TestTasks:
     def test_method_update_by_id_with_all_params(self, client: Agentex) -> None:
         task = client.tasks.update_by_id(
             task_id="task_id",
+            merge_params={"foo": "bar"},
             task_metadata={"foo": "bar"},
         )
         assert_matches_type(Task, task, path=["response"])
@@ -707,6 +708,7 @@ class TestTasks:
     def test_method_update_by_name_with_all_params(self, client: Agentex) -> None:
         task = client.tasks.update_by_name(
             task_name="task_name",
+            merge_params={"foo": "bar"},
             task_metadata={"foo": "bar"},
         )
         assert_matches_type(Task, task, path=["response"])
@@ -1383,6 +1385,7 @@ class TestAsyncTasks:
     async def test_method_update_by_id_with_all_params(self, async_client: AsyncAgentex) -> None:
         task = await async_client.tasks.update_by_id(
             task_id="task_id",
+            merge_params={"foo": "bar"},
             task_metadata={"foo": "bar"},
         )
         assert_matches_type(Task, task, path=["response"])
@@ -1434,6 +1437,7 @@ class TestAsyncTasks:
     async def test_method_update_by_name_with_all_params(self, async_client: AsyncAgentex) -> None:
         task = await async_client.tasks.update_by_name(
             task_name="task_name",
+            merge_params={"foo": "bar"},
             task_metadata={"foo": "bar"},
         )
         assert_matches_type(Task, task, path=["response"])
