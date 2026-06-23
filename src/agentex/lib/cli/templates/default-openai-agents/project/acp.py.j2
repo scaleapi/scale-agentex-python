@@ -13,6 +13,7 @@ single, self-contained ``acp.py``.
 from __future__ import annotations
 
 import os
+from typing import List
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -26,6 +27,7 @@ from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskP
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.lib.adk import OpenAITurn
@@ -92,6 +94,13 @@ def get_agent() -> Agent:
     return create_agent()
 
 
+class StateModel(BaseModel):
+    """Per-task conversation state persisted between turns."""
+
+    input_list: List[dict]
+    turn_number: int
+
+
 @acp.on_task_create
 async def handle_task_create(params: CreateTaskParams):
     logger.info(f"Task created: {params.task.id}")
@@ -102,12 +111,25 @@ async def handle_task_event_send(params: SendEventParams):
     """Handle each user message: run the agent and auto-send its turn."""
     agent = get_agent()
     task_id = params.task.id
+    agent_id = params.agent.id
     user_message = params.event.content.content
 
     logger.info(f"Processing message for task {task_id}")
 
     # Echo the user's message into the task history.
     await adk.messages.create(task_id=task_id, content=params.event.content)
+
+    # Load (or create) the persisted conversation history for this task so the
+    # agent can see prior turns, then append the new user message.
+    task_state = await adk.state.get_by_task_and_agent(task_id=task_id, agent_id=agent_id)
+    if task_state is None:
+        state = StateModel(input_list=[], turn_number=0)
+        task_state = await adk.state.create(task_id=task_id, agent_id=agent_id, state=state)
+    else:
+        state = StateModel.model_validate(task_state.state)
+
+    state.turn_number += 1
+    state.input_list.append({"role": "user", "content": user_message})
 
     async with adk.tracing.span(
         trace_id=task_id,
@@ -116,7 +138,7 @@ async def handle_task_event_send(params: SendEventParams):
         input={"message": user_message},
         data={"__span_type__": "AGENT_WORKFLOW"},
     ) as turn_span:
-        result = Runner.run_streamed(starting_agent=agent, input=user_message)
+        result = Runner.run_streamed(starting_agent=agent, input=state.input_list)
         turn = OpenAITurn(result=result, model=MODEL_NAME)
         emitter = UnifiedEmitter(
             task_id=task_id,
@@ -124,6 +146,17 @@ async def handle_task_event_send(params: SendEventParams):
             parent_span_id=turn_span.id if turn_span else None,
         )
         turn_result = await emitter.auto_send_turn(turn)
+
+        # Persist the full conversation history (user + assistant + tool calls)
+        # so the next turn resumes with complete context.
+        state.input_list = result.to_input_list()
+        await adk.state.update(
+            state_id=task_state.id,
+            task_id=task_id,
+            agent_id=agent_id,
+            state=state,
+        )
+
         if turn_span:
             turn_span.output = {"final_output": turn_result.final_text}
 
