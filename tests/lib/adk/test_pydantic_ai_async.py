@@ -82,7 +82,9 @@ class FakeStreamingModule:
     def __init__(self) -> None:
         self.contexts: list[FakeContext] = []
 
-    def streaming_task_message_context(self, *, task_id: str, initial_content: Any) -> FakeContext:
+    def streaming_task_message_context(
+        self, *, task_id: str, initial_content: Any, streaming_mode: str = "coalesced", created_at: Any = None
+    ) -> FakeContext:
         tm = TaskMessage(
             id=f"m{len(self.contexts) + 1}",
             task_id=task_id,
@@ -255,15 +257,35 @@ class TestThinkingStreaming:
 
 
 class TestToolCallEmission:
-    async def test_tool_call_emits_full_tool_request_message_on_part_end(
+    async def test_tool_call_opens_streaming_context_with_identity(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        """Async helper uses Option A: tool requests are full messages, not delta streams."""
+        """Tool requests are delivered as a streaming context (Start+Delta+Done).
+
+        AGX1-377 fix: auto_send now delivers streamed tool-request messages
+        natively (Start+ToolRequestDelta+Done). The streaming context is opened
+        at the Start event with the initial ToolRequestContent (tool_call_id +
+        name + empty arguments), argument tokens are streamed as deltas, and the
+        context is closed on Done.
+
+        This test uses a realistic pydantic-ai event sequence: args arrive as a
+        PartDeltaEvent fragment (the way OpenAI/Anthropic actually stream JSON
+        tool-call arguments).
+        """
+        from pydantic_ai.messages import ToolCallPartDelta
+
+        from agentex.types.tool_request_delta import ToolRequestDelta
+
         streaming, messages = fake_adk
         events = [
             PartStartEvent(
                 index=1,
                 part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1"),
+            ),
+            # Realistic: args arrive as delta tokens (JSON string fragments).
+            PartDeltaEvent(
+                index=1,
+                delta=ToolCallPartDelta(args_delta='{"city":"Paris"}'),
             ),
             PartEndEvent(
                 index=1,
@@ -272,21 +294,28 @@ class TestToolCallEmission:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        assert streaming.contexts == [], "Tool calls do not open a streaming context"
-        assert len(messages.created) == 1
-        msg = messages.created[0]
-        assert msg["task_id"] == TASK_ID
-        content = msg["content"]
+        # AGX1-373: tool messages arrive via streaming_task_message_context.
+        assert messages.created == [], "adk.messages.create must not be called"
+        assert len(streaming.contexts) == 1, "tool_request opens a streaming context"
+        ctx = streaming.contexts[0]
+        assert ctx.closed is True
+        content = ctx.initial_content
         assert isinstance(content, ToolRequestContent)
         assert content.tool_call_id == "c1"
         assert content.name == "get_weather"
-        assert content.arguments == {"city": "Paris"}
         assert content.author == "agent"
+        # AGX1-377 streamed shape: initial_content has empty args (args come via delta)
+        assert content.arguments == {}
+        # The arg delta is delivered as a stream_update
+        assert len(ctx.updates) == 1
+        assert isinstance(ctx.updates[0].delta, ToolRequestDelta)
+        assert ctx.updates[0].delta.arguments_delta == '{"city":"Paris"}'
 
     async def test_tool_call_with_dict_args_passes_through(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        _, messages = fake_adk
+        """When args arrive pre-populated as a dict in PartStart, they're in initial_content."""
+        streaming, messages = fake_adk
         events = [
             PartStartEvent(
                 index=0,
@@ -299,22 +328,39 @@ class TestToolCallEmission:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        assert len(messages.created) == 1
-        assert messages.created[0]["content"].arguments == {"q": "weather"}
+        # AGX1-373: tool messages via streaming_task_message_context
+        assert messages.created == []
+        assert len(streaming.contexts) == 1
+        # Dict args present at PartStart land directly in initial_content.arguments
+        assert streaming.contexts[0].initial_content.arguments == {"q": "weather"}
+        assert streaming.contexts[0].updates == [], "no delta for pre-populated dict args"
 
     async def test_tool_call_with_invalid_json_args_surfaces_raw(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        """Don't drop the tool call when the model emits malformed JSON args.
+        """Malformed JSON arg delta is surfaced as a ToolRequestDelta with the raw string.
 
-        The arguments field is preserved under ``_raw`` so the failure is
-        visible to the UI rather than silently truncated.
+        The argument delta is delivered as-is by auto_send; the client-side
+        accumulator or the streaming backend handles malformed JSON gracefully.
+
+        Parts-manager invariant: PartEnd.part is the accumulated snapshot; real
+        pydantic-ai conveys args via PartStart + PartDeltaEvent, so a
+        PartStart(None)+PartEnd(json) with no delta is not realizable.
         """
-        _, messages = fake_adk
+        from pydantic_ai.messages import ToolCallPartDelta
+
+        from agentex.types.tool_request_delta import ToolRequestDelta
+
+        streaming, messages = fake_adk
         events = [
             PartStartEvent(
                 index=0,
                 part=ToolCallPart(tool_name="t", args=None, tool_call_id="c"),
+            ),
+            # Malformed JSON arrives as a delta token.
+            PartDeltaEvent(
+                index=0,
+                delta=ToolCallPartDelta(args_delta="not-json{"),
             ),
             PartEndEvent(
                 index=0,
@@ -323,13 +369,21 @@ class TestToolCallEmission:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        assert len(messages.created) == 1
-        assert messages.created[0]["content"].arguments == {"_raw": "not-json{"}
+        # AGX1-373: tool messages via streaming_task_message_context
+        assert messages.created == []
+        assert len(streaming.contexts) == 1
+        ctx = streaming.contexts[0]
+        # Initial content has empty args (args come via delta)
+        assert ctx.initial_content.arguments == {}
+        # The malformed JSON is surfaced verbatim in the ToolRequestDelta
+        assert len(ctx.updates) == 1
+        assert isinstance(ctx.updates[0].delta, ToolRequestDelta)
+        assert ctx.updates[0].delta.arguments_delta == "not-json{"
 
     async def test_tool_call_with_none_args_defaults_to_empty_dict(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        _, messages = fake_adk
+        streaming, messages = fake_adk
         events = [
             PartStartEvent(
                 index=0,
@@ -342,15 +396,20 @@ class TestToolCallEmission:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        assert len(messages.created) == 1
-        assert messages.created[0]["content"].arguments == {}
+        # AGX1-373: tool messages via streaming_task_message_context
+        assert messages.created == []
+        assert len(streaming.contexts) == 1
+        assert streaming.contexts[0].initial_content.arguments == {}
+        assert streaming.contexts[0].updates == [], "no delta when args are absent"
 
 
 class TestToolResult:
     async def test_tool_return_emits_full_tool_response_message(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        _, messages = fake_adk
+        # AGX1-373: tool responses arrive via streaming_task_message_context
+        # (open+close pair), NOT via adk.messages.create.
+        streaming, messages = fake_adk
         events = [
             FunctionToolResultEvent(
                 part=ToolReturnPart(tool_name="get_weather", content="Sunny, 72F", tool_call_id="c1"),
@@ -358,13 +417,17 @@ class TestToolResult:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        assert len(messages.created) == 1
-        content = messages.created[0]["content"]
+        assert messages.created == [], "adk.messages.create must not be called after reimplementation"
+        assert len(streaming.contexts) == 1
+        ctx = streaming.contexts[0]
+        assert ctx.closed is True
+        content = ctx.initial_content
         assert isinstance(content, ToolResponseContent)
         assert content.tool_call_id == "c1"
         assert content.name == "get_weather"
         assert content.content == "Sunny, 72F"
         assert content.author == "agent"
+        assert ctx.updates == [], "open+close only — no deltas for tool messages"
 
     async def test_tool_return_with_dict_content_preserves_structure(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
@@ -377,7 +440,7 @@ class TestToolResult:
         and divergent from the sync converter which uses ``_tool_return_content``
         to return dicts as-is.
         """
-        _, messages = fake_adk
+        streaming, messages = fake_adk
         events = [
             FunctionToolResultEvent(
                 part=ToolReturnPart(tool_name="t", content={"temp": 72, "sky": "clear"}, tool_call_id="c"),
@@ -385,7 +448,10 @@ class TestToolResult:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        out = messages.created[0]["content"].content
+        # AGX1-373: tool messages via streaming_task_message_context
+        assert messages.created == []
+        assert len(streaming.contexts) == 1
+        out = streaming.contexts[0].initial_content.content
         assert out == {"temp": 72, "sky": "clear"}, (
             f"Expected the dict to survive verbatim; got {out!r}. "
             "If this is a Python repr string, the helper regressed to str(content)."
@@ -402,7 +468,7 @@ class TestToolResult:
             temp: int
             sky: str
 
-        _, messages = fake_adk
+        streaming, messages = fake_adk
         events = [
             FunctionToolResultEvent(
                 part=ToolReturnPart(
@@ -414,13 +480,16 @@ class TestToolResult:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        out = messages.created[0]["content"].content
+        # AGX1-373: tool messages via streaming_task_message_context
+        assert messages.created == []
+        assert len(streaming.contexts) == 1
+        out = streaming.contexts[0].initial_content.content
         assert out == {"temp": 72, "sky": "clear"}
 
     async def test_retry_prompt_part_surfaces_as_tool_response(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        _, messages = fake_adk
+        streaming, messages = fake_adk
         events = [
             FunctionToolResultEvent(
                 part=RetryPromptPart(
@@ -432,8 +501,10 @@ class TestToolResult:
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        assert len(messages.created) == 1
-        content = messages.created[0]["content"]
+        # AGX1-373: tool messages via streaming_task_message_context
+        assert messages.created == []
+        assert len(streaming.contexts) == 1
+        content = streaming.contexts[0].initial_content
         assert isinstance(content, ToolResponseContent)
         assert content.tool_call_id == "c1"
         # RetryPromptPart.content stringifies to the error description
@@ -446,9 +517,9 @@ class TestContextLifecycle:
     ) -> None:
         """End-to-end multi-step shape: text → tool call → tool result → more text.
 
-        Each text/reasoning segment must get its own streaming context that is
-        closed before the next one opens, and tool messages must interleave
-        correctly via ``adk.messages.create``.
+        AGX1-373 envelope change: tool messages now arrive via
+        streaming_task_message_context (open+close pairs) instead of
+        adk.messages.create. All four message types open streaming contexts.
         """
         streaming, messages = fake_adk
         events = [
@@ -474,18 +545,30 @@ class TestContextLifecycle:
         ]
         final = await stream_pydantic_ai_events(_aiter(events), TASK_ID)
 
-        assert len(streaming.contexts) == 2, "One context per text part — tool calls don't open streaming contexts"
+        # AGX1-373: all 4 messages (text, tool_request, tool_response, text)
+        # arrive via streaming_task_message_context.
+        assert messages.created == [], "adk.messages.create must not be called after reimplementation"
+        assert len(streaming.contexts) == 4
         assert all(ctx.closed for ctx in streaming.contexts)
-        assert _text_deltas(streaming.contexts[0]) == ["Looking up..."]
-        assert _text_deltas(streaming.contexts[1]) == ["It's sunny."]
 
-        # Two messages: tool request, then tool response — in that order.
-        assert [type(m["content"]).__name__ for m in messages.created] == [
-            "ToolRequestContent",
-            "ToolResponseContent",
-        ]
-        assert messages.created[0]["content"].tool_call_id == "c1"
-        assert messages.created[1]["content"].tool_call_id == "c1"
+        text_ctxs = [ctx for ctx in streaming.contexts if isinstance(ctx.initial_content, TextContent)]
+        tool_req_ctxs = [ctx for ctx in streaming.contexts if isinstance(ctx.initial_content, ToolRequestContent)]
+        tool_resp_ctxs = [ctx for ctx in streaming.contexts if isinstance(ctx.initial_content, ToolResponseContent)]
+        assert len(text_ctxs) == 2
+        assert len(tool_req_ctxs) == 1
+        assert len(tool_resp_ctxs) == 1
+
+        assert _text_deltas(text_ctxs[0]) == ["Looking up..."]
+        assert _text_deltas(text_ctxs[1]) == ["It's sunny."]
+
+        # Tool content is preserved verbatim.
+        assert tool_req_ctxs[0].initial_content.tool_call_id == "c1"
+        assert tool_resp_ctxs[0].initial_content.tool_call_id == "c1"
+
+        # Tool contexts carry no deltas (open+close only).
+        assert tool_req_ctxs[0].updates == []
+        assert tool_resp_ctxs[0].updates == []
+
         assert final == "It's sunny."
 
     async def test_new_text_part_after_text_closes_previous(
@@ -533,7 +616,11 @@ class TestContextLifecycle:
     async def test_tool_result_closes_any_open_streaming_context(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        """A tool result arriving while a text context is open must close that context first."""
+        """A tool result arriving while a text context is open must close that context first.
+
+        AGX1-373: the tool response itself now also opens a streaming context
+        (open+close pair) rather than going through adk.messages.create.
+        """
         streaming, messages = fake_adk
         events = [
             PartStartEvent(index=0, part=TextPart(content="")),
@@ -548,7 +635,10 @@ class TestContextLifecycle:
         assert streaming.contexts[0].closed is True, (
             "Helper must close any open streaming context before emitting a tool result message"
         )
-        assert len(messages.created) == 1
+        # AGX1-373: tool response arrives via streaming_task_message_context
+        assert messages.created == []
+        assert len(streaming.contexts) == 2
+        assert isinstance(streaming.contexts[1].initial_content, ToolResponseContent)
 
 
 class TestDeltaForOrphanIndexIgnored:
@@ -584,7 +674,7 @@ class TestTracingHandler:
     async def test_handler_records_start_and_end_for_each_tool_call(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        _, messages = fake_adk
+        streaming, messages = fake_adk
         handler = self._RecordingHandler()
         events = [
             PartStartEvent(
@@ -605,11 +695,12 @@ class TestTracingHandler:
             tracing_handler=handler,  # type: ignore[arg-type]
         )
 
-        # Streaming side-effects still happen — tracing is additive.
-        assert [type(m["content"]).__name__ for m in messages.created] == [
-            "ToolRequestContent",
-            "ToolResponseContent",
-        ]
+        # AGX1-373: tool messages arrive via streaming_task_message_context.
+        # Tracing is still additive — both messages are delivered AND hooks fire.
+        assert messages.created == []
+        assert len(streaming.contexts) == 2
+        assert isinstance(streaming.contexts[0].initial_content, ToolRequestContent)
+        assert isinstance(streaming.contexts[1].initial_content, ToolResponseContent)
         # And both lifecycle hooks fired exactly once with the right payload.
         assert handler.starts == [
             {
@@ -680,8 +771,12 @@ class TestTracingHandler:
     async def test_omitting_handler_is_a_no_op_for_existing_behavior(
         self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
     ) -> None:
-        """Regression: passing no tracing handler preserves the pre-tracing behavior."""
-        _, messages = fake_adk
+        """Regression: passing no tracing handler preserves streaming behavior.
+
+        AGX1-373: tool messages arrive via streaming_task_message_context
+        regardless of whether tracing_handler is passed.
+        """
+        streaming, messages = fake_adk
         events = [
             PartStartEvent(
                 index=0,
@@ -696,11 +791,11 @@ class TestTracingHandler:
             ),
         ]
         await stream_pydantic_ai_events(_aiter(events), TASK_ID)
-        # Exact same shape as before tracing existed.
-        assert [type(m["content"]).__name__ for m in messages.created] == [
-            "ToolRequestContent",
-            "ToolResponseContent",
-        ]
+        # AGX1-373: tool messages via streaming_task_message_context.
+        assert messages.created == []
+        assert len(streaming.contexts) == 2
+        content_types = [type(ctx.initial_content).__name__ for ctx in streaming.contexts]
+        assert content_types == ["ToolRequestContent", "ToolResponseContent"]
 
 
 class TestPydanticAITracingHandlerDeterministicIds:
@@ -867,3 +962,101 @@ class TestCleanupOnException:
             await stream_pydantic_ai_events(boom(), TASK_ID)
 
         assert streaming.contexts[0].closed is True
+
+
+# ---------------------------------------------------------------------------
+# Characterization test: lock the wire-level delivery shape for a representative
+# pydantic-ai run (text + tool call + tool response + more text).
+#
+# Step 1 (CURRENT behavior): written against the original implementation.
+# - Text/reasoning use adk.streaming.streaming_task_message_context.
+# - Tool messages use adk.messages.create (FakeMessagesModule.created list).
+# - Final text is the last text segment.
+#
+# Step 2 (POST-reimplementation on UnifiedEmitter / auto_send):
+# The assertions in TestCharacterizeWireShapeNew (below) lock the new shape.
+# Tool messages no longer go through adk.messages.create; they arrive via
+# streaming_task_message_context open+close pairs (Start+Done envelope).
+# This is the AGX1-373 accepted envelope change: logical content is identical.
+# ---------------------------------------------------------------------------
+
+
+class TestCharacterizeWireShape:
+    """Characterization tests: lock the wire-level delivery shape after reimplementation.
+
+    Uses FakeStreamingModule + FakeMessagesModule (the existing fake pair).
+
+    AGX1-373 shape (post-reimplementation on UnifiedEmitter / auto_send):
+    - Text/reasoning: streaming_task_message_context (open + deltas + close)
+    - Tool messages: streaming_task_message_context (open+close, no deltas)
+    - adk.messages.create is NOT called.
+    - Final text == last text segment only.
+
+    This class was first written to characterize the OLD shape (adk.messages.create
+    for tool messages) and was updated post-reimplementation to reflect the new
+    delivery channel. The logical content is identical; only the channel changed.
+    """
+
+    async def test_text_tool_text_new_wire_shape(
+        self, fake_adk: tuple[FakeStreamingModule, FakeMessagesModule]
+    ) -> None:
+        """Representative run: text -> tool call -> tool response -> more text.
+
+        Post-AGX1-373 delivery shape:
+        - Four streaming contexts: text, tool_request, tool_response, text.
+        - adk.messages.create NOT called.
+        - Final text == "It's sunny." (last segment only, matching the
+          multi-step convention).
+        """
+        from pydantic_ai.messages import ToolReturnPart
+
+        streaming, messages = fake_adk
+        events = [
+            PartStartEvent(index=0, part=TextPart(content="")),
+            PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="Looking up...")),
+            PartEndEvent(index=0, part=TextPart(content="Looking up...")),
+            PartStartEvent(
+                index=1,
+                part=ToolCallPart(tool_name="get_weather", args=None, tool_call_id="c1"),
+            ),
+            PartEndEvent(
+                index=1,
+                part=ToolCallPart(tool_name="get_weather", args="{}", tool_call_id="c1"),
+            ),
+            FunctionToolResultEvent(
+                part=ToolReturnPart(tool_name="get_weather", content="Sunny", tool_call_id="c1"),
+            ),
+            PartStartEvent(index=0, part=TextPart(content="")),
+            PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="It's sunny.")),
+            PartEndEvent(index=0, part=TextPart(content="It's sunny.")),
+        ]
+
+        final = await stream_pydantic_ai_events(_aiter(events), TASK_ID)
+
+        assert final == "It's sunny.", "multi-step: only the last text segment is returned"
+
+        # AGX1-373: all 4 messages arrive via streaming_task_message_context
+        assert messages.created == []
+        assert len(streaming.contexts) == 4
+        assert all(ctx.closed for ctx in streaming.contexts)
+
+        content_types = [type(ctx.initial_content).__name__ for ctx in streaming.contexts]
+        assert content_types == [
+            "TextContent",
+            "ToolRequestContent",
+            "ToolResponseContent",
+            "TextContent",
+        ]
+
+        text_ctxs = [ctx for ctx in streaming.contexts if isinstance(ctx.initial_content, TextContent)]
+        tool_req_ctxs = [ctx for ctx in streaming.contexts if isinstance(ctx.initial_content, ToolRequestContent)]
+        tool_resp_ctxs = [ctx for ctx in streaming.contexts if isinstance(ctx.initial_content, ToolResponseContent)]
+
+        assert _text_deltas(text_ctxs[0]) == ["Looking up..."]
+        assert _text_deltas(text_ctxs[1]) == ["It's sunny."]
+        assert tool_req_ctxs[0].initial_content.tool_call_id == "c1"
+        assert tool_req_ctxs[0].initial_content.name == "get_weather"
+        assert tool_req_ctxs[0].updates == []
+        assert tool_resp_ctxs[0].initial_content.tool_call_id == "c1"
+        assert tool_resp_ctxs[0].initial_content.content == "Sunny"
+        assert tool_resp_ctxs[0].updates == []

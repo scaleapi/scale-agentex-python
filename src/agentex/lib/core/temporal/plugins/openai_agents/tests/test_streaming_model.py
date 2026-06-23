@@ -12,8 +12,11 @@ from agents.model_settings import Reasoning, MCPToolChoice  # type: ignore[attr-
 from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseTextDeltaEvent,
+    ResponseOutputItemDoneEvent,
     ResponseOutputItemAddedEvent,
+    ResponseFunctionCallArgumentsDoneEvent,
     ResponseReasoningSummaryTextDeltaEvent,
+    ResponseFunctionCallArgumentsDeltaEvent,
 )
 
 
@@ -849,6 +852,197 @@ class TestStreamingModelBasics:
                 handoffs=[],
                 tracing=None,
             )
+
+
+class TestStreamingModelFunctionCallArgsStreaming:
+    """Verify ``ResponseFunctionCallArgumentsDeltaEvent``s are surfaced as
+    ``ToolRequestDelta`` updates and that a final ``ToolRequestContent`` Full is
+    emitted on ``ResponseOutputItemDoneEvent``.
+
+    Without this, write-heavy tools (``write_file``, ``apply_patch``) buffer their
+    entire argument body inside ``invoke_model_activity`` and the UI sees a
+    multi-second freeze while the model is actively producing tokens.
+    """
+
+    @staticmethod
+    def _build_function_call_stream(arguments_text: str):
+        """Construct a streaming event sequence for a single function_call.
+
+        Mirrors the production order: Added → N × ArgumentsDelta → ArgumentsDone
+        → OutputItemDone → ResponseCompleted. ``spec=...`` makes ``isinstance``
+        dispatch in production work without triggering pydantic validation.
+        """
+        call_item = MagicMock()
+        call_item.type = "function_call"
+        call_item.id = "fc_abc"
+        call_item.call_id = "call_abc"
+        call_item.name = "write_file"
+        call_item.arguments = ""
+
+        item_added = MagicMock(spec=ResponseOutputItemAddedEvent)
+        item_added.item = call_item
+        item_added.output_index = 0
+
+        # Split the argument text into a few chunks to exercise the per-delta loop
+        chunk_size = max(1, len(arguments_text) // 3) if arguments_text else 1
+        chunks = [arguments_text[i:i + chunk_size] for i in range(0, len(arguments_text), chunk_size)] or [""]
+        delta_events = []
+        for chunk in chunks:
+            ev = MagicMock(spec=ResponseFunctionCallArgumentsDeltaEvent)
+            ev.delta = chunk
+            ev.output_index = 0
+            delta_events.append(ev)
+
+        args_done = MagicMock(spec=ResponseFunctionCallArgumentsDoneEvent)
+        args_done.arguments = arguments_text
+        args_done.output_index = 0
+
+        item_done = MagicMock(spec=ResponseOutputItemDoneEvent)
+        item_done.item = call_item
+        item_done.output_index = 0
+
+        completed = MagicMock(spec=ResponseCompletedEvent)
+        completed.response = MagicMock(output=[], usage=MagicMock(), id=None)
+
+        return [item_added, *delta_events, args_done, item_done, completed], chunks
+
+    @staticmethod
+    def _install_real_task_message(mock_adk_streaming, task_id: str):
+        """Replace the autouse fixture's MagicMock ``task_message`` with a real
+        ``TaskMessage`` so production's ``StreamTaskMessageDelta(parent_task_message=...)``
+        construction passes pydantic validation. The default mock works for tests
+        that only assert on the context's ``__aenter__`` call but breaks tests
+        that exercise ``stream_update`` end-to-end.
+        """
+        from agentex.types.task_message import TaskMessage
+        from agentex.types.task_message_content import ToolRequestContent
+
+        ctx = mock_adk_streaming.streaming_task_message_context.return_value
+        ctx.task_message = TaskMessage(
+            id="msg_test",
+            task_id=task_id,
+            content=ToolRequestContent(
+                author="agent",
+                tool_call_id="call_abc",
+                name="write_file",
+                arguments={},
+            ),
+            streaming_status="IN_PROGRESS",
+        )
+        return ctx
+
+    @pytest.mark.asyncio
+    async def test_function_call_emits_argument_deltas_and_final_full(
+        self, streaming_model, mock_adk_streaming, _streaming_context_vars, sample_task_id
+    ):
+        """A function_call with well-formed JSON args should produce:
+        (1) one streaming context opened with ``ToolRequestContent`` initial_content,
+        (2) one ``StreamTaskMessageDelta`` per ``ArgumentsDelta`` event carrying a
+            ``ToolRequestDelta`` with the right ``tool_call_id`` and ``arguments_delta``,
+        (3) one final ``StreamTaskMessageFull`` with ``ToolRequestContent`` whose
+            ``arguments`` is the parsed JSON dict.
+        """
+        from agentex.types.task_message_delta import ToolRequestDelta
+        from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
+        from agentex.types.task_message_content import ToolRequestContent
+
+        ctx = self._install_real_task_message(mock_adk_streaming, sample_task_id)
+
+        args_text = '{"path": "/tmp/foo.txt", "contents": "hello world"}'
+        events, chunks = self._build_function_call_stream(args_text)
+
+        mock_stream = AsyncMock()
+        mock_stream.__aiter__.return_value = iter(events)
+        streaming_model.client.responses.create = AsyncMock(return_value=mock_stream)
+
+        await streaming_model.get_response(
+            system_instructions=None,
+            input="please write foo",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        # 1. A streaming context was opened with ToolRequestContent.
+        opens = [
+            c for c in mock_adk_streaming.streaming_task_message_context.call_args_list
+            if isinstance(c.kwargs.get("initial_content"), ToolRequestContent)
+        ]
+        assert len(opens) == 1, f"expected one ToolRequest context, got {len(opens)}"
+        initial = opens[0].kwargs["initial_content"]
+        assert initial.tool_call_id == "call_abc"
+        assert initial.name == "write_file"
+
+        # 2. One StreamTaskMessageDelta(ToolRequestDelta) was streamed per
+        #    ArgumentsDelta event, preserving the delta text exactly.
+        delta_updates = [
+            call.args[0] if call.args else call.kwargs.get("update")
+            for call in ctx.stream_update.call_args_list
+            if (call.args and isinstance(call.args[0], StreamTaskMessageDelta)
+                and isinstance(call.args[0].delta, ToolRequestDelta))
+        ]
+        assert len(delta_updates) == len(chunks)
+        for update, expected_chunk in zip(delta_updates, chunks):
+            assert update.delta.tool_call_id == "call_abc"
+            assert update.delta.name == "write_file"
+            assert update.delta.arguments_delta == expected_chunk
+
+        # 3. A final StreamTaskMessageFull(ToolRequestContent) was streamed with
+        #    parsed args.
+        full_updates = [
+            call.args[0] if call.args else call.kwargs.get("update")
+            for call in ctx.stream_update.call_args_list
+            if (call.args and isinstance(call.args[0], StreamTaskMessageFull)
+                and isinstance(call.args[0].content, ToolRequestContent))
+        ]
+        assert len(full_updates) == 1
+        final = full_updates[0].content
+        assert final.tool_call_id == "call_abc"
+        assert final.name == "write_file"
+        assert final.arguments == {"path": "/tmp/foo.txt", "contents": "hello world"}
+
+    @pytest.mark.asyncio
+    async def test_function_call_malformed_args_fall_back_to_empty_dict(
+        self, streaming_model, mock_adk_streaming, _streaming_context_vars, sample_task_id, caplog
+    ):
+        """If the model produces invalid JSON for the args, the final
+        ``ToolRequestContent`` should carry ``arguments={}`` and a warning should
+        be logged. The raw delta stream is preserved either way.
+        """
+        from agentex.types.task_message_update import StreamTaskMessageFull
+        from agentex.types.task_message_content import ToolRequestContent
+
+        ctx = self._install_real_task_message(mock_adk_streaming, sample_task_id)
+
+        # Missing closing brace — invalid JSON.
+        events, _ = self._build_function_call_stream('{"path": "/tmp/foo.txt", "contents":')
+
+        mock_stream = AsyncMock()
+        mock_stream.__aiter__.return_value = iter(events)
+        streaming_model.client.responses.create = AsyncMock(return_value=mock_stream)
+
+        with caplog.at_level("WARNING"):
+            await streaming_model.get_response(
+                system_instructions=None,
+                input="please write foo",
+                model_settings=ModelSettings(),
+                tools=[],
+                output_schema=None,
+                handoffs=[],
+                tracing=None,
+            )
+
+        full_updates = [
+            call.args[0] if call.args else call.kwargs.get("update")
+            for call in ctx.stream_update.call_args_list
+            if (call.args and isinstance(call.args[0], StreamTaskMessageFull)
+                and isinstance(call.args[0].content, ToolRequestContent))
+        ]
+        assert len(full_updates) == 1
+        assert full_updates[0].content.arguments == {}
+        assert any("Failed to parse tool call arguments" in r.getMessage() for r in caplog.records)
 
 
 class TestStreamingModelUsageResponseIdAndCacheKey:
