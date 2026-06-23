@@ -52,11 +52,11 @@ async def auto_send(
     final_text_parts so that multi-step turns return the LAST text segment.
     Full(TextContent) also overwrites final_text_parts (same semantics).
 
-    AGX1-378: created_at is forwarded to every streaming_task_message_context
-    call so callers can back-date message timestamps.
+    created_at is forwarded to every streaming_task_message_context call so
+    callers can back-date message timestamps.
 
     Mirrors the open/close/stream_update pattern from
-    src/agentex/lib/adk/_modules/_langgraph_async.py:
+    src/agentex/lib/adk/_modules/_langgraph_turn.py:
       - context opened via streaming_task_message_context(...).__aenter__()
       - context closed via ctx.close() (not __aexit__)
       - deltas pushed as StreamTaskMessageDelta with parent_task_message set
@@ -110,8 +110,8 @@ async def auto_send(
                 ctx = ctx_map.get(event.index)
                 if ctx is not None and event.delta is not None:
                     # Reconstruct the delta with parent_task_message set from
-                    # the context's task_message (mirrors _langgraph_async.py
-                    # lines 72-78 and 117-127).
+                    # the context's task_message (mirrors the legacy
+                    # _langgraph_async streaming helper, now in _langgraph_turn.py).
                     delta_with_parent = StreamTaskMessageDelta(
                         parent_task_message=ctx.task_message,
                         delta=event.delta,

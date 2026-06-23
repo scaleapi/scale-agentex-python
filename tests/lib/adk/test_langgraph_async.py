@@ -26,7 +26,7 @@ from agentex.types.task_message import TaskMessage
 from agentex.types.text_content import TextContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import StreamTaskMessageDelta
-from agentex.lib.adk._modules._langgraph_async import stream_langgraph_events
+from agentex.lib.adk._modules._langgraph_turn import stream_langgraph_events
 
 TASK_ID = "task-test"
 

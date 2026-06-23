@@ -1,7 +1,7 @@
 """Integration test: Temporal channel with a LangGraph agent.
 
-The Temporal LangGraph agent pattern uses ``emit_langgraph_messages`` (from
-``_langgraph_messages.py``) inside a Temporal activity. That module is not
+The Temporal LangGraph agent pattern uses ``emit_langgraph_messages`` (now in
+``_langgraph_sync.py``) inside a Temporal activity. That helper is not
 yet unified onto the harness surface (it has its own Redis-streaming code).
 
 This test file verifies the LangGraph Temporal agent's streaming behavior using
@@ -43,8 +43,7 @@ from agentex.types.text_content import TextContent
 from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
-from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
-from agentex.lib.adk._modules._langgraph_async import stream_langgraph_events
+from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn, stream_langgraph_events
 
 # ---------------------------------------------------------------------------
 # Remove conftest stubs so real langchain_core types are used

@@ -13,10 +13,10 @@ What is tested
 --------------
 - The async handler pushes the correct sequence of messages to the fake streaming
   backend: Full(ToolRequest) + Full(ToolResponse) + text Start/Delta/Done.
-- final_text accumulates all text (not just last segment — AGX1-377 unified behavior).
+- final_text accumulates all text (not just last segment — unified behavior).
 - Tool messages go through streaming_task_message_context (not messages.create).
-- With a SpanTracer, no tool spans are produced (AGX1-377: Full events are not
-  handled by SpanDeriver today).
+- With a SpanTracer, Full tool events produce tool spans (request opens, response
+  closes), aligning LangGraph tracing with the Start+Done harnesses.
 
 What is NOT covered without live infrastructure
 -----------------------------------------------
@@ -45,6 +45,8 @@ from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
+
+from ._fakes import FakeTracing
 
 # ---------------------------------------------------------------------------
 # Remove conftest stubs so real langchain_core types are used
@@ -103,30 +105,6 @@ class _FakeStreaming:
 
 
 # ---------------------------------------------------------------------------
-# Fake tracing backend
-# ---------------------------------------------------------------------------
-
-
-class _FakeSpan:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.output: Any = None
-
-
-class _FakeTracing:
-    def __init__(self) -> None:
-        self.started: list[tuple[str, Any]] = []
-        self.ended: list[tuple[str, Any]] = []
-
-    async def start_span(self, *, trace_id: str, name: str, **kw: Any) -> _FakeSpan:
-        self.started.append((name, kw.get("parent_id")))
-        return _FakeSpan(name)
-
-    async def end_span(self, *, trace_id: str, span: _FakeSpan) -> None:
-        self.ended.append((span.name, span.output))
-
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -142,9 +120,9 @@ def _make_stream(events: list[tuple[str, Any]]):
 async def _run_auto_send_turn(
     stream_events: list[tuple[str, Any]],
     trace_id: str | None = None,
-) -> tuple[TurnResult, _FakeStreaming, _FakeTracing | None]:
+) -> tuple[TurnResult, _FakeStreaming, FakeTracing | None]:
     fake_streaming = _FakeStreaming()
-    fake_tracing = _FakeTracing() if trace_id else None
+    fake_tracing = FakeTracing() if trace_id else None
 
     tracer: SpanTracer | bool = False
     if trace_id and fake_tracing is not None:
@@ -275,7 +253,7 @@ class TestAsyncAutoSendChannel:
         assert usage.total_tokens == 15
 
     async def test_tracer_produces_tool_spans_for_full_events(self):
-        """AGX1-377: SpanDeriver now handles Full tool events (request opens, response closes).
+        """SpanDeriver handles Full tool events (request opens, response closes).
 
         Full(ToolRequestContent) opens a tool span; Full(ToolResponseContent) closes it.
         This aligns LangGraph tracing with Start+Done harnesses (pydantic-ai, openai-agents).
