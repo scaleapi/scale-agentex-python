@@ -1,46 +1,52 @@
-# Tutorial 100: Async LangGraph Agent
+# Tutorial: Async LangGraph Agent
 
-This tutorial demonstrates how to build an **asynchronous** LangGraph agent on AgentEx with:
-- Task-based event handling via Redis
-- Tool calling (ReAct pattern)
-- Multi-turn conversation memory via AgentEx checkpointer
-- Tracing integration
+This tutorial demonstrates how to build an **async** LangGraph agent on AgentEx
+using the **unified harness surface**:
 
-## Graph Structure
+```python
+turn = LangGraphTurn(stream, model=None)
+emitter = UnifiedEmitter(task_id=task_id, trace_id=task_id, ...)
+result = await emitter.auto_send_turn(turn)
+```
 
-![Graph](graph.png)
+The `LangGraphTurn` + `UnifiedEmitter.auto_send_turn` path replaces calling the
+lower-level ``stream_langgraph_events`` helper directly.
 
-## Sync vs Async: Key Differences
+## Key Concepts
 
-| Aspect | Sync (Tutorial 030) | Async (This Tutorial) |
-|--------|--------------------|-----------------------|
-| **ACP Type** | `sync` | `async` |
-| **Handler** | `@acp.on_message_send` | `@acp.on_task_event_send` |
-| **Response** | HTTP streaming (yields) | Redis streaming |
-| **Message Echo** | Implicit | Explicit (`adk.messages.create`) |
-| **Streaming Helper** | `convert_langgraph_to_agentex_events()` | `stream_langgraph_events()` |
-| **Extra Handlers** | None | `on_task_create`, `on_task_cancel` |
+### Unified Harness
 
-### When to use Async?
-- Long-running tasks that may exceed HTTP timeout
-- Agents that need to push updates asynchronously
-- Multi-step workflows where the client polls for results
-- Production agents that need reliable message delivery via Redis
+`LangGraphTurn` implements the `HarnessTurn` protocol: it wraps the raw
+LangGraph `astream()` generator and exposes `events` (an async generator of
+`TaskMessageUpdate`) and `usage()` (token counts captured from the final
+`AIMessage`).
+
+`UnifiedEmitter.auto_send_turn(turn)` pushes each event to Redis via
+`streaming_task_message_context`, accumulates the final text, and returns a
+`TurnResult(final_text=..., usage=...)`.
+
+The same `LangGraphTurn` object can also be passed to
+`UnifiedEmitter.yield_turn` in the sync channel.
+
+### AGX1-377 Note
+
+LangGraph emits tool requests as `StreamTaskMessageFull` events (from "updates"
+node outputs). The `SpanDeriver` does not open tool spans from Full events
+today; that gap is tracked in AGX1-373.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `project/acp.py` | ACP server with async event handlers |
-| `project/graph.py` | LangGraph state graph definition |
+| `project/acp.py` | ACP server using unified harness (LangGraphTurn + auto_send_turn) |
+| `project/graph.py` | LangGraph state graph (weather example) |
 | `project/tools.py` | Tool definitions (weather example) |
 | `tests/test_agent.py` | Integration tests |
-| `manifest.yaml` | Agent configuration |
+| `manifest.yaml` | Agent configuration (name: ab100-langgraph) |
 
 ## Running Locally
 
 ```bash
-# From this directory
 agentex agents run
 ```
 

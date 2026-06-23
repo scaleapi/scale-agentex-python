@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "ab100-langgraph"
 version = "0.1.0"
-description = "An async LangGraph agent with tool calling and Redis streaming"
+description = "An async LangGraph agent using the unified harness surface"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

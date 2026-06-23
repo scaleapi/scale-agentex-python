@@ -5,13 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "at130-langgraph"
 version = "0.1.0"
-description = "A Temporal-backed LangGraph agent whose nodes run as Temporal activities"
+description = "A Temporal-backed LangGraph agent (harness variant) whose nodes run as Temporal activities"
 requires-python = ">=3.12"
 dependencies = [
     "agentex-sdk",
     "scale-gp",
-    # Temporal with the LangGraph plugin (temporalio.contrib.langgraph),
-    # which runs LangGraph nodes as Temporal activities. Needs >=1.27.0.
     "temporalio[langgraph]>=1.27.0",
     "langchain-openai",
     "langchain-core",

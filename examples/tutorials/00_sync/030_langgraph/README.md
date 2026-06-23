@@ -1,43 +1,50 @@
-# Tutorial 030: Sync LangGraph Agent
+# Tutorial: Sync LangGraph Agent
 
-This tutorial demonstrates how to build a **synchronous** LangGraph agent on AgentEx with:
-- Tool calling (ReAct pattern)
-- Streaming token output
-- Multi-turn conversation memory via AgentEx checkpointer
-- Tracing integration
+This tutorial demonstrates how to build a **synchronous** LangGraph agent on AgentEx
+using the **unified harness surface**:
 
-## Graph Structure
+```python
+turn = LangGraphTurn(stream, model=None)
+emitter = UnifiedEmitter(task_id=task_id, trace_id=task_id, ...)
+async for event in emitter.yield_turn(turn):
+    yield event
+```
 
-![Graph](graph.png)
+The `LangGraphTurn` + `UnifiedEmitter` path replaces calling the lower-level
+``convert_langgraph_to_agentex_events`` helper directly.
 
 ## Key Concepts
 
-### Sync ACP
-The sync ACP model uses HTTP request/response for communication. The `@acp.on_message_send` handler receives a message and yields streaming events back to the client.
+### Unified Harness
 
-### LangGraph Integration
-- **StateGraph**: Defines the agent's state machine with `AgentState` (message history)
-- **ToolNode**: Automatically executes tool calls from the LLM
-- **tools_condition**: Routes between tool execution and final response
-- **Checkpointer**: Uses AgentEx's HTTP checkpointer for cross-request memory
+`LangGraphTurn` implements the `HarnessTurn` protocol: it wraps the raw
+LangGraph `astream()` generator and exposes `events` (an async generator of
+`TaskMessageUpdate`) and `usage()` (token counts captured from the final
+`AIMessage`).
 
-### Streaming
-The agent streams tokens as they're generated using `convert_langgraph_to_agentex_events()`, which converts LangGraph's stream events into AgentEx `TaskMessageUpdate` events.
+`UnifiedEmitter.yield_turn(turn)` iterates the turn's events and yields them
+to the sync ACP handler unchanged. The same `LangGraphTurn` object can also be
+passed to `UnifiedEmitter.auto_send_turn` in the async/temporal channels.
+
+### AGX1-377 Note
+
+LangGraph emits tool requests as `StreamTaskMessageFull` events (from "updates"
+node outputs). The `SpanDeriver` does not open tool spans from Full events
+today; that gap is tracked in AGX1-373.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `project/acp.py` | ACP server and message handler |
-| `project/graph.py` | LangGraph state graph definition |
+| `project/acp.py` | ACP server using unified harness (LangGraphTurn + yield_turn) |
+| `project/graph.py` | LangGraph state graph (weather example) |
 | `project/tools.py` | Tool definitions (weather example) |
 | `tests/test_agent.py` | Integration tests |
-| `manifest.yaml` | Agent configuration |
+| `manifest.yaml` | Agent configuration (name: s030-langgraph) |
 
 ## Running Locally
 
 ```bash
-# From this directory
 agentex agents run
 ```
 

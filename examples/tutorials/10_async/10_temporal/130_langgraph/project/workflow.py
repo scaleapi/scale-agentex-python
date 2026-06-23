@@ -1,4 +1,4 @@
-"""Temporal workflow for at130-langgraph — Temporal as the LangGraph runtime.
+"""Temporal workflow for at130-langgraph.
 
 Each turn the workflow runs the LangGraph graph (``project/graph.py``) via the
 ``temporalio.contrib.langgraph`` plugin. The plugin runs the LLM ``agent`` node
@@ -37,7 +37,7 @@ logger = make_logger(__name__)
 
 
 @workflow.defn(name=environment_variables.WORKFLOW_NAME)
-class At130LanggraphWorkflow(BaseWorkflow):
+class AtHarnessLanggraphWorkflow(BaseWorkflow):
     """Runs the LangGraph agent each turn; its nodes run as Temporal activities."""
 
     def __init__(self) -> None:
@@ -56,10 +56,7 @@ class At130LanggraphWorkflow(BaseWorkflow):
         result = await compiled.ainvoke({"messages": self._messages})
         self._messages = result["messages"]
 
-        # Surface the messages this turn produced (tool calls, results, final
-        # text) to the AgentEx UI. The SDK helper does the LangGraph→AgentEx
-        # message conversion.
-        await emit_langgraph_messages(self._messages[self._emitted:], params.task.id)
+        await emit_langgraph_messages(self._messages[self._emitted :], params.task.id)
         self._emitted = len(self._messages)
 
     @workflow.signal

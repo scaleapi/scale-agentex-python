@@ -1,13 +1,14 @@
-"""ACP handler for async Pydantic AI agent.
+"""ACP handler for the async harness Pydantic AI test agent.
 
-Uses the async ACP model with Redis streaming instead of HTTP yields.
-Text and reasoning tokens stream as Redis deltas; tool requests and
-responses are persisted as discrete full messages.
+This agent exercises the UNIFIED HARNESS SURFACE on the async (Redis-streaming)
+channel — ``UnifiedEmitter.auto_send_turn(PydanticAITurn(...))``
+— calling it directly rather than via the ``stream_pydantic_ai_events`` helper
+(which the ``110_pydantic_ai`` tutorial uses). This makes the unified-surface
+wiring explicit at the agent-author level.
 
 Multi-turn memory is persisted via ``adk.state``: on each turn we load the
 previous pydantic-ai ``message_history`` from state, run the agent with it,
-then save the updated history back. Without this, every turn would be a
-fresh stateless run and the agent would forget the prior conversation.
+then save the updated history back.
 """
 
 from __future__ import annotations
@@ -23,17 +24,15 @@ from pydantic_ai.run import AgentRunResultEvent
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 import agentex.lib.adk as adk
-from project.agent import create_agent
-from agentex.lib.adk import (
-    stream_pydantic_ai_events,
-    create_pydantic_ai_tracing_handler,
-)
+from project.agent import MODEL_NAME, create_agent
 from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.lib.core.harness import UnifiedEmitter
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
 
 logger = make_logger(__name__)
@@ -66,9 +65,7 @@ class ConversationState(BaseModel):
 
     ``history_json`` holds the pydantic-ai message history serialized by
     ``ModelMessagesTypeAdapter`` — pydantic-ai's official way to round-trip
-    ``ModelMessage`` objects through JSON. We can't use a plain
-    ``list[ModelMessage]`` field because ``ModelMessage`` is a discriminated
-    union of runtime types, not a stable Pydantic schema.
+    ``ModelMessage`` objects through JSON.
     """
 
     history_json: str = "[]"
@@ -77,11 +74,7 @@ class ConversationState(BaseModel):
 
 @acp.on_task_create
 async def handle_task_create(params: CreateTaskParams):
-    """Initialize per-task state on task creation.
-
-    A fresh task starts with no message history; the conversation is built
-    up by ``handle_task_event_send`` on each subsequent user message.
-    """
+    """Initialize per-task state on task creation."""
     logger.info(f"Task created: {params.task.id}")
     await adk.state.create(
         task_id=params.task.id,
@@ -92,7 +85,7 @@ async def handle_task_create(params: CreateTaskParams):
 
 @acp.on_task_event_send
 async def handle_task_event_send(params: SendEventParams):
-    """Handle each user message: load prior history, run the agent, save updated history."""
+    """Handle each user message through the unified auto_send_turn path."""
     agent = get_agent()
     task_id = params.task.id
     agent_id = params.agent.id
@@ -103,9 +96,7 @@ async def handle_task_event_send(params: SendEventParams):
     # Echo the user's message into the task history.
     await adk.messages.create(task_id=task_id, content=params.event.content)
 
-    # Load the previous conversation history from state. If state is missing
-    # (e.g. task wasn't initialised via on_task_create), fall back to a fresh
-    # one so the agent still responds — just without memory of prior turns.
+    # Load the previous conversation history from state (fall back to fresh).
     task_state = await adk.state.get_by_task_and_agent(task_id=task_id, agent_id=agent_id)
     if task_state is None:
         state = ConversationState()
@@ -123,15 +114,15 @@ async def handle_task_event_send(params: SendEventParams):
         input={"message": user_message},
         data={"__span_type__": "AGENT_WORKFLOW"},
     ) as turn_span:
-        tracing_handler = create_pydantic_ai_tracing_handler(
+        # Construct the UnifiedEmitter from the ACP context so tracing is
+        # automatic and messages are auto-sent to the task stream (Redis).
+        emitter = UnifiedEmitter(
+            task_id=task_id,
             trace_id=task_id,
             parent_span_id=turn_span.id if turn_span else None,
-            task_id=task_id,
         )
 
-        # Wrap the pydantic-ai event stream so we can capture the final
-        # AgentRunResultEvent (which carries the full message list for the
-        # next turn) without changing the streaming-helper's signature.
+        # Capture the terminal AgentRunResultEvent to persist message history.
         captured_messages: list[Any] = []
 
         async def tee_messages(upstream) -> AsyncIterator[Any]:
@@ -141,9 +132,13 @@ async def handle_task_event_send(params: SendEventParams):
                 yield event
 
         async with agent.run_stream_events(user_message, message_history=previous_messages) as stream:
-            final_output = await stream_pydantic_ai_events(
-                tee_messages(stream), task_id, tracing_handler=tracing_handler
+            # The unified auto_send path delivers streamed tool requests natively
+            # (Start+Delta+Done), so no coalescing workaround is needed.
+            turn = PydanticAITurn(
+                tee_messages(stream),
+                model=MODEL_NAME,
             )
+            result = await emitter.auto_send_turn(turn)
 
         # Save the updated message history so the next turn picks up here.
         if captured_messages:
@@ -156,7 +151,7 @@ async def handle_task_event_send(params: SendEventParams):
             )
 
         if turn_span:
-            turn_span.output = {"final_output": final_output}
+            turn_span.output = {"final_output": result.final_text}
 
 
 @acp.on_task_cancel

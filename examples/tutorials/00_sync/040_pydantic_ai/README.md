@@ -1,46 +1,52 @@
-# Tutorial 040: Sync Pydantic AI Agent
+# Sync Pydantic AI Agent
 
-This tutorial demonstrates how to build a **synchronous** Pydantic AI agent on AgentEx with:
-- Tool calling (Pydantic AI handles the tool loop internally)
-- Streaming token output (including token-by-token tool-call argument streaming)
+A minimal **synchronous** Pydantic AI agent that drives the **unified harness
+surface** (`UnifiedEmitter.yield_turn` + `PydanticAITurn`) on the sync
+(HTTP-yield) channel.
 
-## Key Concepts
+## Why this agent exists
 
-### Sync ACP
-The sync ACP model uses HTTP request/response for communication. The `@acp.on_message_send` handler receives a message and yields streaming events back to the client.
+This agent is the sync coverage for the unified surface: it shows an agent
+author wiring the sync channel through `UnifiedEmitter.yield_turn` and getting
+automatic span derivation (tool spans nested under the per-turn span) for free,
+exactly like the async/temporal channels.
 
-### Pydantic AI Integration
-- **Agent**: A single `pydantic_ai.Agent` that owns the model and tools. No graph required — Pydantic AI runs its own tool-call loop until the model is done.
-- **`@agent.tool_plain`**: Registers a Python function as a tool. Pydantic AI infers the schema from type hints and docstring.
-- **`agent.run_stream_events(...)`**: Yields `AgentStreamEvent`s (PartStartEvent / PartDeltaEvent / PartEndEvent / FunctionToolResultEvent) as the model produces them.
+## How it wires the unified surface
 
-### Streaming
-The agent streams tokens and tool-call arguments as they're generated using `convert_pydantic_ai_to_agentex_events()`, which adapts Pydantic AI's stream into AgentEx `TaskMessageUpdate` events. Notably, **tool-call arguments stream as `ToolRequestDelta` tokens** rather than arriving as a single complete payload — a richer experience than what OpenAI Agents SDK currently exposes.
+In `project/acp.py`:
+
+```python
+emitter = UnifiedEmitter(
+    task_id=task_id,
+    trace_id=task_id,
+    parent_span_id=turn_span.id if turn_span else None,
+)
+async with agent.run_stream_events(user_message) as stream:
+    turn = PydanticAITurn(stream, model=MODEL_NAME)  # coalesce off: stream tool-call arg tokens
+    async for ev in emitter.yield_turn(turn):
+        yield ev
+```
+
+- `coalesce_tool_requests=False` (the default) preserves token-by-token
+  tool-call argument streaming on the sync channel.
+- The `UnifiedEmitter` is constructed from the ACP/streaming context
+  (`task_id` + `trace_id` + `parent_span_id`) so tool spans nest under the
+  per-turn `AGENT_WORKFLOW` span automatically.
 
 ## Files
 
-| File | Description |
-|------|-------------|
-| `project/acp.py` | ACP server and message handler |
-| `project/agent.py` | Pydantic AI agent + tool registration |
-| `project/tools.py` | Tool definitions (weather example) |
-| `tests/test_agent.py` | Integration tests |
-| `manifest.yaml` | Agent configuration |
+- `project/acp.py` — sync ACP handler using `emitter.yield_turn(...)`.
+- `project/agent.py` — builds the `pydantic_ai.Agent` with one tool.
+- `project/tools.py` — `get_weather(city)` returning a constant.
+- `tests/test_agent.py` — live integration test (requires a running agent).
 
-## Running Locally
+## Tools
 
-```bash
-# From this directory
-agentex agents run
-```
+- `get_weather(city: str) -> str`: returns a fixed "sunny and 72°F" string so a
+  run deterministically exercises text + a tool call + a tool response.
 
-## Running Tests
+## Offline coverage
 
-```bash
-pytest tests/test_agent.py -v
-```
-
-## Notes
-
-- Multi-turn conversation memory is not wired in this tutorial. Pydantic AI does not ship a checkpointer like LangGraph; to add memory, load prior messages via `adk.messages.list(task_id=...)` and pass them to `agent.run_stream_events(..., message_history=...)`.
-- Reasoning/thinking tokens are not exercised here because `gpt-4o-mini` does not emit `ThinkingPart`s. Swap to a reasoning-capable model (e.g. `openai:o1-mini` via Pydantic AI's appropriate provider) if you want to test that branch end-to-end.
+Offline integration tests for the same wiring (pydantic-ai `TestModel` + fake
+streaming/tracing, no network) live in the SDK repo under
+`tests/lib/core/harness/` (the pydantic-ai sync suite).
