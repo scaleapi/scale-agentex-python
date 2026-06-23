@@ -16,7 +16,6 @@ ToolRequestDelta events as the streamed tool-request inputs.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, AsyncIterator
 
 import pytest
@@ -39,6 +38,7 @@ from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 from .runner import (
     Fixture,
     register,
+    run_pure_async,
     run_cross_channel_conformance,
 )
 
@@ -62,7 +62,12 @@ async def _canonical(pydantic_events: list[Any]) -> list[Any]:
 
 
 def _build_fixtures() -> list[Fixture]:
-    """Build all pydantic-ai conformance fixtures synchronously via asyncio.run."""
+    """Build all pydantic-ai conformance fixtures synchronously at import time.
+
+    Uses the loop-free ``run_pure_async`` driver rather than ``asyncio.run()``,
+    which would raise under an already-running loop (programmatic pytest,
+    notebooks) since this runs during module import.
+    """
 
     # ------------------------------------------------------------------ #
     # 1. Text-only run: simple streaming text response.
@@ -139,10 +144,10 @@ def _build_fixtures() -> list[Fixture]:
         PartEndEvent(index=0, part=TextPart(content="It's cloudy and 15C in London.")),
     ]
 
-    text_only_events = asyncio.run(_canonical(text_only_pydantic))
-    tool_call_events = asyncio.run(_canonical(tool_call_pydantic))
-    reasoning_events = asyncio.run(_canonical(reasoning_pydantic))
-    multi_step_events = asyncio.run(_canonical(multi_step_pydantic))
+    text_only_events = run_pure_async(_canonical(text_only_pydantic))
+    tool_call_events = run_pure_async(_canonical(tool_call_pydantic))
+    reasoning_events = run_pure_async(_canonical(reasoning_pydantic))
+    multi_step_events = run_pure_async(_canonical(multi_step_pydantic))
 
     return [
         Fixture(name="pydantic-ai-text-only", events=text_only_events),

@@ -97,6 +97,25 @@ def all_fixtures() -> list[Fixture]:
     return list(_REGISTRY)
 
 
+def run_pure_async(coro: Any) -> Any:
+    """Drive a *pure* (I/O-free) coroutine to completion without an event loop.
+
+    Conformance fixtures are built at import time so they can parametrize the
+    tests below. The fixture-building coroutines only iterate in-memory events
+    and never suspend on a real future, so we step them by hand instead of
+    ``asyncio.run()``. ``asyncio.run()`` at import raises ``RuntimeError`` when a
+    loop is already running (programmatic pytest, a Jupyter kernel, or a
+    session-scoped asyncio loop); this driver is unaffected by ambient loop
+    state. It raises if the coroutine ever suspends on real I/O.
+    """
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError("conformance fixture build unexpectedly suspended on real I/O")
+
+
 def derive_all(events: list[StreamTaskMessage]) -> list[SpanSignal]:
     d = SpanDeriver()
     out: list[SpanSignal] = []

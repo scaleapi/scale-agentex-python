@@ -11,7 +11,6 @@ them, to guarantee determinism regardless of pytest collection order.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, AsyncIterator
 
 import pytest
@@ -19,7 +18,7 @@ import pytest
 from agentex.lib.core.harness.types import StreamTaskMessage
 from agentex.lib.adk._modules._codex_sync import convert_codex_to_agentex_events
 
-from .runner import Fixture, register
+from .runner import Fixture, register, run_pure_async
 
 
 async def _aiter(items: list[Any]) -> AsyncIterator[Any]:
@@ -32,7 +31,9 @@ async def _collect(events: list[Any]) -> list[StreamTaskMessage]:
 
 
 def _build(events: list[Any]) -> list[StreamTaskMessage]:
-    return asyncio.run(_collect(events))
+    # Loop-free driver: this runs at import time, where asyncio.run() would raise
+    # under an already-running loop (programmatic pytest, notebooks).
+    return run_pure_async(_collect(events))
 
 
 # ---------------------------------------------------------------------------
