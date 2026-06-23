@@ -405,9 +405,13 @@ class TestReasoningStreaming:
         assert isinstance(starts[0].content, ReasoningContent)
         assert reasoning_fulls == []
         assert len(content_deltas) == 1
-        assert content_deltas[0].delta.content_delta == "thinking... done"
+        content_delta = content_deltas[0].delta
+        assert isinstance(content_delta, ReasoningContentDelta)
+        assert content_delta.content_delta == "thinking... done"
         assert len(summary_deltas) == 1
-        assert summary_deltas[0].delta.summary_delta == "thinking... done"
+        summary_delta = summary_deltas[0].delta
+        assert isinstance(summary_delta, ReasoningSummaryDelta)
+        assert summary_delta.summary_delta == "thinking... done"
         assert len(dones) == 1
         idx = starts[0].index
         assert content_deltas[0].index == idx
@@ -438,7 +442,9 @@ class TestReasoningStreaming:
         assert isinstance(starts[0].content, ReasoningContent)
         assert reasoning_fulls == []
         assert len(content_deltas) == 1
-        assert content_deltas[0].delta.content_delta == "orphan thought"
+        content_delta = content_deltas[0].delta
+        assert isinstance(content_delta, ReasoningContentDelta)
+        assert content_delta.content_delta == "orphan thought"
         assert len(dones) == 1
         assert dones[0].index == starts[0].index
 
@@ -451,10 +457,12 @@ class TestReasoningStreaming:
             },
         ]
         out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
-        summary_delta = next(
+        summary_event = next(
             e for e in out if isinstance(e, StreamTaskMessageDelta) and isinstance(e.delta, ReasoningSummaryDelta)
         )
-        assert summary_delta.delta.summary_delta == "line one"
+        summary_delta = summary_event.delta
+        assert isinstance(summary_delta, ReasoningSummaryDelta)
+        assert summary_delta.summary_delta == "line one"
 
     async def test_reasoning_empty_block_closes_with_done_only(self) -> None:
         """A reasoning block that completes with no text still closes its Start."""
