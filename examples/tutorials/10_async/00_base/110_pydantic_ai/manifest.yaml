@@ -17,7 +17,7 @@ local_development:
 agent:
   acp_type: async
   name: ab110-pydantic-ai
-  description: An async Pydantic AI agent with tool calling and Redis streaming
+  description: An async Pydantic AI harness test agent using the unified emitter surface
 
   temporal:
     enabled: false
@@ -38,7 +38,7 @@ agent:
     - env_var_name: SGP_CLIENT_BASE_URL
       secret_name: sgp-client-base-url
       secret_key: url
-  
+
 deployment:
   image:
     repository: ""
@@ -47,7 +47,7 @@ deployment:
   global:
     agent:
       name: "ab110-pydantic-ai"
-      description: "An async Pydantic AI agent with tool calling and Redis streaming"
+      description: "An async Pydantic AI harness test agent using the unified emitter surface"
     replicaCount: 1
     resources:
       requests:

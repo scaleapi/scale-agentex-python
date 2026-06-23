@@ -17,7 +17,7 @@ local_development:
 agent:
   acp_type: sync
   name: s030-langgraph
-  description: A sync LangGraph agent with tool calling and streaming
+  description: A sync LangGraph agent using the unified harness surface (LangGraphTurn + UnifiedEmitter.yield_turn)
 
   temporal:
     enabled: false
@@ -47,7 +47,7 @@ deployment:
   global:
     agent:
       name: "s030-langgraph"
-      description: "A sync LangGraph agent with tool calling and streaming"
+      description: "A sync LangGraph agent using the unified harness surface"
     replicaCount: 1
     resources:
       requests:
