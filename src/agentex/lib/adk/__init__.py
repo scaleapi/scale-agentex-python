@@ -10,9 +10,11 @@ from agentex.lib.adk._modules._langgraph_tracing import create_langgraph_tracing
 from agentex.lib.adk._modules._langgraph_async import stream_langgraph_events
 from agentex.lib.adk._modules._langgraph_messages import emit_langgraph_messages
 from agentex.lib.adk._modules._langgraph_sync import convert_langgraph_to_agentex_events
+from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
 from agentex.lib.adk._modules._pydantic_ai_async import stream_pydantic_ai_events
 from agentex.lib.adk._modules._pydantic_ai_sync import convert_pydantic_ai_to_agentex_events
 from agentex.lib.adk._modules._pydantic_ai_tracing import create_pydantic_ai_tracing_handler
+from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
 from agentex.lib.adk._modules._claude_code_sync import convert_claude_code_to_agentex_events
 from agentex.lib.adk._modules._claude_code_turn import (
     ClaudeCodeTurn,
@@ -70,10 +72,12 @@ __all__ = [
     "stream_langgraph_events",
     "emit_langgraph_messages",
     "convert_langgraph_to_agentex_events",
+    "LangGraphTurn",
     # Pydantic AI
     "stream_pydantic_ai_events",
     "convert_pydantic_ai_to_agentex_events",
     "create_pydantic_ai_tracing_handler",
+    "PydanticAITurn",
     # Claude Code
     "convert_claude_code_to_agentex_events",
     "ClaudeCodeTurn",

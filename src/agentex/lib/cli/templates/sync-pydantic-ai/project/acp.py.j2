@@ -15,19 +15,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from project.agent import create_agent
+from project.agent import MODEL_NAME, create_agent
 
 import agentex.lib.adk as adk
-from agentex.lib.adk import (
-    create_pydantic_ai_tracing_handler,
-    convert_pydantic_ai_to_agentex_events,
-)
 from agentex.protocol.acp import SendMessageParams
+from agentex.lib.core.harness import UnifiedEmitter
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.types.task_message_update import TaskMessageUpdate
 from agentex.types.task_message_content import TaskMessageContent
+from agentex.lib.adk import PydanticAITurn
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
 
 logger = make_logger(__name__)
@@ -73,7 +71,7 @@ async def handle_message_send(
     logger.info(f"Processing message for task {task_id}")
 
     # Open a per-message turn span. Tool calls below nest underneath this
-    # span via the tracing handler's parent_span_id wiring.
+    # span via the emitter's parent_span_id wiring.
     async with adk.tracing.span(
         trace_id=task_id,
         task_id=task_id,
@@ -81,13 +79,14 @@ async def handle_message_send(
         input={"message": user_message},
         data={"__span_type__": "AGENT_WORKFLOW"},
     ) as turn_span:
-        tracing_handler = create_pydantic_ai_tracing_handler(
+        # Construct the UnifiedEmitter from the ACP/streaming context so tracing
+        # is automatic: tool spans nest under this turn's span.
+        emitter = UnifiedEmitter(
+            task_id=task_id,
             trace_id=task_id,
             parent_span_id=turn_span.id if turn_span else None,
-            task_id=task_id,
         )
         async with agent.run_stream_events(user_message) as stream:
-            async for event in convert_pydantic_ai_to_agentex_events(
-                stream, tracing_handler=tracing_handler
-            ):
-                yield event
+            turn = PydanticAITurn(stream, model=MODEL_NAME)
+            async for ev in emitter.yield_turn(turn):
+                yield ev
