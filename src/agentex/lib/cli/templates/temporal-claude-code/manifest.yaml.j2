@@ -100,14 +100,16 @@ agent:
     - env_var_name: REDIS_URL
       secret_name: redis-url-secret
       secret_key: url
-  #   - env_var_name: LITELLM_API_KEY
-  #     secret_name: litellm-api-key
-  #     secret_key: api-key
-  
-  # Optional: Set Environment variables for running your agent locally as well 
+    # The Claude Code CLI spawned in project/activities.py authenticates with
+    # ANTHROPIC_API_KEY; without it every turn fails with a CLI auth error.
+    - env_var_name: ANTHROPIC_API_KEY
+      secret_name: anthropic-api-key
+      secret_key: api-key
+
+  # Optional: Set Environment variables for running your agent locally as well
   # as for deployment later on
-  env: {}
-  #   LITELLM_API_KEY: "<YOUR_LITELLM_API_KEY_HERE>"
+  env:
+    ANTHROPIC_API_KEY: ""  # Required by the Claude Code CLI
   #   OPENAI_BASE_URL: "<YOUR_OPENAI_BASE_URL_HERE>"
   #   OPENAI_ORG_ID: "<YOUR_OPENAI_ORG_ID_HERE>"
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, AsyncIterator
 from datetime import datetime
+from collections import deque
 
 from temporalio import activity
 
@@ -82,11 +83,17 @@ async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIter
     # Drain stderr concurrently. With --verbose, Claude Code can write enough to
     # stderr to fill the OS pipe buffer; if we only read stdout, the CLI blocks
     # on its stderr write while we block reading stdout — a deadlock. A
-    # background task keeps stderr flowing so stdout never stalls.
+    # background task keeps stderr flowing so stdout never stalls. We keep a
+    # bounded tail so a non-zero exit can be surfaced with context instead of
+    # silently completing the turn.
+    stderr_tail: deque[str] = deque(maxlen=20)
+
     async def _drain_stderr() -> None:
         assert proc.stderr is not None
-        async for _ in proc.stderr:
-            pass
+        async for raw in proc.stderr:
+            text = raw.decode("utf-8", errors="replace").rstrip()
+            if text:
+                stderr_tail.append(text)
 
     stderr_task = asyncio.create_task(_drain_stderr())
 
@@ -104,6 +111,14 @@ async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIter
             yield buffer.strip()
 
         await proc.wait()
+        if proc.returncode:
+            # The CLI failed (missing binary/auth, bad command). Raise so the
+            # activity (and turn) surfaces as failed instead of completing with
+            # no output. Temporal will apply the activity's retry policy.
+            tail = "\n".join(stderr_tail)
+            raise RuntimeError(
+                f"claude CLI exited with status {proc.returncode}:\n{tail}"
+            )
     finally:
         # Release the subprocess and stderr drain task even if the consumer
         # abandons the generator early (task cancellation / client disconnect):
