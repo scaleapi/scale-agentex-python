@@ -28,6 +28,7 @@ from openai.types.responses.response_reasoning_text_done_event import ResponseRe
 from openai.types.responses.response_reasoning_text_delta_event import ResponseReasoningTextDeltaEvent
 from openai.types.responses.response_reasoning_summary_text_done_event import ResponseReasoningSummaryTextDoneEvent
 
+from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.task_message_delta import TextDelta
 from agentex.types.task_message_update import (
     StreamTaskMessageDone,
@@ -36,7 +37,6 @@ from agentex.types.task_message_update import (
     StreamTaskMessageStart,
 )
 from agentex.types.task_message_content import TextContent
-from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.types.reasoning_content_delta import ReasoningContentDelta
