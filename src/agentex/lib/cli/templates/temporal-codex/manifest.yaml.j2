@@ -100,10 +100,12 @@ agent:
     - env_var_name: REDIS_URL
       secret_name: redis-url-secret
       secret_key: url
-  #   - env_var_name: LITELLM_API_KEY
-  #     secret_name: litellm-api-key
-  #     secret_key: api-key
-  
+    # The codex CLI spawned in project/activities.py reads OPENAI_API_KEY
+    # directly; without it every turn fails with an auth error.
+    - env_var_name: OPENAI_API_KEY
+      secret_name: openai-api-key
+      secret_key: api-key
+
   # Optional: Set Environment variables for running your agent locally as well 
   # as for deployment later on
   env: {}
