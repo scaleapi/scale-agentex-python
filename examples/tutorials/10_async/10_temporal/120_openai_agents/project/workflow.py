@@ -84,6 +84,9 @@ class At140HarnessOpenaiWorkflow(BaseWorkflow):
                     input_list=self._messages,
                     trace_id=params.task.id,
                     parent_span_id=span.id if span else None,
+                    # Deterministic timestamp under replay so a retried activity
+                    # re-emits this turn's messages with stable ordering.
+                    created_at=workflow.now(),
                 ),
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=RetryPolicy(maximum_attempts=3),

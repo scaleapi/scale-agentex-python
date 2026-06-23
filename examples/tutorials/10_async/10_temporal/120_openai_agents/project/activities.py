@@ -13,6 +13,7 @@ returns the accumulated final text + normalized usage.
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime
 
 from agents import Runner
 from pydantic import BaseModel
@@ -38,6 +39,10 @@ class RunHarnessAgentParams(BaseModel):
     input_list: list[Any] = []
     trace_id: str | None = None
     parent_span_id: str | None = None
+    # Deterministic turn timestamp from workflow.now(); forwarded to
+    # auto_send_turn so retried activities re-emit messages with stable
+    # timestamps instead of new server-side ones (which could reorder turns).
+    created_at: datetime | None = None
 
 
 class RunHarnessAgentResult(BaseModel):
@@ -70,6 +75,6 @@ class HarnessActivities:
             trace_id=params.trace_id,
             parent_span_id=params.parent_span_id,
         )
-        turn_result = await emitter.auto_send_turn(turn)
+        turn_result = await emitter.auto_send_turn(turn, created_at=params.created_at)
         # to_input_list() is valid now: auto_send_turn has exhausted the stream.
         return RunHarnessAgentResult(final_text=turn_result.final_text, input_list=result.to_input_list())
