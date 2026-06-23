@@ -16,12 +16,32 @@ Typical sync usage:
         async with agent.run_stream_events(params.content.content) as stream:
             async for event in convert_pydantic_ai_to_agentex_events(stream):
                 yield event
+
+Recommended: unified surface
+-----------------------------
+For new handlers, prefer ``UnifiedEmitter`` + ``PydanticAITurn`` over the
+bare converter. The unified surface wires tracing automatically when a
+``trace_id`` is provided, so tool and reasoning spans are derived from the
+same event stream with no extra setup:
+
+    from agentex.lib.core.harness import UnifiedEmitter
+    from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
+
+    emitter = UnifiedEmitter(task_id=task_id, trace_id=trace_id, parent_span_id=parent_span_id)
+    turn = PydanticAITurn(agent.run_stream_events(prompt), model="openai:gpt-4o")
+    async for event in emitter.yield_turn(turn):
+        yield event   # forwarded over the ACP streaming response; spans derived automatically
+
+``convert_pydantic_ai_to_agentex_events`` remains the low-level tap for
+callers that manage their own tracing or need direct access to the raw
+converted stream.
 """
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, AsyncIterator
+import inspect
+from typing import TYPE_CHECKING, Any, Callable, AsyncIterator
 
 from pydantic_ai.run import AgentRunResultEvent
 
@@ -105,6 +125,7 @@ def _tool_return_content(result: ToolReturnPart | Any) -> Any:
 async def convert_pydantic_ai_to_agentex_events(
     stream_response: AsyncIterator[Any],
     tracing_handler: "AgentexPydanticAITracingHandler | None" = None,
+    on_result: Callable[[AgentRunResultEvent], Any] | None = None,
 ) -> AsyncIterator[StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone]:
     """Convert a Pydantic AI agent event stream into Agentex stream events.
 
@@ -132,6 +153,12 @@ async def convert_pydantic_ai_to_agentex_events(
             tool call in the run is also recorded as an Agentex child span
             beneath the handler's configured ``parent_span_id``. Streaming
             behavior is unchanged when omitted.
+        on_result: Optional callback invoked with the terminal
+            ``AgentRunResultEvent`` when the run completes. Both sync and
+            async callables are accepted. No ``StreamTaskMessage*`` events are
+            yielded for this terminal event; the callback is the only side
+            effect. Useful for capturing run-level usage without altering the
+            streaming output.
 
     Yields:
         Agentex ``StreamTaskMessage*`` events suitable for forwarding back over
@@ -328,6 +355,10 @@ async def convert_pydantic_ai_to_agentex_events(
             # Already covered by PartStart/PartDelta/PartEnd events above, or
             # informational only (FinalResultEvent / AgentRunResultEvent signal
             # run-level state, not new content to surface).
+            if isinstance(event, AgentRunResultEvent) and on_result is not None:
+                ret = on_result(event)
+                if inspect.iscoroutine(ret):
+                    await ret
             continue
 
         else:

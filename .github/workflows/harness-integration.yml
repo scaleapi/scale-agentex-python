@@ -1,0 +1,61 @@
+name: Harness Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "src/agentex/lib/core/harness/**"
+      - "src/agentex/lib/adk/_modules/**"
+      - "tests/lib/core/harness/test_harness_pydantic_ai_*.py"
+      - "tests/lib/core/harness/test_harness_langgraph_*.py"
+      - ".github/workflows/harness-integration.yml"
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: '0.10.2'
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      # Defer to scripts/test so the harness suite runs under the exact same
+      # invocation as the main CI test job: DEFER_PYDANTIC_BUILD=false and
+      # `uv run --isolated --all-packages --all-extras pytest`, across the
+      # min/max supported Python versions. Running `uv run pytest` directly
+      # would risk an all-extras-only dep passing locally but failing in CI.
+      - name: Conformance suite
+        run: ./scripts/test tests/lib/core/harness/ -v
+
+  # Offline harness integration tests (sync / async / temporal channels) for each
+  # migrated harness. These use fake streams / TestModel + fake streaming/tracing
+  # and require no live infrastructure. Future harness migration PRs (6-8) add
+  # their harness to the matrix below and their test paths to the triggers above.
+  live-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        harness: [pydantic_ai, langgraph]
+        channel: [sync, async, temporal]
+      fail-fast: false
+    name: ${{ matrix.harness }}-${{ matrix.channel }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: '0.10.2'
+
+      - name: Bootstrap
+        run: ./scripts/bootstrap
+
+      - name: ${{ matrix.harness }} ${{ matrix.channel }} integration tests (offline)
+        run: |
+          ./scripts/test tests/lib/core/harness/test_harness_${{ matrix.harness }}_${{ matrix.channel }}.py -v

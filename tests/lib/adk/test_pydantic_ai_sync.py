@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import asyncio
 from typing import Any, AsyncIterator
 
 import pytest
+from pydantic_ai.run import AgentRunResult, AgentRunResultEvent
 from pydantic_ai.messages import (
     TextPart,
     PartEndEvent,
@@ -481,3 +483,75 @@ class TestStartingTextMatchesAuthor:
             content = getattr(e, "content", None)
             if content is not None and hasattr(content, "author"):
                 assert content.author == "agent"
+
+
+class TestOnResultCallback:
+    """on_result callback: captures the terminal AgentRunResultEvent without
+    altering streaming output."""
+
+    def _make_result_event(self, output: Any = "hello") -> AgentRunResultEvent:
+        result = AgentRunResult(output=output, _output_tool_name=None)
+        return AgentRunResultEvent(result=result)
+
+    async def test_callback_invoked_once_with_result_event(self):
+        """on_result is called exactly once, with the AgentRunResultEvent."""
+        captured: list[AgentRunResultEvent] = []
+
+        def on_result(event: AgentRunResultEvent) -> None:
+            captured.append(event)
+
+        result_event = self._make_result_event("the answer")
+        events = [result_event]
+        await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events), on_result=on_result))
+
+        assert len(captured) == 1
+        assert captured[0] is result_event
+        assert captured[0].result.output == "the answer"
+
+    async def test_streaming_output_unchanged_with_callback(self):
+        """Yielded StreamTaskMessage* sequence is identical whether on_result is set or not."""
+        result_event = self._make_result_event()
+        events = [
+            PartStartEvent(index=0, part=TextPart(content="")),
+            PartDeltaEvent(index=0, delta=TextPartDelta(content_delta="hi")),
+            PartEndEvent(index=0, part=TextPart(content="hi")),
+            result_event,
+        ]
+
+        captured: list[AgentRunResultEvent] = []
+        out_with = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events), on_result=captured.append))
+        out_without = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
+
+        assert len(out_with) == len(out_without)
+        for a, b in zip(out_with, out_without):
+            assert type(a) is type(b)
+            assert a.model_dump() == b.model_dump()
+        assert len(captured) == 1
+
+    async def test_no_callback_no_error(self):
+        """AgentRunResultEvent is silently ignored when on_result is None."""
+        result_event = self._make_result_event()
+        events = [result_event]
+        out = await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events)))
+        assert out == []
+
+    async def test_async_callback_is_awaited(self):
+        """An async on_result callable is properly awaited.
+
+        The callback suspends (``await asyncio.sleep(0)``) before recording its
+        side effect, so ``awaited`` is only populated if the converter actually
+        awaits the returned coroutine — distinguishing "awaited" from
+        "called-but-not-awaited."
+        """
+        awaited: list[AgentRunResultEvent] = []
+
+        async def on_result_async(event: AgentRunResultEvent) -> None:
+            await asyncio.sleep(0)
+            awaited.append(event)
+
+        result_event = self._make_result_event("async_output")
+        events = [result_event]
+        await _collect(convert_pydantic_ai_to_agentex_events(_aiter(events), on_result=on_result_async))
+
+        assert len(awaited) == 1
+        assert awaited[0].result.output == "async_output"
