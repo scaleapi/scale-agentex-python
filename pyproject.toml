@@ -1,6 +1,6 @@
 [project]
 name = "agentex-client"
-version = "0.14.0"
+version = "0.15.0"
 description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
