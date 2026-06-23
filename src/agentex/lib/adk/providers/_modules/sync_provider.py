@@ -71,8 +71,8 @@ class SyncStreamingModel(Model):
         wrap a ``Runner.run_streamed`` result in
         ``agentex.lib.adk._modules._openai_turn.OpenAITurn`` and drive
         delivery + tracing through ``UnifiedEmitter`` (see the
-        ``060_harness_openai`` / ``130_harness_openai`` / ``140_harness_openai``
-        tutorials). This per-model tracing wrapper predates the harness and is
+        ``050_openai_agents`` / ``120_openai_agents`` tutorials). This
+        per-model tracing wrapper predates the harness and is
         retained only for backwards compatibility; it will be removed in a
         future release. No runtime warning is emitted.
     """
