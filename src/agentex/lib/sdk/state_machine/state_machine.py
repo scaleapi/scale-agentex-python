@@ -113,6 +113,7 @@ class StateMachine(ABC, Generic[T]):
         """
         Reset the state machine to its initial state.
         """
+        span = None
         if self._trace_transitions:
             if self._task_id is None:
                 raise ValueError(
@@ -126,7 +127,7 @@ class StateMachine(ABC, Generic[T]):
 
         await self.transition(self._initial_state)
 
-        if self._trace_transitions:
+        if self._trace_transitions and span is not None:
             span.output = {"output_state": self._initial_state}  # type: ignore[assignment,union-attr]
             await adk.tracing.end_span(trace_id=self._task_id, span=span)
 
