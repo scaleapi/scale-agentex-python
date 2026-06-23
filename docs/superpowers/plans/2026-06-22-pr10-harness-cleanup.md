@@ -342,11 +342,11 @@ Verified dual tutorial sets on `next`:
 Run: `grep -rln "create_langgraph_tracing_handler\|create_pydantic_ai_tracing_handler\|stream_langgraph_events\|stream_pydantic_ai_events" examples/tutorials/`
 Expected: the pre-unified dirs (the ones to retire) show up.
 
-- [ ] **Step 3: Replace in place, one framework at a time.** For each: `git rm -r` the pre-unified dir, then `git mv` the unified `harness_*` dir into that numbered slot (or copy-then-delete where content must merge). Mapping:
-  - `harness_pydantic_ai` → `00_sync/040_pydantic_ai`, `10_async/00_base/110_pydantic_ai`, `10_async/10_temporal/110_pydantic_ai`
-  - `harness_langgraph` → `00_sync/030_langgraph`, `10_async/00_base/100_langgraph`, `10_async/10_temporal/130_langgraph`
-  - `060_harness_openai`/`130_harness_openai`/`140_harness_openai` → drop the `harness_` infix into the retired openai slots (`NNN_openai_*`)
-  - `harness_codex` ×3 → fresh `NNN_codex` numbers consistent with the sequence
+- [ ] **Step 3: Replace in place, one framework at a time.** For each framework, `git rm -r` the pre-unified dir AND `git mv` the unified `harness_*` dir into that exact slot — both halves are required, or the old dir lingers and the tier ends up with two tutorials for the same framework. Mapping (left = source dir to move, right = old dir to delete + destination path):
+  - `harness_pydantic_ai` → replaces `00_sync/040_pydantic_ai`, `10_async/00_base/110_pydantic_ai`, `10_async/10_temporal/110_pydantic_ai`
+  - `harness_langgraph` → replaces `00_sync/030_langgraph`, `10_async/00_base/100_langgraph`, `10_async/10_temporal/130_langgraph`
+  - `060_harness_openai`/`130_harness_openai`/`140_harness_openai` → **delete the old `*_openai_agents_local_sandbox` dirs** (`00_sync/050_…`, `10_async/00_base/120_…`, `10_async/10_temporal/120_…`) and move the harness_openai dirs into those slots, renamed `050_openai_agents` / `120_openai_agents` (drops the `harness_` infix AND the 060/130/140 collision with `claude_code`). Do NOT merely rename `060_harness_openai`→`060_openai` — that would leave the old `050_openai_agents_local_sandbox` in place.
+  - `harness_codex` ×3 → fresh `NNN_codex` numbers consistent with the sequence (`070`/`140`/`150`); no old dir to delete
 
 - [ ] **Step 4: Confirm survivors are clean**
 
@@ -471,11 +471,11 @@ Run: `uv run --all-packages python -c "import agentex.lib.adk; print('ok')"` →
 Run: `grep -rn "providers._modules.openai\|providers/_modules/openai\|sync_provider\|openai_turn\|SyncStreamingProvider\|convert_openai_to_agentex_events" src/ tests/ examples/`
 
 - [ ] **Step 2: Move + rename** the harness-surface modules into `_modules/_openai_sync.py` / `_openai_turn.py`. Keep `SyncStreamingProvider`/`SyncStreamingModel` (they are the supported sync path) — relocate them into `_openai_sync.py` (or keep a re-export shim at the old path for one release so the CLI template keeps working until updated).
-- [ ] **Step 3: Update the CLI template** `acp.py.j2` import to the new path. Update `adk/__init__.py` and tests.
-- [ ] **Step 4: Move the openai tests** `tests/lib/adk/providers/test_openai_turn.py` → `tests/lib/adk/test_openai_turn.py` (and `test_openai_activities.py` per the openai.py decision) so openai tests sit alongside the other four harnesses.
+- [ ] **Step 3: Keep a back-compat shim at the old paths — do NOT expect zero references.** Several consumers legitimately import from `providers/_modules/sync_provider.py` and are NOT migrated by this plan: the `sync-openai-agents` CLI template, and the base sync tutorials `examples/tutorials/00_sync/010_multiturn/project/acp.py` (`SyncStreamingProvider`) and `00_sync/020_streaming/project/acp.py` (`SyncStreamingProvider` + `convert_openai_to_agentex_events`). So `sync_provider.py` MUST remain as a shim that keeps `SyncStreamingModel`/`SyncStreamingProvider` and re-exports the relocated `convert_openai_to_agentex_events` from `_modules/_openai_sync.py`; likewise leave a shim at `providers/_modules/openai_turn.py` re-exporting `OpenAITurn`. Update only the internal importers you actually moved (`adk/__init__.py`, the relocated test).
+- [ ] **Step 4: (optional) Move the openai turn test** `tests/lib/adk/providers/test_openai_turn.py` → `tests/lib/adk/test_openai_turn.py` for symmetry, or leave it and just repoint its import to the new `_modules/_openai_turn` path (required because it monkeypatches `convert_openai_to_agentex_events` on the turn module's namespace).
 - [ ] **Step 5: Verify**
 
-Run: `grep -rn "providers._modules.openai_turn\|providers._modules.sync_provider" src/ tests/ examples/` → zero (or only the deliberate one-release shim).
+Run: `grep -rn "providers._modules.openai_turn\|providers._modules.sync_provider" src/ tests/ examples/` → the only remaining hits are the kept shims (`providers/_modules/{sync_provider,openai_turn}.py` themselves) and their intended one-release consumers (the `sync-openai-agents` template + the `010_multiturn`/`020_streaming` base sync tutorials). Confirm each resolves via the shim — `python -c "from agentex.lib.adk.providers._modules.sync_provider import SyncStreamingProvider, convert_openai_to_agentex_events"` — NOT that the count is zero.
 Run: `uv run --all-packages --all-extras pytest tests/lib/adk/ tests/lib/core/harness/ -q` → green.
 Run: `uv run --all-packages python -c "import agentex.lib.adk; print('ok')"` → `ok`.
 
@@ -512,8 +512,8 @@ The pre-unified planning docs for the now-merged stack are obsolete.
 - [ ] **Step 1:** Re-read `adk/docs/harness.md` end-to-end against the post-E/F/I tree; confirm every symbol, tap, example, and module path matches reality.
 - [ ] **Step 2: Re-grep for any stale reference**
 
-Run: `grep -rln "harness_pydantic_ai\|harness_langgraph\|harness_openai\|harness_codex\|create_.*_tracing_handler\|providers._modules.openai_turn\|sync_provider" examples/ docs/ adk/docs/ src/agentex/lib/cli/templates/ README.md`
-Expected: zero (or only deliberate one-release shims, noted in the changelog).
+Run: `grep -rln "harness_pydantic_ai\|harness_langgraph\|harness_openai\|harness_codex\|create_.*_tracing_handler" examples/ docs/ adk/docs/ src/agentex/lib/cli/templates/ README.md`
+Expected: zero for the `harness_*` paths and the deprecated handlers. (This plan doc itself still names the old `harness_*`/openai dirs as the historical retirement record — that is expected.) Then separately confirm the `sync_provider`/`openai_turn` shims still resolve for their intended one-release consumers (the `sync-openai-agents` template + the `010_multiturn`/`020_streaming` base sync tutorials), rather than expecting zero references — `python -c "from agentex.lib.adk.providers._modules.sync_provider import SyncStreamingProvider, convert_openai_to_agentex_events; from agentex.lib.adk.providers._modules.openai_turn import OpenAITurn"`.
 
 - [ ] **Step 3: Add the changelog / release note** documenting the breaking removals: `create_langgraph_tracing_handler` / `create_pydantic_ai_tracing_handler` (+ classes), any removed `stream_*_events`/`emit_langgraph_messages` public helper, the openai module relocation (new import path), and the `adk.harness` namespace if adopted.
 - [ ] **Step 4: Commit** (`docs(harness): final docs consistency pass + changelog for the harness-cleanup removals`).

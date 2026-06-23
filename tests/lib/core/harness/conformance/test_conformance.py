@@ -272,11 +272,28 @@ async def test_cross_channel_equivalence(fixture: Fixture) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("fixture", all_fixtures(), ids=lambda f: f.name)
-def test_span_derivation_is_deterministic(fixture: Fixture) -> None:
-    """Span derivation over the same event list is idempotent.
+def test_span_derivation_is_deterministic() -> None:
+    """Span derivation over the same event list is idempotent, for EVERY
+    registered fixture across all harnesses.
+
+    ``all_fixtures()`` is read at run time (not at collection/parametrize time)
+    so it sees fixtures registered by every conformance module, regardless of
+    import/collection order. The per-harness conformance modules are imported
+    eagerly via ``conftest.py`` in this directory, so this test covers the full
+    cross-harness fixture set even when run in isolation. (Parametrizing on
+    ``all_fixtures()`` at import time would freeze the set to whatever happened
+    to be registered before this module was collected.)
 
     Retained as a lightweight regression guard. The primary cross-channel
     guarantee is asserted in test_cross_channel_equivalence above.
     """
-    assert derive_all(fixture.events) == derive_all(fixture.events)
+    fixtures = all_fixtures()
+    assert len(fixtures) > len(_FIXTURES), (
+        "expected per-harness fixtures to be registered in addition to the "
+        f"{len(_FIXTURES)} generic ones; got {len(fixtures)} total — a conformance "
+        "module's fixtures are not being registered (check conftest imports)"
+    )
+    for fixture in fixtures:
+        assert derive_all(fixture.events) == derive_all(fixture.events), (
+            f"[{fixture.name}] span derivation is not deterministic"
+        )
