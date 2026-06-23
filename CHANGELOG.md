@@ -6,6 +6,38 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.15.0 (2026-06-23)
+
+Full Changelog: [agentex-client-v0.14.0...agentex-client-v0.15.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.14.0...agentex-client-v0.15.0)
+
+### Features
+
+* **api:** add webhook endpoint ([37c7d9d](https://github.com/scaleapi/scale-agentex-python/commit/37c7d9d465943184ab84922ba1079b939516d534))
+* **claude-code:** stream-json parser tap for the unified harness surface ([#420](https://github.com/scaleapi/scale-agentex-python/issues/420)) ([904339c](https://github.com/scaleapi/scale-agentex-python/commit/904339c21b8cd641a02d903c03d4a8730b4d7e84))
+* **codex:** event-stream parser tap for the unified harness surface ([#421](https://github.com/scaleapi/scale-agentex-python/issues/421)) ([9b2b031](https://github.com/scaleapi/scale-agentex-python/commit/9b2b03144cc67bb497e0a301686207aba2629758))
+* **harness:** public adk facade + docs for the unified harness surface (PR 9) ([#423](https://github.com/scaleapi/scale-agentex-python/issues/423)) ([fa60632](https://github.com/scaleapi/scale-agentex-python/commit/fa60632f9be84315a3fdc627745ae5b605994bd8))
+* **harness:** unified harness surface — foundation (span derivation, delivery adapters, emitter) ([#412](https://github.com/scaleapi/scale-agentex-python/issues/412)) ([a9cacf4](https://github.com/scaleapi/scale-agentex-python/commit/a9cacf4eb71697351ee658a570636f04bbf31ad5))
+* **langgraph:** migrate LangGraph harness onto unified surface ([#417](https://github.com/scaleapi/scale-agentex-python/issues/417)) ([d344228](https://github.com/scaleapi/scale-agentex-python/commit/d34422845de4b80ed69d2dccfdb0c680ef2fbca3))
+* **openai-agents:** migrate onto the unified harness surface ([#416](https://github.com/scaleapi/scale-agentex-python/issues/416)) ([d10e151](https://github.com/scaleapi/scale-agentex-python/commit/d10e1510bd5da44ad5acc5cac638750122083fce))
+* **pydantic-ai:** migrate onto unified harness surface (PR4) ([#415](https://github.com/scaleapi/scale-agentex-python/issues/415)) ([5ec62c2](https://github.com/scaleapi/scale-agentex-python/commit/5ec62c20781d24fc3e0b92734fcd444b1e791d70))
+* **sdk:** add webhook helper for forward-route handlers ([#419](https://github.com/scaleapi/scale-agentex-python/issues/419)) ([514075d](https://github.com/scaleapi/scale-agentex-python/commit/514075de2189f33be4ade0ac84368019e55ed7ea))
+* **streaming:** stream tool call argument deltas in TemporalStreamingModel ([#355](https://github.com/scaleapi/scale-agentex-python/issues/355)) ([c8de1d4](https://github.com/scaleapi/scale-agentex-python/commit/c8de1d4c9c3b5b3c16ad4aaf9644c1ba0d618757))
+* **tracing:** skip Agentex span-start write by default (end-only ingest) ([#438](https://github.com/scaleapi/scale-agentex-python/issues/438)) ([10d22a2](https://github.com/scaleapi/scale-agentex-python/commit/10d22a27091c9c410ae808dab9cfce5dab3816a8))
+
+
+### Bug Fixes
+
+* **harness:** assert cross-channel (yield vs auto-send) conformance equivalence [AGX1-373] ([#414](https://github.com/scaleapi/scale-agentex-python/issues/414)) ([694960f](https://github.com/scaleapi/scale-agentex-python/commit/694960f913b8ba521d9236e876e5e00f57a3a3ff))
+* **harness:** correct codex & openai reasoning stream envelopes ([#441](https://github.com/scaleapi/scale-agentex-python/issues/441)) ([1d86e8a](https://github.com/scaleapi/scale-agentex-python/commit/1d86e8a47a369814540b6e853cd20240c6098f27))
+* **tests:** use relative import for assert_matches_type in webhooks test ([#440](https://github.com/scaleapi/scale-agentex-python/issues/440)) ([5954a9f](https://github.com/scaleapi/scale-agentex-python/commit/5954a9fc8c7961ef5ceb41abf3ca32e6e78590c5))
+* **tracing:** fail open temporal span activities ([#437](https://github.com/scaleapi/scale-agentex-python/issues/437)) ([2d63eef](https://github.com/scaleapi/scale-agentex-python/commit/2d63eef53bdb919bb6568e04708e3b7abcb8075b))
+
+
+### Refactors
+
+* **cli:** migrate existing langgraph/pydantic-ai templates to unified surface ([#429](https://github.com/scaleapi/scale-agentex-python/issues/429)) ([ee41408](https://github.com/scaleapi/scale-agentex-python/commit/ee41408c420eba5c6b8fe8719c8ebd445dcd220c))
+* **tutorials:** migrate to the unified harness surface + renumber ([#428](https://github.com/scaleapi/scale-agentex-python/issues/428)) ([ebaf617](https://github.com/scaleapi/scale-agentex-python/commit/ebaf617256c7971dde12fd7e25f02b05f2f42fca))
+
 ## 0.14.0 (2026-06-22)
 
 Full Changelog: [agentex-client-v0.13.1...agentex-client-v0.14.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.13.1...agentex-client-v0.14.0)

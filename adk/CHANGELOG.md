@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.0 (2026-06-23)
+
+Full Changelog: [agentex-sdk-v0.13.2...agentex-sdk-v0.14.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.13.2...agentex-sdk-v0.14.0)
+
+### Features
+
+* **harness:** public adk facade + docs for the unified harness surface (PR 9) ([#423](https://github.com/scaleapi/scale-agentex-python/issues/423)) ([fa60632](https://github.com/scaleapi/scale-agentex-python/commit/fa60632f9be84315a3fdc627745ae5b605994bd8))
+
 ## 0.13.2 (2026-06-22)
 
 Full Changelog: [agentex-sdk-v0.13.1...agentex-sdk-v0.13.2](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.13.1...agentex-sdk-v0.13.2)
