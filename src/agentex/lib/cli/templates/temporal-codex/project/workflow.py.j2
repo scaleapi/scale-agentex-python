@@ -1,0 +1,145 @@
+"""Temporal workflow for {{ agent_name }} — Codex harness.
+
+Demonstrates the ``convert_codex_to_agentex_events`` tap + ``CodexTurn`` +
+``UnifiedEmitter`` for a Temporal-durable ACP agent.
+
+KEY CONCEPTS DEMONSTRATED:
+- Running ``codex exec --json`` in the ``run_codex_turn`` activity. Subprocess
+  I/O is not permitted on the Temporal workflow event loop (the deterministic
+  sandbox loop does not implement ``subprocess_exec``), so the signal handler
+  delegates the turn to an activity, which also gets Temporal's retry + timeout
+  guarantees.
+- Wrapping the stdout line stream in a ``CodexTurn`` (inside the activity).
+- Delivering events via ``UnifiedEmitter.auto_send_turn``, which pushes
+  ``StreamTaskMessage*`` events to Redis so the UI sees tokens in real time.
+- Passing ``created_at=workflow.now()`` for deterministic timestamps under
+  Temporal replay (required for Temporal-safe delivery).
+- Persisting the codex thread ID on the workflow instance itself — Temporal's
+  workflow state is durable, so no external ``adk.state`` round-trip is needed.
+"""
+
+from __future__ import annotations
+
+import os
+from datetime import timedelta
+
+from temporalio import workflow
+
+from agentex.lib import adk
+from agentex.lib.types.acp import SendEventParams, CreateTaskParams
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
+from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
+
+with workflow.unsafe.imports_passed_through():
+    from project.activities import RunCodexTurnParams, run_codex_turn
+
+add_tracing_processor_config(
+    SGPTracingProcessorConfig(
+        sgp_api_key=os.environ.get("SGP_API_KEY", ""),
+        sgp_account_id=os.environ.get("SGP_ACCOUNT_ID", ""),
+        sgp_base_url=os.environ.get("SGP_CLIENT_BASE_URL", ""),
+    )
+)
+
+environment_variables = EnvironmentVariables.refresh()
+
+if environment_variables.WORKFLOW_NAME is None:
+    raise ValueError("Environment variable WORKFLOW_NAME is not set")
+if environment_variables.AGENT_NAME is None:
+    raise ValueError("Environment variable AGENT_NAME is not set")
+
+logger = make_logger(__name__)
+
+MODEL = os.environ.get("CODEX_MODEL", "o4-mini")
+
+
+@workflow.defn(name=environment_variables.WORKFLOW_NAME)
+class {{ workflow_class }}(BaseWorkflow):
+    """Long-running Temporal workflow that runs codex exec for each turn.
+
+    Conversation state (codex thread ID + turn counter) is kept on the
+    workflow instance. Temporal's durable replay reconstructs this state if
+    the worker crashes, so no external ``adk.state`` round-trip is needed.
+    """
+
+    def __init__(self):
+        super().__init__(display_name=environment_variables.AGENT_NAME)
+        self._complete_task = False
+        self._turn_number = 0
+        self._codex_thread_id: str | None = None
+
+    @workflow.signal(name=SignalName.RECEIVE_EVENT)
+    async def on_task_event_send(self, params: SendEventParams) -> None:
+        """Handle a new user message: spawn codex, stream events via UnifiedEmitter."""
+        logger.info("Received task event: %s", params.task.id)
+        self._turn_number += 1
+
+        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+
+        user_message = params.event.content.content
+
+        async with adk.tracing.span(
+            trace_id=params.task.id,
+            task_id=params.task.id,
+            name=f"Turn {self._turn_number}",
+            input={"message": user_message},
+        ) as span:
+            # Delegate the subprocess turn to an activity: subprocess I/O is not
+            # permitted on the Temporal workflow event loop. The activity streams
+            # events to the task and returns the final text + codex thread id.
+            # workflow.now() gives a deterministic timestamp under replay.
+            result = await workflow.execute_activity(
+                run_codex_turn,
+                RunCodexTurnParams(
+                    task_id=params.task.id,
+                    prompt=user_message,
+                    model=MODEL,
+                    trace_id=params.task.id,
+                    parent_span_id=span.id if span else None,
+                    thread_id=self._codex_thread_id,
+                    created_at=workflow.now(),
+                ),
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+
+            # Persist the codex thread id so the next turn resumes the session.
+            session_id = result.get("session_id")
+            if session_id:
+                self._codex_thread_id = session_id
+
+            if span:
+                span.output = {
+                    "final_text": result.get("final_text"),
+                    "model": result.get("model"),
+                }
+
+    @workflow.run
+    async def on_task_create(self, params: CreateTaskParams) -> str:
+        """Workflow entry point — keep the conversation alive for incoming signals."""
+        logger.info("Task created: %s", params.task.id)
+
+        await adk.messages.create(
+            task_id=params.task.id,
+            content=TextContent(
+                author="agent",
+                content=(
+                    "Task initialized.\n"
+                    "Send me a message and I'll run codex (local subprocess) "
+                    "to answer, streaming events via the unified harness surface."
+                ),
+            ),
+        )
+
+        await workflow.wait_condition(lambda: self._complete_task, timeout=None)
+        return "Task completed"
+
+    @workflow.signal
+    async def complete_task_signal(self) -> None:
+        """Graceful workflow shutdown signal."""
+        logger.info("Received complete_task signal")
+        self._complete_task = True
