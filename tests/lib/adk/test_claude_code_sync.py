@@ -140,6 +140,48 @@ class TestTextContent:
         text_starts = [e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, TextContent)]
         assert len(text_starts) == 1, "Text block must not be emitted twice"
 
+    async def test_streamed_message_split_across_assistant_envelopes_not_duplicated(self):
+        """Regression: one streamed message (thinking + text) can materialise as
+        SEPARATE assistant envelopes. Content-based dedup must skip both streamed
+        blocks even though the text arrives in its own later envelope — an earlier
+        index-based scheme re-emitted the text (duplicate)."""
+        envelopes = [
+            # Streamed: thinking at block index 0, then text at block index 1.
+            {
+                "type": "stream_event",
+                "event": {"type": "content_block_start", "index": 0, "content_block": {"type": "thinking"}},
+            },
+            {
+                "type": "stream_event",
+                "event": {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "thinking_delta", "thinking": "ponder"},
+                },
+            },
+            {"type": "stream_event", "event": {"type": "content_block_stop", "index": 0}},
+            {
+                "type": "stream_event",
+                "event": {"type": "content_block_start", "index": 1, "content_block": {"type": "text"}},
+            },
+            {
+                "type": "stream_event",
+                "event": {"type": "content_block_delta", "index": 1, "delta": {"type": "text_delta", "text": "answer"}},
+            },
+            {"type": "stream_event", "event": {"type": "content_block_stop", "index": 1}},
+            # Materialised as two separate assistant envelopes (thinking alone at
+            # idx 0, then text alone at idx 0) — the shape that caused duplicates.
+            {"type": "assistant", "message": {"content": [{"type": "thinking", "thinking": "ponder"}]}},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "answer"}]}},
+        ]
+        out = await _collect(convert_claude_code_to_agentex_events(_aiter(envelopes)))
+        text_starts = [e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, TextContent)]
+        reasoning_starts = [
+            e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, ReasoningContent)
+        ]
+        assert len(text_starts) == 1, "Streamed text must not be re-emitted by its own materialised envelope"
+        assert len(reasoning_starts) == 1, "Streamed thinking must not be re-emitted either"
+
     async def test_later_turn_non_streamed_text_not_dropped(self):
         """A non-streamed text block in a later turn must not be dropped because an
         earlier turn streamed a block at the same index."""
