@@ -15,7 +15,7 @@ members = [
 
 [[package]]
 name = "agentex-client"
-version = "0.13.0"
+version = "0.17.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
