@@ -22,7 +22,11 @@ from agentex.types.task_message_delta import (
     ToolResponseDelta,
     ReasoningSummaryDelta,
 )
-from agentex.types.task_message_update import StreamTaskMessageDelta
+from agentex.types.task_message_update import (
+    StreamTaskMessageDone,
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+)
 from agentex.lib.core.services.adk.streaming import (
     CoalescingBuffer,
     StreamingTaskMessageContext,
@@ -303,6 +307,50 @@ class TestCoalescingBufferTimeWindow:
             await buf.close()
 
 
+class TestCoalescingBufferIdleParks:
+    """The ticker must park on its wake event when idle, not poll every
+    FLUSH_INTERVAL_S — a buffer orphaned without close() otherwise pins CPU."""
+
+    @staticmethod
+    def _count_drains(buf: CoalescingBuffer) -> list[int]:
+        """Instrument _drain_locked to count drain cycles."""
+        n = [0]
+        orig = buf._drain_locked
+
+        def counting() -> list[StreamTaskMessageDelta]:
+            n[0] += 1
+            return orig()
+
+        buf._drain_locked = counting  # type: ignore[method-assign]
+        return n
+
+    @pytest.mark.asyncio
+    async def test_idle_buffer_does_not_spin(self) -> None:
+        buf = CoalescingBuffer(on_flush=AsyncMock())
+        drains = self._count_drains(buf)
+        buf.start()
+        try:
+            # ~8 FLUSH_INTERVAL_S windows; a polling ticker would drain ~8x.
+            await asyncio.sleep(0.4)
+            assert drains[0] == 0, f"idle ticker woke {drains[0]}x (must park at 0)"
+        finally:
+            await buf.close()
+
+    @pytest.mark.asyncio
+    async def test_orphaned_buffer_parks_after_flush(self, task_message: TaskMessage) -> None:
+        """An orphaned buffer (close() never runs) must still park once drained."""
+        buf = CoalescingBuffer(on_flush=AsyncMock())
+        buf.start()
+        try:
+            await buf.add(_text(task_message, "hi"))
+            await asyncio.sleep(0.020)  # let the immediate flush land and park
+            drains = self._count_drains(buf)  # count only post-flush cycles
+            await asyncio.sleep(0.4)
+            assert drains[0] == 0, f"orphaned ticker woke {drains[0]}x (must park at 0)"
+        finally:
+            await buf.close()
+
+
 class TestCoalescingBufferClose:
     @pytest.mark.asyncio
     async def test_close_drains_remaining_buffered_items(self, task_message: TaskMessage) -> None:
@@ -351,6 +399,35 @@ class TestCoalescingBufferClose:
         # Fully drained and closed; this should silently no-op.
         await buf.add(_text(task_message, "after"))
         assert flushed == []
+
+    @pytest.mark.asyncio
+    async def test_cancelled_close_does_not_drop_in_flight_batch(self, task_message: TaskMessage) -> None:
+        """If close() is cancelled while the ticker is mid-flush, the already-
+        drained batch must still publish — not be lost to a force-cancel."""
+        flushed: list[StreamTaskMessageDelta] = []
+        gate = asyncio.Event()
+        entered = asyncio.Event()
+
+        async def on_flush(u: StreamTaskMessageDelta) -> None:
+            entered.set()
+            await gate.wait()  # block mid-flush, before the item is recorded
+            flushed.append(u)
+
+        buf = CoalescingBuffer(on_flush=on_flush)
+        buf.start()
+        await buf.add(_text(task_message, "hi"))  # first delta → immediate flush
+        await entered.wait()  # ticker is now blocked inside on_flush
+
+        close_task = asyncio.create_task(buf.close())
+        await asyncio.sleep(0)  # let close() reach `await self._task`
+        close_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await close_task
+
+        gate.set()  # release the in-flight flush
+        assert buf._task is not None
+        await buf._task  # ticker finishes the batch and exits on _closed
+        assert len(flushed) == 1, "in-flight batch was dropped on cancelled close()"
 
 
 class TestCoalescingBufferCloseDuringFlush:
@@ -520,3 +597,96 @@ class TestStreamingTaskMessageContextCreatedAt:
 
         kwargs = client.messages.create.call_args.kwargs
         assert kwargs["created_at"] is omit
+
+
+class TestFullMessageClosesBuffer:
+    """A StreamTaskMessageFull must stop the buffer ticker. If it marks the
+    context done without closing the buffer, close()'s _is_closed short-circuit
+    leaves the ticker orphaned (the worker CPU leak)."""
+
+    @pytest.mark.asyncio
+    async def test_full_message_stops_ticker(self) -> None:
+        ctx, _svc, tm = await _make_context("coalesced")
+        # A delta makes the buffer and its ticker live.
+        await ctx.stream_update(_text(tm, "hello"))
+        buf = ctx._buffer
+        assert buf is not None
+        task = buf._task
+        assert task is not None and not task.done()
+
+        await ctx.stream_update(
+            StreamTaskMessageFull(
+                parent_task_message=tm,
+                content=TextContent(author="agent", content="final", format="markdown"),
+                type="full",
+            )
+        )
+
+        assert ctx._buffer is None, "Full message left the buffer un-closed"
+        assert task.done(), "coalescing-buffer ticker still running after Full (orphaned)"
+
+    @pytest.mark.asyncio
+    async def test_full_is_terminal_publish_no_trailing_deltas(self) -> None:
+        # Buffered deltas must publish BEFORE the Full, never after (a trailing
+        # delta after the terminal Full reads as a stale duplicate tail).
+        ctx, svc, tm = await _make_context("coalesced")
+        # "alpha" flushes immediately; "beta" stays buffered in the window.
+        await ctx.stream_update(_text(tm, "alpha"))
+        await ctx.stream_update(_text(tm, "beta"))
+
+        full = StreamTaskMessageFull(
+            parent_task_message=tm,
+            content=TextContent(author="agent", content="alphabeta", format="markdown"),
+            type="full",
+        )
+        await ctx.stream_update(full)
+
+        published = [c.args[0] for c in svc.stream_update.await_args_list]
+        assert published, "nothing was published"
+        assert published[-1] is full, (
+            f"Full must be the terminal publish; saw trailing "
+            f"{type(published[-1]).__name__} after it (stale duplicate tail)"
+        )
+        assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
+            "expected the buffered deltas to be published before the Full"
+        )
+
+    @pytest.mark.asyncio
+    async def test_done_is_single_terminal_publish_no_trailing_deltas(self) -> None:
+        # Same guarantee as Full: buffered deltas publish BEFORE the terminal
+        # Done, Done is published exactly once (not duplicated by close()), and
+        # the caller's Done is published as-is so its metadata (index) survives.
+        ctx, svc, tm = await _make_context("coalesced")
+        # "alpha" flushes immediately; "beta" stays buffered in the window.
+        await ctx.stream_update(_text(tm, "alpha"))
+        await ctx.stream_update(_text(tm, "beta"))
+
+        done = StreamTaskMessageDone(parent_task_message=tm, type="done", index=7)
+        await ctx.stream_update(done)
+
+        published = [c.args[0] for c in svc.stream_update.await_args_list]
+        dones = [u for u in published if isinstance(u, StreamTaskMessageDone)]
+        assert len(dones) == 1, f"Done must publish exactly once, saw {len(dones)}"
+        assert published[-1] is done, (
+            f"the caller's Done must be the terminal publish (metadata preserved); "
+            f"saw trailing {type(published[-1]).__name__}"
+        )
+        assert dones[0].index == 7, "caller's Done index must be preserved, not synthesized away"
+        assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
+            "expected the buffered deltas to be published before the Done"
+        )
+
+    @pytest.mark.asyncio
+    async def test_close_reaps_buffer_even_if_already_marked_closed(self) -> None:
+        # close() must stop the ticker even when _is_closed is already set.
+        ctx, _svc, tm = await _make_context("coalesced")
+        await ctx.stream_update(_text(tm, "hi"))
+        buf = ctx._buffer
+        assert buf is not None
+        task = buf._task
+        assert task is not None and not task.done()
+
+        ctx._is_closed = True  # stray "already done" mark with a live buffer
+        await ctx.close()
+
+        assert task.done(), "close() must reap the buffer even when already marked closed"
