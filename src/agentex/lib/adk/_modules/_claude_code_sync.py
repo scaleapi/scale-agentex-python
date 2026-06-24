@@ -144,10 +144,16 @@ async def convert_claude_code_to_agentex_events(
                     text = block.get("text", "")
                     if not text:
                         continue
-                    # Skip blocks already delivered via stream_event deltas,
-                    # matched by content (see _streamed_texts).
+                    # Skip blocks already delivered via stream_event deltas. Two
+                    # cases: (1) the streamed block already finished — its full
+                    # text is recorded in _streamed_texts; (2) the materialised
+                    # envelope arrives INTERLEAVED, mid-stream, before the streamed
+                    # block's content_block_stop records its buffer — the still-open
+                    # block's partial buffer is a prefix of this full text.
                     if text in _streamed_texts:
                         _streamed_texts.remove(text)
+                        continue
+                    if _text_open and _text_buf and text.startswith(_text_buf):
                         continue
                     msg_index = next_index
                     next_index += 1
@@ -170,10 +176,14 @@ async def convert_claude_code_to_agentex_events(
                 elif block_type == "thinking":
                     thinking_text = block.get("thinking", "")
                     if thinking_text:
-                        # Skip blocks already delivered via stream_event deltas,
-                        # matched by content (see _streamed_thinkings).
+                        # Skip blocks already delivered via stream_event deltas.
+                        # Same two cases as text above: finished streamed block
+                        # (recorded), or an interleaved materialised envelope whose
+                        # text the still-open streamed buffer is a prefix of.
                         if thinking_text in _streamed_thinkings:
                             _streamed_thinkings.remove(thinking_text)
+                            continue
+                        if _thinking_open and _thinking_buf and thinking_text.startswith(_thinking_buf):
                             continue
                         summary = _extract_summary(thinking_text)
                         msg_index = next_index

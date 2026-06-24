@@ -182,6 +182,42 @@ class TestTextContent:
         assert len(text_starts) == 1, "Streamed text must not be re-emitted by its own materialised envelope"
         assert len(reasoning_starts) == 1, "Streamed thinking must not be re-emitted either"
 
+    async def test_interleaved_materialized_block_not_duplicated(self):
+        """Regression: the materialised `assistant` envelope can arrive MID-stream
+        (before the streamed block's content_block_stop). Content-recorded dedup
+        hasn't fired yet, so the still-open block's partial buffer is prefix-matched
+        against the materialised full text to suppress the duplicate."""
+        envelopes = [
+            {
+                "type": "stream_event",
+                "event": {"type": "content_block_start", "index": 0, "content_block": {"type": "thinking"}},
+            },
+            {
+                "type": "stream_event",
+                "event": {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "thinking_delta", "thinking": "I"},
+                },
+            },
+            # Materialised envelope interleaved before content_block_stop.
+            {"type": "assistant", "message": {"content": [{"type": "thinking", "thinking": "I need to load tools."}]}},
+            {
+                "type": "stream_event",
+                "event": {
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "thinking_delta", "thinking": " need to load tools."},
+                },
+            },
+            {"type": "stream_event", "event": {"type": "content_block_stop", "index": 0}},
+        ]
+        out = await _collect(convert_claude_code_to_agentex_events(_aiter(envelopes)))
+        reasoning_starts = [
+            e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, ReasoningContent)
+        ]
+        assert len(reasoning_starts) == 1, "Interleaved materialised reasoning must not duplicate the streamed block"
+
     async def test_later_turn_non_streamed_text_not_dropped(self):
         """A non-streamed text block in a later turn must not be dropped because an
         earlier turn streamed a block at the same index."""
