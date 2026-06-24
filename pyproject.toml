@@ -3,7 +3,7 @@
 # overlay (formerly `src/agentex/lib/*`) now lives in `adk/` and ships
 # as the sibling `agentex-sdk` package — see `adk/pyproject.toml`.
 name = "agentex-client"
-version = "0.15.0"
+version = "0.16.0"
 description = "The official Python REST client for the Agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"

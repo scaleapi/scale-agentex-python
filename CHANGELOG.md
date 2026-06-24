@@ -12,6 +12,36 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.16.0 (2026-06-24)
+
+Full Changelog: [agentex-client-v0.15.0...agentex-client-v0.16.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.15.0...agentex-client-v0.16.0)
+
+### ⚠ BREAKING CHANGES
+
+* **harness:** consolidate the Pydantic-AI harness + remove tracing handler ([#431](https://github.com/scaleapi/scale-agentex-python/issues/431))
+* **harness:** consolidate the LangGraph harness + remove tracing handler ([#430](https://github.com/scaleapi/scale-agentex-python/issues/430))
+
+### Features
+
+* **cli:** add claude-code init templates (sync / async / temporal) ([#435](https://github.com/scaleapi/scale-agentex-python/issues/435)) ([fd9bc4a](https://github.com/scaleapi/scale-agentex-python/commit/fd9bc4a81417b9d75ad692b779293720f8435d37))
+* **cli:** add codex init templates (sync / async / temporal) ([#436](https://github.com/scaleapi/scale-agentex-python/issues/436)) ([0fadfd7](https://github.com/scaleapi/scale-agentex-python/commit/0fadfd7a113536d49a99894a3b80ed0915a0e0fb))
+* **cli:** add default-openai-agents init template (async base) ([#434](https://github.com/scaleapi/scale-agentex-python/issues/434)) ([624e9c8](https://github.com/scaleapi/scale-agentex-python/commit/624e9c8f3b4c4288a7037bc83651970cfb02e6b0))
+* **openai-agents:** single-emit + input-bearing tool spans + run_turn ([#445](https://github.com/scaleapi/scale-agentex-python/issues/445)) ([53ab8ef](https://github.com/scaleapi/scale-agentex-python/commit/53ab8efaaf65590e71abe07149582ea59814921b))
+* **openai-temporal:** render hosted/server-side tool calls in TemporalStreamingModel ([#442](https://github.com/scaleapi/scale-agentex-python/issues/442)) ([5dce9f0](https://github.com/scaleapi/scale-agentex-python/commit/5dce9f097723d3436a0e40277139e7cce68580ef))
+
+
+### Bug Fixes
+
+* **cli:** harden init templates per Greptile feedback (suite-wide) ([#444](https://github.com/scaleapi/scale-agentex-python/issues/444)) ([2d85eb0](https://github.com/scaleapi/scale-agentex-python/commit/2d85eb0952f2298e6c412ab44b9c59255431cb84))
+* **harness:** harden Claude Code + OpenAI taps and span tracing ([#446](https://github.com/scaleapi/scale-agentex-python/issues/446)) ([5b4359d](https://github.com/scaleapi/scale-agentex-python/commit/5b4359dcf28f390f780215ed954fa52e8cb4dd7c))
+
+
+### Refactors
+
+* **harness:** consolidate the LangGraph harness + remove tracing handler ([#430](https://github.com/scaleapi/scale-agentex-python/issues/430)) ([a3fb5ad](https://github.com/scaleapi/scale-agentex-python/commit/a3fb5ad51f6392a48cbb8324f15c9619f10244b6))
+* **harness:** consolidate the Pydantic-AI harness + remove tracing handler ([#431](https://github.com/scaleapi/scale-agentex-python/issues/431)) ([48c3da8](https://github.com/scaleapi/scale-agentex-python/commit/48c3da8777ae20a9ca6d544238dccd64d6c62c2b))
+* **harness:** move OpenAI harness into adk/_modules + facade export ([#432](https://github.com/scaleapi/scale-agentex-python/issues/432)) ([58bdb16](https://github.com/scaleapi/scale-agentex-python/commit/58bdb16b4b18db22188a29d5d1b31759f9d0dd4e))
+
 ## 0.15.0 (2026-06-23)
 
 Full Changelog: [agentex-client-v0.14.0...agentex-client-v0.15.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.14.0...agentex-client-v0.15.0)
