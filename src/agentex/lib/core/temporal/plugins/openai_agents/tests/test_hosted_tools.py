@@ -10,6 +10,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from openai.types.responses.response_output_item import (
+    LocalShellCall,
+    ImageGenerationCall,
+    LocalShellCallAction,
+)
+from openai.types.responses.response_computer_tool_call import ActionClick, ResponseComputerToolCall
+from openai.types.responses.response_function_web_search import ActionSearch, ResponseFunctionWebSearch
+
 from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model import (
     _HOSTED_TOOL_TYPES,
     _coerce_args,
@@ -20,7 +28,7 @@ from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_m
 
 def test_hosted_tool_types_membership():
     for t in ("web_search_call", "file_search_call", "code_interpreter_call",
-              "image_generation_call", "mcp_call"):
+              "image_generation_call", "mcp_call", "computer_call", "local_shell_call"):
         assert t in _HOSTED_TOOL_TYPES
     assert "function_call" not in _HOSTED_TOOL_TYPES
 
@@ -34,12 +42,50 @@ def test_coerce_args_variants():
 
 
 def test_hosted_tool_request_web_search():
-    item = SimpleNamespace(type="web_search_call", id="ws_1",
-                           action={"query": "agentex"})
+    # Use the real Responses-API type to prove `action` is a genuine SDK field
+    # (it is on ResponseFunctionWebSearch), not a hand-crafted stand-in.
+    item = ResponseFunctionWebSearch(
+        id="ws_1",
+        status="completed",
+        type="web_search_call",
+        action=ActionSearch(type="search", query="agentex"),
+    )
     call_id, name, args = _hosted_tool_request(item)
     assert call_id == "ws_1"
     assert name == "web_search"  # "_call" stripped
-    assert args == {"query": "agentex"}
+    assert args["query"] == "agentex"
+    assert args["type"] == "search"
+
+
+def test_hosted_tool_request_computer_call():
+    item = ResponseComputerToolCall(
+        id="cc_1",
+        call_id="ccall_1",
+        type="computer_call",
+        status="completed",
+        pending_safety_checks=[],
+        action=ActionClick(type="click", button="left", x=10, y=20),
+    )
+    call_id, name, args = _hosted_tool_request(item)
+    assert call_id == "cc_1"
+    assert name == "computer"
+    assert args["type"] == "click"
+    assert args["button"] == "left"
+    assert args["x"] == 10 and args["y"] == 20
+
+
+def test_hosted_tool_request_local_shell_call():
+    item = LocalShellCall(
+        id="ls_1",
+        call_id="lscall_1",
+        type="local_shell_call",
+        status="completed",
+        action=LocalShellCallAction(type="exec", command=["ls", "-la"], env={}),
+    )
+    call_id, name, args = _hosted_tool_request(item)
+    assert call_id == "ls_1"
+    assert name == "local_shell"
+    assert args["command"] == ["ls", "-la"]
 
 
 def test_hosted_tool_request_mcp_uses_server_label():
@@ -72,6 +118,16 @@ def test_hosted_tool_result_mcp_error_and_output():
     assert "boom" in _hosted_tool_result(err_item)
     ok_item = SimpleNamespace(type="mcp_call", error=None, output="done")
     assert _hosted_tool_result(ok_item) == "done"
+
+
+def test_hosted_tool_result_image_generation():
+    item = ImageGenerationCall(
+        id="ig_1",
+        type="image_generation_call",
+        status="completed",
+        result="QUJD",  # 4 chars of (fake) base64
+    )
+    assert _hosted_tool_result(item) == "<image generated: 4 bytes>"
 
 
 def test_hosted_tool_result_falls_back_to_status():

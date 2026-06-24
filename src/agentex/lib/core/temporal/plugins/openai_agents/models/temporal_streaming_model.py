@@ -178,6 +178,13 @@ def _hosted_tool_request(item: Any) -> tuple[str, str, dict[str, Any]]:
         args = {"queries": list(getattr(item, "queries", []) or [])}
     elif itype == "code_interpreter_call":
         args = {"code": getattr(item, "code", "") or ""}
+    elif itype in ("computer_call", "local_shell_call"):
+        # Both carry an `action` object: a ComputerAction (click/scroll/type/...)
+        # or a LocalShellCallAction (command/env/cwd). Surface it as the args so
+        # the trace shows what the tool actually did, not just its status.
+        action = getattr(item, "action", None)
+        if action is not None:
+            args = _coerce_args(action)
     elif itype == "mcp_call":
         mcp_name = getattr(item, "name", None) or "mcp"
         server = getattr(item, "server_label", None)
@@ -204,6 +211,12 @@ def _hosted_tool_result(item: Any) -> str:
         results = getattr(item, "results", None)
         if results:
             return json.dumps([_serialize_item(r) for r in results])[:_HOSTED_TOOL_RESULT_CAP]
+    elif itype == "image_generation_call":
+        # `result` is base64 image data; surface a compact reference instead of
+        # dumping the (large) payload into the trace.
+        result = getattr(item, "result", None)
+        if result:
+            return f"<image generated: {len(result)} bytes>"
     return str(getattr(item, "status", "completed") or "completed")
 
 
