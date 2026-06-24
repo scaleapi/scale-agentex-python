@@ -47,10 +47,11 @@ from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 def _safe_parse_arguments(arguments: Any) -> dict[str, Any]:
     """Coerce a tool call's ``arguments`` into a dict, tolerating bad JSON.
 
-    Mirrors the Temporal streaming model: malformed, truncated, or
-    provider-specific raw arguments must not abort the whole turn, so a
-    non-decodable string is preserved under ``raw`` instead of raising and a
-    non-dict JSON value is wrapped under ``value``.
+    ``ToolRequestContent.arguments`` is typed ``Dict[str, object]``, so the
+    result is ALWAYS a dict — a non-dict payload must not abort the turn.
+    Mirroring the Temporal streaming model: malformed/truncated strings are
+    preserved under ``raw``, and any other non-dict value (a list, scalar, or
+    SDK object) is serialized if possible, otherwise wrapped under ``value``.
     """
     if not arguments:
         return {}
@@ -62,7 +63,12 @@ def _safe_parse_arguments(arguments: Any) -> dict[str, Any]:
         except (json.JSONDecodeError, ValueError):
             return {"raw": arguments}
         return parsed if isinstance(parsed, dict) else {"value": parsed}
-    return arguments
+    # Non-string, non-dict (e.g. a provider tool passing a list / scalar / SDK
+    # object). Prefer the object's own dict form; fall back to wrapping it.
+    dumped = arguments.model_dump() if hasattr(arguments, "model_dump") else None
+    if isinstance(dumped, dict):
+        return dumped
+    return {"value": arguments}
 
 
 def _extract_tool_call_info(tool_call_item: Any) -> tuple[str, str, dict[str, Any]]:

@@ -59,6 +59,28 @@ def test_safe_parse_arguments_non_dict_json_wrapped():
     assert _safe_parse_arguments("42") == {"value": 42}
 
 
+def test_safe_parse_arguments_non_string_non_dict_always_returns_dict():
+    # A provider tool may pass arguments as a list / scalar / SDK object rather
+    # than a JSON string. The result must still be a dict so ToolRequestContent
+    # (arguments: Dict[str, object]) accepts it instead of raising.
+    assert _safe_parse_arguments([1, 2]) == {"value": [1, 2]}
+    assert _safe_parse_arguments(7) == {"value": 7}
+
+    class _Args:
+        def model_dump(self):
+            return {"q": "hi"}
+
+    assert _safe_parse_arguments(_Args()) == {"q": "hi"}
+
+    # An SDK object whose model_dump is not a dict still degrades to a dict.
+    class _BadDump:
+        def model_dump(self):
+            return ["not", "a", "dict"]
+
+    bad = _BadDump()
+    assert _safe_parse_arguments(bad) == {"value": bad}
+
+
 # ---------------------------------------------------------------------------
 # convert_openai_to_agentex_events — reasoning + text sequencing
 # ---------------------------------------------------------------------------
