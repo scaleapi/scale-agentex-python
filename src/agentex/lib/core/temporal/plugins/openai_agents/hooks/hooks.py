@@ -15,10 +15,11 @@ Two responsibilities, independently switchable:
    tool's response, so ``on_tool_end`` is its only source (disabling it makes the
    tool-call "done" events vanish). ``run_turn`` wires this correctly for you.
 
-2. SGP tracing (enabled when ``trace_id`` is provided): opens a ``tool:<name>``
-   span on tool start with the tool ARGUMENTS as its input and closes it on tool
-   end with the result as its output, parented to ``parent_span_id``. Token usage
-   metrics are always emitted via ``LLMMetricsHooks`` regardless of these flags.
+2. SGP tracing (enabled when ``trace_id`` is provided): opens a span named after
+   the tool on tool start with the tool ARGUMENTS as its input and closes it on
+   tool end with the result as its output, parented to ``parent_span_id``. Token
+   usage metrics are always emitted via ``LLMMetricsHooks`` regardless of these
+   flags.
 """
 
 from __future__ import annotations
@@ -70,8 +71,8 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         - Agent handoffs (on_handoff, ``emit_handoffs``): when control transfers
 
     Tracing (when ``trace_id`` is provided):
-        - A ``tool:<name>`` SGP span per tool call, with the tool arguments as the
-          span input and the tool result as the span output.
+        - One SGP span per tool call, named after the tool, with the tool
+          arguments as the span input and the tool result as the span output.
 
     Usage:
         Basic usage - streams all lifecycle events::
@@ -153,8 +154,8 @@ class TemporalStreamingHooks(LLMMetricsHooks):
                 on tool end. Keep True with the streaming model provider — it does
                 NOT emit function-tool responses, so this is their only source.
             emit_handoffs: When True (default) stream a handoff text message.
-            trace_id: When provided, open a ``tool:<name>`` SGP span per tool call
-                with the arguments as input and the result as output. When None,
+            trace_id: When provided, open an SGP span per tool call (named after
+                the tool) with the arguments as input and the result as output. When None,
                 no tool spans are created (token-usage metrics still emit).
             parent_span_id: Parent span id the per-tool spans attach to.
         """
@@ -224,8 +225,8 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         """Stream the tool request (optional) and open a traced span (optional).
 
         Streams a ToolRequestContent message when ``emit_tool_requests`` is True,
-        and opens a ``tool:<name>`` SGP span (input = arguments) when ``trace_id``
-        is set. Both read the same parsed arguments.
+        and opens an SGP span named after the tool (input = arguments) when
+        ``trace_id`` is set. Both read the same parsed arguments.
 
         Args:
             context: The run context wrapper (a ToolContext with tool_call_id and tool_arguments)
@@ -263,7 +264,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         """Stream the tool response (optional) and close the traced span (optional).
 
         Streams a ToolResponseContent message when ``emit_tool_responses`` is True,
-        and closes the matching ``tool:<name>`` span (output = result) when one was
+        and closes the matching tool span (output = result) when one was
         opened in on_tool_start.
 
         Args:
@@ -324,7 +325,11 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         )
 
     async def _maybe_start_tool_span(self, tool_call_id: str, tool_name: str, arguments: dict[str, Any]) -> None:
-        """Open a ``tool:<name>`` SGP span with the arguments as input.
+        """Open a span named after the tool with the arguments as input.
+
+        The span name is the bare ``tool_name`` (no prefix) to match the shared
+        unified-harness span reducer (``core/harness/span_derivation.py``), so
+        OpenAI Temporal traces look the same as every other harness.
 
         Best-effort: tracing must never break a tool call, so any failure is
         logged and swallowed. No-op when ``trace_id`` is not set.
@@ -335,7 +340,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
             span = await _get_adk().tracing.start_span(
                 trace_id=self.trace_id,
                 parent_id=self.parent_span_id,
-                name=f"tool:{tool_name}",
+                name=tool_name,
                 input={"arguments": arguments},
                 start_to_close_timeout=_TRACE_TIMEOUT,
             )
