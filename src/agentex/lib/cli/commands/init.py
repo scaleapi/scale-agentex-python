@@ -27,17 +27,20 @@ class TemplateType(str, Enum):
     TEMPORAL_PYDANTIC_AI = "temporal-pydantic-ai"
     TEMPORAL_LANGGRAPH = "temporal-langgraph"
     TEMPORAL_CLAUDE_CODE = "temporal-claude-code"
+    TEMPORAL_CODEX = "temporal-codex"
     DEFAULT = "default"
     DEFAULT_LANGGRAPH = "default-langgraph"
     DEFAULT_PYDANTIC_AI = "default-pydantic-ai"
     DEFAULT_OPENAI_AGENTS = "default-openai-agents"
     DEFAULT_CLAUDE_CODE = "default-claude-code"
+    DEFAULT_CODEX = "default-codex"
     SYNC = "sync"
     SYNC_OPENAI_AGENTS = "sync-openai-agents"
     SYNC_OPENAI_AGENTS_LOCAL_SANDBOX = "sync-openai-agents-local-sandbox"
     SYNC_LANGGRAPH = "sync-langgraph"
     SYNC_PYDANTIC_AI = "sync-pydantic-ai"
     SYNC_CLAUDE_CODE = "sync-claude-code"
+    SYNC_CODEX = "sync-codex"
 
 
 def render_template(
@@ -71,17 +74,20 @@ def create_project_structure(
         TemplateType.TEMPORAL_PYDANTIC_AI: ["acp.py", "workflow.py", "run_worker.py", "agent.py", "tools.py"],
         TemplateType.TEMPORAL_LANGGRAPH: ["acp.py", "workflow.py", "run_worker.py", "graph.py", "tools.py"],
         TemplateType.TEMPORAL_CLAUDE_CODE: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
+        TemplateType.TEMPORAL_CODEX: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
         TemplateType.DEFAULT: ["acp.py"],
         TemplateType.DEFAULT_LANGGRAPH: ["acp.py", "graph.py", "tools.py"],
         TemplateType.DEFAULT_PYDANTIC_AI: ["acp.py", "agent.py", "tools.py"],
         TemplateType.DEFAULT_OPENAI_AGENTS: ["acp.py"],
         TemplateType.DEFAULT_CLAUDE_CODE: ["acp.py"],
+        TemplateType.DEFAULT_CODEX: ["acp.py"],
         TemplateType.SYNC: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS_LOCAL_SANDBOX: ["acp.py", "agent.py", "tools.py"],
         TemplateType.SYNC_LANGGRAPH: ["acp.py", "graph.py", "tools.py"],
         TemplateType.SYNC_PYDANTIC_AI: ["acp.py", "agent.py", "tools.py"],
         TemplateType.SYNC_CLAUDE_CODE: ["acp.py"],
+        TemplateType.SYNC_CODEX: ["acp.py"],
     }[template_type]
 
     # Create project/code files
@@ -196,6 +202,7 @@ def init():
                 {"name": "Async ACP + LangGraph", "value": TemplateType.DEFAULT_LANGGRAPH},
                 {"name": "Async ACP + Pydantic AI", "value": TemplateType.DEFAULT_PYDANTIC_AI},
                 {"name": "Async ACP + Claude Code", "value": TemplateType.DEFAULT_CLAUDE_CODE},
+                {"name": "Async ACP + Codex", "value": TemplateType.DEFAULT_CODEX},
             ],
         ).ask()
         if not template_type:
@@ -209,6 +216,7 @@ def init():
                 {"name": "Temporal + Pydantic AI", "value": TemplateType.TEMPORAL_PYDANTIC_AI},
                 {"name": "Temporal + LangGraph", "value": TemplateType.TEMPORAL_LANGGRAPH},
                 {"name": "Temporal + Claude Code", "value": TemplateType.TEMPORAL_CLAUDE_CODE},
+                {"name": "Temporal + Codex", "value": TemplateType.TEMPORAL_CODEX},
             ],
         ).ask()
         if not template_type:
@@ -223,6 +231,7 @@ def init():
                 {"name": "Sync ACP + LangGraph", "value": TemplateType.SYNC_LANGGRAPH},
                 {"name": "Sync ACP + Pydantic AI", "value": TemplateType.SYNC_PYDANTIC_AI},
                 {"name": "Sync ACP + Claude Code", "value": TemplateType.SYNC_CLAUDE_CODE},
+                {"name": "Sync ACP + Codex", "value": TemplateType.SYNC_CODEX},
             ],
         ).ask()
         if not template_type:
