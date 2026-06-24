@@ -85,6 +85,13 @@ class {{ workflow_class }}(BaseWorkflow):
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """Handle a new user message: echo it, then run the agent durably."""
         logger.info(f"Received task event: {params.task.id}")
+
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+            return
+        user_message = content.content
+
         self._turn_number += 1
 
         # Echo the user's message so it shows up in the UI as a chat bubble.
@@ -94,7 +101,7 @@ class {{ workflow_class }}(BaseWorkflow):
             trace_id=params.task.id,
             task_id=params.task.id,
             name=f"Turn {self._turn_number}",
-            input={"message": params.event.content.content},
+            input={"message": user_message},
         ) as span:
             # temporal_agent.run() is the magic line. Internally it schedules
             # a model activity (LLM HTTP call) and, for each tool the model
@@ -107,7 +114,7 @@ class {{ workflow_class }}(BaseWorkflow):
             # without it the agent would respond to each user message as if
             # it had never seen the conversation before.
             result = await temporal_agent.run(
-                params.event.content.content,
+                user_message,
                 message_history=self._message_history,
                 deps=TaskDeps(
                     task_id=params.task.id,

@@ -39,18 +39,18 @@ ENV UV_HTTP_TIMEOUT=1000
 WORKDIR /app/{{ project_path_from_build_root }}
 
 # Copy dependency files for layer caching
-COPY {{ project_path_from_build_root }}/pyproject.toml {{ project_path_from_build_root }}/uv.lock ./
+COPY {{ project_path_from_build_root }}/pyproject.toml ./
 
 # Install dependencies (without project itself, for layer caching)
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-install-project --no-dev
+    uv sync --no-install-project --no-dev
 
 # Copy the project code
 COPY {{ project_path_from_build_root }}/project ./project
 
 # Install the project
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev
+    uv sync --no-dev
 
 ENV PATH="/app/{{ project_path_from_build_root }}/.venv/bin:$PATH"
 

@@ -251,7 +251,10 @@ Add sophisticated response generation:
 @acp.on_message_send
 async def handle_message_send(params: SendMessageParams):
     # Analyze input
-    user_message = params.content.content
+    content = params.content
+    if not isinstance(content, TextContent):
+        return TextContent(author="agent", content="Sorry, I can only handle text messages right now.")
+    user_message = content.content
     
     # Generate response
     response = await generate_intelligent_response(user_message)

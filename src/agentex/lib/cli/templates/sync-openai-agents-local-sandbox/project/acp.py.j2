@@ -63,7 +63,11 @@ async def handle_message_send(
 ) -> TaskMessageContent:
     """Handle incoming messages by running the local-sandbox agent."""
     task_id = params.task.id
-    user_message = params.content.content
+    content = params.content
+    if not isinstance(content, TextContent):
+        logger.warning("Ignoring non-text message content (type=%s)", getattr(content, "type", "?"))
+        return TextContent(author="agent", content="Sorry, I can only handle text messages right now.")
+    user_message = content.content
     logger.info(f"Processing message for task {task_id}")
 
     async with adk.tracing.span(

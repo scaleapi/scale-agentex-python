@@ -80,9 +80,13 @@ class {{ workflow_class }}(BaseWorkflow):
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """Handle a user message: spawn Claude Code and push events to the task stream."""
         async with self._turn_lock:
-            self._turn_number += 1
             task_id = params.task.id
-            prompt = params.event.content.content
+            content = params.event.content
+            if not isinstance(content, TextContent):
+                logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+                return
+            self._turn_number += 1
+            prompt = content.content
             logger.info("Turn %d for task %s", self._turn_number, task_id)
 
             await adk.messages.create(task_id=task_id, content=params.event.content)

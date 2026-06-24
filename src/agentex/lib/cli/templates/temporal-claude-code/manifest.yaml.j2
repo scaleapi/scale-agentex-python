@@ -73,7 +73,7 @@ agent:
 
   # Description of what your agent does
   # Helps with documentation and discovery
-  description: "{{ description }}"
+  description: {{ description | tojson }}
 
   # Temporal workflow configuration
   # This enables your agent to run as a Temporal workflow for long-running tasks
