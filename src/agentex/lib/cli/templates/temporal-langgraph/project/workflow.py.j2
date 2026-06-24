@@ -93,11 +93,11 @@ class {{ workflow_class }}(BaseWorkflow):
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """Handle a new user message: echo it, then run the agent graph durably."""
         logger.info(f"Received task event for task {params.task.id}")
-        self._turn_number += 1
         content = params.event.content
         if not isinstance(content, TextContent):
             logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
             return
+        self._turn_number += 1
         user_text = content.content
 
         # Echo the user's message so it shows up as a chat bubble.

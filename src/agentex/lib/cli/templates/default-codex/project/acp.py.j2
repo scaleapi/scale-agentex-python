@@ -257,3 +257,6 @@ async def handle_task_event_send(params: SendEventParams):
 @acp.on_task_cancel
 async def handle_task_canceled(params: CancelTaskParams):
     logger.info("Task canceled: %s", params.task.id)
+    # Evict the per-task turn lock so it doesn't accumulate for the lifetime of
+    # the process (one Lock per task otherwise lives forever).
+    _task_locks.pop(params.task.id, None)
