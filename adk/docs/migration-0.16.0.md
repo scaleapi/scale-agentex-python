@@ -197,6 +197,76 @@ path. No API change — behavior only.
    function-tool response path (`on_tool_end`) so hosted and function tools
    render identically within the same flow.
 
+5. **Reasoning text now appears in derived spans.** `SpanDeriver` opened reasoning
+   spans with empty input and closed them with `output=None`, so reasoning/thinking
+   text never reached the trace (spans showed blank — read as "0 reasoning traces").
+   It now accumulates the `ReasoningContentDelta` / `ReasoningSummaryDelta` text (and
+   any text seeded on the Start content) and records it as the span output. Affects
+   every harness that streams reasoning, including the Claude Code tap.
+
+6. **Claude Code: no more duplicate text messages.** The `stream-json` converter
+   deduped streamed-vs-materialized blocks by numeric block index and reset that
+   state after every materialized `assistant` envelope. A single streamed message
+   that materializes as several envelopes (thinking, then text) lost the dedup
+   marker between envelopes and re-emitted the text. Dedup is now **content-based**
+   (match the streamed block's text, consume once), which a numeric index cannot do
+   reliably.
+
 > Action: if you adopted `OpenAITurn` for **reasoning models** (o1/o3/gpt-5) on
 > the sync path before these fixes, upgrade — fixes 2 and 3 are required for
-> correct reasoning rendering.
+> correct reasoning rendering. Claude Code agents on the unified harness tap should
+> upgrade for fixes 5 and 6.
+
+---
+
+## 6. Legacy Temporal `claude_agents` plugin → unified harness tap
+
+`agentex.lib.core.temporal.plugins.claude_agents` (`run_claude_agent_activity`,
+`create_streaming_hooks`, `TemporalStreamingHooks`, `ClaudeMessageHandler`) is the
+**original** Claude Code integration: it drives the Python `claude-agent-sdk`
+directly and hand-rolls its own streaming + tracing. It is **superseded** by the
+unified harness tap and slated for removal in a future release. It still works
+today, so this migration is **recommended, not yet required** — but new Claude Code
+agents should use the tap, and existing ones should plan to move.
+
+Why migrate: the tap routes Claude Code through the same canonical
+`StreamTaskMessage*` stream as every other harness, so it gets central span
+derivation (tool **and** reasoning spans), the single delivery path
+(`UnifiedEmitter`), and fixes like the two above for free. The legacy plugin does
+not derive reasoning spans at all and duplicates the streaming/tracing logic.
+
+**Before — legacy plugin activity:**
+
+```python
+from agentex.lib.core.temporal.plugins.claude_agents import run_claude_agent_activity
+
+# In the workflow:
+result = await workflow.execute_activity(
+    run_claude_agent_activity,
+    args=[prompt, workspace_path, allowed_tools, ...],
+    start_to_close_timeout=...,
+)
+```
+
+**After — unified harness tap.** Run the CLI yourself (`claude -p --output-format
+stream-json --include-partial-messages`), wrap its stdout in `ClaudeCodeTurn`, and
+deliver through `UnifiedEmitter`:
+
+```python
+from agentex.lib.adk import ClaudeCodeTurn, UnifiedEmitter
+
+# `stdout_lines` is an async iterator of the CLI's stdout lines (raw JSON strings
+# or pre-parsed dicts) — e.g. read from sandbox.exec() / a subprocess.
+turn = ClaudeCodeTurn(stdout_lines)
+
+emitter = UnifiedEmitter(task_id=task_id, trace_id=trace_id, parent_span_id=parent_span_id)
+result = await emitter.auto_send_turn(turn, created_at=workflow.now())
+# result.final_text — last text segment
+# result.usage      — TurnUsage (tokens, cost, num_reasoning_blocks, ...)
+```
+
+The golden agent is the reference implementation
+(`teams/sgp/agents/golden_agent/project/harness/`): it spawns the CLI in a sandbox,
+yields stdout lines into `ClaudeCodeTurn`, and drives `auto_send_turn`. Known
+remaining consumers to migrate: the `090_claude_agents_sdk_mvp` tutorial and the
+`eval_dashboard_agent`.
