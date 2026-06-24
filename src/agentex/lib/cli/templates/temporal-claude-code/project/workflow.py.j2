@@ -1,0 +1,144 @@
+"""Temporal workflow for {{ agent_name }} — Claude Code harness.
+
+Holds conversation state (session_id for multi-turn resume) durably across
+crashes. Each user message triggers ``on_task_event_send``, which delegates the
+turn to the ``run_claude_code_turn`` activity. The activity spawns the Claude
+Code CLI, wraps its stdout in ``ClaudeCodeTurn``, and delivers the turn via
+``UnifiedEmitter.auto_send_turn`` (the async Redis push path).
+
+Note on subprocess inside Temporal
+------------------------------------
+Subprocess (and all other) I/O must run in a Temporal *activity*, never in
+workflow code. Temporal runs workflow + signal-handler bodies on a
+deterministic sandbox event loop that does not implement ``subprocess_exec``
+(spawning the CLI there raises ``NotImplementedError``). The activity also gets
+Temporal's retry + timeout guarantees.
+"""
+
+from __future__ import annotations
+
+import os
+import json
+import asyncio
+from datetime import timedelta
+
+from temporalio import workflow
+
+from agentex.lib import adk
+from agentex.lib.types.acp import SendEventParams, CreateTaskParams
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.temporal.types.workflow import SignalName
+from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
+from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
+
+with workflow.unsafe.imports_passed_through():
+    from project.activities import RunClaudeCodeTurnParams, run_claude_code_turn
+
+add_tracing_processor_config(
+    SGPTracingProcessorConfig(
+        sgp_api_key=os.environ.get("SGP_API_KEY", ""),
+        sgp_account_id=os.environ.get("SGP_ACCOUNT_ID", ""),
+        sgp_base_url=os.environ.get("SGP_CLIENT_BASE_URL", ""),
+    )
+)
+
+environment_variables = EnvironmentVariables.refresh()
+
+if environment_variables.WORKFLOW_NAME is None:
+    raise ValueError("Environment variable WORKFLOW_NAME is not set")
+if environment_variables.AGENT_NAME is None:
+    raise ValueError("Environment variable AGENT_NAME is not set")
+
+logger = make_logger(__name__)
+
+
+@workflow.defn(name=environment_variables.WORKFLOW_NAME)
+class {{ workflow_class }}(BaseWorkflow):
+    """Temporal workflow that runs Claude Code locally for each user message.
+
+    Persists the Claude Code session_id across turns so the CLI can resume
+    the conversation (``-r <session_id>``). Temporal's durable state ensures
+    the session_id survives worker crashes.
+    """
+
+    def __init__(self):
+        super().__init__(display_name=environment_variables.AGENT_NAME)
+        self._complete_task = False
+        self._turn_number = 0
+        # Claude Code session_id for multi-turn resume.
+        self._session_id: str | None = None
+        # Serialize turns: signal handlers can interleave at await points, so two
+        # quick messages could both read the same stale _session_id and run
+        # independent Claude Code sessions. The lock keeps turns sequential and
+        # preserves conversation continuity.
+        self._turn_lock = asyncio.Lock()
+
+    @workflow.signal(name=SignalName.RECEIVE_EVENT)
+    async def on_task_event_send(self, params: SendEventParams) -> None:
+        """Handle a user message: spawn Claude Code and push events to the task stream."""
+        async with self._turn_lock:
+            self._turn_number += 1
+            task_id = params.task.id
+            prompt = params.event.content.content
+            logger.info("Turn %d for task %s", self._turn_number, task_id)
+
+            await adk.messages.create(task_id=task_id, content=params.event.content)
+
+            async with adk.tracing.span(
+                trace_id=task_id,
+                task_id=task_id,
+                name=f"Turn {self._turn_number}",
+                input={"message": prompt},
+            ) as span:
+                # Delegate the subprocess turn to an activity: subprocess I/O is not
+                # permitted on the Temporal workflow event loop. The activity streams
+                # events to the task and returns the final text + session_id.
+                # workflow.now() gives a deterministic timestamp under replay.
+                result = await workflow.execute_activity(
+                    run_claude_code_turn,
+                    RunClaudeCodeTurnParams(
+                        task_id=task_id,
+                        prompt=prompt,
+                        trace_id=task_id,
+                        parent_span_id=span.id if span else None,
+                        session_id=self._session_id,
+                        created_at=workflow.now(),
+                    ),
+                    # Agentic Claude Code runs (multiple tool calls, large codegen)
+                    # can take a while; tune this to your workload.
+                    start_to_close_timeout=timedelta(minutes=30),
+                )
+
+                # Capture session_id to enable Claude Code resume on the next turn.
+                sid = result.get("session_id")
+                if sid:
+                    self._session_id = sid
+
+                if span:
+                    span.output = {"final_text": result.get("final_text")}
+
+    @workflow.run
+    async def on_task_create(self, params: CreateTaskParams) -> str:
+        logger.info("Task created: %s", params.task.id)
+
+        await adk.messages.create(
+            task_id=params.task.id,
+            content=TextContent(
+                author="agent",
+                content=(
+                    f"Task initialized with params:\n{json.dumps(params.params, indent=2)}\n"
+                    "Send me a message and I'll run it through Claude Code locally."
+                ),
+            ),
+        )
+
+        await workflow.wait_condition(lambda: self._complete_task, timeout=None)
+        return "Task completed"
+
+    @workflow.signal
+    async def complete_task_signal(self) -> None:
+        logger.info("Received complete_task signal")
+        self._complete_task = True

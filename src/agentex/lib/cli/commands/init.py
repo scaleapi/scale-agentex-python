@@ -26,15 +26,18 @@ class TemplateType(str, Enum):
     TEMPORAL_OPENAI_AGENTS = "temporal-openai-agents"
     TEMPORAL_PYDANTIC_AI = "temporal-pydantic-ai"
     TEMPORAL_LANGGRAPH = "temporal-langgraph"
+    TEMPORAL_CLAUDE_CODE = "temporal-claude-code"
     DEFAULT = "default"
     DEFAULT_LANGGRAPH = "default-langgraph"
     DEFAULT_PYDANTIC_AI = "default-pydantic-ai"
     DEFAULT_OPENAI_AGENTS = "default-openai-agents"
+    DEFAULT_CLAUDE_CODE = "default-claude-code"
     SYNC = "sync"
     SYNC_OPENAI_AGENTS = "sync-openai-agents"
     SYNC_OPENAI_AGENTS_LOCAL_SANDBOX = "sync-openai-agents-local-sandbox"
     SYNC_LANGGRAPH = "sync-langgraph"
     SYNC_PYDANTIC_AI = "sync-pydantic-ai"
+    SYNC_CLAUDE_CODE = "sync-claude-code"
 
 
 def render_template(
@@ -67,15 +70,18 @@ def create_project_structure(
         TemplateType.TEMPORAL_OPENAI_AGENTS: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
         TemplateType.TEMPORAL_PYDANTIC_AI: ["acp.py", "workflow.py", "run_worker.py", "agent.py", "tools.py"],
         TemplateType.TEMPORAL_LANGGRAPH: ["acp.py", "workflow.py", "run_worker.py", "graph.py", "tools.py"],
+        TemplateType.TEMPORAL_CLAUDE_CODE: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
         TemplateType.DEFAULT: ["acp.py"],
         TemplateType.DEFAULT_LANGGRAPH: ["acp.py", "graph.py", "tools.py"],
         TemplateType.DEFAULT_PYDANTIC_AI: ["acp.py", "agent.py", "tools.py"],
         TemplateType.DEFAULT_OPENAI_AGENTS: ["acp.py"],
+        TemplateType.DEFAULT_CLAUDE_CODE: ["acp.py"],
         TemplateType.SYNC: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS_LOCAL_SANDBOX: ["acp.py", "agent.py", "tools.py"],
         TemplateType.SYNC_LANGGRAPH: ["acp.py", "graph.py", "tools.py"],
         TemplateType.SYNC_PYDANTIC_AI: ["acp.py", "agent.py", "tools.py"],
+        TemplateType.SYNC_CLAUDE_CODE: ["acp.py"],
     }[template_type]
 
     # Create project/code files
@@ -189,6 +195,7 @@ def init():
                 {"name": "Async ACP + OpenAI Agents SDK", "value": TemplateType.DEFAULT_OPENAI_AGENTS},
                 {"name": "Async ACP + LangGraph", "value": TemplateType.DEFAULT_LANGGRAPH},
                 {"name": "Async ACP + Pydantic AI", "value": TemplateType.DEFAULT_PYDANTIC_AI},
+                {"name": "Async ACP + Claude Code", "value": TemplateType.DEFAULT_CLAUDE_CODE},
             ],
         ).ask()
         if not template_type:
@@ -201,6 +208,7 @@ def init():
                 {"name": "Temporal + OpenAI Agents SDK (Recommended)", "value": TemplateType.TEMPORAL_OPENAI_AGENTS},
                 {"name": "Temporal + Pydantic AI", "value": TemplateType.TEMPORAL_PYDANTIC_AI},
                 {"name": "Temporal + LangGraph", "value": TemplateType.TEMPORAL_LANGGRAPH},
+                {"name": "Temporal + Claude Code", "value": TemplateType.TEMPORAL_CLAUDE_CODE},
             ],
         ).ask()
         if not template_type:
@@ -214,6 +222,7 @@ def init():
                 {"name": "Sync ACP + OpenAI Agents SDK + Local Sandbox", "value": TemplateType.SYNC_OPENAI_AGENTS_LOCAL_SANDBOX},
                 {"name": "Sync ACP + LangGraph", "value": TemplateType.SYNC_LANGGRAPH},
                 {"name": "Sync ACP + Pydantic AI", "value": TemplateType.SYNC_PYDANTIC_AI},
+                {"name": "Sync ACP + Claude Code", "value": TemplateType.SYNC_CLAUDE_CODE},
             ],
         ).ask()
         if not template_type:
