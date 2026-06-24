@@ -198,3 +198,9 @@ result = await emitter.auto_send_turn(turn, created_at=workflow.now())
 # result.final_text — last text segment
 # result.usage     — TurnUsage (tokens, cost, ...)
 ```
+
+---
+
+## Migration
+
+- [Migrating to `agentex-client` 0.16.0 / `agentex-sdk` 0.15.0](./migration-0.16.0.md) — removed LangGraph/Pydantic-AI tracing handlers (tracing is now derived from the canonical stream), private `_modules` path moves, the OpenAI harness facade relocation, and the new `run_turn` Temporal entry point.

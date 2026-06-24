@@ -19,6 +19,8 @@ from agentex.types.task_message_update import (
 )
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
+from agentex.types.reasoning_content_delta import ReasoningContentDelta
+from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 
 
 @dataclass
@@ -51,6 +53,9 @@ class SpanDeriver:
     def __init__(self) -> None:
         self._tool_by_index: dict[int, _ToolReqMeta] = {}
         self._reasoning_index_open: set[int] = set()
+        # accumulated reasoning text per open reasoning index, recorded as the
+        # span output on close (deltas carry the chain-of-thought / summary text).
+        self._reasoning_text: dict[int, str] = {}
         # insertion-ordered set of open tool_call_ids (dict keys preserve order)
         self._open_tool_ids: dict[str, None] = {}
 
@@ -72,8 +77,10 @@ class SpanDeriver:
             signals.append(CloseSpan(key=tcid, output=None, is_complete=False))
         self._open_tool_ids.clear()
         for idx in sorted(self._reasoning_index_open):
-            signals.append(CloseSpan(key=f"reasoning:{idx}", output=None, is_complete=False))
+            text = self._reasoning_text.pop(idx, "")
+            signals.append(CloseSpan(key=f"reasoning:{idx}", output=text or None, is_complete=False))
         self._reasoning_index_open.clear()
+        self._reasoning_text.clear()
         return signals
 
     def _on_start(self, event: StreamTaskMessageStart) -> list[SpanSignal]:
@@ -90,6 +97,11 @@ class SpanDeriver:
             return []
         if content.type == "reasoning":
             self._reasoning_index_open.add(idx)
+            # Seed from any text already on the Start content — non-streaming
+            # harnesses may carry the full reasoning up front; deltas append.
+            summary = getattr(content, "summary", None) or []
+            body = getattr(content, "content", None) or []
+            self._reasoning_text[idx] = "".join([*summary, *body])
             return [OpenSpan(key=f"reasoning:{idx}", kind="reasoning", name="reasoning", input={})]
         return []
 
@@ -102,6 +114,12 @@ class SpanDeriver:
             meta = self._tool_by_index.get(idx)
             if meta is not None and delta.arguments_delta:
                 meta.args_buf += delta.arguments_delta
+        elif isinstance(delta, ReasoningContentDelta):
+            if idx in self._reasoning_index_open and delta.content_delta:
+                self._reasoning_text[idx] = self._reasoning_text.get(idx, "") + delta.content_delta
+        elif isinstance(delta, ReasoningSummaryDelta):
+            if idx in self._reasoning_index_open and delta.summary_delta:
+                self._reasoning_text[idx] = self._reasoning_text.get(idx, "") + delta.summary_delta
         return []
 
     def _on_full(self, event: StreamTaskMessageFull) -> list[SpanSignal]:
@@ -150,5 +168,6 @@ class SpanDeriver:
             return [OpenSpan(key=meta.tool_call_id, kind="tool", name=meta.name, input=args)]
         if idx in self._reasoning_index_open:
             self._reasoning_index_open.discard(idx)
-            return [CloseSpan(key=f"reasoning:{idx}", output=None, is_complete=True)]
+            text = self._reasoning_text.pop(idx, "")
+            return [CloseSpan(key=f"reasoning:{idx}", output=text or None, is_complete=True)]
         return []

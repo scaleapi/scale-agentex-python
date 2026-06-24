@@ -16,6 +16,21 @@ except Exception:  # ddtrace may be absent in some envs; fall back to stdlib
     logger = logging.getLogger(__name__)
 
 
+def _as_span_payload(value: Any, *, key: str) -> Any:
+    """Coerce a span input/output payload into a dict.
+
+    The SGP spans API requires ``input`` and ``output`` to be objects: a scalar
+    or string is rejected with a 422 and the span is dropped by the async
+    processor. The SpanDeriver legitimately produces non-dict payloads — the
+    reasoning span's output is the chain-of-thought string, and some harnesses'
+    tool results are plain strings — so wrap anything that isn't already a dict
+    (``None`` passes through unchanged so an absent payload stays absent).
+    """
+    if value is None or isinstance(value, dict):
+        return value
+    return {key: value}
+
+
 class SpanTracer:
     """Opens/closes adk.tracing child spans in response to span signals.
 
@@ -60,7 +75,7 @@ class SpanTracer:
                 span = await self._tracing.start_span(
                     trace_id=self.trace_id,
                     name=signal.name,
-                    input=signal.input,
+                    input=_as_span_payload(signal.input, key="input"),
                     parent_id=self.parent_span_id,
                     task_id=self.task_id,
                 )
@@ -73,7 +88,7 @@ class SpanTracer:
                     # The real TracingModule.end_span signature is:
                     #   end_span(trace_id, span, start_to_close_timeout, heartbeat_timeout, retry_policy)
                     # It does not accept an output= kwarg.
-                    span.output = signal.output
+                    span.output = _as_span_payload(signal.output, key="output")
                     # Tool failure status (ToolResponseContent.is_error) is recorded
                     # on span.data when the harness reports one; Span has no dedicated
                     # error field. None means no status was reported, so leave data alone.

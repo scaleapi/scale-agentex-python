@@ -15,7 +15,32 @@ async def test_open_then_close_starts_and_ends_span():
     await tracer.handle(OpenSpan(key="call_1", kind="tool", name="Bash", input={"cmd": "ls"}))
     await tracer.handle(CloseSpan(key="call_1", output="files", is_complete=True))
     assert fake.started == [("Bash", "p1", {"cmd": "ls"})]
-    assert fake.ended == [("Bash", "files")]
+    # A plain-string output is wrapped in a dict (SGP spans require an object).
+    assert fake.ended == [("Bash", {"output": "files"})]
+
+
+@pytest.mark.asyncio
+async def test_non_dict_payloads_are_wrapped_in_a_dict():
+    """SGP spans reject scalar input/output with a 422; the tracer wraps any
+    non-dict payload so reasoning spans (string output) are not dropped."""
+    fake = FakeTracing()
+    tracer = SpanTracer(trace_id="t1", parent_span_id="p1", tracing=fake)
+    await tracer.handle(OpenSpan(key="reasoning:0", kind="reasoning", name="reasoning", input={}))
+    await tracer.handle(CloseSpan(key="reasoning:0", output="chain of thought", is_complete=True))
+    # Empty-dict input stays a dict; string output is wrapped.
+    assert fake.started == [("reasoning", "p1", {})]
+    assert fake.ended == [("reasoning", {"output": "chain of thought"})]
+
+
+@pytest.mark.asyncio
+async def test_dict_and_none_payloads_pass_through_unchanged():
+    fake = FakeTracing()
+    tracer = SpanTracer(trace_id="t1", parent_span_id="p1", tracing=fake)
+    await tracer.handle(OpenSpan(key="c", kind="tool", name="T", input={"a": 1}))
+    await tracer.handle(CloseSpan(key="c", output={"result": "x"}, is_complete=True))
+    await tracer.handle(OpenSpan(key="d", kind="tool", name="U", input={}))
+    await tracer.handle(CloseSpan(key="d", output=None, is_complete=False))
+    assert fake.ended == [("T", {"result": "x"}), ("U", None)]
 
 
 @pytest.mark.asyncio
