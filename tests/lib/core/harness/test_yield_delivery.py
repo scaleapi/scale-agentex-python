@@ -42,7 +42,8 @@ async def test_yield_passes_events_through_and_traces():
     out = [e async for e in yield_events(_gen(events), tracer=tracer)]
     assert out == events  # passthrough unchanged
     assert fake.started_names == ["Bash"]  # span derived + opened
-    assert fake.ended_outputs == ["ok"]  # span closed with response
+    # String tool output is wrapped in a dict (SGP spans require an object).
+    assert fake.ended_outputs == [{"output": "ok"}]  # span closed with response
 
 
 @pytest.mark.asyncio
