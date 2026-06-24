@@ -27,6 +27,7 @@ from agentex.lib.core.harness import UnifiedEmitter
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
 
@@ -134,7 +135,11 @@ async def handle_task_create(params: CreateTaskParams):
 async def handle_task_event_send(params: SendEventParams):
     """Handle a user message: spawn Claude Code locally and push events to the task stream."""
     task_id = params.task.id
-    prompt = params.event.content.content
+    content = params.event.content
+    if not isinstance(content, TextContent):
+        logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+        return
+    prompt = content.content
     logger.info("Processing message for task %s", task_id)
 
     await adk.messages.create(task_id=task_id, content=params.event.content)

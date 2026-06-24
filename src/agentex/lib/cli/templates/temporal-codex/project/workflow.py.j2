@@ -88,7 +88,12 @@ class {{ workflow_class }}(BaseWorkflow):
 
             await adk.messages.create(task_id=params.task.id, content=params.event.content)
 
-            user_message = params.event.content.content
+            content = params.event.content
+            if not isinstance(content, TextContent):
+                logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+                return
+
+            user_message = content.content
 
             async with adk.tracing.span(
                 trace_id=params.task.id,

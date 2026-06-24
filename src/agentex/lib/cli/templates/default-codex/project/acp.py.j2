@@ -32,6 +32,7 @@ load_dotenv()
 import agentex.lib.adk as adk
 from agentex.lib.adk import CodexTurn
 from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.types.text_content import TextContent
 from agentex.lib.core.harness import UnifiedEmitter
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
@@ -56,6 +57,20 @@ acp = FastACP.create(
 )
 
 MODEL = os.environ.get("CODEX_MODEL", "o4-mini")
+
+# Serialize turns per task. Two ``task/event/send`` calls for the same task can
+# otherwise both read the old ``codex_thread_id`` (or ``None``), run independent
+# codex turns, and race to overwrite the stored thread id — forking the session.
+# A per-task lock keeps turns sequential without blocking other tasks.
+_task_locks: dict[str, asyncio.Lock] = {}
+
+
+def _task_lock(task_id: str) -> asyncio.Lock:
+    lock = _task_locks.get(task_id)
+    if lock is None:
+        lock = asyncio.Lock()
+        _task_locks[task_id] = lock
+    return lock
 
 
 class ConversationState(BaseModel):
@@ -150,81 +165,93 @@ async def handle_task_event_send(params: SendEventParams):
     """Handle each user message: spawn codex, stream events, save thread ID."""
     task_id = params.task.id
     agent_id = params.agent.id
-    user_message = params.event.content.content
+
+    content = params.event.content
+    if not isinstance(content, TextContent):
+        logger.warning(
+            "Ignoring non-text event content (type=%s) for task %s",
+            getattr(content, "type", "?"),
+            task_id,
+        )
+        return
+    user_message = content.content
 
     logger.info("Processing message for task %s", task_id)
 
-    await adk.messages.create(task_id=task_id, content=params.event.content)
+    await adk.messages.create(task_id=task_id, content=content)
 
-    task_state = await adk.state.get_by_task_and_agent(task_id=task_id, agent_id=agent_id)
-    if task_state is None:
-        state = ConversationState()
-        task_state = await adk.state.create(task_id=task_id, agent_id=agent_id, state=state)
-    else:
-        state = ConversationState.model_validate(task_state.state)
+    # Serialize the read-modify-write of ``codex_thread_id`` so two concurrent
+    # turns on the same task cannot fork the codex session.
+    async with _task_lock(task_id):
+        task_state = await adk.state.get_by_task_and_agent(task_id=task_id, agent_id=agent_id)
+        if task_state is None:
+            state = ConversationState()
+            task_state = await adk.state.create(task_id=task_id, agent_id=agent_id, state=state)
+        else:
+            state = ConversationState.model_validate(task_state.state)
 
-    state.turn_number += 1
+        state.turn_number += 1
 
-    async with adk.tracing.span(
-        trace_id=task_id,
-        task_id=task_id,
-        name=f"Turn {state.turn_number}",
-        input={"message": user_message},
-        data={"__span_type__": "AGENT_WORKFLOW"},
-    ) as turn_span:
-        start_ms = int(time.monotonic() * 1000)
-
-        process = await _spawn_codex(MODEL, thread_id=state.codex_thread_id)
-
-        assert process.stdin is not None
-        process.stdin.write(user_message.encode("utf-8"))
-        await process.stdin.drain()
-        process.stdin.close()
-
-        turn = CodexTurn(
-            events=_process_stdout(process),
-            model=MODEL,
-        )
-
-        emitter = UnifiedEmitter(
-            task_id=task_id,
+        async with adk.tracing.span(
             trace_id=task_id,
-            parent_span_id=turn_span.id if turn_span else None,
-        )
-
-        # Guarantee the subprocess is reaped even if auto_send_turn raises
-        # (e.g. a Redis error); otherwise codex stays blocked writing to a full
-        # stdout pipe buffer and the OS process leaks until the server restarts.
-        try:
-            result = await emitter.auto_send_turn(turn)
-        finally:
-            if process.returncode is None:
-                process.kill()
-            await process.wait()
-
-        # Record the real wall-clock duration AFTER streaming completes; setting
-        # it before the stream ran would capture only subprocess spawn overhead.
-        turn.duration_ms = int(time.monotonic() * 1000) - start_ms
-
-        usage = turn.usage()
-
-        # Persist the codex session id (public accessor; valid post-stream) so the
-        # next turn resumes the same session.
-        if turn.session_id:
-            state.codex_thread_id = turn.session_id
-
-        await adk.state.update(
-            state_id=task_state.id,
             task_id=task_id,
-            agent_id=agent_id,
-            state=state,
-        )
+            name=f"Turn {state.turn_number}",
+            input={"message": user_message},
+            data={"__span_type__": "AGENT_WORKFLOW"},
+        ) as turn_span:
+            start_ms = int(time.monotonic() * 1000)
 
-        if turn_span:
-            turn_span.output = {
-                "final_text": result.final_text,
-                "model": usage.model,
-            }
+            process = await _spawn_codex(MODEL, thread_id=state.codex_thread_id)
+
+            assert process.stdin is not None
+            process.stdin.write(user_message.encode("utf-8"))
+            await process.stdin.drain()
+            process.stdin.close()
+
+            turn = CodexTurn(
+                events=_process_stdout(process),
+                model=MODEL,
+            )
+
+            emitter = UnifiedEmitter(
+                task_id=task_id,
+                trace_id=task_id,
+                parent_span_id=turn_span.id if turn_span else None,
+            )
+
+            # Guarantee the subprocess is reaped even if auto_send_turn raises
+            # (e.g. a Redis error); otherwise codex stays blocked writing to a full
+            # stdout pipe buffer and the OS process leaks until the server restarts.
+            try:
+                result = await emitter.auto_send_turn(turn)
+            finally:
+                if process.returncode is None:
+                    process.kill()
+                await process.wait()
+
+            # Record the real wall-clock duration AFTER streaming completes; setting
+            # it before the stream ran would capture only subprocess spawn overhead.
+            turn.duration_ms = int(time.monotonic() * 1000) - start_ms
+
+            usage = turn.usage()
+
+            # Persist the codex session id (public accessor; valid post-stream) so the
+            # next turn resumes the same session.
+            if turn.session_id:
+                state.codex_thread_id = turn.session_id
+
+            await adk.state.update(
+                state_id=task_state.id,
+                task_id=task_id,
+                agent_id=agent_id,
+                state=state,
+            )
+
+            if turn_span:
+                turn_span.output = {
+                    "final_text": result.final_text,
+                    "model": usage.model,
+                }
 
 
 @acp.on_task_cancel

@@ -94,7 +94,11 @@ class {{ workflow_class }}(BaseWorkflow):
         """Handle a new user message: echo it, then run the agent graph durably."""
         logger.info(f"Received task event for task {params.task.id}")
         self._turn_number += 1
-        user_text = params.event.content.content
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+            return
+        user_text = content.content
 
         # Echo the user's message so it shows up as a chat bubble.
         await adk.messages.create(task_id=params.task.id, content=params.event.content)

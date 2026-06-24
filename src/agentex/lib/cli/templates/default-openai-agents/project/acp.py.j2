@@ -27,6 +27,7 @@ from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskP
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.lib.core.harness.emitter import UnifiedEmitter
@@ -112,7 +113,11 @@ async def handle_task_event_send(params: SendEventParams):
     agent = get_agent()
     task_id = params.task.id
     agent_id = params.agent.id
-    user_message = params.event.content.content
+    content = params.event.content
+    if not isinstance(content, TextContent):
+        logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+        return
+    user_message = content.content
 
     logger.info(f"Processing message for task {task_id}")
 

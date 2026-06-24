@@ -98,7 +98,12 @@ async def handle_message_send(
         )
         return
 
-    user_prompt = params.content.content
+    content = params.content
+    if not isinstance(content, TextContent):
+        logger.warning("Ignoring non-text message content (type=%s)", getattr(content, "type", "?"))
+        return
+
+    user_prompt = content.content
 
     # Retrieve the task state. Each event is handled as a new turn, so we need to get the state for the current turn.
     task_state = await adk.state.get_by_task_and_agent(task_id=params.task.id, agent_id=params.agent.id)
