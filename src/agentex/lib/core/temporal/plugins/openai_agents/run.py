@@ -147,9 +147,8 @@ async def run_turn(
         # If the runner terminated mid-tool (max-turns, cancellation, SDK error),
         # on_tool_end never fired for the in-flight call, leaving its span open.
         # Drain any leftovers so they don't orphan in the tracing backend.
-        close_open_tool_spans = getattr(hooks, "close_open_tool_spans", None)
-        if callable(close_open_tool_spans):
-            await close_open_tool_spans()
+        if isinstance(hooks, TemporalStreamingHooks):
+            await hooks.close_open_tool_spans()
 
     resolved_model = model
     if resolved_model is None:
