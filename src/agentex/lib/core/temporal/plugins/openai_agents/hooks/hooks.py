@@ -6,18 +6,21 @@ to SGP with both inputs and outputs.
 
 Two responsibilities, independently switchable:
 
-1. UI message emission (``emit_messages``, default True): streams
-   ToolRequestContent / ToolResponseContent / handoff messages. Leave it on for
-   the non-streaming model provider, which does not emit these itself. Turn it
-   OFF when pairing with ``TemporalStreamingModelProvider`` — that model already
-   streams the tool-call message from the model output, so emitting here as well
-   double-posts every tool call. ``run_turn`` wires this off for you.
+1. UI message emission, split into tool requests / tool responses / handoffs
+   (each default True). Leave all on for the non-streaming model provider, which
+   does not emit them itself. When pairing with ``TemporalStreamingModelProvider``
+   set ``emit_tool_requests=False`` — that model already streams the tool REQUEST
+   from the model output, so emitting it here double-posts. But keep
+   ``emit_tool_responses=True``: the streaming model does NOT emit a function
+   tool's response, so ``on_tool_end`` is its only source (disabling it makes the
+   tool-call "done" events vanish). ``run_turn`` wires this correctly for you.
 
 2. SGP tracing (enabled when ``trace_id`` is provided): opens a ``tool:<name>``
    span on tool start with the tool ARGUMENTS as its input and closes it on tool
    end with the result as its output, parented to ``parent_span_id``. Token usage
    metrics are always emitted via ``LLMMetricsHooks`` regardless of these flags.
 """
+
 from __future__ import annotations
 
 import json
@@ -61,10 +64,10 @@ class TemporalStreamingHooks(LLMMetricsHooks):
     AgentEx UI via Temporal activities. It subclasses the OpenAI Agents SDK's RunHooks
     to intercept lifecycle events and forward them for real-time UI updates.
 
-    Lifecycle events streamed (when ``emit_messages`` is True):
-        - Tool requests (on_tool_start): Streams when a tool is about to be invoked
-        - Tool responses (on_tool_end): Streams the tool's execution result
-        - Agent handoffs (on_handoff): Streams when control transfers between agents
+    Lifecycle events streamed (each gated by its own flag, all default True):
+        - Tool requests (on_tool_start, ``emit_tool_requests``): when a tool is invoked
+        - Tool responses (on_tool_end, ``emit_tool_responses``): the tool's result
+        - Agent handoffs (on_handoff, ``emit_handoffs``): when control transfers
 
     Tracing (when ``trace_id`` is provided):
         - A ``tool:<name>`` SGP span per tool call, with the tool arguments as the
@@ -78,13 +81,14 @@ class TemporalStreamingHooks(LLMMetricsHooks):
             hooks = TemporalStreamingHooks(task_id="abc123")
             result = await Runner.run(agent, input, hooks=hooks)
 
-        Paired with the streaming model provider (avoid double-posting tool
-        messages — the model already streams them). Prefer ``run_turn`` which
-        wires this for you::
+        Paired with the streaming model provider (it already streams the tool
+        REQUEST, so suppress that here — but keep responses, which the model does
+        not emit). Prefer ``run_turn`` which wires this for you::
 
             hooks = TemporalStreamingHooks(
                 task_id="abc123",
-                emit_messages=False,
+                emit_tool_requests=False,
+                emit_tool_responses=True,
                 trace_id=trace_id,
                 parent_span_id=parent_span_id,
             )
@@ -111,7 +115,9 @@ class TemporalStreamingHooks(LLMMetricsHooks):
     Attributes:
         task_id: The AgentEx task ID for routing streamed events
         timeout: Timeout for streaming activity calls (default: 10 seconds)
-        emit_messages: Whether to stream tool/handoff messages to the UI
+        emit_tool_requests: Whether to stream the ToolRequestContent on tool start
+        emit_tool_responses: Whether to stream the ToolResponseContent on tool end
+        emit_handoffs: Whether to stream the handoff text message
         trace_id: When set, tool calls are traced to SGP (input + output)
         parent_span_id: Parent span for the per-tool spans
     """
@@ -121,18 +127,32 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         task_id: str,
         timeout: timedelta = timedelta(seconds=10),
         *,
-        emit_messages: bool = True,
+        emit_tool_requests: bool = True,
+        emit_tool_responses: bool = True,
+        emit_handoffs: bool = True,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
     ):
         """Initialize the streaming hooks.
 
+        Request and response emission are independently switchable because the
+        ``TemporalStreamingModelProvider`` emits a function tool's REQUEST from
+        the model output but NOT its response — the function result only ever
+        surfaces here via ``on_tool_end``. So when pairing with that provider,
+        set ``emit_tool_requests=False`` (the model already posted the request)
+        but keep ``emit_tool_responses=True`` (otherwise the tool-call "done"
+        events disappear). ``run_turn`` wires this correctly for you.
+
         Args:
             task_id: AgentEx task ID for routing streamed events to the correct UI session
             timeout: Timeout for streaming activity invocations (default: 10 seconds)
-            emit_messages: When True (default) stream tool/handoff messages to the
-                UI. Set False when a streaming model provider already emits the
-                tool-call messages, to avoid double-posting.
+            emit_tool_requests: When True (default) stream a ToolRequestContent on
+                tool start. Set False when a streaming model provider already
+                emits the request, to avoid double-posting it.
+            emit_tool_responses: When True (default) stream a ToolResponseContent
+                on tool end. Keep True with the streaming model provider — it does
+                NOT emit function-tool responses, so this is their only source.
+            emit_handoffs: When True (default) stream a handoff text message.
             trace_id: When provided, open a ``tool:<name>`` SGP span per tool call
                 with the arguments as input and the result as output. When None,
                 no tool spans are created (token-usage metrics still emit).
@@ -141,7 +161,9 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         super().__init__()
         self.task_id = task_id
         self.timeout = timeout
-        self.emit_messages = emit_messages
+        self.emit_tool_requests = emit_tool_requests
+        self.emit_tool_responses = emit_tool_responses
+        self.emit_handoffs = emit_handoffs
         self.trace_id = trace_id
         self.parent_span_id = parent_span_id
         # tool_call_id -> open SGP span, so on_tool_end closes the right one.
@@ -201,9 +223,9 @@ class TemporalStreamingHooks(LLMMetricsHooks):
     async def on_tool_start(self, context: RunContextWrapper, agent: Agent, tool: Tool) -> None:  # noqa: ARG002
         """Stream the tool request (optional) and open a traced span (optional).
 
-        Streams a ToolRequestContent message when ``emit_messages`` is True, and
-        opens a ``tool:<name>`` SGP span (input = arguments) when ``trace_id`` is
-        set. Both read the same parsed arguments.
+        Streams a ToolRequestContent message when ``emit_tool_requests`` is True,
+        and opens a ``tool:<name>`` SGP span (input = arguments) when ``trace_id``
+        is set. Both read the same parsed arguments.
 
         Args:
             context: The run context wrapper (a ToolContext with tool_call_id and tool_arguments)
@@ -213,7 +235,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         tool_call_id = self._tool_call_id(context, tool)
         tool_arguments = self._parse_tool_arguments(context)
 
-        if self.emit_messages:
+        if self.emit_tool_requests:
             await workflow.execute_activity(
                 stream_lifecycle_content,
                 args=[
@@ -240,8 +262,8 @@ class TemporalStreamingHooks(LLMMetricsHooks):
     ) -> None:
         """Stream the tool response (optional) and close the traced span (optional).
 
-        Streams a ToolResponseContent message when ``emit_messages`` is True, and
-        closes the matching ``tool:<name>`` span (output = result) when one was
+        Streams a ToolResponseContent message when ``emit_tool_responses`` is True,
+        and closes the matching ``tool:<name>`` span (output = result) when one was
         opened in on_tool_start.
 
         Args:
@@ -252,7 +274,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         """
         tool_call_id = self._tool_call_id(context, tool)
 
-        if self.emit_messages:
+        if self.emit_tool_responses:
             await workflow.execute_activity(
                 stream_lifecycle_content,
                 args=[
@@ -279,14 +301,14 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         """Stream handoff message when control transfers between agents.
 
         Sends a text message to the UI indicating that one agent is handing off
-        to another agent. No-op when ``emit_messages`` is False.
+        to another agent. No-op when ``emit_handoffs`` is False.
 
         Args:
             context: The run context wrapper
             from_agent: The agent transferring control
             to_agent: The agent receiving control
         """
-        if not self.emit_messages:
+        if not self.emit_handoffs:
             return
         await workflow.execute_activity(
             stream_lifecycle_content,

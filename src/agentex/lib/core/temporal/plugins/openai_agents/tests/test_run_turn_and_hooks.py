@@ -55,16 +55,16 @@ def test_parse_tool_arguments_non_tool_context_is_empty():
 
 
 # --------------------------------------------------------------------------- #
-# Message emission gating (the double-post fix)
+# Message emission gating (the double-post fix + the response-survival guard)
 # --------------------------------------------------------------------------- #
 
 
 @pytest.mark.asyncio
-async def test_emit_messages_true_streams_tool_request(monkeypatch):
+async def test_defaults_stream_tool_request(monkeypatch):
     exec_activity = AsyncMock()
     monkeypatch.setattr(hooks_mod.workflow, "execute_activity", exec_activity)
 
-    hooks = TemporalStreamingHooks(task_id="t1", emit_messages=True)
+    hooks = TemporalStreamingHooks(task_id="t1")  # all emit flags default True
     await hooks.on_tool_start(_tool_context(), MagicMock(), _tool())
 
     exec_activity.assert_awaited_once()
@@ -76,23 +76,41 @@ async def test_emit_messages_true_streams_tool_request(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_emit_messages_false_skips_tool_request(monkeypatch):
+async def test_requests_off_skips_request_but_keeps_response(monkeypatch):
+    """The streaming-model pairing: suppress the duplicate REQUEST, but the
+    RESPONSE must still emit (the model never emits function-tool responses)."""
     exec_activity = AsyncMock()
     monkeypatch.setattr(hooks_mod.workflow, "execute_activity", exec_activity)
 
-    hooks = TemporalStreamingHooks(task_id="t1", emit_messages=False)
+    hooks = TemporalStreamingHooks(task_id="t1", emit_tool_requests=False, emit_tool_responses=True)
     await hooks.on_tool_start(_tool_context(), MagicMock(), _tool())
+    exec_activity.assert_not_awaited()  # request suppressed
+
+    await hooks.on_tool_end(_tool_context(), MagicMock(), _tool(), "the result")
+    exec_activity.assert_awaited_once()  # response still emitted
+    _, kwargs = exec_activity.call_args
+    payload = kwargs["args"][1]
+    assert payload["name"] == "search"
+    assert payload["content"] == "the result"
+
+
+@pytest.mark.asyncio
+async def test_responses_off_skips_response(monkeypatch):
+    exec_activity = AsyncMock()
+    monkeypatch.setattr(hooks_mod.workflow, "execute_activity", exec_activity)
+
+    hooks = TemporalStreamingHooks(task_id="t1", emit_tool_responses=False)
     await hooks.on_tool_end(_tool_context(), MagicMock(), _tool(), "result")
 
     exec_activity.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_emit_messages_false_skips_handoff(monkeypatch):
+async def test_emit_handoffs_false_skips_handoff(monkeypatch):
     exec_activity = AsyncMock()
     monkeypatch.setattr(hooks_mod.workflow, "execute_activity", exec_activity)
 
-    hooks = TemporalStreamingHooks(task_id="t1", emit_messages=False)
+    hooks = TemporalStreamingHooks(task_id="t1", emit_handoffs=False)
     await hooks.on_handoff(MagicMock(), MagicMock(name="from"), MagicMock(name="to"))
 
     exec_activity.assert_not_awaited()
@@ -112,7 +130,9 @@ async def test_tool_span_carries_input_and_output(monkeypatch):
     fake_adk = SimpleNamespace(tracing=SimpleNamespace(start_span=start_span, end_span=end_span))
     monkeypatch.setattr(hooks_mod, "_get_adk", lambda: fake_adk)
 
-    hooks = TemporalStreamingHooks(task_id="t1", emit_messages=False, trace_id="trace-1", parent_span_id="parent-1")
+    hooks = TemporalStreamingHooks(
+        task_id="t1", emit_tool_requests=False, trace_id="trace-1", parent_span_id="parent-1"
+    )
     await hooks.on_tool_start(_tool_context(), MagicMock(), _tool())
 
     start_span.assert_awaited_once()
@@ -133,7 +153,7 @@ async def test_no_trace_id_means_no_span(monkeypatch):
     fake_adk = SimpleNamespace(tracing=SimpleNamespace(start_span=start_span))
     monkeypatch.setattr(hooks_mod, "_get_adk", lambda: fake_adk)
 
-    hooks = TemporalStreamingHooks(task_id="t1", emit_messages=False, trace_id=None)
+    hooks = TemporalStreamingHooks(task_id="t1", emit_tool_requests=False, trace_id=None)
     await hooks.on_tool_start(_tool_context(), MagicMock(), _tool())
 
     start_span.assert_not_awaited()
@@ -199,11 +219,13 @@ async def test_run_turn_returns_usage_and_passes_through_result(monkeypatch):
     assert out.usage.total_tokens == 140
     assert out.usage.model == "openai/gpt-5.5"
 
-    # Default hooks must be wired so the streaming model is the sole emitter.
+    # Default hooks must be wired so the streaming model is the sole tool-REQUEST
+    # emitter, while the hooks still emit tool RESPONSES (the model does not).
     runner_run.assert_awaited_once()
     _, kwargs = runner_run.call_args
     hooks = kwargs["hooks"]
-    assert hooks.emit_messages is False
+    assert hooks.emit_tool_requests is False
+    assert hooks.emit_tool_responses is True
     assert hooks.trace_id == "trace-1"
     assert hooks.parent_span_id == "parent-1"
 
@@ -213,7 +235,7 @@ async def test_run_turn_respects_supplied_hooks(monkeypatch):
     runner_run = AsyncMock(return_value=_result_with_usage())
     monkeypatch.setattr(run_mod.Runner, "run", runner_run)
 
-    custom_hooks = TemporalStreamingHooks(task_id="t1", emit_messages=False)
+    custom_hooks = TemporalStreamingHooks(task_id="t1", emit_tool_requests=False)
     await run_mod.run_turn(
         SimpleNamespace(model="m"),
         "hi",

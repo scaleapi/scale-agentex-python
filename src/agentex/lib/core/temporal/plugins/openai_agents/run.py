@@ -110,10 +110,11 @@ async def run_turn(
         run_config: Forwarded to ``Runner.run`` verbatim (carries the model
             provider and any ``SandboxRunConfig``). Left untouched here.
         hooks: Optional hooks override. When omitted, a default
-            ``TemporalStreamingHooks(emit_messages=False, ...)`` is used so the
-            streaming model is the sole tool-message emitter, and ``trace_id`` /
+            ``TemporalStreamingHooks(emit_tool_requests=False, ...)`` is used so
+            the streaming model is the sole tool-REQUEST emitter while the hooks
+            still emit tool RESPONSES (the model does not), and ``trace_id`` /
             ``parent_span_id`` are forwarded into it. When you pass your own
-            subclass (also with ``emit_messages=False``) to add agent-specific
+            subclass (also with ``emit_tool_requests=False``) to add agent-specific
             lifecycle behavior such as a sandbox-ready card, ``trace_id`` and
             ``parent_span_id`` are NOT applied for you — pass them to your
             subclass's constructor yourself if you want tool spans traced.
@@ -127,7 +128,11 @@ async def run_turn(
     if hooks is None:
         hooks = TemporalStreamingHooks(
             task_id=task_id,
-            emit_messages=False,
+            # The streaming model already posts the tool REQUEST, so suppress it
+            # here (no double-post) — but keep responses, which the model does not
+            # emit for function tools (on_tool_end is their only source).
+            emit_tool_requests=False,
+            emit_tool_responses=True,
             trace_id=trace_id,
             parent_span_id=parent_span_id,
         )
