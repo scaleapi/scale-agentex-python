@@ -218,7 +218,8 @@ async def test_auto_send_derives_tool_spans_via_tracer():
 
     assert result.final_text == ""
     assert fake_tracing.started_names == ["Bash"]
-    assert fake_tracing.ended_outputs == ["ok"]
+    # String tool output is wrapped in a dict (SGP spans require an object).
+    assert fake_tracing.ended_outputs == [{"output": "ok"}]
 
 
 # ---------------------------------------------------------------------------

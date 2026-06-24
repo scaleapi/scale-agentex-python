@@ -51,6 +51,10 @@ This gives you:
 - No forked plugin required - uses standard OpenAIAgentsPlugin
 """
 
+from agentex.lib.core.temporal.plugins.openai_agents.run import (
+    OpenAIAgentsTurnResult,
+    run_turn,
+)
 from agentex.lib.core.temporal.plugins.openai_agents.hooks.hooks import (
     TemporalStreamingHooks,
 )
@@ -81,4 +85,6 @@ __all__ = [
     "streaming_parent_span_id",
     "TemporalStreamingHooks",
     "stream_lifecycle_content",
+    "run_turn",
+    "OpenAIAgentsTurnResult",
 ]

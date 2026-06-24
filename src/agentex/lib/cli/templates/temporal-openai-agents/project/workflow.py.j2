@@ -100,6 +100,11 @@ class {{ workflow_class }}(BaseWorkflow):
     async def on_task_event_send(self, params: SendEventParams) -> None:
         logger.info(f"Received task message instruction: {params}")
 
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+            return
+
         # Increment turn number for tracing
         self._state.turn_number += 1
 
@@ -108,7 +113,7 @@ class {{ workflow_class }}(BaseWorkflow):
         self._parent_span_id = params.task.id
 
         # Add the user message to conversation history
-        self._state.input_list.append({"role": "user", "content": params.event.content.content})
+        self._state.input_list.append({"role": "user", "content": content.content})
 
         # Echo back the client's message to show it in the UI
         await adk.messages.create(task_id=params.task.id, content=params.event.content)

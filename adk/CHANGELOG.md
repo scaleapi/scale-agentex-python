@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.15.0 (2026-06-24)
+
+Full Changelog: [agentex-sdk-v0.14.0...agentex-sdk-v0.15.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.14.0...agentex-sdk-v0.15.0)
+
+### ⚠ BREAKING CHANGES
+
+* **harness:** consolidate the LangGraph harness + remove tracing handler ([#430](https://github.com/scaleapi/scale-agentex-python/issues/430))
+
+### Bug Fixes
+
+* **harness:** harden Claude Code + OpenAI taps and span tracing ([#446](https://github.com/scaleapi/scale-agentex-python/issues/446)) ([5b4359d](https://github.com/scaleapi/scale-agentex-python/commit/5b4359dcf28f390f780215ed954fa52e8cb4dd7c))
+
+
+### Refactors
+
+* **harness:** consolidate the LangGraph harness + remove tracing handler ([#430](https://github.com/scaleapi/scale-agentex-python/issues/430)) ([a3fb5ad](https://github.com/scaleapi/scale-agentex-python/commit/a3fb5ad51f6392a48cbb8324f15c9619f10244b6))
+
 ## 0.14.0 (2026-06-23)
 
 Full Changelog: [agentex-sdk-v0.13.2...agentex-sdk-v0.14.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.13.2...agentex-sdk-v0.14.0)

@@ -46,6 +46,8 @@ from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
 
+from ._fakes import FakeTracing
+
 # ---------------------------------------------------------------------------
 # Remove conftest stubs so real langchain_core types are used
 # ---------------------------------------------------------------------------
@@ -63,32 +65,6 @@ def _real_langchain_core():
 
 
 # ---------------------------------------------------------------------------
-# Fake tracing backend
-# ---------------------------------------------------------------------------
-
-
-class _FakeSpan:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.output: Any = None
-
-
-class _FakeTracing:
-    def __init__(self) -> None:
-        self.started: list[tuple[str, Any]] = []
-        self.ended: list[tuple[str, Any]] = []
-
-    async def start_span(
-        self, *, trace_id: str, name: str, input: Any = None, parent_id: Any = None, **kw: Any
-    ) -> _FakeSpan:
-        self.started.append((name, parent_id))
-        return _FakeSpan(name)
-
-    async def end_span(self, *, trace_id: str, span: _FakeSpan) -> None:
-        self.ended.append((span.name, span.output))
-
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -103,8 +79,8 @@ def _make_stream(events: list[tuple[str, Any]]):
 
 async def _run_yield_turn(
     stream_events: list[tuple[str, Any]], trace_id: str | None = None
-) -> tuple[list[Any], _FakeTracing | None]:
-    fake_tracing = _FakeTracing() if trace_id else None
+) -> tuple[list[Any], FakeTracing | None]:
+    fake_tracing = FakeTracing() if trace_id else None
     tracer: SpanTracer | bool | None = None
     if trace_id and fake_tracing is not None:
         tracer = SpanTracer(trace_id=trace_id, parent_span_id=None, task_id="task1", tracing=fake_tracing)
@@ -191,7 +167,7 @@ class TestSyncYieldChannel:
         assert out == []
 
     async def test_tracer_produces_tool_spans_for_full_events(self):
-        """AGX1-377: SpanDeriver now handles Full tool events (request opens, response closes).
+        """SpanDeriver handles Full tool events (request opens, response closes).
 
         Full(ToolRequestContent) opens a tool span; Full(ToolResponseContent) closes it.
         This aligns LangGraph tracing with Start+Done harnesses (pydantic-ai, openai-agents).

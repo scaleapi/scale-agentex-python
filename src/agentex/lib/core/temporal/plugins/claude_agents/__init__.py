@@ -1,5 +1,16 @@
 """Claude Agents SDK integration with Temporal.
 
+.. deprecated::
+    This is the original Claude Code integration: it drives the Python
+    ``claude-agent-sdk`` directly and hand-rolls its own streaming + tracing
+    (and does not derive reasoning spans). It is superseded by the unified
+    harness tap (``agentex.lib.adk.ClaudeCodeTurn`` over the ``claude -p
+    --output-format stream-json`` CLI stdout, delivered via ``UnifiedEmitter``),
+    which routes Claude Code through the same canonical ``StreamTaskMessage*``
+    stream as every other harness. It still works, but new agents should use the
+    tap and existing ones should plan to migrate; see
+    ``adk/docs/migration-0.16.0.md`` for the before/after.
+
 This plugin provides integration between Claude Agents SDK and AgentEx's
 Temporal-based orchestration platform.
 

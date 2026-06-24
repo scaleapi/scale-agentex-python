@@ -7,8 +7,7 @@ on:
     paths:
       - "src/agentex/lib/core/harness/**"
       - "src/agentex/lib/adk/_modules/**"
-      - "tests/lib/core/harness/test_harness_pydantic_ai_*.py"
-      - "tests/lib/core/harness/test_harness_langgraph_*.py"
+      - "tests/lib/core/harness/test_harness_*.py"
       - ".github/workflows/harness-integration.yml"
 
 jobs:
@@ -34,14 +33,15 @@ jobs:
         run: ./scripts/test tests/lib/core/harness/ -v
 
   # Offline harness integration tests (sync / async / temporal channels) for each
-  # migrated harness. These use fake streams / TestModel + fake streaming/tracing
-  # and require no live infrastructure. Future harness migration PRs (6-8) add
-  # their harness to the matrix below and their test paths to the triggers above.
+  # harness. These use fake streams / TestModel + fake streaming/tracing and
+  # require no live infrastructure. All five harnesses are now covered; the
+  # trigger above uses a `test_harness_*.py` glob so new suites are picked up
+  # automatically.
   live-matrix:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        harness: [pydantic_ai, langgraph]
+        harness: [pydantic_ai, langgraph, openai, claude_code, codex]
         channel: [sync, async, temporal]
       fail-fast: false
     name: ${{ matrix.harness }}-${{ matrix.channel }}

@@ -14,6 +14,7 @@ from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.protocol.acp import SendMessageParams
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
 from agentex.lib.adk import LangGraphTurn
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.types.task_message_delta import TextDelta
@@ -63,7 +64,11 @@ async def handle_message_send(
     graph = await get_graph()
 
     thread_id = params.task.id
-    user_message = params.content.content
+    content = params.content
+    if not isinstance(content, TextContent):
+        logger.warning("Ignoring non-text message content (type=%s)", getattr(content, "type", "?"))
+        return
+    user_message = content.content
 
     logger.info(f"Processing message for thread {thread_id}")
 

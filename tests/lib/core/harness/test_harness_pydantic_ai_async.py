@@ -12,7 +12,7 @@ produce a fixed text reply.
 
 The async path uses the bare PydanticAITurn (no coalescing): the foundation
 auto_send delivers streamed tool-request Start+ToolRequestDelta+Done messages
-natively (AGX1-377 fix), so no coalescing wrapper is needed.
+natively, so no coalescing wrapper is needed.
 
 What is tested
 --------------
@@ -50,6 +50,8 @@ from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
+
+from ._fakes import FakeTracing
 
 # ---------------------------------------------------------------------------
 # Minimal agent under test
@@ -121,39 +123,6 @@ class _FakeStreaming:
 
 
 # ---------------------------------------------------------------------------
-# Fake tracing backend
-# ---------------------------------------------------------------------------
-
-
-class _FakeSpan:
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.output: Any = None
-
-
-class _FakeTracing:
-    def __init__(self) -> None:
-        self.started: list[tuple[str, str | None]] = []
-        self.ended: list[tuple[str, Any]] = []
-
-    async def start_span(
-        self,
-        *,
-        trace_id: str,
-        name: str,
-        input: Any = None,
-        parent_id: Any = None,
-        data: Any = None,
-        task_id: Any = None,
-    ) -> _FakeSpan:
-        self.started.append((name, parent_id))
-        return _FakeSpan(name)
-
-    async def end_span(self, *, trace_id: str, span: _FakeSpan) -> None:
-        self.ended.append((span.name, span.output))
-
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -163,7 +132,7 @@ async def _run_auto_send_turn(
     user_msg: str = "What is the weather in Paris?",
     trace_id: str | None = None,
     parent_span_id: str | None = None,
-    fake_tracing: _FakeTracing | None = None,
+    fake_tracing: FakeTracing | None = None,
 ) -> tuple[TurnResult, _FakeStreaming]:
     """Drive the async (auto_send) path and return the TurnResult + fake streaming state."""
     fake_streaming = _FakeStreaming()
@@ -304,9 +273,9 @@ class TestAsyncAutoSendFinalText:
 class TestAsyncAutoSendSpanDerivation:
     """Span derivation on the async path now works for streamed tool requests.
 
-    The foundation auto_send delivers Start+ToolRequestDelta+Done natively
-    (AGX1-377 fix). The SpanDeriver opens a tool span on Done(tool_request),
-    so the async path now derives spans just like the sync path.
+    The foundation auto_send delivers Start+ToolRequestDelta+Done natively.
+    The SpanDeriver opens a tool span on Done(tool_request), so the async path
+    derives spans just like the sync path.
     """
 
     async def test_tool_span_derived_on_async_path(self) -> None:
@@ -314,7 +283,7 @@ class TestAsyncAutoSendSpanDerivation:
         on the async/auto_send path when auto_send delivers the streamed
         Start+ToolRequestDelta+Done sequence."""
         agent = _make_agent()
-        fake_tracing = _FakeTracing()
+        fake_tracing = FakeTracing()
         tracer = SpanTracer(
             trace_id="trace1",
             parent_span_id="parent",

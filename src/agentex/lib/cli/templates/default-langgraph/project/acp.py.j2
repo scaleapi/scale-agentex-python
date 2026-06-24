@@ -22,6 +22,7 @@ from agentex.protocol.acp import SendEventParams, CancelTaskParams, CreateTaskPa
 from agentex.lib.types.fastacp import AsyncACPConfig
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
 from agentex.lib.adk import LangGraphTurn
 
 from project.graph import create_graph
@@ -55,7 +56,11 @@ async def handle_task_event_send(params: SendEventParams):
     """Handle incoming events, streaming tokens and tool calls via Redis."""
     graph = await get_graph()
     task_id = params.task.id
-    user_message = params.event.content.content
+    content = params.event.content
+    if not isinstance(content, TextContent):
+        logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+        return
+    user_message = content.content
 
     logger.info(f"Processing message for thread {task_id}")
 

@@ -15,7 +15,7 @@ Typical usage::
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import Any, AsyncIterator
 
 from pydantic_ai.run import AgentRunResultEvent
 
@@ -27,9 +27,6 @@ from agentex.types.task_message_update import (
     StreamTaskMessageStart,
 )
 from agentex.lib.adk._modules._pydantic_ai_sync import convert_pydantic_ai_to_agentex_events
-
-if TYPE_CHECKING:
-    from agentex.lib.adk._modules._pydantic_ai_tracing import AgentexPydanticAITracingHandler
 
 StreamTaskMessage = StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone
 
@@ -83,19 +80,17 @@ class PydanticAITurn:
     ``events`` is identical to the bare ``convert_pydantic_ai_to_agentex_events``
     output (tool calls stream as ``Start + ToolRequestDelta + Done``, preserving
     argument-token streaming on the sync/yield channel). The foundation
-    ``auto_send`` delivers the streamed tool-request shape natively (AGX1-377),
-    so no coalescing is needed on either channel.
+    ``auto_send`` delivers the streamed tool-request shape natively, so no
+    coalescing is needed on either channel.
     """
 
     def __init__(
         self,
         stream: AsyncIterator[Any],
         model: str | None = None,
-        tracing_handler: "AgentexPydanticAITracingHandler | None" = None,
     ) -> None:
         self._stream = stream
         self._model = model
-        self._tracing_handler = tracing_handler
         self._usage = TurnUsage(model=model)
 
     @property
@@ -119,7 +114,6 @@ class PydanticAITurn:
 
         raw_stream = convert_pydantic_ai_to_agentex_events(
             self._stream,
-            tracing_handler=self._tracing_handler,
             on_result=_capture,
         )
         async for ev in raw_stream:
@@ -132,3 +126,48 @@ class PydanticAITurn:
         Before exhaustion the model field is set but token fields are None.
         """
         return self._usage
+
+
+async def stream_pydantic_ai_events(
+    stream,
+    task_id: str,
+) -> str:
+    """Stream Pydantic AI events to Agentex via Redis.
+
+    Consumes a Pydantic AI ``agent.run_stream_events(...)`` async iterator and
+    pushes Agentex streaming updates to Redis via the ``adk.streaming``
+    contexts. For use with async ACP agents that stream via Redis rather than
+    HTTP yields.
+
+    Text and thinking tokens stream as deltas inside coalesced streaming
+    contexts. Tool requests and tool results are posted as open+close pairs
+    on a streaming context (the unified surface persists ``initial_content``
+    when a context is closed without deltas). This matches the ``auto_send``
+    convention used by all other async/Temporal harnesses.
+
+    Tracing is derived automatically from the event stream by the emitter when
+    a ``trace_id`` is provided to the ``UnifiedEmitter``.
+
+    Args:
+        stream: Async iterator yielded by ``agent.run_stream_events(...)``.
+        task_id: The Agentex task ID to stream messages to.
+
+    Returns:
+        The accumulated text content of the **last** text part in the run.
+        Multi-step runs (where the model emits text, then a tool call, then
+        more text) return only the final text segment, matching the
+        ``stream_langgraph_events`` convention.
+    """
+    from agentex.lib.core.harness.emitter import UnifiedEmitter
+
+    turn = PydanticAITurn(
+        stream,
+        model=None,
+    )
+    emitter = UnifiedEmitter(
+        task_id=task_id,
+        trace_id=None,
+        parent_span_id=None,
+    )
+    result = await emitter.auto_send_turn(turn)
+    return result.final_text

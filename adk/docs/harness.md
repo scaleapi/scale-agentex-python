@@ -39,14 +39,17 @@ Every harness tap produces a sequence of these. Everything downstream (delivery,
 
 ## Per-harness taps: `convert_<harness>_to_agentex_events`
 
-A tap is an async generator that translates the harness's native event stream into `StreamTaskMessage*` events. The currently shipped taps are:
+A tap is an async generator that translates the harness's native event stream into `StreamTaskMessage*` events. The shipped taps are:
 
 | Harness | Tap function | Exported from |
 |---|---|---|
 | pydantic-ai | `convert_pydantic_ai_to_agentex_events` | `agentex.lib.adk` |
 | LangGraph | `convert_langgraph_to_agentex_events` | `agentex.lib.adk` |
+| claude-code | `convert_claude_code_to_agentex_events` | `agentex.lib.adk` |
+| codex | `convert_codex_to_agentex_events` | `agentex.lib.adk` |
+| OpenAI Agents | `convert_openai_to_agentex_events` | `agentex.lib.adk.providers._modules.sync_provider` |
 
-Taps for claude-code and codex will be added in subsequent PRs (AGX1-420, AGX1-421) and exported from `agentex.lib.adk` in the same way.
+Each harness also provides a `HarnessTurn` wrapper that pairs its tap's event stream with usage extraction: `PydanticAITurn`, `LangGraphTurn`, `ClaudeCodeTurn`, `CodexTurn`, and `OpenAITurn`.
 
 ---
 
@@ -157,11 +160,13 @@ Spans are derived from the canonical stream by `SpanDeriver` (pure, no `adk` dep
 
 ## Usage examples by channel
 
-### Sync ACP (pydantic-ai tap)
+### Sync ACP (`yield_turn`)
+
+Build the harness's `HarnessTurn` wrapper and iterate `emitter.yield_turn(turn)` — the emitter forwards each event to the caller and traces spans as a side effect:
 
 ```python
 import agentex.lib.adk as adk
-from agentex.lib.adk import UnifiedEmitter, convert_pydantic_ai_to_agentex_events
+from agentex.lib.adk import UnifiedEmitter, ClaudeCodeTurn
 
 @acp.on_message_send
 async def handle(params):
@@ -172,13 +177,12 @@ async def handle(params):
             trace_id=task_id,
             parent_span_id=turn_span.id if turn_span else None,
         )
-        tap = convert_pydantic_ai_to_agentex_events(pydantic_stream)
-        # wrap tap in a HarnessTurn then yield_turn, or yield directly:
-        async for event in tap:
+        turn = ClaudeCodeTurn(claude_code_stream)   # any HarnessTurn
+        async for event in emitter.yield_turn(turn):
             yield event
 ```
 
-For the pre-unified sync path the tap is still yielded directly; `UnifiedEmitter.yield_turn` is the forward-looking integration point when a `HarnessTurn` wrapper is available.
+Every harness follows the same shape — swap `ClaudeCodeTurn` for `PydanticAITurn`, `LangGraphTurn`, `CodexTurn`, or `OpenAITurn` and feed it that harness's native stream.
 
 ### Async Temporal (auto-send)
 
@@ -194,3 +198,9 @@ result = await emitter.auto_send_turn(turn, created_at=workflow.now())
 # result.final_text — last text segment
 # result.usage     — TurnUsage (tokens, cost, ...)
 ```
+
+---
+
+## Migration
+
+- [Migrating to `agentex-client` 0.16.0 / `agentex-sdk` 0.15.0](./migration-0.16.0.md) — removed LangGraph/Pydantic-AI tracing handlers (tracing is now derived from the canonical stream), private `_modules` path moves, the OpenAI harness facade relocation, and the new `run_turn` Temporal entry point.

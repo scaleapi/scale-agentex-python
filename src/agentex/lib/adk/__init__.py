@@ -6,15 +6,15 @@ from agentex.lib.adk._modules.acp import ACPModule
 from agentex.lib.adk._modules.agents import AgentsModule
 from agentex.lib.adk._modules.agent_task_tracker import AgentTaskTrackerModule
 from agentex.lib.adk._modules.checkpointer import create_checkpointer
-from agentex.lib.adk._modules._langgraph_tracing import create_langgraph_tracing_handler
-from agentex.lib.adk._modules._langgraph_async import stream_langgraph_events
-from agentex.lib.adk._modules._langgraph_messages import emit_langgraph_messages
-from agentex.lib.adk._modules._langgraph_sync import convert_langgraph_to_agentex_events
-from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn
-from agentex.lib.adk._modules._pydantic_ai_async import stream_pydantic_ai_events
+from agentex.lib.adk._modules._langgraph_turn import LangGraphTurn, stream_langgraph_events
+from agentex.lib.adk._modules._langgraph_sync import (
+    emit_langgraph_messages,
+    convert_langgraph_to_agentex_events,
+)
+from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn, stream_pydantic_ai_events
 from agentex.lib.adk._modules._pydantic_ai_sync import convert_pydantic_ai_to_agentex_events
-from agentex.lib.adk._modules._pydantic_ai_tracing import create_pydantic_ai_tracing_handler
-from agentex.lib.adk._modules._pydantic_ai_turn import PydanticAITurn
+from agentex.lib.adk._modules._openai_sync import convert_openai_to_agentex_events
+from agentex.lib.adk._modules._openai_turn import OpenAITurn, openai_usage_to_turn_usage
 from agentex.lib.adk._modules._claude_code_sync import convert_claude_code_to_agentex_events
 from agentex.lib.adk._modules._claude_code_turn import (
     ClaudeCodeTurn,
@@ -68,7 +68,6 @@ __all__ = [
     "agent_task_tracker",
     # Checkpointing / LangGraph
     "create_checkpointer",
-    "create_langgraph_tracing_handler",
     "stream_langgraph_events",
     "emit_langgraph_messages",
     "convert_langgraph_to_agentex_events",
@@ -76,8 +75,11 @@ __all__ = [
     # Pydantic AI
     "stream_pydantic_ai_events",
     "convert_pydantic_ai_to_agentex_events",
-    "create_pydantic_ai_tracing_handler",
     "PydanticAITurn",
+    # OpenAI Agents
+    "convert_openai_to_agentex_events",
+    "OpenAITurn",
+    "openai_usage_to_turn_usage",
     # Claude Code
     "convert_claude_code_to_agentex_events",
     "ClaudeCodeTurn",

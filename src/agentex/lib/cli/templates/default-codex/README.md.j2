@@ -1,0 +1,72 @@
+# {{ agent_name }} - AgentEx Async Codex Agent
+
+This template builds an **asynchronous** (non-Temporal) agent that drives the
+**Codex CLI** through the unified harness surface on AgentEx:
+- Spawns `codex exec --json` as a local subprocess
+- Wraps the CLI's stdout stream in a `CodexTurn`
+- Delivers canonical `StreamTaskMessage*` events via `UnifiedEmitter.auto_send_turn`
+  (the async Redis push path), so the UI receives output in real time
+- Persists the codex session/thread ID via `adk.state` for multi-turn memory
+- Tracing integration to SGP / AgentEx
+
+## Prerequisites
+
+- The `codex` CLI installed and on your `PATH` (`npm install -g @openai/codex`)
+- An `OPENAI_API_KEY` in your environment
+
+## Running the Agent
+
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/
+│   ├── __init__.py
+│   └── acp.py          # ACP server, subprocess spawn, state, and event handlers
+├── Dockerfile
+├── manifest.yaml
+├── dev.ipynb
+{% if use_uv %}
+└── pyproject.toml
+{% else %}
+└── requirements.txt
+{% endif %}
+```
+
+## Key Concepts
+
+### Async ACP with the harness
+The async ACP model streams events over Redis instead of an HTTP response. The
+`@acp.on_task_event_send` handler spawns the Codex CLI and pushes the harness
+events to the task stream.
+
+### Multi-turn memory
+The codex session/thread ID is persisted via `adk.state`, so each new turn
+resumes the same codex session with `codex exec resume <thread_id>`.
+
+### The unified harness surface
+`CodexTurn` + `UnifiedEmitter` are the unified harness surface. The turn
+normalizes CLI output into canonical AgentEx events; the emitter traces and
+delivers them.
+
+## Development
+
+### 1. Choose a model
+Set `CODEX_MODEL` (defaults to `o4-mini`) to control which model codex uses.
+
+### 2. Customize the subprocess
+Edit `_spawn_codex` in `project/acp.py` to change the CLI flags or how the
+prompt is delivered.
+
+### 3. Configure Credentials
+Set your credentials via `manifest.yaml`, an exported environment variable, or a
+`.env` file in the project directory.
+
+### 4. Run Locally
+```bash
+export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
+```

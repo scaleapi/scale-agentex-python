@@ -742,11 +742,10 @@ class OpenAIService:
         ) as span:
             heartbeat_if_in_workflow("run agent streamed auto send")
 
-            # AGX1-378 restored: created_at is now threaded through
-            # UnifiedEmitter.auto_send_turn -> auto_send -> every
-            # streaming_task_message_context call, so the first agent message of
-            # the turn is stamped with the workflow-supplied timestamp (e.g.
-            # workflow.now()) just as the original inline loop did.
+            # created_at is threaded through UnifiedEmitter.auto_send_turn ->
+            # auto_send -> every streaming_task_message_context call, so the
+            # first agent message of the turn is stamped with the
+            # workflow-supplied timestamp (e.g. workflow.now()).
             # The dispenser is still used below for guardrail-rejection messages,
             # which open their own streaming contexts directly.
             _take_created_at = _make_created_at_dispenser(created_at)
