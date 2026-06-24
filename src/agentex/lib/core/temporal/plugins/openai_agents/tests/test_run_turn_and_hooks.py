@@ -137,7 +137,7 @@ async def test_tool_span_carries_input_and_output(monkeypatch):
 
     start_span.assert_awaited_once()
     _, kwargs = start_span.call_args
-    assert kwargs["name"] == "tool:search"
+    assert kwargs["name"] == "search"
     assert kwargs["parent_id"] == "parent-1"
     assert kwargs["input"] == {"arguments": {"query": "hi"}}
 
