@@ -10,6 +10,8 @@ from agentex.types.task_message_update import (
 )
 from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
+from agentex.types.reasoning_content_delta import ReasoningContentDelta
+from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 from agentex.lib.core.harness.span_derivation import SpanDeriver
 
 
@@ -98,7 +100,84 @@ def test_reasoning_opens_on_start_closes_on_done():
     ]
     sigs = _signals(d, events)
     assert sigs[0] == OpenSpan(key="reasoning:0", kind="reasoning", name="reasoning", input={})
+    # No deltas -> nothing to record, so output stays None (not an empty string).
     assert sigs[1] == CloseSpan(key="reasoning:0", output=None, is_complete=True)
+
+
+def test_reasoning_content_deltas_recorded_as_output():
+    """The chain-of-thought streamed via ReasoningContentDelta lands on the
+    reasoning span's output (previously dropped, leaving the span blank)."""
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageStart(
+            type="start", index=0, content=ReasoningContent(type="reasoning", author="agent", summary=[], content=[])
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=ReasoningContentDelta(type="reasoning_content", content_index=0, content_delta="Let me "),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=ReasoningContentDelta(type="reasoning_content", content_index=0, content_delta="think."),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+    ]
+    sigs = _signals(d, events)
+    assert sigs[0] == OpenSpan(key="reasoning:0", kind="reasoning", name="reasoning", input={})
+    assert sigs[1] == CloseSpan(key="reasoning:0", output="Let me think.", is_complete=True)
+
+
+def test_reasoning_summary_deltas_recorded_as_output():
+    """Reasoning-model summary deltas (o-series) also land on the span output."""
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageStart(
+            type="start", index=0, content=ReasoningContent(type="reasoning", author="agent", summary=[], content=[])
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=ReasoningSummaryDelta(type="reasoning_summary", summary_index=0, summary_delta="Summary text"),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+    ]
+    sigs = _signals(d, events)
+    assert sigs[1] == CloseSpan(key="reasoning:0", output="Summary text", is_complete=True)
+
+
+def test_reasoning_text_seeded_from_start_content():
+    """A non-streaming harness that carries the full thinking on the Start
+    content still records it as output even with no deltas."""
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageStart(
+            type="start",
+            index=0,
+            content=ReasoningContent(type="reasoning", author="agent", summary=[], content=["full thought"]),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+    ]
+    sigs = _signals(d, events)
+    assert sigs[1] == CloseSpan(key="reasoning:0", output="full thought", is_complete=True)
+
+
+def test_reasoning_unclosed_flushes_with_text():
+    """An unclosed reasoning span flushes incomplete but still carries its text."""
+    d = SpanDeriver()
+    events = [
+        StreamTaskMessageStart(
+            type="start", index=0, content=ReasoningContent(type="reasoning", author="agent", summary=[], content=[])
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=ReasoningContentDelta(type="reasoning_content", content_index=0, content_delta="partial"),
+        ),
+    ]
+    sigs = _signals(d, events)
+    assert sigs[-1] == CloseSpan(key="reasoning:0", output="partial", is_complete=False)
 
 
 def test_parallel_tools_pair_by_tool_call_id():
