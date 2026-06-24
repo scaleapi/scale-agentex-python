@@ -182,7 +182,8 @@ async def handle_task_event_send(params: SendEventParams):
 
     # Serialize the read-modify-write of ``codex_thread_id`` so two concurrent
     # turns on the same task cannot fork the codex session.
-    async with _task_lock(task_id):
+    lock = _task_lock(task_id)
+    async with lock:
         task_state = await adk.state.get_by_task_and_agent(task_id=task_id, agent_id=agent_id)
         if task_state is None:
             state = ConversationState()
@@ -253,10 +254,14 @@ async def handle_task_event_send(params: SendEventParams):
                     "model": usage.model,
                 }
 
+    # Evict the lock once this turn has released it and no other turn holds or
+    # is waiting on it, so ``_task_locks`` stays bounded without breaking the
+    # serialization guarantee. There is no await between ``_task_lock()`` and
+    # acquiring it, so an unlocked, waiter-free lock has no in-flight user.
+    if not lock.locked() and not getattr(lock, "_waiters", None):
+        _task_locks.pop(task_id, None)
+
 
 @acp.on_task_cancel
 async def handle_task_canceled(params: CancelTaskParams):
     logger.info("Task canceled: %s", params.task.id)
-    # Evict the per-task turn lock so it doesn't accumulate for the lifetime of
-    # the process (one Lock per task otherwise lives forever).
-    _task_locks.pop(params.task.id, None)
