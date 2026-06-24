@@ -234,9 +234,9 @@ class TemporalStreamingHooks(LLMMetricsHooks):
     async def on_tool_end(
         self,
         context: RunContextWrapper,
-        agent: Agent,
+        agent: Agent,  # noqa: ARG002
         tool: Tool,
-        result: str,  # noqa: ARG002
+        result: str,
     ) -> None:
         """Stream the tool response (optional) and close the traced span (optional).
 
@@ -336,3 +336,33 @@ class TemporalStreamingHooks(LLMMetricsHooks):
             )
         except Exception as e:  # noqa: BLE001 - tracing is best-effort
             logger.warning(f"[tracing] tool end_span failed (non-fatal): {e}")
+
+    async def close_open_tool_spans(self) -> None:
+        """Close any tool spans still open because ``on_tool_end`` never fired.
+
+        ``on_tool_start`` opens a span that ``on_tool_end`` is expected to close.
+        If the runner terminates mid-tool (max-turns exceeded, cancellation, an
+        unexpected SDK exception), the matching ``on_tool_end`` never runs and the
+        span would otherwise stay open forever — orphaned in the tracing backend.
+        Call this from a ``finally`` around ``Runner.run`` to drain the leftovers.
+
+        Best-effort, like the rest of tracing: each span is closed with an
+        ``incomplete`` marker and any failure is logged and swallowed.
+        """
+        if not self._tool_spans:
+            return
+        orphaned = list(self._tool_spans.items())
+        self._tool_spans.clear()
+        for tool_call_id, span in orphaned:
+            logger.warning(
+                f"[tracing] tool span for {tool_call_id} left open (on_tool_end never fired); closing as incomplete"
+            )
+            try:
+                span.output = {"result": None, "status": "incomplete"}
+                await _get_adk().tracing.end_span(
+                    trace_id=self.trace_id,
+                    span=span,
+                    start_to_close_timeout=_TRACE_TIMEOUT,
+                )
+            except Exception as e:  # noqa: BLE001 - tracing is best-effort
+                logger.warning(f"[tracing] orphan tool end_span failed (non-fatal): {e}")

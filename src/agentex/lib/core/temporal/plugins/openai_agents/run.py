@@ -101,15 +101,22 @@ async def run_turn(
         starting_agent: The agent to run.
         input: The input list / string passed to ``Runner.run``.
         task_id: AgentEx task id for streaming.
-        trace_id: When set, tool calls are traced to SGP (input + output).
-        parent_span_id: Parent span for the per-tool spans (typically the turn span).
+        trace_id: When set, tool calls are traced to SGP (input + output). Only
+            applied when ``hooks`` is omitted (it flows into the default
+            ``TemporalStreamingHooks``). Ignored when you pass your own ``hooks``
+            — see ``hooks`` below.
+        parent_span_id: Parent span for the per-tool spans (typically the turn
+            span). Same caveat as ``trace_id``: only applied to the default hooks.
         run_config: Forwarded to ``Runner.run`` verbatim (carries the model
             provider and any ``SandboxRunConfig``). Left untouched here.
         hooks: Optional hooks override. When omitted, a default
             ``TemporalStreamingHooks(emit_messages=False, ...)`` is used so the
-            streaming model is the sole tool-message emitter. Pass your own
+            streaming model is the sole tool-message emitter, and ``trace_id`` /
+            ``parent_span_id`` are forwarded into it. When you pass your own
             subclass (also with ``emit_messages=False``) to add agent-specific
-            lifecycle behavior such as a sandbox-ready card.
+            lifecycle behavior such as a sandbox-ready card, ``trace_id`` and
+            ``parent_span_id`` are NOT applied for you — pass them to your
+            subclass's constructor yourself if you want tool spans traced.
         model: Model name recorded on the returned usage; derived from the agent
             when not supplied.
         max_turns: Forwarded to ``Runner.run``.
@@ -129,7 +136,15 @@ async def run_turn(
     if run_config is not None:
         run_kwargs["run_config"] = run_config
 
-    result = await Runner.run(starting_agent, input, **run_kwargs)
+    try:
+        result = await Runner.run(starting_agent, input, **run_kwargs)
+    finally:
+        # If the runner terminated mid-tool (max-turns, cancellation, SDK error),
+        # on_tool_end never fired for the in-flight call, leaving its span open.
+        # Drain any leftovers so they don't orphan in the tracing backend.
+        close_open_tool_spans = getattr(hooks, "close_open_tool_spans", None)
+        if callable(close_open_tool_spans):
+            await close_open_tool_spans()
 
     resolved_model = model
     if resolved_model is None:
