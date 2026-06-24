@@ -178,12 +178,15 @@ async def handle_task_event_send(params: SendEventParams):
 
     logger.info("Processing message for task %s", task_id)
 
-    await adk.messages.create(task_id=task_id, content=content)
-
-    # Serialize the read-modify-write of ``codex_thread_id`` so two concurrent
-    # turns on the same task cannot fork the codex session.
+    # Serialize the whole turn (echo + the read-modify-write of
+    # ``codex_thread_id``) so two concurrent turns on the same task cannot fork
+    # the codex session or interleave their echoed messages.
     lock = _task_lock(task_id)
-    async with lock:
+    await lock.acquire()
+    try:
+        # Echo inside the lock so this turn's message stays ordered with it.
+        await adk.messages.create(task_id=task_id, content=content)
+
         task_state = await adk.state.get_by_task_and_agent(task_id=task_id, agent_id=agent_id)
         if task_state is None:
             state = ConversationState()
@@ -253,13 +256,14 @@ async def handle_task_event_send(params: SendEventParams):
                     "final_text": result.final_text,
                     "model": usage.model,
                 }
-
-    # Evict the lock once this turn has released it and no other turn holds or
-    # is waiting on it, so ``_task_locks`` stays bounded without breaking the
-    # serialization guarantee. There is no await between ``_task_lock()`` and
-    # acquiring it, so an unlocked, waiter-free lock has no in-flight user.
-    if not lock.locked() and not getattr(lock, "_waiters", None):
-        _task_locks.pop(task_id, None)
+    finally:
+        lock.release()
+        # Evict the lock once released and idle (unlocked, no waiters) so
+        # ``_task_locks`` stays bounded even if the turn raised. There is no
+        # await between ``_task_lock()`` and acquiring it, so an unlocked,
+        # waiter-free lock has no in-flight user.
+        if not lock.locked() and not getattr(lock, "_waiters", None):
+            _task_locks.pop(task_id, None)
 
 
 @acp.on_task_cancel
