@@ -12,6 +12,7 @@ through ``UnifiedEmitter``.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from openai.types.responses import (
@@ -43,6 +44,27 @@ from agentex.types.reasoning_content_delta import ReasoningContentDelta
 from agentex.types.reasoning_summary_delta import ReasoningSummaryDelta
 
 
+def _safe_parse_arguments(arguments: Any) -> dict[str, Any]:
+    """Coerce a tool call's ``arguments`` into a dict, tolerating bad JSON.
+
+    Mirrors the Temporal streaming model: malformed, truncated, or
+    provider-specific raw arguments must not abort the whole turn, so a
+    non-decodable string is preserved under ``raw`` instead of raising and a
+    non-dict JSON value is wrapped under ``value``.
+    """
+    if not arguments:
+        return {}
+    if isinstance(arguments, dict):
+        return arguments
+    if isinstance(arguments, str):
+        try:
+            parsed = json.loads(arguments)
+        except (json.JSONDecodeError, ValueError):
+            return {"raw": arguments}
+        return parsed if isinstance(parsed, dict) else {"value": parsed}
+    return arguments
+
+
 def _extract_tool_call_info(tool_call_item: Any) -> tuple[str, str, dict[str, Any]]:
     """
     Extract call_id, tool_name, and tool_arguments from a tool call item.
@@ -69,30 +91,12 @@ def _extract_tool_call_info(tool_call_item: Any) -> tuple[str, str, dict[str, An
     elif isinstance(tool_call_item, ResponseFunctionToolCall):
         # Handle standard function tool calls
         tool_name = tool_call_item.name
-        # Handle the arguments field which might be a string or None
-        if tool_call_item.arguments:
-            if isinstance(tool_call_item.arguments, str):
-                import json
-
-                tool_arguments = json.loads(tool_call_item.arguments) if tool_call_item.arguments else {}
-            else:
-                tool_arguments = tool_call_item.arguments
-        else:
-            tool_arguments = {}
+        tool_arguments = _safe_parse_arguments(tool_call_item.arguments)
     else:
         # Generic handling for any tool call type
         tool_name = getattr(tool_call_item, "name", type(tool_call_item).__name__)
-        # Handle the arguments field which might be a string or None
         if hasattr(tool_call_item, "arguments"):
-            arguments = tool_call_item.arguments
-            if isinstance(arguments, str):
-                import json
-
-                tool_arguments = json.loads(arguments) if arguments else {}
-            elif arguments is None:
-                tool_arguments = {}
-            else:
-                tool_arguments = arguments
+            tool_arguments = _safe_parse_arguments(tool_call_item.arguments)
         else:
             tool_arguments = tool_call_item.model_dump()
 
@@ -150,7 +154,6 @@ async def convert_openai_to_agentex_events(stream_response):
     tool_map = {}
     event_count = 0
     message_index = 0  # Track message index for proper sequencing
-    seen_tool_output = False  # Track if we've seen tool output to know when final text starts
     item_id_to_index = {}  # Map item_id to message index
     item_id_to_type = {}  # Map item_id to content type (text, reasoning_content, reasoning_summary)
 
@@ -172,16 +175,16 @@ async def convert_openai_to_agentex_events(stream_response):
                 elif isinstance(raw_event, ResponseOutputItemDoneEvent):
                     item_id = raw_event.item.id
                     if item_id in item_id_to_index:
-                        # Get the message type to decide whether to send done event
-                        message_type = item_id_to_type.get(item_id, "text")
-
-                        # Don't send done events for reasoning content/summary
-                        # They just end with their last delta
-                        if message_type not in ("reasoning_content", "reasoning_summary"):
-                            yield StreamTaskMessageDone(
-                                type="done",
-                                index=item_id_to_index[item_id],
-                            )
+                        # Close every streamed message — text AND reasoning — with a
+                        # matching Done. UnifiedEmitter.auto_send only releases a
+                        # context on StreamTaskMessageDone; skipping it for reasoning
+                        # left those messages hanging and their spans incomplete. The
+                        # accumulator rebuilds ReasoningContent from the deltas, so the
+                        # Done carries no payload.
+                        yield StreamTaskMessageDone(
+                            type="done",
+                            index=item_id_to_index[item_id],
+                        )
 
                 # Skip reasoning summary part added events - we handle them on delta
                 elif isinstance(raw_event, ResponseReasoningSummaryPartAddedEvent):
@@ -292,17 +295,14 @@ async def convert_openai_to_agentex_events(stream_response):
                     # Check if this event has an item_id
                     item_id = getattr(raw_event, "item_id", None)
 
-                    # If this is a new item_id we haven't seen, it's a new message
+                    # If this is a new item_id we haven't seen, it's a new message.
+                    # Reserve a fresh index for every text item_id (matching the
+                    # increment-then-use convention of the reasoning/tool paths).
+                    # Reusing the current index let a final answer collide with the
+                    # preceding reasoning message on reasoning-model streams.
                     if item_id and item_id not in item_id_to_index:
-                        # Check if this is truly a NEW text message after tools
-                        # We need to differentiate between the first text and the final text after tools
-                        if seen_tool_output:
-                            # This is the final text message after tool execution
-                            message_index += 1
-                            item_id_to_index[item_id] = message_index
-                        else:
-                            item_id_to_index[item_id] = message_index
-
+                        message_index += 1
+                        item_id_to_index[item_id] = message_index
                         item_id_to_type[item_id] = "text"
 
                         # Send a start event with empty content for this new text message
@@ -363,7 +363,6 @@ async def convert_openai_to_agentex_events(stream_response):
                     author="agent",
                 )
                 message_index += 1  # Increment for new message
-                seen_tool_output = True  # Mark that we've seen tool output so next text gets new index
                 yield StreamTaskMessageFull(
                     type="full",
                     index=message_index,

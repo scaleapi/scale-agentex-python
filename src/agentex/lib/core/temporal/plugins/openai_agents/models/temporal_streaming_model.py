@@ -1087,7 +1087,10 @@ class TemporalStreamingModel(Model):
                                     author="agent",
                                     tool_call_id=call_id,
                                     name=name,
-                                    content={"result": _hosted_tool_result(item)[:_HOSTED_TOOL_RESULT_CAP]},
+                                    # Plain string, matching the function-tool response
+                                    # path (hooks.on_tool_end) so hosted and function
+                                    # tools render identically in the same flow.
+                                    content=_hosted_tool_result(item)[:_HOSTED_TOOL_RESULT_CAP],
                                 ),
                             )
 
