@@ -177,6 +177,12 @@ class CoalescingBuffer:
         if self._closed:
             return
         async with self._lock:
+            # Re-check under the lock: a concurrent close() (e.g. from a racing
+            # Full) may have drained and shut down the ticker after the check
+            # above but before we acquired the lock. Appending now would strand
+            # the delta in a dead buffer, never published.
+            if self._closed:
+                return
             self._buf.append(update)
             self._buf_chars += _delta_char_len(update.delta)
             if not self._first_flushed or self._buf_chars >= self.MAX_BUFFERED_CHARS:

@@ -355,6 +355,24 @@ class TestCoalescingBufferClose:
         await buf.add(_text(task_message, "after"))
         assert flushed == []
 
+    @pytest.mark.asyncio
+    async def test_add_racing_close_is_not_stranded(self, task_message: TaskMessage) -> None:
+        """TOCTOU: a delta that passes add()'s pre-lock _closed check but only
+        acquires the lock after close() set _closed must be dropped, not appended
+        to a drained, ticker-less buffer where it would never be published."""
+        buf = CoalescingBuffer(on_flush=AsyncMock())
+        buf.start()
+        # Hold the lock so add() parks *after* its pre-lock _closed check.
+        await buf._lock.acquire()
+        add_task = asyncio.create_task(buf.add(_text(task_message, "racing")))
+        await asyncio.sleep(0)  # add() passes the _closed check, blocks on the lock
+        buf._closed = True  # close() wins the race
+        buf._lock.release()
+        await add_task
+
+        assert buf._buf == [], "racing delta was stranded in the closed buffer"
+        await buf.close()  # cleanup
+
 
 class TestCoalescingBufferCloseDuringFlush:
     @pytest.mark.asyncio
