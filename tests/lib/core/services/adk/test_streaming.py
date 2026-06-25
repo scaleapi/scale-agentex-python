@@ -22,7 +22,10 @@ from agentex.types.task_message_delta import (
     ToolResponseDelta,
     ReasoningSummaryDelta,
 )
-from agentex.types.task_message_update import StreamTaskMessageDelta
+from agentex.types.task_message_update import (
+    StreamTaskMessageFull,
+    StreamTaskMessageDelta,
+)
 from agentex.lib.core.services.adk.streaming import (
     CoalescingBuffer,
     StreamingTaskMessageContext,
@@ -520,3 +523,57 @@ class TestStreamingTaskMessageContextCreatedAt:
 
         kwargs = client.messages.create.call_args.kwargs
         assert kwargs["created_at"] is omit
+
+
+class TestFullMessageClosesBuffer:
+    """A StreamTaskMessageFull must stop the buffer ticker and drain its deltas
+    before the terminal Full. Marking the context done without closing the
+    buffer leaves close()'s _is_closed short-circuit to orphan the ticker, and
+    publishing buffered deltas after the Full reads as a stale duplicate tail."""
+
+    @pytest.mark.asyncio
+    async def test_full_message_stops_ticker(self) -> None:
+        ctx, _svc, tm = await _make_context("coalesced")
+        # A delta makes the buffer and its ticker live.
+        await ctx.stream_update(_text(tm, "hello"))
+        buf = ctx._buffer
+        assert buf is not None
+        task = buf._task
+        assert task is not None and not task.done()
+
+        await ctx.stream_update(
+            StreamTaskMessageFull(
+                parent_task_message=tm,
+                content=TextContent(author="agent", content="final", format="markdown"),
+                type="full",
+            )
+        )
+
+        assert ctx._buffer is None, "Full message left the buffer un-closed"
+        assert task.done(), "coalescing-buffer ticker still running after Full (orphaned)"
+
+    @pytest.mark.asyncio
+    async def test_full_is_terminal_publish_no_trailing_deltas(self) -> None:
+        # Buffered deltas must publish BEFORE the Full, never after (a trailing
+        # delta after the terminal Full reads as a stale duplicate tail).
+        ctx, svc, tm = await _make_context("coalesced")
+        # "alpha" flushes immediately; "beta" stays buffered in the window.
+        await ctx.stream_update(_text(tm, "alpha"))
+        await ctx.stream_update(_text(tm, "beta"))
+
+        full = StreamTaskMessageFull(
+            parent_task_message=tm,
+            content=TextContent(author="agent", content="alphabeta", format="markdown"),
+            type="full",
+        )
+        await ctx.stream_update(full)
+
+        published = [c.args[0] for c in svc.stream_update.await_args_list]
+        assert published, "nothing was published"
+        assert published[-1] is full, (
+            f"Full must be the terminal publish; saw trailing "
+            f"{type(published[-1]).__name__} after it (stale duplicate tail)"
+        )
+        assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
+            "expected the buffered deltas to be published before the Full"
+        )

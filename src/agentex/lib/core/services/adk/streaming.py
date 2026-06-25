@@ -420,14 +420,16 @@ class StreamingTaskMessageContext:
         if not self.task_message:
             raise ValueError("Context not properly initialized - no task message")
 
-        if self._is_closed:
-            return self.task_message  # Already done
-
-        # Drain any buffered deltas before announcing DONE so consumers see the
-        # full sequence in order.
+        # Reap the buffer (stopping its ticker) before the _is_closed
+        # short-circuit, so a context already marked done by a Full update can't
+        # leave the ticker orphaned. Draining here also lets consumers see the
+        # full delta sequence in order before DONE.
         if self._buffer is not None:
             await self._buffer.close()
             self._buffer = None
+
+        if self._is_closed:
+            return self.task_message  # Already done (buffer reaped above)
 
         # Send the DONE event
         done_event = StreamTaskMessageDone(
@@ -485,6 +487,15 @@ class StreamingTaskMessageContext:
             if self._streaming_mode == "coalesced" and self._buffer is not None:
                 await self._buffer.add(update)
                 return update
+
+        # A Full ends the stream and supersedes buffered deltas. Drain and stop
+        # the buffer BEFORE publishing the Full, so leftover deltas land in order
+        # (deltas -> Full) instead of trailing the terminal Full as a stale
+        # duplicate tail. This also stops the ticker, which would otherwise be
+        # orphaned when __aexit__'s close() short-circuits on _is_closed.
+        if isinstance(update, StreamTaskMessageFull) and self._buffer is not None:
+            await self._buffer.close()
+            self._buffer = None
 
         result = await self._streaming_service.stream_update(update)
 
