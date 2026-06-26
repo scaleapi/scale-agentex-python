@@ -575,7 +575,9 @@ class TestFullMessageClosesBuffer:
         # Buffered deltas must publish BEFORE the Full, never after (a trailing
         # delta after the terminal Full reads as a stale duplicate tail).
         ctx, svc, tm = await _make_context("coalesced")
-        # "alpha" flushes immediately; "beta" stays buffered in the window.
+        # Two deltas through the buffer. Regardless of how the coalescing window
+        # batches them (1 or 2 publishes), the invariant under test is the same:
+        # every delta publishes before the terminal Full, never after it.
         await ctx.stream_update(_text(tm, "alpha"))
         await ctx.stream_update(_text(tm, "beta"))
 
@@ -595,3 +597,27 @@ class TestFullMessageClosesBuffer:
         assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
             "expected the buffered deltas to be published before the Full"
         )
+
+    @pytest.mark.asyncio
+    async def test_late_delta_during_close_window_is_not_published_after_full(self) -> None:
+        """Once a Full reaps the buffer, a delta racing in before _is_closed is
+        set (buffer already None) must be dropped, not published after the Full.
+        Simulates the concurrent window via the _is_closing flag directly."""
+        ctx, svc, tm = await _make_context("coalesced")
+        await ctx.stream_update(_text(tm, "hello"))
+
+        full = StreamTaskMessageFull(
+            parent_task_message=tm,
+            content=TextContent(author="agent", content="hello", format="markdown"),
+            type="full",
+        )
+        await ctx.stream_update(full)
+        # Full set _is_closed; reopen the close window to mimic a delta arriving
+        # after the buffer was reaped but before the terminal finished.
+        ctx._is_closed = False
+        ctx._is_closing = True
+        svc.stream_update.reset_mock()
+
+        await ctx.stream_update(_text(tm, "late"))
+
+        assert svc.stream_update.await_count == 0, "late delta published after the terminal Full"
