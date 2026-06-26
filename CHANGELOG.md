@@ -12,6 +12,14 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.16.1 (2026-06-26)
+
+Full Changelog: [agentex-client-v0.16.0...agentex-client-v0.16.1](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.16.0...agentex-client-v0.16.1)
+
+### Bug Fixes
+
+* **streaming:** StreamTaskMessageFull closes the coalescing buffer ([#426](https://github.com/scaleapi/scale-agentex-python/issues/426)) ([94ce668](https://github.com/scaleapi/scale-agentex-python/commit/94ce6687a86ecac8ee1a6ee1b3448f463e3b0e83))
+
 ## 0.16.0 (2026-06-24)
 
 Full Changelog: [agentex-client-v0.15.0...agentex-client-v0.16.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.15.0...agentex-client-v0.16.0)
