@@ -386,9 +386,6 @@ class StreamingTaskMessageContext:
         self._agentex_client = agentex_client
         self._streaming_service = streaming_service
         self._is_closed = False
-        # Set once a terminal (Full/Done) starts processing, so a concurrent
-        # delta can't publish after the terminal during the close window.
-        self._is_closing = False
         self._delta_accumulator = DeltaAccumulator()
         self._streaming_mode: StreamingMode = streaming_mode
         self._buffer: CoalescingBuffer | None = None
@@ -402,7 +399,6 @@ class StreamingTaskMessageContext:
 
     async def open(self) -> "StreamingTaskMessageContext":
         self._is_closed = False
-        self._is_closing = False
 
         self.task_message = await self._agentex_client.messages.create(
             task_id=self.task_id,
@@ -504,17 +500,6 @@ class StreamingTaskMessageContext:
             if self._streaming_mode == "coalesced" and self._buffer is not None:
                 await self._buffer.add(update)
                 return update
-            if self._is_closing:
-                # A terminal (Full/Done) is in flight and the buffer is already
-                # reaped; drop this late delta instead of publishing it after the
-                # terminal event. It is still recorded in the accumulator above.
-                return update
-
-        # From here the update is terminal. Mark closing so a concurrent delta
-        # can't fall through and publish after the terminal once the buffer is
-        # reaped below.
-        if isinstance(update, (StreamTaskMessageFull, StreamTaskMessageDone)):
-            self._is_closing = True
 
         # A Full ends the stream and supersedes buffered deltas. Drain and stop
         # the buffer BEFORE publishing the Full, so leftover deltas land in order
