@@ -439,51 +439,41 @@ class StreamingTaskMessageContext:
         if not self.task_message:
             raise ValueError("Context not properly initialized - no task message")
 
-        # Mark closing before reaping so a concurrent coalesced delta can't slip
-        # past the now-None buffer and publish after DONE. Rolled back below if
-        # the terminal write fails, so a failed close doesn't wedge the context
-        # into silently dropping later deltas.
-        self._is_closing = True
-        try:
-            # Reap the buffer (stopping its ticker) before the _is_closed
-            # short-circuit, so a context already marked done by a Full update
-            # can't leave the ticker orphaned. Draining here also lets consumers
-            # see the full delta sequence in order before DONE.
-            await self._reap_buffer()
+        # Reap the buffer (stopping its ticker) before the _is_closed
+        # short-circuit, so a context already marked done by a Full update can't
+        # leave the ticker orphaned. Draining here also lets consumers see the
+        # full delta sequence in order before DONE.
+        await self._reap_buffer()
 
-            if self._is_closed:
-                return self.task_message  # Already done (buffer reaped above)
+        if self._is_closed:
+            return self.task_message  # Already done (buffer reaped above)
 
-            # Send the DONE event
-            done_event = StreamTaskMessageDone(
-                parent_task_message=self.task_message,
-                type="done",
-            )
-            await self._streaming_service.stream_update(done_event)
+        # Send the DONE event
+        done_event = StreamTaskMessageDone(
+            parent_task_message=self.task_message,
+            type="done",
+        )
+        await self._streaming_service.stream_update(done_event)
 
-            # Update the task message with the final content
-            has_deltas = (
-                self._delta_accumulator._accumulated_deltas
-                or self._delta_accumulator._reasoning_summaries
-                or self._delta_accumulator._reasoning_contents
-            )
-            if has_deltas:
-                self.task_message.content = self._delta_accumulator.convert_to_content()
+        # Update the task message with the final content
+        has_deltas = (
+            self._delta_accumulator._accumulated_deltas
+            or self._delta_accumulator._reasoning_summaries
+            or self._delta_accumulator._reasoning_contents
+        )
+        if has_deltas:
+            self.task_message.content = self._delta_accumulator.convert_to_content()
 
-            await self._agentex_client.messages.update(
-                task_id=self.task_id,
-                message_id=self.task_message.id,
-                content=self.task_message.content.model_dump(),
-                streaming_status="DONE",
-            )
+        await self._agentex_client.messages.update(
+            task_id=self.task_id,
+            message_id=self.task_message.id,
+            content=self.task_message.content.model_dump(),
+            streaming_status="DONE",
+        )
 
-            # Mark the context as done
-            self._is_closed = True
-            return self.task_message
-        except Exception:
-            if not self._is_closed:
-                self._is_closing = False
-            raise
+        # Mark the context as done
+        self._is_closed = True
+        return self.task_message
 
     async def stream_update(self, update: TaskMessageUpdate) -> TaskMessageUpdate | None:
         """Stream an update to the repository.
@@ -522,38 +512,32 @@ class StreamingTaskMessageContext:
 
         # From here the update is terminal. Mark closing so a concurrent delta
         # can't fall through and publish after the terminal once the buffer is
-        # reaped below. Rolled back if the terminal path fails, so a failed
-        # terminal doesn't wedge the context into silently dropping later deltas.
-        is_terminal = isinstance(update, (StreamTaskMessageFull, StreamTaskMessageDone))
-        if is_terminal:
+        # reaped below.
+        if isinstance(update, (StreamTaskMessageFull, StreamTaskMessageDone)):
             self._is_closing = True
-        try:
-            # A Full ends the stream and supersedes buffered deltas. Drain and
-            # stop the buffer BEFORE publishing the Full, so leftover deltas land
-            # in order (deltas -> Full) instead of trailing the terminal Full as
-            # a stale duplicate tail. This also stops the ticker, which would
-            # otherwise be orphaned when __aexit__'s close() short-circuits.
-            if isinstance(update, StreamTaskMessageFull):
-                await self._reap_buffer()
 
-            result = await self._streaming_service.stream_update(update)
+        # A Full ends the stream and supersedes buffered deltas. Drain and stop
+        # the buffer BEFORE publishing the Full, so leftover deltas land in order
+        # (deltas -> Full) instead of trailing the terminal Full as a stale
+        # duplicate tail. This also stops the ticker, which would otherwise be
+        # orphaned when __aexit__'s close() short-circuits on _is_closed.
+        if isinstance(update, StreamTaskMessageFull):
+            await self._reap_buffer()
 
-            if isinstance(update, StreamTaskMessageDone):
-                await self.close()
-                return update
-            elif isinstance(update, StreamTaskMessageFull):
-                await self._agentex_client.messages.update(
-                    task_id=self.task_id,
-                    message_id=update.parent_task_message.id,  # type: ignore[union-attr]
-                    content=update.content.model_dump(),
-                    streaming_status="DONE",
-                )
-                self._is_closed = True
-            return result
-        except Exception:
-            if not self._is_closed:
-                self._is_closing = False
-            raise
+        result = await self._streaming_service.stream_update(update)
+
+        if isinstance(update, StreamTaskMessageDone):
+            await self.close()
+            return update
+        elif isinstance(update, StreamTaskMessageFull):
+            await self._agentex_client.messages.update(
+                task_id=self.task_id,
+                message_id=update.parent_task_message.id,  # type: ignore[union-attr]
+                content=update.content.model_dump(),
+                streaming_status="DONE",
+            )
+            self._is_closed = True
+        return result
 
 
 class StreamingService:
