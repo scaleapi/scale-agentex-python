@@ -177,6 +177,12 @@ class CoalescingBuffer:
         if self._closed:
             return
         async with self._lock:
+            # Re-check under the lock: a concurrent close() (e.g. from a racing
+            # Full) may have drained and shut down the ticker after the check
+            # above but before we acquired the lock. Appending now would strand
+            # the delta in a dead buffer, never published.
+            if self._closed:
+                return
             self._buf.append(update)
             self._buf_chars += _delta_char_len(update.delta)
             if not self._first_flushed or self._buf_chars >= self.MAX_BUFFERED_CHARS:
@@ -415,19 +421,28 @@ class StreamingTaskMessageContext:
 
         return self
 
+    async def _reap_buffer(self) -> None:
+        """Drain and stop the coalescing buffer, releasing its background ticker.
+
+        Idempotent: a no-op once the buffer has already been reaped.
+        """
+        if self._buffer is not None:
+            await self._buffer.close()
+            self._buffer = None
+
     async def close(self) -> TaskMessage:
         """Close the streaming context."""
         if not self.task_message:
             raise ValueError("Context not properly initialized - no task message")
 
-        if self._is_closed:
-            return self.task_message  # Already done
+        # Reap the buffer (stopping its ticker) before the _is_closed
+        # short-circuit, so a context already marked done by a Full update can't
+        # leave the ticker orphaned. Draining here also lets consumers see the
+        # full delta sequence in order before DONE.
+        await self._reap_buffer()
 
-        # Drain any buffered deltas before announcing DONE so consumers see the
-        # full sequence in order.
-        if self._buffer is not None:
-            await self._buffer.close()
-            self._buffer = None
+        if self._is_closed:
+            return self.task_message  # Already done (buffer reaped above)
 
         # Send the DONE event
         done_event = StreamTaskMessageDone(
@@ -485,6 +500,14 @@ class StreamingTaskMessageContext:
             if self._streaming_mode == "coalesced" and self._buffer is not None:
                 await self._buffer.add(update)
                 return update
+
+        # A Full ends the stream and supersedes buffered deltas. Drain and stop
+        # the buffer BEFORE publishing the Full, so leftover deltas land in order
+        # (deltas -> Full) instead of trailing the terminal Full as a stale
+        # duplicate tail. This also stops the ticker, which would otherwise be
+        # orphaned when __aexit__'s close() short-circuits on _is_closed.
+        if isinstance(update, StreamTaskMessageFull):
+            await self._reap_buffer()
 
         result = await self._streaming_service.stream_update(update)
 
