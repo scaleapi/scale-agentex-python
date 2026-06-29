@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.2 (2026-06-29)
+
+Full Changelog: [agentex-sdk-v0.15.0...agentex-sdk-v0.16.2](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.15.0...agentex-sdk-v0.16.2)
+
+### Bug Fixes
+
+* **adk:** release streaming buffer repair in sdk ([#449](https://github.com/scaleapi/scale-agentex-python/issues/449)) ([20795cb](https://github.com/scaleapi/scale-agentex-python/commit/20795cb158244767207b6d3758929014bc015bb6))
+
 ## 0.15.0 (2026-06-24)
 
 Full Changelog: [agentex-sdk-v0.14.0...agentex-sdk-v0.15.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.14.0...agentex-sdk-v0.15.0)

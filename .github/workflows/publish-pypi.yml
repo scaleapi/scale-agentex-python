@@ -4,6 +4,16 @@
 name: Publish PyPI
 on:
   workflow_dispatch:
+    inputs:
+      package:
+        description: Package to publish
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - agentex-client
+          - agentex-sdk
 
   release:
     types: [published]
@@ -33,3 +43,5 @@ jobs:
           # Back-compat fallback — used by bin/publish-pypi when the
           # dedicated tokens above are unset.
           PYPI_TOKEN: ${{ secrets.AGENTEX_PYPI_TOKEN || secrets.PYPI_TOKEN }}
+          # Manual dispatches can override tag-derived package selection.
+          PYPI_PACKAGE: ${{ inputs.package }}
