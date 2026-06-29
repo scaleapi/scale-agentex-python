@@ -10,6 +10,16 @@
       "component": "agentex-sdk"
     }
   },
+  "plugins": [
+    {
+      "type": "linked-versions",
+      "groupName": "agentex",
+      "components": [
+        "agentex-client",
+        "agentex-sdk"
+      ]
+    }
+  ],
   "$schema": "https://raw.githubusercontent.com/stainless-api/release-please/main/schemas/config.json",
   "include-v-in-tag": true,
   "include-component-in-tag": true,
