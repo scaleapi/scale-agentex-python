@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# Publish slim (root) before heavy (adk/): heavy pins slim, so a slim-first
-# failure aborts before shipping a heavy that needs an unreleased client.
+# Publish only the package requested by the component tag. Manual dispatches can
+# set PYPI_PACKAGE=all to publish both packages; in that case publish slim
+# before heavy because the heavy package depends on the slim package.
 
 set -eux
 
@@ -9,6 +10,45 @@ rm -rf dist
 # --wheel: the heavy's cross-dir force-include can't build via sdist.
 uv build --all-packages --wheel
 
-# --check-url makes the per-component-tag double-trigger idempotent.
-uv publish --check-url https://pypi.org/simple/ --token="${AGENTEX_CLIENT_PYPI_TOKEN:-$PYPI_TOKEN}" dist/agentex_client-*.whl
-uv publish --check-url https://pypi.org/simple/ --token="${AGENTEX_PYPI_TOKEN:-$PYPI_TOKEN}" dist/agentex_sdk-*.whl
+publish_client() {
+  uv publish --check-url https://pypi.org/simple/ --token="${AGENTEX_CLIENT_PYPI_TOKEN:-${PYPI_TOKEN:-}}" dist/agentex_client-*.whl
+}
+
+publish_sdk() {
+  uv publish --check-url https://pypi.org/simple/ --token="${AGENTEX_PYPI_TOKEN:-${PYPI_TOKEN:-}}" dist/agentex_sdk-*.whl
+}
+
+package="${PYPI_PACKAGE:-}"
+
+if [ -z "$package" ]; then
+  tag_name="${GITHUB_REF_NAME:-}"
+  if [ -z "$tag_name" ] && [[ "${GITHUB_REF:-}" == refs/tags/* ]]; then
+    tag_name="${GITHUB_REF#refs/tags/}"
+  fi
+
+  case "$tag_name" in
+    agentex-client-v*) package="agentex-client" ;;
+    agentex-sdk-v*) package="agentex-sdk" ;;
+    *)
+      echo "Unable to infer package from tag '$tag_name'. Set PYPI_PACKAGE to one of: all, agentex-client, agentex-sdk." >&2
+      exit 1
+      ;;
+  esac
+fi
+
+case "$package" in
+  all)
+    publish_client
+    publish_sdk
+    ;;
+  agentex-client)
+    publish_client
+    ;;
+  agentex-sdk)
+    publish_sdk
+    ;;
+  *)
+    echo "Unknown PYPI_PACKAGE '$package'. Expected one of: all, agentex-client, agentex-sdk." >&2
+    exit 1
+    ;;
+esac
