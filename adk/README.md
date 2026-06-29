@@ -30,3 +30,5 @@ The two packages contribute disjoint files to the `agentex.*` namespace — `age
 ## Repo layout
 
 This package is hand-authored and lives at `adk/` inside [scaleapi/scale-agentex-python](https://github.com/scaleapi/scale-agentex-python). Stainless codegen never touches `adk/**` — it's outside the generated surface. The sibling `agentex-client` package lives at the repo root and IS Stainless-generated.
+
+The wheel source is assembled from `src/agentex/lib/**` by `adk/hatch_build.py`.
