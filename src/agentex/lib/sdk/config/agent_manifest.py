@@ -24,6 +24,7 @@ from collections.abc import Iterator
 from agentex.lib.utils.io import load_yaml_file
 from agentex.lib.utils.logging import make_logger
 from agentex.config.agent_manifest import AgentManifest  # noqa: F401
+from agentex.lib.utils.build_provenance import iter_context_files
 
 logger = make_logger(__name__)
 
@@ -189,12 +190,11 @@ class BuildContextManager:
 
         tar_buffer = io.BytesIO()
 
+        # Sorted, relpath-stable enumeration (shared with the content hash) so the
+        # archive's member order is deterministic across machines.
         with tarfile.open(fileobj=tar_buffer, mode="w:gz") as tar_file:
-            for path in Path(root_path).rglob(
-                "*"
-            ):  # Recursively add files to the tar.gz
-                if path.is_file():  # Ensure that we're only adding files
-                    tar_file.add(path, arcname=path.relative_to(root_path))
+            for path in iter_context_files(Path(root_path)):
+                tar_file.add(path, arcname=path.relative_to(root_path))
 
         tar_buffer.seek(0)  # Reset the buffer position to the beginning
         yield tar_buffer

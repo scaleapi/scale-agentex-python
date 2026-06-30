@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import NamedTuple
 from pathlib import Path
 
@@ -8,11 +9,14 @@ from python_on_whales import DockerException, docker
 
 from agentex.lib.cli.debug import DebugConfig
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.build_provenance import BuildProvenance, capture_build_provenance
 from agentex.lib.cli.handlers.run_handlers import RunError, run_agent as _run_agent
 from agentex.lib.sdk.config.agent_manifest import BuildContextManager, load_agent_manifest, build_context_manager
 
 logger = make_logger(__name__)
 console = Console()
+
+_BUILD_INFO_FILENAME = "build-info.json"
 
 
 class DockerBuildError(Exception):
@@ -28,6 +32,7 @@ class CloudBuildContext(NamedTuple):
     tag: str
     image_name: str
     build_context_size_kb: float
+    provenance: BuildProvenance
 
 
 def build_agent(
@@ -261,8 +266,24 @@ def prepare_cloud_build_context(
     logger.info("Preparing build context...")
 
     with build_context_manager(agent_manifest, build_context_root) as build_context:
+        staged_root = Path(build_context.path)
+        # Capture source identity over the staged (post-.dockerignore) tree — the
+        # exact bytes that ship — then write build-info.json into it so it lands
+        # in the image for runtime registration. Capture runs before the write so
+        # the content hash never includes build-info.json itself.
+        provenance = capture_build_provenance(
+            repo_path=build_context_root,
+            context_root=build_context_root,
+            content_root=staged_root,
+        )
+        (staged_root / _BUILD_INFO_FILENAME).write_text(json.dumps(provenance.build_info(), indent=2, sort_keys=True))
+        logger.info(
+            f"Build provenance: commit={provenance.commit} ref={provenance.ref} "
+            f"clean_commit={provenance.is_clean_commit}"
+        )
+
         # Compress the prepared context using the static zipped method
-        with BuildContextManager.zipped(root_path=build_context.path) as archive_buffer:
+        with BuildContextManager.zipped(root_path=staged_root) as archive_buffer:
             archive_bytes = archive_buffer.read()
 
         build_context_size_kb = len(archive_bytes) / 1024
@@ -275,4 +296,5 @@ def prepare_cloud_build_context(
             tag=tag,
             image_name=image_name,
             build_context_size_kb=build_context_size_kb,
+            provenance=provenance,
         )

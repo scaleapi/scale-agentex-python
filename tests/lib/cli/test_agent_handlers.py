@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 import os
+import json
 import tarfile
 import tempfile
 from pathlib import Path
@@ -144,6 +146,23 @@ agent:
         assert result.dockerfile_path == "Dockerfile"
         assert len(result.archive_bytes) > 0
         assert result.build_context_size_kb > 0
+
+    def test_prepare_cloud_build_context_writes_build_info(self, temp_agent_dir: Path):
+        """build-info.json ships in the archive and matches the captured provenance."""
+        manifest_path = str(temp_agent_dir / "manifest.yaml")
+
+        result = prepare_cloud_build_context(manifest_path=manifest_path)
+
+        # Non-git temp dir → the content hash is the identity, no commit.
+        assert result.provenance.commit is None
+        assert result.provenance.working_tree_hash is not None
+
+        with tarfile.open(fileobj=io.BytesIO(result.archive_bytes), mode="r:gz") as archive:
+            build_info_name = next(n for n in archive.getnames() if n.endswith("build-info.json"))
+            member = archive.extractfile(build_info_name)
+            assert member is not None
+            shipped = json.loads(member.read())
+        assert shipped == result.provenance.build_info()
 
     def test_prepare_cloud_build_context_with_tag_override(self, temp_agent_dir: Path):
         """Test that tag parameter overrides manifest tag."""
