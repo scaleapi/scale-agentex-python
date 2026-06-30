@@ -28,13 +28,13 @@ _HASH_CHUNK_BYTES = 1 << 20
 
 @dataclass(frozen=True)
 class BuildProvenance:
-    """Source identity for one build. All fields degrade to ``None``.
+    """Source identity for one build; every field degrades to ``None``.
 
-    Exactly one identity anchors the build: a **clean committed tree** keys on
-    ``commit`` (``working_tree_hash`` is ``None``); anything else — a dirty tree
-    or a non-git context, neither of which a commit can address — carries a
-    ``working_tree_hash`` instead. So a non-null hash means "no clean commit to
-    point to," and ``is_clean_commit`` is the gate ``--require-clean`` checks.
+    ``working_tree_hash`` is the deterministic content hash of the build context
+    and is always computed — it identifies the exact bytes that shipped,
+    independent of git state. ``commit`` (+ ``ref`` / ``repo``) anchor those bytes
+    to source, and ``dirty`` records whether the work tree had uncommitted changes
+    at build time (``None`` outside a git work tree).
     """
 
     repo: Optional[str] = None
@@ -42,15 +42,12 @@ class BuildProvenance:
     ref: Optional[str] = None
     subpath: Optional[str] = None
     working_tree_hash: Optional[str] = None
+    dirty: Optional[bool] = None
     author_name: Optional[str] = None
     author_email: Optional[str] = None
     build_timestamp: Optional[str] = None
 
-    @property
-    def is_clean_commit(self) -> bool:
-        return self.commit is not None and self.working_tree_hash is None
-
-    def source_fields(self) -> dict[str, str]:
+    def source_fields(self) -> dict[str, object]:
         """The ``source_*`` form fields for the cloud-build upload (None omitted)."""
         fields = {
             "source_repo": self.repo,
@@ -58,10 +55,11 @@ class BuildProvenance:
             "source_ref": self.ref,
             "source_subpath": self.subpath,
             "working_tree_hash": self.working_tree_hash,
+            "source_dirty": self.dirty,
         }
         return {key: value for key, value in fields.items() if value is not None}
 
-    def build_info(self) -> dict[str, str]:
+    def build_info(self) -> dict[str, object]:
         """The ``build-info.json`` payload (runtime ``registration_metadata``).
 
         Overlapping keys match the server's ``DeploymentHistory`` type
@@ -75,6 +73,7 @@ class BuildProvenance:
             "branch_name": self.ref,
             "subpath": self.subpath,
             "working_tree_hash": self.working_tree_hash,
+            "dirty": self.dirty,
             "author_name": self.author_name,
             "author_email": self.author_email,
             "build_timestamp": self.build_timestamp,
@@ -167,6 +166,19 @@ def working_tree_hash(root: Path) -> str:
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 
+def _safe_working_tree_hash(root: Path) -> Optional[str]:
+    """``working_tree_hash`` that degrades to None — capture must never fail a build.
+
+    A permission error or filesystem race during the walk/stat/read would otherwise
+    raise out of capture and abort the build before the archive is even created.
+    """
+    try:
+        return working_tree_hash(root)
+    except Exception:
+        logger.warning("build-provenance: content hash failed; omitting", exc_info=True)
+        return None
+
+
 def capture_build_provenance(
     repo_path: Path, context_root: Path, content_root: Optional[Path] = None
 ) -> BuildProvenance:
@@ -176,19 +188,18 @@ def capture_build_provenance(
     relative to the repo root (which agent, in a monorepo). ``content_root`` is
     the directory hashed — the *staged*, post-``.dockerignore`` tree that actually
     ships; it defaults to ``context_root`` when there is no separate staging dir.
-    The content hash is computed unless a clean commit identifies the build (so:
-    for a dirty tree or a non-git context, but not for a clean committed tree).
+    ``working_tree_hash`` is always computed; git coordinates anchor it to source
+    when available.
     """
     timestamp = datetime.now(timezone.utc).isoformat()
     hash_root = content_root if content_root is not None else context_root
+    tree_hash = _safe_working_tree_hash(hash_root)
+
     repo_root = _git(repo_path, "rev-parse", "--show-toplevel")
     if repo_root is None:
-        # No git at all — the content hash is the only identity available.
-        logger.info("build-provenance: %s is not a git work tree; hashing context", repo_path)
-        return BuildProvenance(
-            working_tree_hash=working_tree_hash(hash_root),
-            build_timestamp=timestamp,
-        )
+        # No git — the content hash is the only identity available.
+        logger.info("build-provenance: %s is not a git work tree; content hash only", repo_path)
+        return BuildProvenance(working_tree_hash=tree_hash, build_timestamp=timestamp)
 
     repo_root_path = Path(repo_root)
     commit = _git(repo_root_path, "rev-parse", "HEAD")
@@ -207,10 +218,8 @@ def capture_build_provenance(
     except ValueError:
         subpath = None
 
-    # Hash unless a clean commit identifies the build: dirty tree, or an unborn
-    # HEAD with no commit yet, both fall back to the content hash.
+    # `git status --porcelain` is empty (→ _git returns None) for a clean tree.
     dirty = _git(repo_root_path, "status", "--porcelain") is not None
-    tree_hash = working_tree_hash(hash_root) if (dirty or commit is None) else None
 
     return BuildProvenance(
         repo=remote,
@@ -218,6 +227,7 @@ def capture_build_provenance(
         ref=ref,
         subpath=subpath,
         working_tree_hash=tree_hash,
+        dirty=dirty,
         author_name=author_name,
         author_email=author_email,
         build_timestamp=timestamp,

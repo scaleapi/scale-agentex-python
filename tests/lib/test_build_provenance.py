@@ -130,26 +130,13 @@ def test_capture_clean_tree(tmp_path: Path) -> None:
     assert prov.repo == "github.com/scaleapi/demo"
     assert prov.ref == "main"
     assert prov.commit is not None and len(prov.commit) == 40
-    assert prov.working_tree_hash is None
-    assert prov.is_clean_commit is True
+    assert prov.working_tree_hash is not None  # always computed
+    assert prov.dirty is False
     assert prov.subpath is None
     assert prov.author_email == "dev@scale.com"
 
 
-def test_capture_dirty_tracked_modification(tmp_path: Path) -> None:
-    repo = _init_repo(tmp_path / "repo")
-    _write(repo, "main.py", "print(1)")
-    _commit_all(repo)
-    _write(repo, "main.py", "print(2)")  # modify tracked, do not commit
-
-    prov = capture_build_provenance(repo, repo)
-
-    assert prov.is_clean_commit is False
-    assert prov.working_tree_hash is not None
-    assert prov.commit is not None  # commit still recorded alongside the hash
-
-
-def test_capture_dirty_untracked_file_changes_hash(tmp_path: Path) -> None:
+def test_capture_untracked_file_changes_hash(tmp_path: Path) -> None:
     repo = _init_repo(tmp_path / "repo")
     _write(repo, "main.py", "print(1)")
     _commit_all(repo)
@@ -159,7 +146,7 @@ def test_capture_dirty_untracked_file_changes_hash(tmp_path: Path) -> None:
 
     # The stale-code guard: an untracked file is part of the build context, so it
     # must move the hash (a `git diff` of tracked files alone would miss it).
-    assert prov.is_clean_commit is False
+    assert prov.dirty is True
     assert prov.working_tree_hash == working_tree_hash(repo)
     assert working_tree_hash(repo) != _hash_without(repo, "scratch.py")
 
@@ -214,7 +201,7 @@ def test_capture_no_remote(tmp_path: Path) -> None:
 
     assert prov.repo is None
     assert prov.commit is not None
-    assert prov.is_clean_commit is True  # no remote, but a clean commit still anchors it
+    assert prov.working_tree_hash is not None  # always computed
 
 
 def test_capture_non_git_dir(tmp_path: Path) -> None:
@@ -226,10 +213,26 @@ def test_capture_non_git_dir(tmp_path: Path) -> None:
     assert prov.repo is None
     assert prov.commit is None
     assert prov.ref is None
-    # No commit to point to → the content hash is the identity.
+    # No commit → the content hash is the identity; dirtiness is undefined (no VCS).
     assert prov.working_tree_hash == working_tree_hash(plain)
-    assert prov.is_clean_commit is False
+    assert prov.dirty is None
     assert prov.build_timestamp is not None
+
+
+def test_capture_never_raises_when_hash_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import agentex.lib.utils.build_provenance as bp
+
+    plain = tmp_path / "plain"  # non-git → would hash, which we force to fail
+    _write(plain, "main.py", "print(1)")
+
+    def _boom(_root: Path) -> str:
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(bp, "working_tree_hash", _boom)
+
+    prov = bp.capture_build_provenance(plain, plain)  # must not raise
+
+    assert prov.working_tree_hash is None
 
 
 def test_capture_monorepo_subpath(tmp_path: Path) -> None:

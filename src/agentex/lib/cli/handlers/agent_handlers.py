@@ -279,7 +279,7 @@ def prepare_cloud_build_context(
         (staged_root / _BUILD_INFO_FILENAME).write_text(json.dumps(provenance.build_info(), indent=2, sort_keys=True))
         logger.info(
             f"Build provenance: commit={provenance.commit} ref={provenance.ref} "
-            f"clean_commit={provenance.is_clean_commit}"
+            f"working_tree_hash={provenance.working_tree_hash}"
         )
 
         # Compress the prepared context using the static zipped method
