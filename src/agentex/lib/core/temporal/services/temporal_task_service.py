@@ -33,6 +33,15 @@ class TemporalTaskService:
 
         returns the workflow ID of the temporal workflow
         """
+        # None / 0 / negative => no execution timeout (workflow can stay open
+        # indefinitely, which long-lived chat/session agents rely on). A positive
+        # value bounds the whole continue-as-new chain's wall-clock lifetime.
+        timeout_seconds = self._env_vars.WORKFLOW_EXECUTION_TIMEOUT_SECONDS
+        execution_timeout = (
+            timedelta(seconds=timeout_seconds)
+            if timeout_seconds and timeout_seconds > 0
+            else None
+        )
         return await self._temporal_client.start_workflow(
             workflow=self._env_vars.WORKFLOW_NAME,
             arg=CreateTaskParams(
@@ -42,7 +51,7 @@ class TemporalTaskService:
             ),
             id=task.id,
             task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
-            execution_timeout=timedelta(seconds=self._env_vars.WORKFLOW_EXECUTION_TIMEOUT_SECONDS),
+            execution_timeout=execution_timeout,
         )
 
     async def get_state(self, task_id: str) -> WorkflowState:

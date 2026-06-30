@@ -6,7 +6,6 @@ from enum import Enum
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import Field
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
@@ -76,11 +75,14 @@ class EnvironmentVariables(BaseModel):
     # Workflow Configuration
     WORKFLOW_TASK_QUEUE: str | None = None
     WORKFLOW_NAME: str | None = None
-    # Maximum total time (in seconds) a workflow execution can run, including
-    # retries and continue-as-new. Defaults to 24h to bound runaway workflows;
-    # agents with longer-running tasks should override this. Must be > 0 — a
-    # zero or negative timedelta would cause every submitted workflow to fail.
-    WORKFLOW_EXECUTION_TIMEOUT_SECONDS: int = Field(default=86400, gt=0)
+    # Maximum total wall-clock time (in seconds) a workflow execution can run,
+    # INCLUDING retries and the entire continue-as-new chain (Temporal does not
+    # reset it on continue-as-new). Defaults to None = no execution timeout, so
+    # long-lived chat/session workflows can stay open indefinitely. None / 0 /
+    # negative are all treated as "no timeout" at the start_workflow call site.
+    # To bound idle workflows, use an explicit durable timer inside the workflow
+    # (e.g. run_until_complete's `timeout`), not this chain-wide ceiling.
+    WORKFLOW_EXECUTION_TIMEOUT_SECONDS: int | None = None
     # Temporal Worker Configuration
     HEALTH_CHECK_PORT: int = 80
     # Auth Configuration
