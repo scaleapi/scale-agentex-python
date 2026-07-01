@@ -24,7 +24,7 @@ class BuildContext(ConfigBaseModel):
         description="The path to the Dockerfile. Should be specified relative to the root directory.",
     )
     dockerignore: str | None = Field(
-        None,
+        default=None,
         description="The path to the .dockerignore file. Should be specified relative to the root directory.",
     )
 
