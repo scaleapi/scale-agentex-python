@@ -53,19 +53,27 @@ class At000HelloAcpWorkflow(BaseWorkflow):
     async def on_task_create(self, params: CreateTaskParams) -> None:
         logger.info(f"Received task create params: {params}")
 
-        # 1. Acknowledge that the task has been created.
-        await adk.messages.create(
-            task_id=params.task.id,
-            content=TextContent(
-                author="agent",
-                content=f"Hello! I've received your task. Normally you can do some state initialization here, or just pass and do nothing until you get your first event. For now I'm just acknowledging that I've received a task with the following params:\n\n{json.dumps(params.params, indent=2)}.\n\nYou should only see this message once, when the task is created. All subsequent events will be handled by the `on_task_event_send` handler.",
-            ),
-        )
+        # 1. Acknowledge that the task has been created. Gate this one-time prologue
+        # on is_continued_run(): run_until_complete below recycles the workflow via
+        # continue-as-new, which re-enters on_task_create from the top — without this
+        # guard the "you should only see this once" welcome would re-fire on every
+        # recycle. Original run -> emit; continued (recycled) run -> skip.
+        if not self.is_continued_run():
+            await adk.messages.create(
+                task_id=params.task.id,
+                content=TextContent(
+                    author="agent",
+                    content=f"Hello! I've received your task. Normally you can do some state initialization here, or just pass and do nothing until you get your first event. For now I'm just acknowledging that I've received a task with the following params:\n\n{json.dumps(params.params, indent=2)}.\n\nYou should only see this message once, when the task is created. All subsequent events will be handled by the `on_task_event_send` handler.",
+                ),
+            )
 
-        # 2. Wait for the task to be completed indefinitely. If we don't do this the workflow will close as soon as this function returns. Temporal can run hundreds of millions of workflows in parallel, so you don't need to worry about too many workflows running at once.
-
-        # Thus, if you want this agent to field events indefinitely (or for a long time) you need to wait for a condition to be met.
-        await workflow.wait_condition(
-            lambda: self._complete_task,
-            timeout=None, # Set a timeout if you want to prevent the task from running indefinitely. Generally this is not needed. Temporal can run hundreds of millions of workflows in parallel and more. Only do this if you have a specific reason to do so.
-        )
+        # 2. Keep the workflow open to field events. We use run_until_complete
+        # instead of a bare wait_condition: it still waits indefinitely, but also
+        # recycles the Temporal event history via continue-as-new before it hits the
+        # ~50k-event / 50MB limit, so this chat can stay open forever. Adopting
+        # run_until_complete IS the opt-in — agents that keep the old wait_condition
+        # never recycle. This agent keeps no cross-turn state, so nothing needs
+        # restoring across a recycle and `params` is the only carry-forward. (Agents
+        # that DO keep state restore it at the top of @workflow.run on a recycled
+        # run — framework-specific, landing per-integration in follow-up PRs.)
+        await self.run_until_complete(params, is_complete=lambda: self._complete_task)

@@ -153,7 +153,7 @@ class TemporalClient:
         duplicate_policy: DuplicateWorkflowPolicy = DuplicateWorkflowPolicy.ALLOW_DUPLICATE,
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
         task_timeout: timedelta = timedelta(seconds=10),
-        execution_timeout: timedelta = timedelta(seconds=86400),
+        execution_timeout: timedelta | None = None,
         **kwargs: Any,
     ) -> str:
         temporal_retry_policy = TemporalRetryPolicy(**retry_policy.model_dump(exclude_unset=True))
