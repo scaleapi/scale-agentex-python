@@ -20,17 +20,6 @@ def get_auth_principal(env_vars: EnvironmentVariables):
     except Exception:
         return None
 
-def get_build_info():
-    build_info_path = os.environ.get("BUILD_INFO_PATH")
-    logger.info(f"Getting build info from {build_info_path}")
-    if not build_info_path:
-        return None
-    try:
-        with open(build_info_path, "r") as f:
-            return json.load(f)
-    except Exception:
-        return None
-
 async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
     """Register this agent with the Agentex server"""
     if not env_vars.AGENTEX_BASE_URL:
@@ -44,8 +33,8 @@ async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
         or f"Generic description for agent: {env_vars.AGENT_NAME}"
     )
 
-    # Build registration metadata from build-info.json + deployment env var
-    registration_metadata = get_build_info() or {}
+    # Registration metadata carries the deployment id and agent card.
+    registration_metadata: dict = {}
     if env_vars.AGENTEX_DEPLOYMENT_ID:
         registration_metadata["deployment_id"] = env_vars.AGENTEX_DEPLOYMENT_ID
     if agent_card is not None:
