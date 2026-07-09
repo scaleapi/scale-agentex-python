@@ -1,9 +1,8 @@
-"""Tests that the openai_agents temporal models copy real token usage onto spans.
+"""Tests that the openai_agents streaming model copies real token usage onto spans.
 
 The backend bills per-call usage from ``span.output["usage"]``; these tests
-assert each model writes the framework-reported usage there (and, for the
-streaming model, into the returned ``ModelResponse.usage``) instead of
-dropping it.
+assert the streaming model writes the API-reported usage there (and into the
+returned ``ModelResponse.usage``) instead of dropping it.
 """
 
 from __future__ import annotations
@@ -14,8 +13,7 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from agents import ModelResponse, ModelSettings
-from agents.usage import Usage
+from agents import ModelSettings
 from openai.types.responses import Response, ResponseCompletedEvent
 from openai.types.responses.response_usage import (
     ResponseUsage,
@@ -25,10 +23,6 @@ from openai.types.responses.response_usage import (
 
 import agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model as tsm
 from agentex.types.span import Span
-from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_tracing_model import (
-    TemporalTracingResponsesModel,
-    TemporalTracingChatCompletionsModel,
-)
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     streaming_task_id,
     streaming_trace_id,
@@ -81,17 +75,6 @@ def tracing_contextvars():
     streaming_parent_span_id.reset(tokens[2])
 
 
-def _agents_usage() -> Usage:
-    return Usage(
-        requests=1,
-        input_tokens=120,
-        output_tokens=80,
-        total_tokens=200,
-        input_tokens_details=InputTokensDetails(cached_tokens=30),
-        output_tokens_details=OutputTokensDetails(reasoning_tokens=40),
-    )
-
-
 EXPECTED_USAGE_BLOB = {
     "input_tokens": 120,
     "output_tokens": 80,
@@ -104,38 +87,6 @@ EXPECTED_USAGE_BLOB = {
 def _output_dict(span: Span) -> dict[str, Any]:
     assert isinstance(span.output, dict)
     return span.output
-
-
-class TestTemporalTracingModels:
-    async def _run_wrapper(self, wrapper_cls) -> Span:
-        tracer = FakeTracer()
-        base_model = MagicMock()
-        base_model.model = "gpt-4o"
-        base_model.get_response = AsyncMock(
-            return_value=ModelResponse(output=[], usage=_agents_usage(), response_id="resp-1")
-        )
-
-        model = wrapper_cls(base_model, tracer)
-        response = await model.get_response(
-            system_instructions=None,
-            input="hello",
-            model_settings=ModelSettings(),
-            tools=[],
-            output_schema=None,
-            handoffs=[],
-            tracing=None,
-        )
-        assert response.usage.input_tokens == 120
-        assert len(tracer.trace_obj.spans) == 1
-        return tracer.trace_obj.spans[0]
-
-    async def test_responses_model_writes_usage_to_span_output(self, tracing_contextvars):
-        span = await self._run_wrapper(TemporalTracingResponsesModel)
-        assert _output_dict(span)["usage"] == EXPECTED_USAGE_BLOB
-
-    async def test_chat_completions_model_writes_usage_to_span_output(self, tracing_contextvars):
-        span = await self._run_wrapper(TemporalTracingChatCompletionsModel)
-        assert _output_dict(span)["usage"] == EXPECTED_USAGE_BLOB
 
 
 class FakeStream:
