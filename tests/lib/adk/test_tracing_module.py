@@ -8,6 +8,7 @@ from temporalio.exceptions import ActivityError
 
 import agentex.lib.adk._modules.tracing as _tracing_mod
 from agentex.types.span import Span
+from agentex.lib.core.harness.types import TurnUsage
 from agentex.lib.adk._modules.tracing import TurnSpan, TracingModule
 from agentex.lib.core.services.adk.tracing import TracingService
 
@@ -289,7 +290,38 @@ class TestTurnSpan:
         # The aggregate lives in data, never in output — output stays payload-only
         assert ended_span.output == {"response": "hello"}
 
-    async def test_turn_span_record_usage_with_individual_counts(self):
+    async def test_turn_span_record_usage_with_turn_usage(self):
+        mock_service, module = _make_module()
+        started = _make_span()
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        turn_usage = TurnUsage(
+            model="gpt-4o",
+            input_tokens=10,
+            output_tokens=5,
+            cached_input_tokens=2,
+            total_tokens=15,
+            cost_usd=0.5,
+        )
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                turn.record_usage(turn_usage)
+
+        ended_span = mock_service.end_span.call_args.kwargs["span"]
+        # cost_usd is lifted out of the blob to data["cost_usd"]
+        assert ended_span.data["cost_usd"] == 0.5
+        assert ended_span.data["usage"] == {
+            "model": "gpt-4o",
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "cached_input_tokens": 2,
+            "total_tokens": 15,
+            "num_tool_calls": 0,
+            "num_reasoning_blocks": 0,
+        }
+
+    async def test_turn_span_explicit_cost_overrides_turn_usage_cost(self):
         mock_service, module = _make_module()
         started = _make_span()
         mock_service.start_span.return_value = started
@@ -297,14 +329,23 @@ class TestTurnSpan:
 
         with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
             async with module.turn_span(trace_id="trace-123", name="turn") as turn:
-                turn.record_usage(input_tokens=10, output_tokens=5, cached_input_tokens=2)
+                turn.record_usage(TurnUsage(input_tokens=1, cost_usd=0.5), cost_usd=0.75)
 
         ended_span = mock_service.end_span.call_args.kwargs["span"]
-        assert ended_span.data["usage"] == {
-            "input_tokens": 10,
-            "output_tokens": 5,
-            "cached_input_tokens": 2,
-        }
+        assert ended_span.data["cost_usd"] == 0.75
+
+    async def test_turn_span_warns_on_unrecognized_usage_keys(self, caplog):
+        mock_service, module = _make_module()
+        started = _make_span()
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                with caplog.at_level("WARNING"):
+                    turn.record_usage(usage={"inputTokens": 10})
+
+        assert any("no recognized token keys" in message for message in caplog.messages)
 
     async def test_turn_span_preserves_existing_data(self):
         mock_service, module = _make_module()

@@ -52,7 +52,9 @@ Token usage on spans is what the backend bills from, and it reads two shapes:
   (litellm, OpenAI Agents SDK, LangGraph) emit this automatically. Summed only when no
   aggregate exists in the trace.
 
-Record the turn rollup with `adk.tracing.turn_span()` instead of hand-writing usage keys:
+Record the turn rollup with `adk.tracing.turn_span()` instead of hand-writing usage keys.
+It accepts the harness `TurnUsage` that every turn adapter reports (`LangGraphTurn.usage()`,
+`run_turn(...).usage`, `ClaudeCodeTurn.usage()`, ...), cost included:
 
 ```python
 async with adk.tracing.turn_span(
@@ -61,9 +63,9 @@ async with adk.tracing.turn_span(
     input={"prompt": prompt},
     task_id=task.id,
 ) as turn:
-    result = await run_llm_calls()
-    turn.output = {"response": result.text}
-    turn.record_usage(usage=result.usage, cost_usd=result.cost_usd)
+    result = await run_turn(...)
+    turn.output = {"response": result.final_output}
+    turn.record_usage(result.usage)  # TurnUsage; cost_usd stamped automatically
 ```
 
 **Never put usage on both a rollup span's `output` and its per-call children's
