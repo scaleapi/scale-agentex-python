@@ -28,6 +28,7 @@ from openai.types.responses import ResponsePromptParam
 from agents.models.openai_responses import OpenAIResponsesModel
 from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
 
+from agentex.lib.core.tracing.usage import usage_from_openai_response_usage
 from agentex.lib.core.tracing.tracer import AsyncTracer
 
 # Import AgentEx components
@@ -243,10 +244,15 @@ class TemporalTracingResponsesModel(Model):
                                 continue
 
                     # Set span output with structured data
-                    span.output = {  # type: ignore[attr-defined]
+                    output_data: dict[str, Any] = {
                         "new_items": new_items,
                         "final_output": final_output,
                     }
+                    # Per-call usage for billing; deduped against any turn aggregate
+                    usage_blob = usage_from_openai_response_usage(getattr(response, "usage", None))
+                    if usage_blob:
+                        output_data["usage"] = usage_blob
+                    span.output = output_data  # type: ignore[attr-defined]
 
                     return response
 
@@ -270,6 +276,12 @@ class TemporalTracingResponsesModel(Model):
                 prompt=prompt,
                 **kwargs,
             )
+
+    @override
+    def stream_response(self, *args, **kwargs):
+        """Streaming is handled via get_response in Temporal activities.
+        Required so the class is concrete and instantiable at runtime."""
+        raise NotImplementedError("stream_response is not used in Temporal activities - use get_response instead")
 
 
 class TemporalTracingChatCompletionsModel(Model):
@@ -376,10 +388,15 @@ class TemporalTracingChatCompletionsModel(Model):
                                 continue
 
                     # Set span output with structured data
-                    span.output = {  # type: ignore[attr-defined]
+                    output_data: dict[str, Any] = {
                         "new_items": new_items,
                         "final_output": final_output,
                     }
+                    # Per-call usage for billing; deduped against any turn aggregate
+                    usage_blob = usage_from_openai_response_usage(getattr(response, "usage", None))
+                    if usage_blob:
+                        output_data["usage"] = usage_blob
+                    span.output = output_data  # type: ignore[attr-defined]
 
                     return response
 
@@ -400,3 +417,9 @@ class TemporalTracingChatCompletionsModel(Model):
                 tracing=tracing,
                 **kwargs,
             )
+
+    @override
+    def stream_response(self, *args, **kwargs):
+        """Streaming is handled via get_response in Temporal activities.
+        Required so the class is concrete and instantiable at runtime."""
+        raise NotImplementedError("stream_response is not used in Temporal activities - use get_response instead")
