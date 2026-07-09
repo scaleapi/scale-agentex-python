@@ -69,22 +69,35 @@ Types:
 from agentex.types.agents import (
     ScheduleCreateResponse,
     ScheduleRetrieveResponse,
+    ScheduleUpdateResponse,
     ScheduleListResponse,
     SchedulePauseResponse,
+    SchedulePauseByNameResponse,
     ScheduleResumeResponse,
+    ScheduleResumeByNameResponse,
+    ScheduleRetrieveByNameResponse,
     ScheduleTriggerResponse,
+    ScheduleTriggerByNameResponse,
+    ScheduleUpdateByNameResponse,
 )
 ```
 
 Methods:
 
 - <code title="post /agents/{agent_id}/schedules">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">create</a>(agent_id, \*\*<a href="src/agentex/types/agents/schedule_create_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_create_response.py">ScheduleCreateResponse</a></code>
-- <code title="get /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">retrieve</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_retrieve_response.py">ScheduleRetrieveResponse</a></code>
+- <code title="get /agents/{agent_id}/schedules/{schedule_id}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">retrieve</a>(schedule_id, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_retrieve_response.py">ScheduleRetrieveResponse</a></code>
+- <code title="patch /agents/{agent_id}/schedules/{schedule_id}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">update</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_update_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_update_response.py">ScheduleUpdateResponse</a></code>
 - <code title="get /agents/{agent_id}/schedules">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">list</a>(agent_id, \*\*<a href="src/agentex/types/agents/schedule_list_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_list_response.py">ScheduleListResponse</a></code>
-- <code title="delete /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">delete</a>(name, \*, agent_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
-- <code title="post /agents/{agent_id}/schedules/name/{name}/pause">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">pause</a>(name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_pause_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_pause_response.py">SchedulePauseResponse</a></code>
-- <code title="post /agents/{agent_id}/schedules/name/{name}/resume">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">resume</a>(name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_resume_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_resume_response.py">ScheduleResumeResponse</a></code>
-- <code title="post /agents/{agent_id}/schedules/name/{name}/trigger">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">trigger</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_trigger_response.py">ScheduleTriggerResponse</a></code>
+- <code title="delete /agents/{agent_id}/schedules/{schedule_id}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">delete</a>(schedule_id, \*, agent_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="delete /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">delete_by_name</a>(name, \*, agent_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/pause">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">pause</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_pause_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_pause_response.py">SchedulePauseResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/name/{name}/pause">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">pause_by_name</a>(name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_pause_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_pause_by_name_response.py">SchedulePauseByNameResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/resume">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">resume</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_resume_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_resume_response.py">ScheduleResumeResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/name/{name}/resume">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">resume_by_name</a>(name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_resume_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_resume_by_name_response.py">ScheduleResumeByNameResponse</a></code>
+- <code title="get /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">retrieve_by_name</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_retrieve_by_name_response.py">ScheduleRetrieveByNameResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/trigger">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">trigger</a>(schedule_id, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_trigger_response.py">ScheduleTriggerResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/name/{name}/trigger">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">trigger_by_name</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_trigger_by_name_response.py">ScheduleTriggerByNameResponse</a></code>
+- <code title="patch /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">update_by_name</a>(path_name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_update_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_update_by_name_response.py">ScheduleUpdateByNameResponse</a></code>
 
 # Tasks
 
