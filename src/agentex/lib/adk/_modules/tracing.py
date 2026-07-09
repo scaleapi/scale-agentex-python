@@ -20,6 +20,7 @@ from agentex.lib.core.temporal.activities.adk.tracing_activities import (
     TracingActivityName,
 )
 from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.core.tracing.usage import usage_from_counts, validate_usage_blob
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
@@ -40,6 +41,73 @@ def _record_temporal_span_activity_dropped(event_type: str) -> None:
         ).add(1, {"event_type": event_type})
     except Exception:
         pass
+
+
+class TurnSpan:
+    """Handle for a turn-level (rollup) span, yielded by ``TracingModule.turn_span``.
+
+    Encapsulates the billing contract so agents cannot double-count usage:
+    the turn's aggregate usage goes to ``span.data["usage"]`` (+
+    ``span.data["cost_usd"]``) via :meth:`record_usage`. The backend keeps the
+    aggregate and de-dups any per-call ``output["usage"]`` children against it.
+    Never hand-write usage into ``output`` on a rollup span — that is the
+    double-count bug this helper exists to prevent.
+
+    All methods no-op when tracing is disabled (``span`` is None), so agent
+    code needs no ``if span:`` guards.
+    """
+
+    def __init__(self, span: Span | None):
+        self.span = span
+
+    def record_usage(
+        self,
+        usage: dict[str, Any] | None = None,
+        cost_usd: float | None = None,
+        *,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        total_tokens: int | None = None,
+        cached_input_tokens: int | None = None,
+        reasoning_tokens: int | None = None,
+    ) -> None:
+        """Record the turn's aggregate usage on the span's ``data``.
+
+        Pass either a prebuilt ``usage`` mapping (framework token spellings
+        like ``prompt_tokens``/``completion_tokens`` are accepted by the
+        backend) or individual token counts, plus an optional ``cost_usd``.
+        Individual counts are merged over the ``usage`` mapping. The usage must
+        be this turn's own tokens, not a session-cumulative total.
+        """
+        if self.span is None:
+            return
+
+        blob: dict[str, Any] = validate_usage_blob(usage) if usage else {}
+        blob.update(
+            usage_from_counts(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                cached_input_tokens=cached_input_tokens,
+                reasoning_tokens=reasoning_tokens,
+            )
+        )
+
+        data = self.span.data if isinstance(self.span.data, dict) else {}
+        if blob:
+            data["usage"] = blob
+        if cost_usd is not None:
+            data["cost_usd"] = cost_usd
+        self.span.data = data
+
+    @property
+    def output(self) -> Any:
+        return self.span.output if self.span is not None else None
+
+    @output.setter
+    def output(self, value: Any) -> None:
+        if self.span is not None:
+            self.span.output = value
 
 
 class TracingModule:
@@ -155,6 +223,49 @@ class TracingModule:
                     heartbeat_timeout=heartbeat_timeout,
                     retry_policy=retry_policy,
                 )
+
+    @asynccontextmanager
+    async def turn_span(
+        self,
+        trace_id: str,
+        name: str,
+        input: list[Any] | dict[str, Any] | BaseModel | None = None,
+        data: list[Any] | dict[str, Any] | BaseModel | None = None,
+        parent_id: str | None = None,
+        task_id: str | None = None,
+        start_to_close_timeout: timedelta = timedelta(seconds=5),
+        heartbeat_timeout: timedelta = timedelta(seconds=5),
+        retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+    ) -> AsyncGenerator[TurnSpan, None]:
+        """Span for one agent turn, with usage recorded as the billable aggregate.
+
+        Same lifecycle as :meth:`span`, but yields a :class:`TurnSpan` whose
+        ``record_usage(usage=..., cost_usd=...)`` writes the turn's rollup
+        usage to ``span.data`` — the shape the backend bills once per turn.
+        Per-call child spans (LLM adapters) may still carry
+        ``output["usage"]``; the backend de-dups them against this aggregate.
+
+        Example::
+
+            async with adk.tracing.turn_span(
+                trace_id=task.id, name="turn", input={...}, task_id=task.id
+            ) as turn:
+                result = await run_llm_calls()
+                turn.output = {"response": result.text}
+                turn.record_usage(usage=result.usage, cost_usd=result.cost_usd)
+        """
+        async with self.span(
+            trace_id=trace_id,
+            name=name,
+            input=input,
+            data=data,
+            parent_id=parent_id,
+            task_id=task_id,
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
+            retry_policy=retry_policy,
+        ) as span:
+            yield TurnSpan(span)
 
     async def start_span(
         self,

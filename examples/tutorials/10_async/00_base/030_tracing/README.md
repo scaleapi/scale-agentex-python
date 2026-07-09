@@ -41,6 +41,37 @@ await adk.tracing.end_span(
 
 Spans create a hierarchical view of agent execution, making it easy to see which operations take time and where errors occur.
 
+## Token Usage & Cost Tracking
+
+Token usage on spans is what the backend bills from, and it reads two shapes:
+
+- **Per-turn aggregate** — `span.data["usage"]` + `span.data["cost_usd"]`. Emit at most
+  once per turn, holding that turn's own usage (not a session-cumulative total). When a
+  trace has an aggregate, the backend keeps it and de-dups all per-call spans against it.
+- **Per-call detail** — `span.output["usage"]`. Optional; the SDK's LLM adapters
+  (litellm, OpenAI Agents SDK, LangGraph) emit this automatically. Summed only when no
+  aggregate exists in the trace.
+
+Record the turn rollup with `adk.tracing.turn_span()` instead of hand-writing usage keys:
+
+```python
+async with adk.tracing.turn_span(
+    trace_id=task.id,
+    name="turn",
+    input={"prompt": prompt},
+    task_id=task.id,
+) as turn:
+    result = await run_llm_calls()
+    turn.output = {"response": result.text}
+    turn.record_usage(usage=result.usage, cost_usd=result.cost_usd)
+```
+
+**Never put usage on both a rollup span's `output` and its per-call children's
+`output`** — that double-counts. `turn_span` writes the aggregate to `data`, so child
+spans stay safe to emit. Recognized token keys: `input_tokens`/`prompt_tokens`,
+`output_tokens`/`completion_tokens`, `cached_input_tokens`/`cached_tokens`,
+`reasoning_tokens`; cost is `cost_usd`.
+
 ## When to Use
 - Debugging complex agent behaviors
 - Performance optimization and bottleneck identification
