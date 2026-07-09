@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 from functools import reduce, singledispatch
+from itertools import zip_longest
 
 from agentex.lib.types.llm_messages import (
     Delta,
@@ -21,7 +22,13 @@ def _concat_chunks(_a: None, b: Any):
 
 @_concat_chunks.register
 def _(a: Completion, b: Completion) -> Completion:
-    a.choices = [_concat_chunks(*c) for c in zip(a.choices, b.choices, strict=False)]
+    # Chunks can have unequal choices: with stream_options.include_usage the
+    # final chunk carries usage but no choices. Keep the unpaired side instead
+    # of truncating to the shorter list.
+    a.choices = [
+        x if y is None else y if x is None else _concat_chunks(x, y)
+        for x, y in zip_longest(a.choices, b.choices)
+    ]
     a.usage = _concat_chunks(a.usage, b.usage)
 
     return a
