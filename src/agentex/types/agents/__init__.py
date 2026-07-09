@@ -7,10 +7,12 @@ from .schedule_pause_params import SchedulePauseParams as SchedulePauseParams
 from .deployment_list_params import DeploymentListParams as DeploymentListParams
 from .schedule_create_params import ScheduleCreateParams as ScheduleCreateParams
 from .schedule_list_response import ScheduleListResponse as ScheduleListResponse
+from .schedule_resume_params import ScheduleResumeParams as ScheduleResumeParams
 from .schedule_pause_response import SchedulePauseResponse as SchedulePauseResponse
 from .deployment_create_params import DeploymentCreateParams as DeploymentCreateParams
 from .deployment_list_response import DeploymentListResponse as DeploymentListResponse
 from .schedule_create_response import ScheduleCreateResponse as ScheduleCreateResponse
+from .schedule_resume_response import ScheduleResumeResponse as ScheduleResumeResponse
 from .schedule_trigger_response import ScheduleTriggerResponse as ScheduleTriggerResponse
 from .deployment_create_response import DeploymentCreateResponse as DeploymentCreateResponse
 from .schedule_retrieve_response import ScheduleRetrieveResponse as ScheduleRetrieveResponse
