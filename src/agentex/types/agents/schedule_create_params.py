@@ -17,7 +17,7 @@ class ScheduleCreateParams(TypedDict, total=False):
     """The first input delivered to each created task."""
 
     name: Required[str]
-    """Human-readable name, unique per agent (e.g. 'daily-granola-summary')."""
+    """Human-readable name, unique among active schedules for the agent."""
 
     cron_expression: Optional[str]
     """Cron expression for the cadence (e.g.

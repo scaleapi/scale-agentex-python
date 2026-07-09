@@ -73,7 +73,7 @@ class SchedulesResource(SyncAPIResource):
         Args:
           initial_input: The first input delivered to each created task.
 
-          name: Human-readable name, unique per agent (e.g. 'daily-granola-summary').
+          name: Human-readable name, unique among active schedules for the agent.
 
           cron_expression: Cron expression for the cadence (e.g. '0 17 \\** \\** MON-FRI'). Mutually exclusive
               with interval_seconds.
@@ -215,7 +215,7 @@ class AsyncSchedulesResource(AsyncAPIResource):
         Args:
           initial_input: The first input delivered to each created task.
 
-          name: Human-readable name, unique per agent (e.g. 'daily-granola-summary').
+          name: Human-readable name, unique among active schedules for the agent.
 
           cron_expression: Cron expression for the cadence (e.g. '0 17 \\** \\** MON-FRI'). Mutually exclusive
               with interval_seconds.

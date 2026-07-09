@@ -59,7 +59,7 @@ class RunSchedule(BaseModel):
     """Delivery method, inferred from the agent's ACP type."""
 
     name: str
-    """Schedule name, unique per agent."""
+    """Human-readable schedule name."""
 
     created_at: Optional[datetime] = None
     """When the schedule was created."""
