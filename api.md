@@ -66,13 +66,23 @@ Methods:
 Types:
 
 ```python
-from agentex.types.agents import ScheduleCreateResponse, ScheduleListResponse
+from agentex.types.agents import (
+    ScheduleCreateResponse,
+    ScheduleRetrieveResponse,
+    ScheduleListResponse,
+    SchedulePauseResponse,
+    ScheduleTriggerResponse,
+)
 ```
 
 Methods:
 
 - <code title="post /agents/{agent_id}/schedules">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">create</a>(agent_id, \*\*<a href="src/agentex/types/agents/schedule_create_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_create_response.py">ScheduleCreateResponse</a></code>
+- <code title="get /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">retrieve</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_retrieve_response.py">ScheduleRetrieveResponse</a></code>
 - <code title="get /agents/{agent_id}/schedules">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">list</a>(agent_id, \*\*<a href="src/agentex/types/agents/schedule_list_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_list_response.py">ScheduleListResponse</a></code>
+- <code title="delete /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">delete</a>(name, \*, agent_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/name/{name}/pause">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">pause</a>(name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_pause_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_pause_response.py">SchedulePauseResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/name/{name}/trigger">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">trigger</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_trigger_response.py">ScheduleTriggerResponse</a></code>
 
 # Tasks
 

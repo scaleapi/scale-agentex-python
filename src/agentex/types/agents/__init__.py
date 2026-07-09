@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 from .schedule_list_params import ScheduleListParams as ScheduleListParams
+from .schedule_pause_params import SchedulePauseParams as SchedulePauseParams
 from .deployment_list_params import DeploymentListParams as DeploymentListParams
 from .schedule_create_params import ScheduleCreateParams as ScheduleCreateParams
 from .schedule_list_response import ScheduleListResponse as ScheduleListResponse
+from .schedule_pause_response import SchedulePauseResponse as SchedulePauseResponse
 from .deployment_create_params import DeploymentCreateParams as DeploymentCreateParams
 from .deployment_list_response import DeploymentListResponse as DeploymentListResponse
 from .schedule_create_response import ScheduleCreateResponse as ScheduleCreateResponse
+from .schedule_trigger_response import ScheduleTriggerResponse as ScheduleTriggerResponse
 from .deployment_create_response import DeploymentCreateResponse as DeploymentCreateResponse
+from .schedule_retrieve_response import ScheduleRetrieveResponse as ScheduleRetrieveResponse
 from .deployment_promote_response import DeploymentPromoteResponse as DeploymentPromoteResponse
 from .deployment_retrieve_response import DeploymentRetrieveResponse as DeploymentRetrieveResponse
 from .deployment_preview_rpc_params import DeploymentPreviewRpcParams as DeploymentPreviewRpcParams

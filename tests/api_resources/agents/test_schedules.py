@@ -12,8 +12,12 @@ from tests.utils import assert_matches_type
 from agentex._utils import parse_datetime
 from agentex.types.agents import (
     ScheduleListResponse,
+    SchedulePauseResponse,
     ScheduleCreateResponse,
+    ScheduleTriggerResponse,
+    ScheduleRetrieveResponse,
 )
+from agentex.types.shared import DeleteResponse
 
 base_url = os.environ.get("TEST_API_BASE_URL", "http://127.0.0.1:4010")
 
@@ -96,6 +100,58 @@ class TestSchedules:
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
+    def test_method_retrieve(self, client: Agentex) -> None:
+        schedule = client.agents.schedules.retrieve(
+            name="name",
+            agent_id="agent_id",
+        )
+        assert_matches_type(ScheduleRetrieveResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_raw_response_retrieve(self, client: Agentex) -> None:
+        response = client.agents.schedules.with_raw_response.retrieve(
+            name="name",
+            agent_id="agent_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        schedule = response.parse()
+        assert_matches_type(ScheduleRetrieveResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_streaming_response_retrieve(self, client: Agentex) -> None:
+        with client.agents.schedules.with_streaming_response.retrieve(
+            name="name",
+            agent_id="agent_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            schedule = response.parse()
+            assert_matches_type(ScheduleRetrieveResponse, schedule, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_path_params_retrieve(self, client: Agentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            client.agents.schedules.with_raw_response.retrieve(
+                name="name",
+                agent_id="",
+            )
+
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `name` but received ''"):
+            client.agents.schedules.with_raw_response.retrieve(
+                name="",
+                agent_id="agent_id",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
     def test_method_list(self, client: Agentex) -> None:
         schedule = client.agents.schedules.list(
             agent_id="agent_id",
@@ -143,6 +199,172 @@ class TestSchedules:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
             client.agents.schedules.with_raw_response.list(
                 agent_id="",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_method_delete(self, client: Agentex) -> None:
+        schedule = client.agents.schedules.delete(
+            name="name",
+            agent_id="agent_id",
+        )
+        assert_matches_type(DeleteResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_raw_response_delete(self, client: Agentex) -> None:
+        response = client.agents.schedules.with_raw_response.delete(
+            name="name",
+            agent_id="agent_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        schedule = response.parse()
+        assert_matches_type(DeleteResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_streaming_response_delete(self, client: Agentex) -> None:
+        with client.agents.schedules.with_streaming_response.delete(
+            name="name",
+            agent_id="agent_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            schedule = response.parse()
+            assert_matches_type(DeleteResponse, schedule, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_path_params_delete(self, client: Agentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            client.agents.schedules.with_raw_response.delete(
+                name="name",
+                agent_id="",
+            )
+
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `name` but received ''"):
+            client.agents.schedules.with_raw_response.delete(
+                name="",
+                agent_id="agent_id",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_method_pause(self, client: Agentex) -> None:
+        schedule = client.agents.schedules.pause(
+            name="name",
+            agent_id="agent_id",
+        )
+        assert_matches_type(SchedulePauseResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_method_pause_with_all_params(self, client: Agentex) -> None:
+        schedule = client.agents.schedules.pause(
+            name="name",
+            agent_id="agent_id",
+            note="note",
+        )
+        assert_matches_type(SchedulePauseResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_raw_response_pause(self, client: Agentex) -> None:
+        response = client.agents.schedules.with_raw_response.pause(
+            name="name",
+            agent_id="agent_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        schedule = response.parse()
+        assert_matches_type(SchedulePauseResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_streaming_response_pause(self, client: Agentex) -> None:
+        with client.agents.schedules.with_streaming_response.pause(
+            name="name",
+            agent_id="agent_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            schedule = response.parse()
+            assert_matches_type(SchedulePauseResponse, schedule, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_path_params_pause(self, client: Agentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            client.agents.schedules.with_raw_response.pause(
+                name="name",
+                agent_id="",
+            )
+
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `name` but received ''"):
+            client.agents.schedules.with_raw_response.pause(
+                name="",
+                agent_id="agent_id",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_method_trigger(self, client: Agentex) -> None:
+        schedule = client.agents.schedules.trigger(
+            name="name",
+            agent_id="agent_id",
+        )
+        assert_matches_type(ScheduleTriggerResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_raw_response_trigger(self, client: Agentex) -> None:
+        response = client.agents.schedules.with_raw_response.trigger(
+            name="name",
+            agent_id="agent_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        schedule = response.parse()
+        assert_matches_type(ScheduleTriggerResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_streaming_response_trigger(self, client: Agentex) -> None:
+        with client.agents.schedules.with_streaming_response.trigger(
+            name="name",
+            agent_id="agent_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            schedule = response.parse()
+            assert_matches_type(ScheduleTriggerResponse, schedule, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_path_params_trigger(self, client: Agentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            client.agents.schedules.with_raw_response.trigger(
+                name="name",
+                agent_id="",
+            )
+
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `name` but received ''"):
+            client.agents.schedules.with_raw_response.trigger(
+                name="",
+                agent_id="agent_id",
             )
 
 
@@ -226,6 +448,58 @@ class TestAsyncSchedules:
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
+    async def test_method_retrieve(self, async_client: AsyncAgentex) -> None:
+        schedule = await async_client.agents.schedules.retrieve(
+            name="name",
+            agent_id="agent_id",
+        )
+        assert_matches_type(ScheduleRetrieveResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_raw_response_retrieve(self, async_client: AsyncAgentex) -> None:
+        response = await async_client.agents.schedules.with_raw_response.retrieve(
+            name="name",
+            agent_id="agent_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        schedule = await response.parse()
+        assert_matches_type(ScheduleRetrieveResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_streaming_response_retrieve(self, async_client: AsyncAgentex) -> None:
+        async with async_client.agents.schedules.with_streaming_response.retrieve(
+            name="name",
+            agent_id="agent_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            schedule = await response.parse()
+            assert_matches_type(ScheduleRetrieveResponse, schedule, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_path_params_retrieve(self, async_client: AsyncAgentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            await async_client.agents.schedules.with_raw_response.retrieve(
+                name="name",
+                agent_id="",
+            )
+
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `name` but received ''"):
+            await async_client.agents.schedules.with_raw_response.retrieve(
+                name="",
+                agent_id="agent_id",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
     async def test_method_list(self, async_client: AsyncAgentex) -> None:
         schedule = await async_client.agents.schedules.list(
             agent_id="agent_id",
@@ -273,4 +547,170 @@ class TestAsyncSchedules:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
             await async_client.agents.schedules.with_raw_response.list(
                 agent_id="",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_delete(self, async_client: AsyncAgentex) -> None:
+        schedule = await async_client.agents.schedules.delete(
+            name="name",
+            agent_id="agent_id",
+        )
+        assert_matches_type(DeleteResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_raw_response_delete(self, async_client: AsyncAgentex) -> None:
+        response = await async_client.agents.schedules.with_raw_response.delete(
+            name="name",
+            agent_id="agent_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        schedule = await response.parse()
+        assert_matches_type(DeleteResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_streaming_response_delete(self, async_client: AsyncAgentex) -> None:
+        async with async_client.agents.schedules.with_streaming_response.delete(
+            name="name",
+            agent_id="agent_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            schedule = await response.parse()
+            assert_matches_type(DeleteResponse, schedule, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_path_params_delete(self, async_client: AsyncAgentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            await async_client.agents.schedules.with_raw_response.delete(
+                name="name",
+                agent_id="",
+            )
+
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `name` but received ''"):
+            await async_client.agents.schedules.with_raw_response.delete(
+                name="",
+                agent_id="agent_id",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_pause(self, async_client: AsyncAgentex) -> None:
+        schedule = await async_client.agents.schedules.pause(
+            name="name",
+            agent_id="agent_id",
+        )
+        assert_matches_type(SchedulePauseResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_pause_with_all_params(self, async_client: AsyncAgentex) -> None:
+        schedule = await async_client.agents.schedules.pause(
+            name="name",
+            agent_id="agent_id",
+            note="note",
+        )
+        assert_matches_type(SchedulePauseResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_raw_response_pause(self, async_client: AsyncAgentex) -> None:
+        response = await async_client.agents.schedules.with_raw_response.pause(
+            name="name",
+            agent_id="agent_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        schedule = await response.parse()
+        assert_matches_type(SchedulePauseResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_streaming_response_pause(self, async_client: AsyncAgentex) -> None:
+        async with async_client.agents.schedules.with_streaming_response.pause(
+            name="name",
+            agent_id="agent_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            schedule = await response.parse()
+            assert_matches_type(SchedulePauseResponse, schedule, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_path_params_pause(self, async_client: AsyncAgentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            await async_client.agents.schedules.with_raw_response.pause(
+                name="name",
+                agent_id="",
+            )
+
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `name` but received ''"):
+            await async_client.agents.schedules.with_raw_response.pause(
+                name="",
+                agent_id="agent_id",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_trigger(self, async_client: AsyncAgentex) -> None:
+        schedule = await async_client.agents.schedules.trigger(
+            name="name",
+            agent_id="agent_id",
+        )
+        assert_matches_type(ScheduleTriggerResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_raw_response_trigger(self, async_client: AsyncAgentex) -> None:
+        response = await async_client.agents.schedules.with_raw_response.trigger(
+            name="name",
+            agent_id="agent_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        schedule = await response.parse()
+        assert_matches_type(ScheduleTriggerResponse, schedule, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_streaming_response_trigger(self, async_client: AsyncAgentex) -> None:
+        async with async_client.agents.schedules.with_streaming_response.trigger(
+            name="name",
+            agent_id="agent_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            schedule = await response.parse()
+            assert_matches_type(ScheduleTriggerResponse, schedule, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_path_params_trigger(self, async_client: AsyncAgentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `agent_id` but received ''"):
+            await async_client.agents.schedules.with_raw_response.trigger(
+                name="name",
+                agent_id="",
+            )
+
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `name` but received ''"):
+            await async_client.agents.schedules.with_raw_response.trigger(
+                name="",
+                agent_id="agent_id",
             )
