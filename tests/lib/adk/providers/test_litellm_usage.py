@@ -7,13 +7,13 @@ output was only the TaskMessage dump) and streaming (litellm omits usage unless
 
 from __future__ import annotations
 
+from typing import Any
 from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
 from agentex.types.span import Span
 from agentex.types.task_message import TaskMessage
-from agentex.types.task_message_content import TextContent
 from agentex.lib.types.llm_messages import (
     Delta,
     Usage,
@@ -22,6 +22,7 @@ from agentex.lib.types.llm_messages import (
     Completion,
     AssistantMessage,
 )
+from agentex.types.task_message_content import TextContent
 from agentex.lib.core.services.adk.providers.litellm import (
     LiteLLMService,
     _stream_kwargs_with_usage,
@@ -52,6 +53,11 @@ class FakeTracer:
 
     def trace(self, trace_id):
         return self.trace_obj
+
+
+def _output_dict(span: Span) -> dict[str, Any]:
+    assert isinstance(span.output, dict)
+    return span.output
 
 
 def _make_streaming_service():
@@ -142,7 +148,7 @@ class TestChatCompletionAutoSend:
         )
 
         span = tracer.trace_obj.spans[0]
-        assert span.output["usage"] == {"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10}
+        assert _output_dict(span)["usage"] == {"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10}
 
     async def test_span_output_omits_usage_when_absent(self):
         completion = Completion(
@@ -158,7 +164,7 @@ class TestChatCompletionAutoSend:
             trace_id="trace-1",
         )
 
-        assert "usage" not in tracer.trace_obj.spans[0].output
+        assert "usage" not in _output_dict(tracer.trace_obj.spans[0])
 
 
 class TestChatCompletionStream:
@@ -177,8 +183,8 @@ class TestChatCompletionStream:
         assert len(results) == 3
         assert captured_kwargs["stream_options"] == {"include_usage": True}
         span = tracer.trace_obj.spans[0]
-        assert span.output["usage"] == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
-        assert span.output["choices"][0]["message"]["content"] == "Hello!"
+        assert _output_dict(span)["usage"] == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        assert _output_dict(span)["choices"][0]["message"]["content"] == "Hello!"
 
 
 class TestChatCompletionStreamAutoSend:
@@ -195,9 +201,9 @@ class TestChatCompletionStreamAutoSend:
 
         assert captured_kwargs["stream_options"] == {"include_usage": True}
         span = tracer.trace_obj.spans[0]
-        assert span.output["usage"] == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+        assert _output_dict(span)["usage"] == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
         # TaskMessage dump is still the base of the span output
-        assert span.output["id"] == "msg-1"
+        assert _output_dict(span)["id"] == "msg-1"
 
     async def test_stream_without_usage_chunk_omits_usage(self):
         captured_kwargs: dict = {}
@@ -210,4 +216,4 @@ class TestChatCompletionStreamAutoSend:
             trace_id="trace-1",
         )
 
-        assert "usage" not in tracer.trace_obj.spans[0].output
+        assert "usage" not in _output_dict(tracer.trace_obj.spans[0])

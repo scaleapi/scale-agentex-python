@@ -314,9 +314,7 @@ class TestTurnSpan:
         mock_service.end_span.return_value = started
 
         with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
-            async with module.turn_span(
-                trace_id="trace-123", name="turn", data={"custom": "value"}
-            ) as turn:
+            async with module.turn_span(trace_id="trace-123", name="turn", data={"custom": "value"}) as turn:
                 turn.record_usage(usage={"prompt_tokens": 3, "completion_tokens": 4})
 
         ended_span = mock_service.end_span.call_args.kwargs["span"]

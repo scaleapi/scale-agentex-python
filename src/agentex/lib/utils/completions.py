@@ -26,8 +26,7 @@ def _(a: Completion, b: Completion) -> Completion:
     # final chunk carries usage but no choices. Keep the unpaired side instead
     # of truncating to the shorter list.
     a.choices = [
-        x if y is None else y if x is None else _concat_chunks(x, y)
-        for x, y in zip_longest(a.choices, b.choices)
+        x if y is None else y if x is None else _concat_chunks(x, y) for x, y in zip_longest(a.choices, b.choices)
     ]
     a.usage = _concat_chunks(a.usage, b.usage)
 
@@ -44,6 +43,7 @@ def _(a: Choice, b: Choice) -> Choice:
 
     a.finish_reason = a.finish_reason or b.finish_reason
     return a
+
 
 @_concat_chunks.register
 def _(a: Usage | None, b: Usage | None) -> Usage | None:
@@ -68,9 +68,7 @@ def _(a: Delta, b: Delta) -> Delta:
             if tool_call.index not in grouped_tool_calls:
                 grouped_tool_calls[tool_call.index] = tool_call
             else:
-                grouped_tool_calls[tool_call.index] = _concat_chunks(
-                    grouped_tool_calls[tool_call.index], tool_call
-                )
+                grouped_tool_calls[tool_call.index] = _concat_chunks(grouped_tool_calls[tool_call.index], tool_call)
 
         a.tool_calls = list(grouped_tool_calls.values())
     elif hasattr(b, "tool_calls") and b.tool_calls:
@@ -88,11 +86,7 @@ def _(a: ToolCallRequest, b: ToolCallRequest) -> ToolCallRequest:
     index_val = a.index if hasattr(a, "index") and a.index is not None else b.index
 
     # Concatenate the function part
-    function_val = (
-        _concat_chunks(a.function, b.function)
-        if a.function and b.function
-        else a.function or b.function
-    )
+    function_val = _concat_chunks(a.function, b.function) if a.function and b.function else a.function or b.function
 
     # Set all properties
     a.id = id_val

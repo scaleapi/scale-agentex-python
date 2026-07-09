@@ -247,9 +247,7 @@ class TracingModule:
 
         Example::
 
-            async with adk.tracing.turn_span(
-                trace_id=task.id, name="turn", input={...}, task_id=task.id
-            ) as turn:
+            async with adk.tracing.turn_span(trace_id=task.id, name="turn", input={...}, task_id=task.id) as turn:
                 result = await run_llm_calls()
                 turn.output = {"response": result.text}
                 turn.record_usage(usage=result.usage, cost_usd=result.cost_usd)

@@ -8,15 +8,32 @@ dropping it.
 
 from __future__ import annotations
 
+from typing import Any
 from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from agents import ModelResponse
-from agents.usage import Usage, InputTokensDetails, OutputTokensDetails
+from agents import ModelResponse, ModelSettings
+from agents.usage import Usage
+from openai.types.responses import Response, ResponseCompletedEvent
+from openai.types.responses.response_usage import (
+    ResponseUsage,
+    InputTokensDetails,
+    OutputTokensDetails,
+)
 
+import agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model as tsm
 from agentex.types.span import Span
+from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_tracing_model import (
+    TemporalTracingResponsesModel,
+    TemporalTracingChatCompletionsModel,
+)
+from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
+    streaming_task_id,
+    streaming_trace_id,
+    streaming_parent_span_id,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -53,12 +70,6 @@ class FakeTracer:
 
 @pytest.fixture
 def tracing_contextvars():
-    from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
-        streaming_task_id,
-        streaming_trace_id,
-        streaming_parent_span_id,
-    )
-
     tokens = [
         streaming_task_id.set("task-1"),
         streaming_trace_id.set("trace-1"),
@@ -80,6 +91,7 @@ def _agents_usage() -> Usage:
         output_tokens_details=OutputTokensDetails(reasoning_tokens=40),
     )
 
+
 EXPECTED_USAGE_BLOB = {
     "input_tokens": 120,
     "output_tokens": 80,
@@ -87,6 +99,11 @@ EXPECTED_USAGE_BLOB = {
     "cached_input_tokens": 30,
     "reasoning_tokens": 40,
 }
+
+
+def _output_dict(span: Span) -> dict[str, Any]:
+    assert isinstance(span.output, dict)
+    return span.output
 
 
 class TestTemporalTracingModels:
@@ -99,8 +116,6 @@ class TestTemporalTracingModels:
         )
 
         model = wrapper_cls(base_model, tracer)
-        from agents import ModelSettings
-
         response = await model.get_response(
             system_instructions=None,
             input="hello",
@@ -115,20 +130,12 @@ class TestTemporalTracingModels:
         return tracer.trace_obj.spans[0]
 
     async def test_responses_model_writes_usage_to_span_output(self, tracing_contextvars):
-        from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_tracing_model import (
-            TemporalTracingResponsesModel,
-        )
-
         span = await self._run_wrapper(TemporalTracingResponsesModel)
-        assert span.output["usage"] == EXPECTED_USAGE_BLOB
+        assert _output_dict(span)["usage"] == EXPECTED_USAGE_BLOB
 
     async def test_chat_completions_model_writes_usage_to_span_output(self, tracing_contextvars):
-        from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_tracing_model import (
-            TemporalTracingChatCompletionsModel,
-        )
-
         span = await self._run_wrapper(TemporalTracingChatCompletionsModel)
-        assert span.output["usage"] == EXPECTED_USAGE_BLOB
+        assert _output_dict(span)["usage"] == EXPECTED_USAGE_BLOB
 
 
 class FakeStream:
@@ -145,21 +152,12 @@ class FakeStream:
 
 class TestTemporalStreamingModel:
     async def test_streaming_model_captures_final_response_usage(self, tracing_contextvars):
-        import agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model as tsm
-
-        from openai.types.responses import Response, ResponseCompletedEvent
-        from openai.types.responses.response_usage import (
-            ResponseUsage,
-            InputTokensDetails as ResponseInputTokensDetails,
-            OutputTokensDetails as ResponseOutputTokensDetails,
-        )
-
         usage = ResponseUsage(
             input_tokens=120,
             output_tokens=80,
             total_tokens=200,
-            input_tokens_details=ResponseInputTokensDetails(cached_tokens=30),
-            output_tokens_details=ResponseOutputTokensDetails(reasoning_tokens=40),
+            input_tokens_details=InputTokensDetails(cached_tokens=30),
+            output_tokens_details=OutputTokensDetails(reasoning_tokens=40),
         )
         completed = ResponseCompletedEvent.model_construct(
             type="response.completed",
@@ -170,13 +168,9 @@ class TestTemporalStreamingModel:
         openai_client = MagicMock()
         openai_client.responses.create = AsyncMock(return_value=FakeStream([completed]))
 
-        with (
-            patch.object(tsm, "create_async_agentex_client", return_value=MagicMock()),
-            patch.object(tsm, "AsyncTracer", return_value=fake_tracer),
-        ):
-            model = tsm.TemporalStreamingModel(model_name="gpt-4o", openai_client=openai_client)
-
-        from agents import ModelSettings
+        with patch.object(tsm, "create_async_agentex_client", return_value=MagicMock()):
+            with patch.object(tsm, "AsyncTracer", return_value=fake_tracer):
+                model = tsm.TemporalStreamingModel(model_name="gpt-4o", openai_client=openai_client)
 
         response = await model.get_response(
             system_instructions=None,
@@ -199,13 +193,9 @@ class TestTemporalStreamingModel:
         # And on the span output for billing
         assert len(fake_tracer.trace_obj.spans) == 1
         span = fake_tracer.trace_obj.spans[0]
-        assert span.output["usage"] == EXPECTED_USAGE_BLOB
+        assert _output_dict(span)["usage"] == EXPECTED_USAGE_BLOB
 
     async def test_streaming_model_omits_usage_when_api_reports_none(self, tracing_contextvars):
-        import agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model as tsm
-
-        from openai.types.responses import Response, ResponseCompletedEvent
-
         completed = ResponseCompletedEvent.model_construct(
             type="response.completed",
             response=Response.model_construct(output=[], usage=None),
@@ -215,13 +205,9 @@ class TestTemporalStreamingModel:
         openai_client = MagicMock()
         openai_client.responses.create = AsyncMock(return_value=FakeStream([completed]))
 
-        with (
-            patch.object(tsm, "create_async_agentex_client", return_value=MagicMock()),
-            patch.object(tsm, "AsyncTracer", return_value=fake_tracer),
-        ):
-            model = tsm.TemporalStreamingModel(model_name="gpt-4o", openai_client=openai_client)
-
-        from agents import ModelSettings
+        with patch.object(tsm, "create_async_agentex_client", return_value=MagicMock()):
+            with patch.object(tsm, "AsyncTracer", return_value=fake_tracer):
+                model = tsm.TemporalStreamingModel(model_name="gpt-4o", openai_client=openai_client)
 
         response = await model.get_response(
             system_instructions=None,
@@ -235,4 +221,4 @@ class TestTemporalStreamingModel:
 
         assert response.usage.input_tokens == 0
         span = fake_tracer.trace_obj.spans[0]
-        assert "usage" not in span.output
+        assert "usage" not in _output_dict(span)

@@ -29,6 +29,7 @@ for _name in ["agentex.lib.adk", "agentex.lib.utils.logging"]:
     sys.modules.setdefault(_name, MagicMock())
 
 # Ensure parent packages exist so the dotted path resolves
+_created_pkg_stubs: list[str] = []
 for _pkg in [
     "agentex",
     "agentex.lib",
@@ -43,6 +44,7 @@ for _pkg in [
         _mod.__path__ = []  # type: ignore[attr-defined]
         _mod.__package__ = _pkg
         sys.modules[_pkg] = _mod
+        _created_pkg_stubs.append(_pkg)
 
 # Real pydantic types — importable without triggering the problematic chain.
 from agentex.types.tool_response_content import ToolResponseContent  # noqa: E402
@@ -56,6 +58,12 @@ assert _spec is not None and _spec.loader is not None
 _hooks_mod = importlib.util.module_from_spec(_spec)
 sys.modules[_spec.name] = _hooks_mod
 _spec.loader.exec_module(_hooks_mod)
+
+# Drop the placeholder packages now that the module is loaded: their empty
+# __path__ would otherwise block real imports of agentex.* submodules in every
+# test collected after this file. The loaded module keeps its bindings.
+for _pkg in _created_pkg_stubs:
+    sys.modules.pop(_pkg, None)
 
 TemporalStreamingHooks = _hooks_mod.TemporalStreamingHooks
 create_streaming_hooks = _hooks_mod.create_streaming_hooks

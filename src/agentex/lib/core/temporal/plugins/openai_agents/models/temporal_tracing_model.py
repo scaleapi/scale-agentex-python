@@ -7,6 +7,7 @@ context interceptor to access task_id, trace_id, and parent_span_id.
 The key innovation is that these are thin wrappers around the standard OpenAI models,
 avoiding code duplication while adding tracing capabilities.
 """
+
 from __future__ import annotations
 
 import logging
@@ -51,24 +52,28 @@ def _serialize_item(item: Any) -> dict[str, Any]:
     Uses model_dump() for Pydantic models, otherwise extracts attributes manually.
     Filters out internal Pydantic fields that can't be serialized.
     """
-    if hasattr(item, 'model_dump'):
+    if hasattr(item, "model_dump"):
         # Pydantic model - use model_dump for proper serialization
         try:
-            return item.model_dump(mode='json', exclude_unset=True)
+            return item.model_dump(mode="json", exclude_unset=True)
         except Exception:
             # Fallback to dict conversion
-            return dict(item) if hasattr(item, '__iter__') else {}
+            return dict(item) if hasattr(item, "__iter__") else {}
     else:
         # Not a Pydantic model - extract attributes manually
         item_dict = {}
         for attr_name in dir(item):
-            if not attr_name.startswith('_') and attr_name not in ('model_fields', 'model_config', 'model_computed_fields'):
+            if not attr_name.startswith("_") and attr_name not in (
+                "model_fields",
+                "model_config",
+                "model_computed_fields",
+            ):
                 try:
                     attr_value = getattr(item, attr_name, None)
                     # Skip methods and None values
                     if attr_value is not None and not callable(attr_value):
                         # Convert to JSON-serializable format
-                        if hasattr(attr_value, 'model_dump'):
+                        if hasattr(attr_value, "model_dump"):
                             item_dict[attr_name] = attr_value.model_dump()
                         elif isinstance(attr_value, (str, int, float, bool, list, dict)):
                             item_dict[attr_name] = attr_value
@@ -106,7 +111,9 @@ class TemporalTracingModelProvider(OpenAIProvider):
         # Initialize tracer for all models
         agentex_client = create_async_agentex_client()
         self._tracer = AsyncTracer(agentex_client)
-        logger.info(f"[TemporalTracingModelProvider] Initialized with AgentEx tracer, custom_client={openai_client is not None}")
+        logger.info(
+            f"[TemporalTracingModelProvider] Initialized with AgentEx tracer, custom_client={openai_client is not None}"
+        )
 
     @override
     def get_model(self, model_name: Optional[str]) -> Model:
@@ -126,10 +133,14 @@ class TemporalTracingModelProvider(OpenAIProvider):
             logger.info(f"[TemporalTracingModelProvider] Wrapping OpenAIResponsesModel '{model_name}' with tracing")
             return TemporalTracingResponsesModel(base_model, self._tracer)  # type: ignore[abstract]
         elif isinstance(base_model, OpenAIChatCompletionsModel):
-            logger.info(f"[TemporalTracingModelProvider] Wrapping OpenAIChatCompletionsModel '{model_name}' with tracing")
+            logger.info(
+                f"[TemporalTracingModelProvider] Wrapping OpenAIChatCompletionsModel '{model_name}' with tracing"
+            )
             return TemporalTracingChatCompletionsModel(base_model, self._tracer)  # type: ignore[abstract]
         else:
-            logger.warning(f"[TemporalTracingModelProvider] Unknown model type, returning without tracing: {type(base_model)}")
+            logger.warning(
+                f"[TemporalTracingModelProvider] Unknown model type, returning without tracing: {type(base_model)}"
+            )
             return base_model
 
 
@@ -181,7 +192,9 @@ class TemporalTracingResponsesModel(Model):
 
         # If we have tracing context, wrap with span
         if trace_id and parent_span_id:
-            logger.debug(f"[TemporalTracingResponsesModel] Adding tracing span for task_id={task_id}, trace_id={trace_id}")
+            logger.debug(
+                f"[TemporalTracingResponsesModel] Adding tracing span for task_id={task_id}, trace_id={trace_id}"
+            )
 
             trace = self._tracer.trace(trace_id)
 
@@ -199,7 +212,9 @@ class TemporalTracingResponsesModel(Model):
                         "temperature": model_settings.temperature,
                         "max_tokens": model_settings.max_tokens,
                         "reasoning": model_settings.reasoning,
-                    } if model_settings else None,
+                    }
+                    if model_settings
+                    else None,
                 },
             ) as span:
                 try:
@@ -222,7 +237,7 @@ class TemporalTracingResponsesModel(Model):
                     new_items = []
                     final_output = None
 
-                    if hasattr(response, 'output') and response.output:
+                    if hasattr(response, "output") and response.output:
                         response_output = response.output if isinstance(response.output, list) else [response.output]
 
                         for item in response_output:
@@ -232,12 +247,12 @@ class TemporalTracingResponsesModel(Model):
                                     new_items.append(item_dict)
 
                                     # Extract final_output from message type if available
-                                    if item_dict.get('type') == 'message' and not final_output:
-                                        content = item_dict.get('content', [])
+                                    if item_dict.get("type") == "message" and not final_output:
+                                        content = item_dict.get("content", [])
                                         if content and isinstance(content, list):
                                             for content_part in content:
-                                                if isinstance(content_part, dict) and 'text' in content_part:
-                                                    final_output = content_part['text']
+                                                if isinstance(content_part, dict) and "text" in content_part:
+                                                    final_output = content_part["text"]
                                                     break
                             except Exception as e:
                                 logger.warning(f"Failed to serialize item in temporal tracing model: {e}")
@@ -329,7 +344,9 @@ class TemporalTracingChatCompletionsModel(Model):
 
         # If we have tracing context, wrap with span
         if trace_id and parent_span_id:
-            logger.debug(f"[TemporalTracingChatCompletionsModel] Adding tracing span for task_id={task_id}, trace_id={trace_id}")
+            logger.debug(
+                f"[TemporalTracingChatCompletionsModel] Adding tracing span for task_id={task_id}, trace_id={trace_id}"
+            )
 
             trace = self._tracer.trace(trace_id)
 
@@ -346,7 +363,9 @@ class TemporalTracingChatCompletionsModel(Model):
                     "model_settings": {
                         "temperature": model_settings.temperature,
                         "max_tokens": model_settings.max_tokens,
-                    } if model_settings else None,
+                    }
+                    if model_settings
+                    else None,
                 },
             ) as span:
                 try:
@@ -366,7 +385,7 @@ class TemporalTracingChatCompletionsModel(Model):
                     new_items = []
                     final_output = None
 
-                    if hasattr(response, 'output') and response.output:
+                    if hasattr(response, "output") and response.output:
                         response_output = response.output if isinstance(response.output, list) else [response.output]
 
                         for item in response_output:
@@ -376,12 +395,12 @@ class TemporalTracingChatCompletionsModel(Model):
                                     new_items.append(item_dict)
 
                                     # Extract final_output from message type if available
-                                    if item_dict.get('type') == 'message' and not final_output:
-                                        content = item_dict.get('content', [])
+                                    if item_dict.get("type") == "message" and not final_output:
+                                        content = item_dict.get("content", [])
                                         if content and isinstance(content, list):
                                             for content_part in content:
-                                                if isinstance(content_part, dict) and 'text' in content_part:
-                                                    final_output = content_part['text']
+                                                if isinstance(content_part, dict) and "text" in content_part:
+                                                    final_output = content_part["text"]
                                                     break
                             except Exception as e:
                                 logger.warning(f"Failed to serialize item in temporal tracing model: {e}")
@@ -406,7 +425,9 @@ class TemporalTracingChatCompletionsModel(Model):
                     raise
         else:
             # No tracing context, just pass through
-            logger.debug("[TemporalTracingChatCompletionsModel] No tracing context available, calling base model directly")
+            logger.debug(
+                "[TemporalTracingChatCompletionsModel] No tracing context available, calling base model directly"
+            )
             return await self._base_model.get_response(
                 system_instructions=system_instructions,
                 input=input,
