@@ -18,11 +18,12 @@ from ..._response import (
     async_to_streamed_response_wrapper,
 )
 from ..._base_client import make_request_options
-from ...types.agents import schedule_list_params, schedule_pause_params, schedule_create_params
+from ...types.agents import schedule_list_params, schedule_pause_params, schedule_create_params, schedule_resume_params
 from ...types.shared.delete_response import DeleteResponse
 from ...types.agents.schedule_list_response import ScheduleListResponse
 from ...types.agents.schedule_pause_response import SchedulePauseResponse
 from ...types.agents.schedule_create_response import ScheduleCreateResponse
+from ...types.agents.schedule_resume_response import ScheduleResumeResponse
 from ...types.agents.schedule_trigger_response import ScheduleTriggerResponse
 from ...types.agents.schedule_retrieve_response import ScheduleRetrieveResponse
 
@@ -280,6 +281,46 @@ class SchedulesResource(SyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=SchedulePauseResponse,
+        )
+
+    def resume(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        note: Optional[str] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleResumeResponse:
+        """
+        Resume a paused run schedule by its active name.
+
+        Args:
+          note: Optional note explaining the resume.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return self._post(
+            path_template("/agents/{agent_id}/schedules/name/{name}/resume", agent_id=agent_id, name=name),
+            body=maybe_transform({"note": note}, schedule_resume_params.ScheduleResumeParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleResumeResponse,
         )
 
     def trigger(
@@ -572,6 +613,46 @@ class AsyncSchedulesResource(AsyncAPIResource):
             cast_to=SchedulePauseResponse,
         )
 
+    async def resume(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        note: Optional[str] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleResumeResponse:
+        """
+        Resume a paused run schedule by its active name.
+
+        Args:
+          note: Optional note explaining the resume.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return await self._post(
+            path_template("/agents/{agent_id}/schedules/name/{name}/resume", agent_id=agent_id, name=name),
+            body=await async_maybe_transform({"note": note}, schedule_resume_params.ScheduleResumeParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleResumeResponse,
+        )
+
     async def trigger(
         self,
         name: str,
@@ -628,6 +709,9 @@ class SchedulesResourceWithRawResponse:
         self.pause = to_raw_response_wrapper(
             schedules.pause,
         )
+        self.resume = to_raw_response_wrapper(
+            schedules.resume,
+        )
         self.trigger = to_raw_response_wrapper(
             schedules.trigger,
         )
@@ -651,6 +735,9 @@ class AsyncSchedulesResourceWithRawResponse:
         )
         self.pause = async_to_raw_response_wrapper(
             schedules.pause,
+        )
+        self.resume = async_to_raw_response_wrapper(
+            schedules.resume,
         )
         self.trigger = async_to_raw_response_wrapper(
             schedules.trigger,
@@ -676,6 +763,9 @@ class SchedulesResourceWithStreamingResponse:
         self.pause = to_streamed_response_wrapper(
             schedules.pause,
         )
+        self.resume = to_streamed_response_wrapper(
+            schedules.resume,
+        )
         self.trigger = to_streamed_response_wrapper(
             schedules.trigger,
         )
@@ -699,6 +789,9 @@ class AsyncSchedulesResourceWithStreamingResponse:
         )
         self.pause = async_to_streamed_response_wrapper(
             schedules.pause,
+        )
+        self.resume = async_to_streamed_response_wrapper(
+            schedules.resume,
         )
         self.trigger = async_to_streamed_response_wrapper(
             schedules.trigger,
