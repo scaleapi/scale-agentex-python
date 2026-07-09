@@ -11,20 +11,23 @@ from pydantic import Field, BaseModel
 from rich.console import Console
 
 from agentex.lib.utils.logging import make_logger
-from agentex.config.agent_config import AgentConfig
+from agentex.config.helm_values import (
+    TEMPORAL_WORKER_KEY,  # noqa: F401  # back-compat re-export
+    _deep_merge,  # noqa: F401  # back-compat re-export
+    build_acp_command,
+    merge_deployment_configs as merge_helm_values,
+    convert_env_vars_dict_to_list,  # noqa: F401  # back-compat re-export
+)
 from agentex.config.agent_manifest import AgentManifest
 from agentex.lib.cli.utils.exceptions import HelmError, DeploymentError
 from agentex.lib.cli.utils.path_utils import PathResolutionError, calculate_docker_acp_module
 from agentex.config.environment_config import OciRegistryConfig, AgentEnvironmentConfig
-from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.sdk.config.agent_manifest import load_agent_manifest
 from agentex.lib.sdk.config.environment_config import load_environments_config_from_manifest_dir
 
 logger = make_logger(__name__)
 console = Console()
-
-TEMPORAL_WORKER_KEY = "temporal-worker"
 DEFAULT_HELM_CHART_VERSION = "0.1.9"
 
 
@@ -231,22 +234,21 @@ def resolve_chart(
     return chart_reference, chart_version
 
 
-def convert_env_vars_dict_to_list(env_vars: dict[str, str]) -> list[dict[str, str]]:
-    """Convert a dictionary of environment variables to a list of dictionaries"""
-    return [{"name": key, "value": value} for key, value in env_vars.items()]
+def _resolve_acp_module(manifest: AgentManifest, manifest_path: str) -> str:
+    """Resolve the ACP module from the source tree, falling back to the default."""
+    try:
+        docker_acp_module = calculate_docker_acp_module(manifest, manifest_path)
+        logger.info(f"Using dynamic ACP command: uvicorn {docker_acp_module}:acp")
+        return docker_acp_module
+    except (PathResolutionError, Exception) as e:
+        # Fallback to default command structure
+        logger.warning(f"Could not calculate dynamic ACP module ({e}), using default: project.acp")
+        return "project.acp"
 
 
 def add_acp_command_to_helm_values(helm_values: dict[str, Any], manifest: AgentManifest, manifest_path: str) -> None:
     """Add dynamic ACP command to helm values based on manifest configuration"""
-    try:
-        docker_acp_module = calculate_docker_acp_module(manifest, manifest_path)
-        # Create the uvicorn command with the correct module path
-        helm_values["command"] = ["uvicorn", f"{docker_acp_module}:acp", "--host", "0.0.0.0", "--port", "8000"]
-        logger.info(f"Using dynamic ACP command: uvicorn {docker_acp_module}:acp")
-    except (PathResolutionError, Exception) as e:
-        # Fallback to default command structure
-        logger.warning(f"Could not calculate dynamic ACP module ({e}), using default: project.acp")
-        helm_values["command"] = ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
+    helm_values["command"] = build_acp_command(_resolve_acp_module(manifest, manifest_path))
 
 
 def merge_deployment_configs(
@@ -255,9 +257,12 @@ def merge_deployment_configs(
     deploy_overrides: InputDeployOverrides,
     manifest_path: str,
 ) -> dict[str, Any]:
-    agent_config: AgentConfig = manifest.agent
+    """Merge global deployment config with environment-specific overrides into helm values.
 
-    """Merge global deployment config with environment-specific overrides into helm values"""
+    Resolves the CLI-side inputs (deploy overrides, filesystem ACP module
+    resolution), then delegates the pure mapping to
+    :func:`agentex.config.helm_values.merge_deployment_configs`.
+    """
     if not manifest.deployment:
         raise DeploymentError("No deployment configuration found in manifest")
 
@@ -267,167 +272,26 @@ def merge_deployment_configs(
     if not repository or not image_tag:
         raise DeploymentError("Repository and image tag are required")
 
-    # Start with global configuration
-    helm_values: dict[str, Any] = {
-        "global": {
-            "image": {
-                "repository": repository,
-                "tag": image_tag,
-                "pullPolicy": "IfNotPresent",
-            },
-            "agent": {
-                "name": manifest.agent.name,
-                "description": manifest.agent.description,
-                "acp_type": manifest.agent.acp_type,
-            },
-        },
-        "replicaCount": manifest.deployment.global_config.replicaCount,
-        "resources": {
-            "requests": {
-                "cpu": manifest.deployment.global_config.resources.requests.cpu,
-                "memory": manifest.deployment.global_config.resources.requests.memory,
-            },
-            "limits": {
-                "cpu": manifest.deployment.global_config.resources.limits.cpu,
-                "memory": manifest.deployment.global_config.resources.limits.memory,
-            },
-        },
-        # Enable autoscaling by default for production deployments
-        "autoscaling": {
-            "enabled": True,
-            "minReplicas": 1,
-            "maxReplicas": 10,
-            "targetCPUUtilizationPercentage": 50,
-        },
-    }
-
-    # Handle temporal configuration using new helper methods
-    if agent_config.is_temporal_agent():
-        temporal_config = agent_config.get_temporal_workflow_config()
-        if temporal_config:
-            helm_values[TEMPORAL_WORKER_KEY] = {
-                "enabled": True,
-                # Enable autoscaling for temporal workers as well
-                "autoscaling": {
-                    "enabled": True,
-                    "minReplicas": 1,
-                    "maxReplicas": 10,
-                    "targetCPUUtilizationPercentage": 50,
-                },
-            }
-            helm_values["global"]["workflow"] = {
-                "name": temporal_config.name,
-                "taskQueue": temporal_config.queue_name,
-            }
-
-    # Collect all environment variables with proper precedence
-    # Priority: manifest -> environments.yaml -> secrets (highest)
-    all_env_vars: dict[str, str] = {}
-    secret_env_vars: list[dict[str, str]] = []
-
-    # Start with agent_config env vars from manifest
-    if agent_config.env:
-        all_env_vars.update(agent_config.env)
-
-    # Override with environment config env vars if they exist
-    if agent_env_config and agent_env_config.helm_overrides and "env" in agent_env_config.helm_overrides:
-        env_overrides = agent_env_config.helm_overrides["env"]
-        if isinstance(env_overrides, list):
-            # Convert list format to dict for easier merging
-            env_override_dict: dict[str, str] = {}
-            for env_var in env_overrides:
-                if isinstance(env_var, dict) and "name" in env_var and "value" in env_var:
-                    env_override_dict[str(env_var["name"])] = str(env_var["value"])
-            all_env_vars.update(env_override_dict)
-
-    # Handle credentials and check for conflicts
-    if agent_config.credentials:
-        for credential in agent_config.credentials:
-            # Handle both CredentialMapping objects and legacy dict format
-            if isinstance(credential, dict):
-                env_var_name = credential["env_var_name"]
-                secret_name = credential["secret_name"]
-                secret_key = credential["secret_key"]
-            else:
-                env_var_name = credential.env_var_name
-                secret_name = credential.secret_name
-                secret_key = credential.secret_key
-
-            # Check if the environment variable name conflicts with existing env vars
-            if env_var_name in all_env_vars:
-                logger.warning(
-                    f"Environment variable '{env_var_name}' is defined in both "
-                    f"env and secretEnvVars. The secret value will take precedence."
-                )
-                # Remove from regular env vars since secret takes precedence
-                del all_env_vars[env_var_name]
-
-            secret_env_vars.append(
-                {
-                    "name": env_var_name,
-                    "secretName": secret_name,
-                    "secretKey": secret_key,
-                }
-            )
-
-    # Apply agent environment configuration overrides
-    if agent_env_config:
-        # Add auth principal env var if environment config is set
-        if agent_env_config.auth:
-            from agentex.lib.cli.utils.auth_utils import _encode_principal_context_from_env_config
-
-            encoded_principal = _encode_principal_context_from_env_config(agent_env_config.auth)
-            logger.info(f"Encoding auth principal from {agent_env_config.auth}")
-            if encoded_principal:
-                all_env_vars[EnvVarKeys.AUTH_PRINCIPAL_B64.value] = encoded_principal
-            else:
-                raise DeploymentError(f"Auth principal unable to be encoded for agent_env_config: {agent_env_config}")
-
-        logger.info(f"Defined agent helm overrides: {agent_env_config.helm_overrides}")
-        logger.info(f"Before-merge helm values: {helm_values}")
-        if agent_env_config.helm_overrides:
-            _deep_merge(helm_values, agent_env_config.helm_overrides)
-        logger.info(f"After-merge helm values: {helm_values}")
-
-    # Set final environment variables
-    # Environment variable precedence: manifest -> environments.yaml -> secrets (highest)
-    if all_env_vars:
-        helm_values["env"] = convert_env_vars_dict_to_list(all_env_vars)
-
-    if secret_env_vars:
-        helm_values["secretEnvVars"] = secret_env_vars
-
-    # Set environment variables for temporal worker if enabled
-    if TEMPORAL_WORKER_KEY in helm_values:
-        if all_env_vars:
-            helm_values[TEMPORAL_WORKER_KEY]["env"] = convert_env_vars_dict_to_list(all_env_vars)
-        if secret_env_vars:
-            helm_values[TEMPORAL_WORKER_KEY]["secretEnvVars"] = secret_env_vars
-
-    # Handle image pull secrets
-    if manifest.deployment and manifest.deployment.imagePullSecrets:
-        pull_secrets = [pull_secret.model_dump() for pull_secret in manifest.deployment.imagePullSecrets]
-        helm_values["global"]["imagePullSecrets"] = pull_secrets
-        helm_values["imagePullSecrets"] = pull_secrets
-
-    # Add dynamic ACP command based on manifest configuration if command is not set in helm overrides
+    # Only resolve the module when the command isn't overridden, matching the
+    # original conditional add_acp_command_to_helm_values call (and its logs).
     helm_overrides_command = (
         agent_env_config and agent_env_config.helm_overrides and "command" in agent_env_config.helm_overrides
     )
-    if not helm_overrides_command:
-        add_acp_command_to_helm_values(helm_values, manifest, manifest_path)
+    acp_module = None if helm_overrides_command else _resolve_acp_module(manifest, manifest_path)
+
+    try:
+        helm_values = merge_helm_values(
+            manifest,
+            agent_env_config,
+            repository=repository,
+            image_tag=image_tag,
+            acp_module=acp_module,
+        )
+    except ValueError as e:
+        raise DeploymentError(str(e)) from e
 
     logger.info("Deploying with the following helm values: %s", helm_values)
     return helm_values
-
-
-def _deep_merge(base_dict: dict[str, Any], override_dict: dict[str, Any]) -> None:
-    """Deep merge override_dict into base_dict"""
-    for key, value in override_dict.items():
-        if key in base_dict and isinstance(base_dict[key], dict) and isinstance(value, dict):
-            _deep_merge(base_dict[key], value)
-        else:
-            base_dict[key] = value
 
 
 def create_helm_values_file(helm_values: dict[str, Any]) -> str:
