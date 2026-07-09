@@ -18,9 +18,13 @@ from ..._response import (
     async_to_streamed_response_wrapper,
 )
 from ..._base_client import make_request_options
-from ...types.agents import schedule_list_params, schedule_create_params
+from ...types.agents import schedule_list_params, schedule_pause_params, schedule_create_params
+from ...types.shared.delete_response import DeleteResponse
 from ...types.agents.schedule_list_response import ScheduleListResponse
+from ...types.agents.schedule_pause_response import SchedulePauseResponse
 from ...types.agents.schedule_create_response import ScheduleCreateResponse
+from ...types.agents.schedule_trigger_response import ScheduleTriggerResponse
+from ...types.agents.schedule_retrieve_response import ScheduleRetrieveResponse
 
 __all__ = ["SchedulesResource", "AsyncSchedulesResource"]
 
@@ -128,6 +132,42 @@ class SchedulesResource(SyncAPIResource):
             cast_to=ScheduleCreateResponse,
         )
 
+    def retrieve(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleRetrieveResponse:
+        """
+        Get a run schedule by its active name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return self._get(
+            path_template("/agents/{agent_id}/schedules/name/{name}", agent_id=agent_id, name=name),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleRetrieveResponse,
+        )
+
     def list(
         self,
         agent_id: str,
@@ -164,6 +204,118 @@ class SchedulesResource(SyncAPIResource):
                 query=maybe_transform({"limit": limit}, schedule_list_params.ScheduleListParams),
             ),
             cast_to=ScheduleListResponse,
+        )
+
+    def delete(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> DeleteResponse:
+        """
+        Delete a run schedule by its active name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return self._delete(
+            path_template("/agents/{agent_id}/schedules/name/{name}", agent_id=agent_id, name=name),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=DeleteResponse,
+        )
+
+    def pause(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        note: Optional[str] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> SchedulePauseResponse:
+        """
+        Pause a run schedule by its active name.
+
+        Args:
+          note: Optional note explaining the pause.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return self._post(
+            path_template("/agents/{agent_id}/schedules/name/{name}/pause", agent_id=agent_id, name=name),
+            body=maybe_transform({"note": note}, schedule_pause_params.SchedulePauseParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=SchedulePauseResponse,
+        )
+
+    def trigger(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleTriggerResponse:
+        """
+        Trigger an immediate, out-of-band run of the schedule by its active name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return self._post(
+            path_template("/agents/{agent_id}/schedules/name/{name}/trigger", agent_id=agent_id, name=name),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleTriggerResponse,
         )
 
 
@@ -270,6 +422,42 @@ class AsyncSchedulesResource(AsyncAPIResource):
             cast_to=ScheduleCreateResponse,
         )
 
+    async def retrieve(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleRetrieveResponse:
+        """
+        Get a run schedule by its active name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return await self._get(
+            path_template("/agents/{agent_id}/schedules/name/{name}", agent_id=agent_id, name=name),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleRetrieveResponse,
+        )
+
     async def list(
         self,
         agent_id: str,
@@ -308,6 +496,118 @@ class AsyncSchedulesResource(AsyncAPIResource):
             cast_to=ScheduleListResponse,
         )
 
+    async def delete(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> DeleteResponse:
+        """
+        Delete a run schedule by its active name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return await self._delete(
+            path_template("/agents/{agent_id}/schedules/name/{name}", agent_id=agent_id, name=name),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=DeleteResponse,
+        )
+
+    async def pause(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        note: Optional[str] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> SchedulePauseResponse:
+        """
+        Pause a run schedule by its active name.
+
+        Args:
+          note: Optional note explaining the pause.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return await self._post(
+            path_template("/agents/{agent_id}/schedules/name/{name}/pause", agent_id=agent_id, name=name),
+            body=await async_maybe_transform({"note": note}, schedule_pause_params.SchedulePauseParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=SchedulePauseResponse,
+        )
+
+    async def trigger(
+        self,
+        name: str,
+        *,
+        agent_id: str,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleTriggerResponse:
+        """
+        Trigger an immediate, out-of-band run of the schedule by its active name.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not name:
+            raise ValueError(f"Expected a non-empty value for `name` but received {name!r}")
+        return await self._post(
+            path_template("/agents/{agent_id}/schedules/name/{name}/trigger", agent_id=agent_id, name=name),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleTriggerResponse,
+        )
+
 
 class SchedulesResourceWithRawResponse:
     def __init__(self, schedules: SchedulesResource) -> None:
@@ -316,8 +616,20 @@ class SchedulesResourceWithRawResponse:
         self.create = to_raw_response_wrapper(
             schedules.create,
         )
+        self.retrieve = to_raw_response_wrapper(
+            schedules.retrieve,
+        )
         self.list = to_raw_response_wrapper(
             schedules.list,
+        )
+        self.delete = to_raw_response_wrapper(
+            schedules.delete,
+        )
+        self.pause = to_raw_response_wrapper(
+            schedules.pause,
+        )
+        self.trigger = to_raw_response_wrapper(
+            schedules.trigger,
         )
 
 
@@ -328,8 +640,20 @@ class AsyncSchedulesResourceWithRawResponse:
         self.create = async_to_raw_response_wrapper(
             schedules.create,
         )
+        self.retrieve = async_to_raw_response_wrapper(
+            schedules.retrieve,
+        )
         self.list = async_to_raw_response_wrapper(
             schedules.list,
+        )
+        self.delete = async_to_raw_response_wrapper(
+            schedules.delete,
+        )
+        self.pause = async_to_raw_response_wrapper(
+            schedules.pause,
+        )
+        self.trigger = async_to_raw_response_wrapper(
+            schedules.trigger,
         )
 
 
@@ -340,8 +664,20 @@ class SchedulesResourceWithStreamingResponse:
         self.create = to_streamed_response_wrapper(
             schedules.create,
         )
+        self.retrieve = to_streamed_response_wrapper(
+            schedules.retrieve,
+        )
         self.list = to_streamed_response_wrapper(
             schedules.list,
+        )
+        self.delete = to_streamed_response_wrapper(
+            schedules.delete,
+        )
+        self.pause = to_streamed_response_wrapper(
+            schedules.pause,
+        )
+        self.trigger = to_streamed_response_wrapper(
+            schedules.trigger,
         )
 
 
@@ -352,6 +688,18 @@ class AsyncSchedulesResourceWithStreamingResponse:
         self.create = async_to_streamed_response_wrapper(
             schedules.create,
         )
+        self.retrieve = async_to_streamed_response_wrapper(
+            schedules.retrieve,
+        )
         self.list = async_to_streamed_response_wrapper(
             schedules.list,
+        )
+        self.delete = async_to_streamed_response_wrapper(
+            schedules.delete,
+        )
+        self.pause = async_to_streamed_response_wrapper(
+            schedules.pause,
+        )
+        self.trigger = async_to_streamed_response_wrapper(
+            schedules.trigger,
         )
