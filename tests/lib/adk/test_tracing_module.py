@@ -321,6 +321,34 @@ class TestTurnSpan:
         assert ended_span.data["custom"] == "value"
         assert ended_span.data["usage"] == {"prompt_tokens": 3, "completion_tokens": 4}
 
+    async def test_turn_span_warns_and_replaces_non_dict_data(self, caplog):
+        mock_service, module = _make_module()
+        started = _make_span(data=[{"item": 1}])
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                with caplog.at_level("WARNING"):
+                    turn.record_usage(usage={"input_tokens": 1, "output_tokens": 2})
+
+        assert any("existing data will be replaced" in message for message in caplog.messages)
+        ended_span = mock_service.end_span.call_args.kwargs["span"]
+        assert ended_span.data == {"usage": {"input_tokens": 1, "output_tokens": 2}}
+
+    async def test_turn_span_dict_data_does_not_warn(self, caplog):
+        mock_service, module = _make_module()
+        started = _make_span(data={"custom": "value"})
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                with caplog.at_level("WARNING"):
+                    turn.record_usage(usage={"input_tokens": 1})
+
+        assert not any("existing data will be replaced" in message for message in caplog.messages)
+
     async def test_turn_span_cost_only(self):
         mock_service, module = _make_module()
         started = _make_span()

@@ -93,6 +93,11 @@ class TurnSpan:
             )
         )
 
+        if self.span.data is not None and not isinstance(self.span.data, dict):
+            logger.warning(
+                f"TurnSpan.record_usage: span.data is {type(self.span.data).__name__} "
+                "(expected dict or None); existing data will be replaced."
+            )
         data = self.span.data if isinstance(self.span.data, dict) else {}
         if blob:
             data["usage"] = blob
