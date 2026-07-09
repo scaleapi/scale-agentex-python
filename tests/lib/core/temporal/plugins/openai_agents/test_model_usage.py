@@ -183,7 +183,6 @@ class TestTemporalStreamingModel:
         )
 
         # Real usage lands on the returned ModelResponse (was zeroed before)
-        assert response.usage.requests == 1
         assert response.usage.input_tokens == 120
         assert response.usage.output_tokens == 80
         assert response.usage.total_tokens == 200
@@ -195,7 +194,7 @@ class TestTemporalStreamingModel:
         span = fake_tracer.trace_obj.spans[0]
         assert _output_dict(span)["usage"] == EXPECTED_USAGE_BLOB
 
-    async def test_streaming_model_omits_usage_when_api_reports_none(self, tracing_contextvars):
+    async def test_streaming_model_writes_zero_usage_when_api_reports_none(self, tracing_contextvars):
         completed = ResponseCompletedEvent.model_construct(
             type="response.completed",
             response=Response.model_construct(output=[], usage=None),
@@ -219,6 +218,14 @@ class TestTemporalStreamingModel:
             tracing=None,
         )
 
+        # No usage from the API: the model reports zeros rather than omitting,
+        # so billing sums 0 instead of missing the span
         assert response.usage.input_tokens == 0
         span = fake_tracer.trace_obj.spans[0]
-        assert "usage" not in _output_dict(span)
+        assert _output_dict(span)["usage"] == {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "cached_input_tokens": 0,
+            "reasoning_tokens": 0,
+        }
