@@ -7,10 +7,10 @@ from typing_extensions import Literal
 from ..._models import BaseModel
 from ..message_author import MessageAuthor
 
-__all__ = ["ScheduleListResponse", "RunSchedule", "RunScheduleInitialInput", "RunScheduleCreatorPrincipal"]
+__all__ = ["ScheduleRetrieveByNameResponse", "InitialInput", "CreatorPrincipal"]
 
 
-class RunScheduleInitialInput(BaseModel):
+class InitialInput(BaseModel):
     """The initial input."""
 
     content: str
@@ -23,7 +23,7 @@ class RunScheduleInitialInput(BaseModel):
     """Input content type."""
 
 
-class RunScheduleCreatorPrincipal(BaseModel):
+class CreatorPrincipal(BaseModel):
     """Credential-free creator identity stored with the schedule.
 
     Never carries cookies, JWTs, API keys, OAuth tokens, or request headers — it
@@ -43,7 +43,7 @@ class RunScheduleCreatorPrincipal(BaseModel):
     """Creator user id, if a user principal."""
 
 
-class RunSchedule(BaseModel):
+class ScheduleRetrieveByNameResponse(BaseModel):
     """Response model describing a scheduled agent run."""
 
     id: str
@@ -52,7 +52,7 @@ class RunSchedule(BaseModel):
     agent_id: str
     """The agent this schedule belongs to."""
 
-    initial_input: RunScheduleInitialInput
+    initial_input: InitialInput
     """The initial input."""
 
     initial_input_method: str
@@ -64,7 +64,7 @@ class RunSchedule(BaseModel):
     created_at: Optional[datetime] = None
     """When the schedule was created."""
 
-    creator_principal: Optional[RunScheduleCreatorPrincipal] = None
+    creator_principal: Optional[CreatorPrincipal] = None
     """Credential-free creator identity stored with the schedule.
 
     Never carries cookies, JWTs, API keys, OAuth tokens, or request headers — it is
@@ -115,13 +115,3 @@ class RunSchedule(BaseModel):
 
     updated_at: Optional[datetime] = None
     """When the schedule was updated."""
-
-
-class ScheduleListResponse(BaseModel):
-    """Response model for listing run schedules."""
-
-    run_schedules: List[RunSchedule]
-    """The list of run schedules."""
-
-    total: int
-    """The number of run schedules returned."""

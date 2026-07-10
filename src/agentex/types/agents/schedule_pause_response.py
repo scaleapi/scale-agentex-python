@@ -1,78 +1,117 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime
 from typing_extensions import Literal
 
 from ..._models import BaseModel
+from ..message_author import MessageAuthor
 
-__all__ = ["SchedulePauseResponse", "Action", "Spec"]
-
-
-class Action(BaseModel):
-    """Information about the scheduled action"""
-
-    task_queue: str
-    """Task queue for the workflow"""
-
-    workflow_id_prefix: str
-    """Prefix for workflow execution IDs"""
-
-    workflow_name: str
-    """Name of the workflow being executed"""
-
-    workflow_params: Optional[List[object]] = None
-    """Parameters passed to the workflow"""
+__all__ = ["SchedulePauseResponse", "InitialInput", "CreatorPrincipal"]
 
 
-class Spec(BaseModel):
-    """Schedule specification"""
+class InitialInput(BaseModel):
+    """The initial input."""
 
-    cron_expressions: Optional[List[str]] = None
-    """Cron expressions for the schedule"""
+    content: str
+    """The initial prompt delivered to the task."""
 
-    end_at: Optional[datetime] = None
-    """When the schedule stops being active"""
+    author: Optional[MessageAuthor] = None
+    """The author attributed to the initial input."""
 
-    intervals_seconds: Optional[List[int]] = None
-    """Interval specifications in seconds"""
+    type: Optional[Literal["text"]] = None
+    """Input content type."""
 
-    start_at: Optional[datetime] = None
-    """When the schedule starts being active"""
+
+class CreatorPrincipal(BaseModel):
+    """Credential-free creator identity stored with the schedule.
+
+    Never carries cookies, JWTs, API keys, OAuth tokens, or request headers — it
+    is creator *context* used only for AuthZ and ownership at fire time.
+    """
+
+    account_id: Optional[str] = None
+    """Account/workspace id of the creator."""
+
+    principal_type: Optional[str] = None
+    """e.g. 'user' or 'service_account'."""
+
+    service_account_id: Optional[str] = None
+    """Creator service-account id, if a service principal."""
+
+    user_id: Optional[str] = None
+    """Creator user id, if a user principal."""
 
 
 class SchedulePauseResponse(BaseModel):
-    """Response model for schedule operations"""
+    """Response model describing a scheduled agent run."""
 
-    action: Action
-    """Information about the scheduled action"""
+    id: str
+    """The unique identifier of the run schedule."""
 
     agent_id: str
-    """ID of the agent this schedule belongs to"""
+    """The agent this schedule belongs to."""
+
+    initial_input: InitialInput
+    """The initial input."""
+
+    initial_input_method: str
+    """Delivery method, inferred from the agent's ACP type."""
 
     name: str
-    """Human-readable name for the schedule"""
-
-    schedule_id: str
-    """Unique identifier for the schedule"""
-
-    spec: Spec
-    """Schedule specification"""
-
-    state: Literal["ACTIVE", "PAUSED"]
-    """Current state of the schedule"""
+    """Human-readable schedule name."""
 
     created_at: Optional[datetime] = None
-    """When the schedule was created"""
+    """When the schedule was created."""
+
+    creator_principal: Optional[CreatorPrincipal] = None
+    """Credential-free creator identity stored with the schedule.
+
+    Never carries cookies, JWTs, API keys, OAuth tokens, or request headers — it is
+    creator _context_ used only for AuthZ and ownership at fire time.
+    """
+
+    cron_expression: Optional[str] = None
+    """Cron cadence, if cron-based."""
+
+    description: Optional[str] = None
+    """Optional description."""
+
+    end_at: Optional[datetime] = None
+    """Schedule deactivation time."""
+
+    interval_seconds: Optional[int] = None
+    """Interval cadence in seconds, if interval-based."""
 
     last_action_time: Optional[datetime] = None
-    """When the schedule last executed"""
+    """When the schedule last fired."""
 
     next_action_times: Optional[List[datetime]] = None
-    """Upcoming scheduled execution times"""
-
-    num_actions_missed: Optional[int] = None
-    """Number of scheduled executions that were missed"""
+    """Upcoming scheduled fire times."""
 
     num_actions_taken: Optional[int] = None
-    """Number of times the schedule has executed"""
+    """Number of times the schedule has fired."""
+
+    paused: Optional[bool] = None
+    """Whether the schedule is paused."""
+
+    skipped_action_times: Optional[List[datetime]] = None
+    """Skipped one-off scheduled fire times."""
+
+    start_at: Optional[datetime] = None
+    """Schedule activation time."""
+
+    state: Optional[Literal["ACTIVE", "PAUSED"]] = None
+    """Live schedule state from Temporal."""
+
+    task_metadata: Optional[Dict[str, object]] = None
+    """Task metadata at fire time."""
+
+    task_params: Optional[Dict[str, object]] = None
+    """Task params at fire time."""
+
+    timezone: Optional[str] = None
+    """Timezone the cron expression is evaluated in."""
+
+    updated_at: Optional[datetime] = None
+    """When the schedule was updated."""

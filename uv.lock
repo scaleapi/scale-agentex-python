@@ -15,7 +15,7 @@ members = [
 
 [[package]]
 name = "agentex-client"
-version = "0.13.0"
+version = "0.17.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
@@ -91,7 +91,7 @@ dev = [
 
 [[package]]
 name = "agentex-sdk"
-version = "0.13.0"
+version = "0.17.0"
 source = { editable = "adk" }
 dependencies = [
     { name = "agentex-client" },
@@ -144,7 +144,7 @@ requires-dist = [
     { name = "langgraph-checkpoint", specifier = ">=2.0.0" },
     { name = "litellm", specifier = ">=1.83.7,<2" },
     { name = "mcp", specifier = ">=1.4.1" },
-    { name = "openai", specifier = ">=2.2,<3" },
+    { name = "openai", specifier = ">=2.2,<2.45" },
     { name = "openai-agents", specifier = ">=0.14.3,<0.15" },
     { name = "opentelemetry-api", specifier = ">=1.20.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.20.0" },

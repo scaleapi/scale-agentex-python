@@ -8,4 +8,4 @@ __all__ = ["ScheduleListParams"]
 
 
 class ScheduleListParams(TypedDict, total=False):
-    page_size: int
+    limit: int
