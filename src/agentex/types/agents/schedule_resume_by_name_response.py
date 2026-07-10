@@ -95,6 +95,9 @@ class ScheduleResumeByNameResponse(BaseModel):
     paused: Optional[bool] = None
     """Whether the schedule is paused."""
 
+    skipped_action_times: Optional[List[datetime]] = None
+    """Skipped one-off scheduled fire times."""
+
     start_at: Optional[datetime] = None
     """Schedule activation time."""
 
