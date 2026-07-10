@@ -76,8 +76,10 @@ from agentex.types.agents import (
     ScheduleResumeResponse,
     ScheduleResumeByNameResponse,
     ScheduleRetrieveByNameResponse,
+    ScheduleSkipResponse,
     ScheduleTriggerResponse,
     ScheduleTriggerByNameResponse,
+    ScheduleUnskipResponse,
     ScheduleUpdateByNameResponse,
 )
 ```
@@ -95,8 +97,10 @@ Methods:
 - <code title="post /agents/{agent_id}/schedules/{schedule_id}/resume">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">resume</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_resume_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_resume_response.py">ScheduleResumeResponse</a></code>
 - <code title="post /agents/{agent_id}/schedules/name/{name}/resume">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">resume_by_name</a>(name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_resume_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_resume_by_name_response.py">ScheduleResumeByNameResponse</a></code>
 - <code title="get /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">retrieve_by_name</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_retrieve_by_name_response.py">ScheduleRetrieveByNameResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/skip">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">skip</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_skip_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_skip_response.py">ScheduleSkipResponse</a></code>
 - <code title="post /agents/{agent_id}/schedules/{schedule_id}/trigger">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">trigger</a>(schedule_id, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_trigger_response.py">ScheduleTriggerResponse</a></code>
 - <code title="post /agents/{agent_id}/schedules/name/{name}/trigger">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">trigger_by_name</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_trigger_by_name_response.py">ScheduleTriggerByNameResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/unskip">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">unskip</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_unskip_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_unskip_response.py">ScheduleUnskipResponse</a></code>
 - <code title="patch /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">update_by_name</a>(path_name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_update_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_update_by_name_response.py">ScheduleUpdateByNameResponse</a></code>
 
 # Tasks
