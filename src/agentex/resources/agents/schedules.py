@@ -20,9 +20,11 @@ from ..._response import (
 from ..._base_client import make_request_options
 from ...types.agents import (
     schedule_list_params,
+    schedule_skip_params,
     schedule_pause_params,
     schedule_create_params,
     schedule_resume_params,
+    schedule_unskip_params,
     schedule_update_params,
     schedule_pause_by_name_params,
     schedule_resume_by_name_params,
@@ -30,9 +32,11 @@ from ...types.agents import (
 )
 from ...types.shared.delete_response import DeleteResponse
 from ...types.agents.schedule_list_response import ScheduleListResponse
+from ...types.agents.schedule_skip_response import ScheduleSkipResponse
 from ...types.agents.schedule_pause_response import SchedulePauseResponse
 from ...types.agents.schedule_create_response import ScheduleCreateResponse
 from ...types.agents.schedule_resume_response import ScheduleResumeResponse
+from ...types.agents.schedule_unskip_response import ScheduleUnskipResponse
 from ...types.agents.schedule_update_response import ScheduleUpdateResponse
 from ...types.agents.schedule_trigger_response import ScheduleTriggerResponse
 from ...types.agents.schedule_retrieve_response import ScheduleRetrieveResponse
@@ -579,6 +583,48 @@ class SchedulesResource(SyncAPIResource):
             cast_to=ScheduleRetrieveByNameResponse,
         )
 
+    def skip(
+        self,
+        schedule_id: str,
+        *,
+        agent_id: str,
+        scheduled_time: Union[str, datetime],
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleSkipResponse:
+        """
+        Skip a recurring fire of the schedule.
+
+        Args:
+          scheduled_time: Specific scheduled fire time to skip.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not schedule_id:
+            raise ValueError(f"Expected a non-empty value for `schedule_id` but received {schedule_id!r}")
+        return self._post(
+            path_template(
+                "/agents/{agent_id}/schedules/{schedule_id}/skip", agent_id=agent_id, schedule_id=schedule_id
+            ),
+            body=maybe_transform({"scheduled_time": scheduled_time}, schedule_skip_params.ScheduleSkipParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleSkipResponse,
+        )
+
     def trigger(
         self,
         schedule_id: str,
@@ -652,6 +698,48 @@ class SchedulesResource(SyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=ScheduleTriggerByNameResponse,
+        )
+
+    def unskip(
+        self,
+        schedule_id: str,
+        *,
+        agent_id: str,
+        scheduled_time: Union[str, datetime],
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleUnskipResponse:
+        """
+        Remove a skip for a recurring fire of the schedule.
+
+        Args:
+          scheduled_time: Specific scheduled fire time to unskip.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not schedule_id:
+            raise ValueError(f"Expected a non-empty value for `schedule_id` but received {schedule_id!r}")
+        return self._post(
+            path_template(
+                "/agents/{agent_id}/schedules/{schedule_id}/unskip", agent_id=agent_id, schedule_id=schedule_id
+            ),
+            body=maybe_transform({"scheduled_time": scheduled_time}, schedule_unskip_params.ScheduleUnskipParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleUnskipResponse,
         )
 
     def update_by_name(
@@ -1274,6 +1362,50 @@ class AsyncSchedulesResource(AsyncAPIResource):
             cast_to=ScheduleRetrieveByNameResponse,
         )
 
+    async def skip(
+        self,
+        schedule_id: str,
+        *,
+        agent_id: str,
+        scheduled_time: Union[str, datetime],
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleSkipResponse:
+        """
+        Skip a recurring fire of the schedule.
+
+        Args:
+          scheduled_time: Specific scheduled fire time to skip.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not schedule_id:
+            raise ValueError(f"Expected a non-empty value for `schedule_id` but received {schedule_id!r}")
+        return await self._post(
+            path_template(
+                "/agents/{agent_id}/schedules/{schedule_id}/skip", agent_id=agent_id, schedule_id=schedule_id
+            ),
+            body=await async_maybe_transform(
+                {"scheduled_time": scheduled_time}, schedule_skip_params.ScheduleSkipParams
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleSkipResponse,
+        )
+
     async def trigger(
         self,
         schedule_id: str,
@@ -1347,6 +1479,50 @@ class AsyncSchedulesResource(AsyncAPIResource):
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
             cast_to=ScheduleTriggerByNameResponse,
+        )
+
+    async def unskip(
+        self,
+        schedule_id: str,
+        *,
+        agent_id: str,
+        scheduled_time: Union[str, datetime],
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> ScheduleUnskipResponse:
+        """
+        Remove a skip for a recurring fire of the schedule.
+
+        Args:
+          scheduled_time: Specific scheduled fire time to unskip.
+
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not agent_id:
+            raise ValueError(f"Expected a non-empty value for `agent_id` but received {agent_id!r}")
+        if not schedule_id:
+            raise ValueError(f"Expected a non-empty value for `schedule_id` but received {schedule_id!r}")
+        return await self._post(
+            path_template(
+                "/agents/{agent_id}/schedules/{schedule_id}/unskip", agent_id=agent_id, schedule_id=schedule_id
+            ),
+            body=await async_maybe_transform(
+                {"scheduled_time": scheduled_time}, schedule_unskip_params.ScheduleUnskipParams
+            ),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=ScheduleUnskipResponse,
         )
 
     async def update_by_name(
@@ -1472,11 +1648,17 @@ class SchedulesResourceWithRawResponse:
         self.retrieve_by_name = to_raw_response_wrapper(
             schedules.retrieve_by_name,
         )
+        self.skip = to_raw_response_wrapper(
+            schedules.skip,
+        )
         self.trigger = to_raw_response_wrapper(
             schedules.trigger,
         )
         self.trigger_by_name = to_raw_response_wrapper(
             schedules.trigger_by_name,
+        )
+        self.unskip = to_raw_response_wrapper(
+            schedules.unskip,
         )
         self.update_by_name = to_raw_response_wrapper(
             schedules.update_by_name,
@@ -1520,11 +1702,17 @@ class AsyncSchedulesResourceWithRawResponse:
         self.retrieve_by_name = async_to_raw_response_wrapper(
             schedules.retrieve_by_name,
         )
+        self.skip = async_to_raw_response_wrapper(
+            schedules.skip,
+        )
         self.trigger = async_to_raw_response_wrapper(
             schedules.trigger,
         )
         self.trigger_by_name = async_to_raw_response_wrapper(
             schedules.trigger_by_name,
+        )
+        self.unskip = async_to_raw_response_wrapper(
+            schedules.unskip,
         )
         self.update_by_name = async_to_raw_response_wrapper(
             schedules.update_by_name,
@@ -1568,11 +1756,17 @@ class SchedulesResourceWithStreamingResponse:
         self.retrieve_by_name = to_streamed_response_wrapper(
             schedules.retrieve_by_name,
         )
+        self.skip = to_streamed_response_wrapper(
+            schedules.skip,
+        )
         self.trigger = to_streamed_response_wrapper(
             schedules.trigger,
         )
         self.trigger_by_name = to_streamed_response_wrapper(
             schedules.trigger_by_name,
+        )
+        self.unskip = to_streamed_response_wrapper(
+            schedules.unskip,
         )
         self.update_by_name = to_streamed_response_wrapper(
             schedules.update_by_name,
@@ -1616,11 +1810,17 @@ class AsyncSchedulesResourceWithStreamingResponse:
         self.retrieve_by_name = async_to_streamed_response_wrapper(
             schedules.retrieve_by_name,
         )
+        self.skip = async_to_streamed_response_wrapper(
+            schedules.skip,
+        )
         self.trigger = async_to_streamed_response_wrapper(
             schedules.trigger,
         )
         self.trigger_by_name = async_to_streamed_response_wrapper(
             schedules.trigger_by_name,
+        )
+        self.unskip = async_to_streamed_response_wrapper(
+            schedules.unskip,
         )
         self.update_by_name = async_to_streamed_response_wrapper(
             schedules.update_by_name,
