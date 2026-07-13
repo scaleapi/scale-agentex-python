@@ -1,11 +1,4 @@
-"""Client-attested build provenance capture (AGX1-418).
-
-The single producer of source identity for agent builds: git coordinates plus a
-deterministic content hash of the build context. Every build path (CLI, sgpctl,
-CI) imports this so capture logic and the ``working_tree_hash`` definition live
-in exactly one place. Capture is best-effort — a missing/odd git state degrades
-to nulls and never raises into a build.
-"""
+"""Capture client-attested source identity without failing agent builds."""
 
 from __future__ import annotations
 
@@ -28,14 +21,7 @@ _HASH_CHUNK_BYTES = 1 << 20
 
 @dataclass(frozen=True)
 class BuildProvenance:
-    """Source identity for one build; every field degrades to ``None``.
-
-    ``working_tree_hash`` is the deterministic content hash of the build context
-    and is always computed — it identifies the exact bytes that shipped,
-    independent of git state. ``commit`` (+ ``ref`` / ``repo``) anchor those bytes
-    to source, and ``dirty`` records whether the work tree had uncommitted changes
-    at build time (``None`` outside a git work tree).
-    """
+    """Source identity for one build; unavailable fields degrade to ``None``."""
 
     repo: Optional[str] = None
     commit: Optional[str] = None
@@ -60,13 +46,7 @@ class BuildProvenance:
         return {key: value for key, value in fields.items() if value is not None}
 
     def build_info(self) -> dict[str, object]:
-        """The ``build-info.json`` payload (runtime ``registration_metadata``).
-
-        Overlapping keys match the server's ``DeploymentHistory`` type
-        (``commit_hash`` / ``branch_name`` / ``author_*`` / ``build_timestamp``),
-        which is populated from ``registration_metadata``; the rest are the
-        provenance-specific coordinates.
-        """
+        """Return provenance using the runtime registration metadata field names."""
         info = {
             "repo": self.repo,
             "commit_hash": self.commit,
@@ -99,12 +79,7 @@ def _git(repo_root: Path, *args: str) -> Optional[str]:
 
 
 def normalize_remote(url: Optional[str]) -> Optional[str]:
-    """Canonicalize a git remote to ``host/path`` — credentials and scheme stripped.
-
-    ``git@github.com:org/repo.git`` and ``https://x:tok@github.com/org/repo.git``
-    both normalize to ``github.com/org/repo``. Host is lowercased; path casing is
-    preserved (repo paths can be case-significant).
-    """
+    """Strip credentials and scheme from a remote, returning ``host/path``."""
     if not url:
         return None
     candidate = url.strip()
@@ -133,11 +108,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def iter_context_files(root: Path) -> list[Path]:
-    """Files (and symlinks) under ``root``, sorted by POSIX relpath.
-
-    The canonical, order-stable enumeration shared by the content hash and the
-    archive packer so the two can never drift on which files they cover.
-    """
+    """Return files and symlinks under ``root``, sorted by POSIX relative path."""
     return sorted(
         (path for path in root.rglob("*") if path.is_symlink() or path.is_file()),
         key=lambda path: path.relative_to(root).as_posix(),
@@ -145,13 +116,7 @@ def iter_context_files(root: Path) -> list[Path]:
 
 
 def working_tree_hash(root: Path) -> str:
-    """Deterministic content hash of the build context at ``root``.
-
-    sha256 over the sorted ``(relpath, normalized mode, content digest)`` of every
-    file — the build *inputs*, not the tarball (tar/gzip framing is
-    non-deterministic and would defeat dedupe). Mode is normalized to the
-    executable bit; symlinks hash their target string, not the resolved content.
-    """
+    """Hash sorted build inputs, normalized modes, and symlink target strings."""
     lines: list[str] = []
     for path in iter_context_files(root):
         relpath = path.relative_to(root).as_posix()
@@ -167,11 +132,7 @@ def working_tree_hash(root: Path) -> str:
 
 
 def _safe_working_tree_hash(root: Path) -> Optional[str]:
-    """``working_tree_hash`` that degrades to None — capture must never fail a build.
-
-    A permission error or filesystem race during the walk/stat/read would otherwise
-    raise out of capture and abort the build before the archive is even created.
-    """
+    """Compute the context hash without allowing capture to fail a build."""
     try:
         return working_tree_hash(root)
     except Exception:
@@ -182,15 +143,7 @@ def _safe_working_tree_hash(root: Path) -> Optional[str]:
 def capture_build_provenance(
     repo_path: Path, context_root: Path, content_root: Optional[Path] = None
 ) -> BuildProvenance:
-    """Capture source identity for a build of ``context_root``.
-
-    ``repo_path`` is where git is interrogated and ``subpath`` is ``context_root``
-    relative to the repo root (which agent, in a monorepo). ``content_root`` is
-    the directory hashed — the *staged*, post-``.dockerignore`` tree that actually
-    ships; it defaults to ``context_root`` when there is no separate staging dir.
-    ``working_tree_hash`` is always computed; git coordinates anchor it to source
-    when available.
-    """
+    """Capture git coordinates and the staged build-context hash."""
     timestamp = datetime.now(timezone.utc).isoformat()
     hash_root = content_root if content_root is not None else context_root
     tree_hash = _safe_working_tree_hash(hash_root)
