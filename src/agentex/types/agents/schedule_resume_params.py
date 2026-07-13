@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Optional
 from typing_extensions import Required, TypedDict
 
-__all__ = ["SchedulePauseParams"]
+__all__ = ["ScheduleResumeParams"]
 
 
-class SchedulePauseParams(TypedDict, total=False):
+class ScheduleResumeParams(TypedDict, total=False):
     agent_id: Required[str]
 
     note: Optional[str]
-    """Optional note explaining the pause."""
+    """Optional note explaining the resume."""

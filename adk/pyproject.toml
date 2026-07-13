@@ -4,7 +4,7 @@
 # (agentex/{__init__.py, _*.py, types/, resources/}) ships from the slim
 # sibling package `agentex-client` which is pinned as a runtime dep.
 name = "agentex-sdk"
-version = "0.17.0"
+version = "0.18.0"
 description = "Agent Development Kit (ADK) overlay for the Agentex API — FastACP server, Temporal workflows, LLM provider integrations, observability"
 license = "Apache-2.0"
 authors = [
@@ -41,7 +41,14 @@ dependencies = [
     # LLM provider integrations
     "litellm>=1.83.7,<2",
     "openai-agents>=0.14.3,<0.15",
-    "openai>=2.2,<3", # Required by openai-agents; litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
+    # Cap <2.45: openai 2.45.0 makes InputTokensDetails.cache_write_tokens a
+    # required field, but openai-agents 0.14.x still builds
+    # InputTokensDetails(cached_tokens=0) (agents/usage.py), so every
+    # Runner.run_streamed raises a pydantic ValidationError at context setup.
+    # openai-agents 0.14.8 is the latest release, so there is no newer version
+    # to bump to; drop this ceiling once openai-agents ships a fix.
+    # litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
+    "openai>=2.2,<2.45",
     "claude-agent-sdk>=0.1.0",
     "pydantic-ai-slim>=1.0,<2",
     "langgraph-checkpoint>=2.0.0",

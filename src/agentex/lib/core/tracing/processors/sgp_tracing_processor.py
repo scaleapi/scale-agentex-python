@@ -15,6 +15,7 @@ from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.observability import tracing_metrics_recording as _metrics
 from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.tracing.span_error import get_span_error
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     SyncTracingProcessor,
     AsyncTracingProcessor,
@@ -83,6 +84,9 @@ def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:
         ),
     )
     sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]
+    error = get_span_error(span)
+    if error is not None:
+        sgp_span.set_error(error_type=error["type"], error_message=error["message"])
     return sgp_span
 
 

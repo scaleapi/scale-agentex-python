@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.18.0 (2026-07-10)
+
+Full Changelog: [agentex-sdk-v0.17.0...agentex-sdk-v0.18.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.17.0...agentex-sdk-v0.18.0)
+
+### Bug Fixes
+
+* cap openai &lt;2.45 for openai-agents 0.14.x compatibility ([#459](https://github.com/scaleapi/scale-agentex-python/issues/459)) ([14c124d](https://github.com/scaleapi/scale-agentex-python/commit/14c124d363ed964ed8c08e10a95ca3939095ea92))
+
+
+### Chores
+
+* **internal:** version bump ([7aeb893](https://github.com/scaleapi/scale-agentex-python/commit/7aeb8937bb794586f7d5931bdc5964d007762b4c))
+* **internal:** version bump ([fcddeea](https://github.com/scaleapi/scale-agentex-python/commit/fcddeea8ef4bdff0a5f7735156c3003166464eac))
+
 ## 0.17.0 (2026-07-01)
 
 Full Changelog: [agentex-sdk-v0.16.2...agentex-sdk-v0.17.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.16.2...agentex-sdk-v0.17.0)
