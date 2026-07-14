@@ -61,9 +61,6 @@ from agentex.lib.core.temporal.plugins.openai_agents.hooks.hooks import (
 from agentex.lib.core.temporal.plugins.openai_agents.hooks.activities import (
     stream_lifecycle_content,
 )
-from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_tracing_model import (
-    TemporalTracingModelProvider,
-)
 from agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model import (
     TemporalStreamingModel,
     TemporalStreamingModelProvider,
@@ -78,7 +75,6 @@ from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interc
 __all__ = [
     "TemporalStreamingModel",
     "TemporalStreamingModelProvider",
-    "TemporalTracingModelProvider",
     "ContextInterceptor",
     "streaming_task_id",
     "streaming_trace_id",
