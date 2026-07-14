@@ -11,6 +11,7 @@ from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
+from agentex.lib.core.tracing.span_error import set_span_error
 from agentex.lib.core.tracing.span_queue import (
     SpanEventType,
     AsyncSpanQueue,
@@ -165,6 +166,9 @@ class Trace:
         span = self.start_span(name, parent_id, input, data, task_id=task_id)
         try:
             yield span
+        except Exception as exc:
+            set_span_error(span, exc)
+            raise
         finally:
             self.end_span(span)
 
@@ -321,5 +325,8 @@ class AsyncTrace:
         span = await self.start_span(name, parent_id, input, data, task_id=task_id)
         try:
             yield span
+        except Exception as exc:
+            set_span_error(span, exc)
+            raise
         finally:
             await self.end_span(span)
