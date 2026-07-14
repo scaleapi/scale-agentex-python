@@ -171,8 +171,10 @@ def capture_build_provenance(
     except ValueError:
         subpath = None
 
-    # `git status --porcelain` is empty (→ _git returns None) for a clean tree.
-    dirty = _git(repo_root_path, "status", "--porcelain") is not None
+    status_args = ("status", "--porcelain")
+    if subpath is not None:
+        status_args += ("--", subpath)
+    dirty = _git(repo_root_path, *status_args) is not None
 
     return BuildProvenance(
         repo=remote,

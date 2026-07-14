@@ -243,3 +243,15 @@ def test_capture_monorepo_subpath(tmp_path: Path) -> None:
     prov = capture_build_provenance(repo, repo / "agents" / "foo")
 
     assert prov.subpath == "agents/foo"
+
+
+def test_capture_monorepo_ignores_changes_outside_context(tmp_path: Path) -> None:
+    repo = _init_repo(tmp_path / "repo")
+    _write(repo, "agents/foo/main.py", "print(1)")
+    _write(repo, "agents/bar/main.py", "print(2)")
+    _commit_all(repo)
+    _write(repo, "agents/bar/scratch.py", "debug = True")
+
+    prov = capture_build_provenance(repo, repo / "agents" / "foo")
+
+    assert prov.dirty is False
