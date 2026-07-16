@@ -174,6 +174,53 @@ class TasksModule:
                 parent_span_id=parent_span_id,
             )
 
+    async def interrupt(
+        self,
+        *,
+        task_id: str,
+        reason: str | None = None,
+        trace_id: str | None = None,
+        parent_span_id: str | None = None,
+        start_to_close_timeout: timedelta = timedelta(seconds=5),
+        heartbeat_timeout: timedelta = timedelta(seconds=5),
+        retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
+    ) -> Task:
+        """
+        Mark a running task as interrupted (non-terminal).
+
+        Interrupt is cooperative: an agent calls this from its interrupt handler,
+        after it has actually stopped its in-flight turn, to record INTERRUPTED.
+        The task stays continuable; the control plane resumes it to RUNNING on the
+        next turn.
+        Args:
+            task_id: The ID of the task to interrupt.
+            reason: Optional reason for the interrupt.
+        Returns:
+            The updated task entry.
+        """
+        params = TaskStatusTransitionParams(
+            task_id=task_id,
+            reason=reason,
+            trace_id=trace_id,
+            parent_span_id=parent_span_id,
+        )
+        if in_temporal_workflow():
+            return await ActivityHelpers.execute_activity(
+                activity_name=TasksActivityName.INTERRUPT_TASK,
+                request=params,
+                response_type=Task,
+                start_to_close_timeout=start_to_close_timeout,
+                retry_policy=retry_policy,
+                heartbeat_timeout=heartbeat_timeout,
+            )
+        else:
+            return await self._tasks_service.interrupt_task(
+                task_id=task_id,
+                reason=reason,
+                trace_id=trace_id,
+                parent_span_id=parent_span_id,
+            )
+
     async def complete(
         self,
         *,
