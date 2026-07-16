@@ -109,7 +109,9 @@ class TasksResource(SyncAPIResource):
         order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         relationships: List[Literal["agents"]] | Omit = omit,
-        status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]]
+        status: Optional[
+            Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "INTERRUPTED", "TERMINATED", "TIMED_OUT", "DELETED"]
+        ]
         | Omit = omit,
         task_metadata: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -705,7 +707,9 @@ class AsyncTasksResource(AsyncAPIResource):
         order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         relationships: List[Literal["agents"]] | Omit = omit,
-        status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]]
+        status: Optional[
+            Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "INTERRUPTED", "TERMINATED", "TIMED_OUT", "DELETED"]
+        ]
         | Omit = omit,
         task_metadata: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
