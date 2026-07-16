@@ -281,3 +281,69 @@ class TestClaudeCodeTurnProtocol:
         it1 = turn.events
         it2 = turn.events
         assert it1 is it2
+
+
+# ---------------------------------------------------------------------------
+# Early session_id capture (resume after interrupt)
+# ---------------------------------------------------------------------------
+
+
+class TestClaudeCodeTurnSessionIdCapture:
+    async def test_session_id_from_result_when_turn_completes(self):
+        envelopes = [
+            {"type": "system", "subtype": "init", "session_id": "sess-init"},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "hi"}]}},
+            {"type": "result", "session_id": "sess-final", "usage": {}},
+        ]
+        turn = ClaudeCodeTurn(_aiter(envelopes))
+        await _drain(turn)
+        # Terminal result wins for a fully-completed turn.
+        assert turn.session_id == "sess-final"
+
+    async def test_session_id_from_init_when_interrupted_before_result(self):
+        """No `result` envelope (turn cut short) must still yield a session_id.
+
+        This is the resume fix: capture session_id from the early system/init
+        envelope so an interrupted-before-completion turn stays resumable.
+        """
+        envelopes = [
+            {"type": "system", "subtype": "init", "session_id": "sess-init"},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "partial"}]}},
+            # stream ends here (interrupted) — no result envelope
+        ]
+        turn = ClaudeCodeTurn(_aiter(envelopes))
+        await _drain(turn)
+        assert turn.session_id == "sess-init"
+
+    async def test_session_id_none_when_no_init_or_result(self):
+        envelopes = [
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": "x"}]}},
+        ]
+        turn = ClaudeCodeTurn(_aiter(envelopes))
+        await _drain(turn)
+        assert turn.session_id is None
+
+    async def test_guarded_lines_closes_source_on_early_break(self):
+        """The converter's finally-backstop closes the source stdout iterator.
+
+        Breaking out of the event loop early (as a cancellation/interrupt would)
+        must trigger aclose() on the underlying lines iterator so the CLI stdout
+        handle is not leaked.
+        """
+        closed = {"value": False}
+
+        async def _lines():
+            try:
+                yield {"type": "system", "subtype": "init", "session_id": "sess-init"}
+                yield {"type": "assistant", "message": {"content": [{"type": "text", "text": "a"}]}}
+                yield {"type": "assistant", "message": {"content": [{"type": "text", "text": "b"}]}}
+            finally:
+                closed["value"] = True
+
+        turn = ClaudeCodeTurn(_lines())
+        events = turn.events
+        # Consume only the first event, then close the stream early.
+        async for _ in events:
+            break
+        await events.aclose()
+        assert closed["value"] is True

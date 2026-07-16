@@ -280,3 +280,60 @@ class TestCodexTurnEvents:
         turn = CodexTurn(_aiter(events), model="o4-mini")
         await _collect(turn)
         assert turn.usage().reasoning_tokens == 40
+
+
+# ---------------------------------------------------------------------------
+# Early session_id capture (resume after interrupt)
+# ---------------------------------------------------------------------------
+
+
+class TestCodexTurnSessionIdCapture:
+    async def test_session_id_from_result_when_turn_completes(self) -> None:
+        events = [
+            {"type": "thread.started", "thread_id": "thread-abc"},
+            {"type": "turn.completed", "usage": None},
+        ]
+        turn = CodexTurn(_aiter(events), model="o4-mini")
+        await _collect(turn)
+        # on_result carries session_id from processor.session_id at end of stream.
+        assert turn.session_id == "thread-abc"
+
+    async def test_session_id_from_init_when_interrupted_before_completion(self) -> None:
+        """thread.started must yield session_id even with no turn.completed.
+
+        Mirrors the claude-code early-capture fix: an interrupted-before-completion
+        codex turn never emits turn.completed, so the early thread.started capture
+        is what keeps it resumable.
+        """
+        events = [
+            {"type": "thread.started", "thread_id": "thread-abc"},
+            # stream ends here (interrupted) — no turn.completed
+        ]
+        turn = CodexTurn(_aiter(events), model="o4-mini")
+        await _collect(turn)
+        assert turn.session_id == "thread-abc"
+
+    async def test_session_id_none_without_thread_started(self) -> None:
+        turn = CodexTurn(_aiter([{"type": "turn.completed", "usage": None}]), model="o4-mini")
+        await _collect(turn)
+        assert turn.session_id is None
+
+    async def test_guarded_events_closes_source_on_early_break(self) -> None:
+        closed = {"value": False}
+
+        async def _events():
+            try:
+                yield {"type": "thread.started", "thread_id": "thread-abc"}
+                yield {
+                    "type": "item.completed",
+                    "item": {"id": "m1", "type": "agent_message", "text": "hi"},
+                }
+            finally:
+                closed["value"] = True
+
+        turn = CodexTurn(_events(), model="o4-mini")
+        gen = turn.events
+        async for _ in gen:
+            break
+        await gen.aclose()
+        assert closed["value"] is True

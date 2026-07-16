@@ -18,6 +18,7 @@ class RPCMethod(str, Enum):
     MESSAGE_SEND = "message/send"
     TASK_CANCEL = "task/cancel"
     TASK_CREATE = "task/create"
+    TASK_INTERRUPT = "task/interrupt"
 
 
 class CreateTaskParams(BaseModel):
@@ -104,6 +105,28 @@ class CancelTaskParams(BaseModel):
     )
 
 
+class InterruptTaskParams(BaseModel):
+    """Parameters for task/interrupt method.
+
+    Non-terminal counterpart to :class:`CancelTaskParams`. The control plane
+    forwards ``task/interrupt`` to the agent so it can stop the in-flight turn
+    while leaving the task continuable (status ``INTERRUPTED``, not a terminal
+    status). See the interrupt-and-queue design doc, sections 5-7.
+
+    Attributes:
+        agent: The agent that the task was sent to.
+        task: The task that was interrupted.
+        request: Additional request context including headers forwarded to this agent.
+    """
+
+    agent: Agent = Field(..., description="The agent that the task was sent to")
+    task: Task = Field(..., description="The task that was interrupted")
+    request: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional request context including headers forwarded to this agent",
+    )
+
+
 RPC_SYNC_METHODS = [
     RPCMethod.MESSAGE_SEND,
 ]
@@ -113,4 +136,14 @@ PARAMS_MODEL_BY_METHOD: dict[RPCMethod, type[BaseModel]] = {
     RPCMethod.TASK_CANCEL: CancelTaskParams,
     RPCMethod.MESSAGE_SEND: SendMessageParams,
     RPCMethod.TASK_CREATE: CreateTaskParams,
+    RPCMethod.TASK_INTERRUPT: InterruptTaskParams,
 }
+
+# TODO(interrupt): the client-facing REST method ``client.tasks.interrupt(task_id,
+# reason=...)`` plus its param/response types (``task_interrupt_params.py``) and the
+# ``AgentRPCMethod`` union additions are Stainless-GENERATED. They regenerate from the
+# upstream OpenAPI change in scale-agentex (design doc sections 9.1 / 9.2) once
+# ``TASK_INTERRUPT`` and the ``POST /tasks/{task_id}/interrupt`` route land there. Do NOT
+# hand-write them under ``src/agentex/resources/**`` or ``src/agentex/types/**``. The
+# hand-editable protocol shapes above (and the agent-side hook in ``agentex.lib.**``)
+# survive regeneration and are what agents rely on today.
