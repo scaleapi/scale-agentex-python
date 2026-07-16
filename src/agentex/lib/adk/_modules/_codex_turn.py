@@ -160,6 +160,10 @@ class CodexTurn:
 
         # Populated by the on_result callback once the stream is exhausted.
         self._result: dict[str, Any] | None = None
+        # Populated by the on_init callback when thread.started arrives (early),
+        # so session_id is available even if the turn is interrupted before
+        # completion (turn.completed / on_result never fires then).
+        self._init_session_id: str | None = None
         # The events generator is created at most once: ``_raw_events`` is a
         # single-consumption AsyncIterator, so re-wrapping it would yield an
         # already-exhausted stream that fires on_result with zeros and clobbers
@@ -179,21 +183,31 @@ class CodexTurn:
             self._events_gen = convert_codex_to_agentex_events(
                 self._raw_events,
                 on_result=self._on_result,
+                on_init=self._on_init,
             )
         return self._events_gen
 
     def _on_result(self, result: dict[str, Any]) -> None:
         self._result = result
 
+    def _on_init(self, init: dict[str, Any]) -> None:
+        sid = init.get("session_id")
+        if sid:
+            self._init_session_id = sid
+
     @property
     def session_id(self) -> str | None:
         """The codex session id, for resuming a multi-turn session.
 
-        Valid only after ``events`` has been fully consumed (populated by the
-        ``on_result`` callback). Returns ``None`` if the stream is not yet
-        exhausted or codex reported no session id.
+        Prefers the id from the terminal ``turn.completed`` result (fully-complete
+        turn), then falls back to the id captured early from ``thread.started``.
+        The early fallback keeps a turn interrupted before completion resumable
+        (no ``turn.completed`` / ``on_result`` fires then). Returns ``None`` only
+        if neither was seen or codex reported no session id.
         """
-        return self._result.get("session_id") if self._result else None
+        if self._result and self._result.get("session_id"):
+            return self._result.get("session_id")
+        return self._init_session_id
 
     def usage(self) -> TurnUsage:
         """Return normalized ``TurnUsage`` for this turn.

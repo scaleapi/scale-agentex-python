@@ -12,6 +12,16 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.20.0 (2026-07-16)
+
+Full Changelog: [agentex-client-v0.19.0...agentex-client-v0.20.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.19.0...agentex-client-v0.20.0)
+
+### Features
+
+* **api:** add interrupt task ([936a2b1](https://github.com/scaleapi/scale-agentex-python/commit/936a2b1d28a5409bd7548d59b0f18491495c805b))
+* **api:** add task/interrupt method and INTERRUPTED status to agents/tasks ([4f1c093](https://github.com/scaleapi/scale-agentex-python/commit/4f1c09348c2ddffeb8c78738fb9b7aa14ed4b752))
+* **interrupt:** task/interrupt hook + protocol + resume-safe session capture (AGX1-391) ([#462](https://github.com/scaleapi/scale-agentex-python/issues/462)) ([eaa3dd5](https://github.com/scaleapi/scale-agentex-python/commit/eaa3dd526b88c454fc604d0e617f7191b66952bb))
+
 ## 0.19.0 (2026-07-14)
 
 Full Changelog: [agentex-client-v0.18.0...agentex-client-v0.19.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.18.0...agentex-client-v0.19.0)

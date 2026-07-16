@@ -12,6 +12,7 @@ __all__ = [
     "Params",
     "ParamsCreateTaskRequest",
     "ParamsCancelTaskRequest",
+    "ParamsInterruptTaskRequest",
     "ParamsSendMessageRequest",
     "ParamsSendEventRequest",
 ]
@@ -20,7 +21,7 @@ __all__ = [
 class DeploymentPreviewRpcParams(TypedDict, total=False):
     agent_id: Required[str]
 
-    method: Required[Literal["event/send", "task/create", "message/send", "task/cancel"]]
+    method: Required[Literal["event/send", "task/create", "message/send", "task/cancel", "task/interrupt"]]
 
     params: Required[Params]
     """The parameters for the agent RPC request"""
@@ -63,6 +64,14 @@ class ParamsCancelTaskRequest(TypedDict, total=False):
     """The name of the task to cancel. Either this or task_id must be provided."""
 
 
+class ParamsInterruptTaskRequest(TypedDict, total=False):
+    task_id: Optional[str]
+    """The ID of the task to interrupt. Either this or task_name must be provided."""
+
+    task_name: Optional[str]
+    """The name of the task to interrupt. Either this or task_id must be provided."""
+
+
 class ParamsSendMessageRequest(TypedDict, total=False):
     content: Required[TaskMessageContentParam]
     """The message that was sent to the agent"""
@@ -92,5 +101,9 @@ class ParamsSendEventRequest(TypedDict, total=False):
 
 
 Params: TypeAlias = Union[
-    ParamsCreateTaskRequest, ParamsCancelTaskRequest, ParamsSendMessageRequest, ParamsSendEventRequest
+    ParamsCreateTaskRequest,
+    ParamsCancelTaskRequest,
+    ParamsInterruptTaskRequest,
+    ParamsSendMessageRequest,
+    ParamsSendEventRequest,
 ]

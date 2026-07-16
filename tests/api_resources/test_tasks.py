@@ -359,6 +359,57 @@ class TestTasks:
 
     @pytest.mark.skip(reason="Mock server tests are disabled")
     @parametrize
+    def test_method_interrupt(self, client: Agentex) -> None:
+        task = client.tasks.interrupt(
+            task_id="task_id",
+        )
+        assert_matches_type(Task, task, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_method_interrupt_with_all_params(self, client: Agentex) -> None:
+        task = client.tasks.interrupt(
+            task_id="task_id",
+            reason="reason",
+        )
+        assert_matches_type(Task, task, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_raw_response_interrupt(self, client: Agentex) -> None:
+        response = client.tasks.with_raw_response.interrupt(
+            task_id="task_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        task = response.parse()
+        assert_matches_type(Task, task, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_streaming_response_interrupt(self, client: Agentex) -> None:
+        with client.tasks.with_streaming_response.interrupt(
+            task_id="task_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            task = response.parse()
+            assert_matches_type(Task, task, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    def test_path_params_interrupt(self, client: Agentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
+            client.tasks.with_raw_response.interrupt(
+                task_id="",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
     def test_method_query_workflow(self, client: Agentex) -> None:
         task = client.tasks.query_workflow(
             query_name="query_name",
@@ -1083,6 +1134,57 @@ class TestAsyncTasks:
     async def test_path_params_fail(self, async_client: AsyncAgentex) -> None:
         with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
             await async_client.tasks.with_raw_response.fail(
+                task_id="",
+            )
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_interrupt(self, async_client: AsyncAgentex) -> None:
+        task = await async_client.tasks.interrupt(
+            task_id="task_id",
+        )
+        assert_matches_type(Task, task, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_method_interrupt_with_all_params(self, async_client: AsyncAgentex) -> None:
+        task = await async_client.tasks.interrupt(
+            task_id="task_id",
+            reason="reason",
+        )
+        assert_matches_type(Task, task, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_raw_response_interrupt(self, async_client: AsyncAgentex) -> None:
+        response = await async_client.tasks.with_raw_response.interrupt(
+            task_id="task_id",
+        )
+
+        assert response.is_closed is True
+        assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+        task = await response.parse()
+        assert_matches_type(Task, task, path=["response"])
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_streaming_response_interrupt(self, async_client: AsyncAgentex) -> None:
+        async with async_client.tasks.with_streaming_response.interrupt(
+            task_id="task_id",
+        ) as response:
+            assert not response.is_closed
+            assert response.http_request.headers.get("X-Stainless-Lang") == "python"
+
+            task = await response.parse()
+            assert_matches_type(Task, task, path=["response"])
+
+        assert cast(Any, response.is_closed) is True
+
+    @pytest.mark.skip(reason="Mock server tests are disabled")
+    @parametrize
+    async def test_path_params_interrupt(self, async_client: AsyncAgentex) -> None:
+        with pytest.raises(ValueError, match=r"Expected a non-empty value for `task_id` but received ''"):
+            await async_client.tasks.with_raw_response.interrupt(
                 task_id="",
             )
 

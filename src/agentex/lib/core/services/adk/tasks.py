@@ -98,6 +98,25 @@ class TasksService:
                 span.output = task_model.model_dump()
             return task_model
 
+    async def interrupt_task(
+        self,
+        task_id: str,
+        reason: str | None = None,
+        trace_id: str | None = None,
+        parent_span_id: str | None = None,
+    ) -> Task:
+        trace = self._tracer.trace(trace_id)
+        async with trace.span(
+            parent_id=parent_span_id,
+            name="interrupt_task",
+            input={"task_id": task_id, "reason": reason},
+        ) as span:
+            heartbeat_if_in_workflow("interrupt task")
+            task_model = await self._agentex_client.tasks.interrupt(task_id=task_id, reason=reason)
+            if span:
+                span.output = task_model.model_dump()
+            return task_model
+
     async def complete_task(
         self,
         task_id: str,

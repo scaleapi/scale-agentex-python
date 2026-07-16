@@ -10,6 +10,7 @@ from agentex.protocol.acp import (
     SendEventParams,
     CancelTaskParams,
     CreateTaskParams,
+    InterruptTaskParams,
 )
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
@@ -131,4 +132,22 @@ class TemporalACP(BaseACPServer):
                     await self._temporal_task_service.cancel(task_id=params.task.id)
             except Exception as e:
                 logger.error(f"Failed to cancel task: {e}")
+                raise
+
+        @self.on_task_interrupt
+        async def handle_interrupt(params: InterruptTaskParams) -> None:
+            """Forward task/interrupt to the running workflow via TaskService.
+
+            Non-terminal: signals the workflow's ``interrupt_turn`` handler rather
+            than tearing the workflow down, so the task stays continuable.
+            """
+            try:
+                if self._temporal_task_service is not None:
+                    await self._temporal_task_service.interrupt(
+                        agent=params.agent,
+                        task=params.task,
+                        request=params.request,
+                    )
+            except Exception as e:
+                logger.error(f"Failed to interrupt task: {e}")
                 raise
