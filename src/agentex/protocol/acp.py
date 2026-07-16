@@ -138,12 +138,3 @@ PARAMS_MODEL_BY_METHOD: dict[RPCMethod, type[BaseModel]] = {
     RPCMethod.TASK_CREATE: CreateTaskParams,
     RPCMethod.TASK_INTERRUPT: InterruptTaskParams,
 }
-
-# TODO(interrupt): the client-facing REST method ``client.tasks.interrupt(task_id,
-# reason=...)`` plus its param/response types (``task_interrupt_params.py``) and the
-# ``AgentRPCMethod`` union additions are Stainless-GENERATED. They regenerate from the
-# upstream OpenAPI change in scale-agentex (design doc sections 9.1 / 9.2) once
-# ``TASK_INTERRUPT`` and the ``POST /tasks/{task_id}/interrupt`` route land there. Do NOT
-# hand-write them under ``src/agentex/resources/**`` or ``src/agentex/types/**``. The
-# hand-editable protocol shapes above (and the agent-side hook in ``agentex.lib.**``)
-# survive regeneration and are what agents rely on today.

@@ -112,14 +112,7 @@ class TasksService:
             input={"task_id": task_id, "reason": reason},
         ) as span:
             heartbeat_if_in_workflow("interrupt task")
-            # TODO(AGX1-391): switch to self._agentex_client.tasks.interrupt(...) once the
-            # POST /tasks/{id}/interrupt endpoint is added to the Stainless config and
-            # regenerated. Using the generic post keeps this working before regeneration.
-            task_model = await self._agentex_client.post(
-                f"/tasks/{task_id}/interrupt",
-                cast_to=Task,
-                body={"reason": reason},
-            )
+            task_model = await self._agentex_client.tasks.interrupt(task_id=task_id, reason=reason)
             if span:
                 span.output = task_model.model_dump()
             return task_model
