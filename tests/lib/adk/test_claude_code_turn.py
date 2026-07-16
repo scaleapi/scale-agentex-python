@@ -345,5 +345,7 @@ class TestClaudeCodeTurnSessionIdCapture:
         # Consume only the first event, then close the stream early.
         async for _ in events:
             break
-        await events.aclose()
+        events_aclose = getattr(events, "aclose", None)
+        assert events_aclose is not None
+        await events_aclose()
         assert closed["value"] is True

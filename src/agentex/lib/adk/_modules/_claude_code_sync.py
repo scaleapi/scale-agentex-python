@@ -91,7 +91,9 @@ async def convert_claude_code_to_agentex_events(
         async for event in inner:
             yield event
     finally:
-        await inner.aclose()
+        inner_aclose = getattr(inner, "aclose", None)
+        if inner_aclose is not None:
+            await inner_aclose()
         aclose = getattr(lines, "aclose", None)
         if aclose is not None:
             await aclose()

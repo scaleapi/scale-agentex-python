@@ -335,5 +335,7 @@ class TestCodexTurnSessionIdCapture:
         gen = turn.events
         async for _ in gen:
             break
-        await gen.aclose()
+        gen_aclose = getattr(gen, "aclose", None)
+        assert gen_aclose is not None
+        await gen_aclose()
         assert closed["value"] is True

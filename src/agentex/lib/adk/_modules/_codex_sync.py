@@ -543,7 +543,9 @@ async def convert_codex_to_agentex_events(
         async for event in inner:
             yield event
     finally:
-        await inner.aclose()
+        inner_aclose = getattr(inner, "aclose", None)
+        if inner_aclose is not None:
+            await inner_aclose()
         aclose = getattr(events, "aclose", None)
         if aclose is not None:
             await aclose()
