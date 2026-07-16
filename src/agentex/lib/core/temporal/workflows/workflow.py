@@ -6,7 +6,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 
-from agentex.protocol.acp import SendEventParams, CreateTaskParams
+from agentex.protocol.acp import SendEventParams, CreateTaskParams, InterruptTaskParams
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.temporal.types.workflow import SignalName
 
@@ -160,3 +160,32 @@ class BaseWorkflow(ABC):
         gated here runs again on each history rollover.
         """
         return workflow.info().continued_run_id is not None
+
+    @workflow.signal(name=SignalName.INTERRUPT_TURN)
+    async def on_interrupt(self, params: InterruptTaskParams) -> None:
+        """Handle a task/interrupt: stop the in-flight turn, keep the task continuable.
+
+        This is the durable transport for the platform's ``task/interrupt`` verb
+        (design doc section 7). The control plane forwards ``task/interrupt`` to the
+        agent pod over HTTP JSON-RPC; the ACP/Temporal layer routes it to the
+        ``interrupt_turn`` signal, which invokes this hook.
+
+        Temporal runs signal handlers on the same deterministic event loop as the
+        workflow ``run`` method, interleaving at ``await`` points. This handler runs
+        CONCURRENTLY with the in-flight turn coroutine, so it MUST NOT acquire the
+        turn lock (the running turn already holds it) — doing so would deadlock: the
+        interrupt could never fire because it would be waiting on the very turn it is
+        meant to stop.
+
+        The base implementation is a no-op so existing agents keep working (and the
+        signal is still accepted, avoiding "unhandled signal" warnings). Interruptible
+        agents (the golden agent is the reference) override this to actually stop the
+        in-flight model / CLI subprocess — e.g. SIGINT the leased sandbox CLI by pid,
+        or cancel the inline model ``asyncio.Task`` — while preserving partial output
+        and resume state so the next turn continues the conversation.
+        """
+        logger.info(
+            "on_interrupt (no-op base impl) for task %s; override to make this agent "
+            "interruptible",
+            params.task.id,
+        )

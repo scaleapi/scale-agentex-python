@@ -181,6 +181,7 @@ def get_all_activities(sgp_client=None):
         tasks_activities.get_task,
         tasks_activities.delete_task,
         tasks_activities.cancel_task,
+        tasks_activities.interrupt_task,
         tasks_activities.complete_task,
         tasks_activities.fail_task,
         tasks_activities.terminate_task,

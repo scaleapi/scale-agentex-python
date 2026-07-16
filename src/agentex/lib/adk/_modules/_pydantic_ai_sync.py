@@ -121,6 +121,27 @@ async def convert_pydantic_ai_to_agentex_events(
     stream_response: AsyncIterator[Any],
     on_result: Callable[[AgentRunResultEvent], Any] | None = None,
 ) -> AsyncIterator[StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone]:
+    """Public Pydantic AI tap: convert events, closing the source stream on exit.
+
+    Thin wrapper over ``_convert_pydantic_ai_impl`` that adds a cancellation-safe
+    ``finally`` so an interrupted turn tears down the source stream instead of
+    leaking it.
+    """
+    inner = _convert_pydantic_ai_impl(stream_response, on_result=on_result)
+    try:
+        async for event in inner:
+            yield event
+    finally:
+        for _src in (inner, stream_response):
+            _aclose = getattr(_src, "aclose", None)
+            if _aclose is not None:
+                await _aclose()
+
+
+async def _convert_pydantic_ai_impl(
+    stream_response: AsyncIterator[Any],
+    on_result: Callable[[AgentRunResultEvent], Any] | None = None,
+) -> AsyncIterator[StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone]:
     """Convert a Pydantic AI agent event stream into Agentex stream events.
 
     Mapping:

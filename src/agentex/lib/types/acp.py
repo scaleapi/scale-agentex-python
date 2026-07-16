@@ -12,4 +12,5 @@ from agentex.protocol.acp import (  # noqa: F401
     CancelTaskParams,
     CreateTaskParams,
     SendMessageParams,
+    InterruptTaskParams,
 )
