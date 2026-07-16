@@ -1,0 +1,59 @@
+# Agent Manifest Configuration
+
+build:
+  context:
+    root: ../../
+    include_paths:
+      - deep_research/docs_researcher
+    dockerfile: deep_research/docs_researcher/Dockerfile
+    dockerignore: deep_research/docs_researcher/.dockerignore
+
+local_development:
+  agent:
+    port: 8012
+    host_address: host.docker.internal
+
+  paths:
+    acp: project/acp.py
+    worker: project/run_worker.py
+
+agent:
+  acp_type: async
+  name: deep-research-docs
+  description: Searches documentation and the web for relevant guides and references
+
+  temporal:
+    enabled: true
+    workflows:
+      - name: deep-research-docs
+        queue_name: deep_research_docs_queue
+
+  credentials:
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+
+  env:
+    OPENAI_ORG_ID: ""
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+
+  imagePullSecrets:
+    - name: my-registry-secret
+
+  global:
+    agent:
+      name: "deep-research-docs"
+      description: "Searches documentation and the web for relevant guides and references"
+
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
