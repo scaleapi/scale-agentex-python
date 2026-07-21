@@ -248,6 +248,7 @@ class TestSchedules:
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         schedule = client.agents.schedules.list(
             agent_id="agent_id",
+            include_live=True,
             limit=1,
         )
         assert_matches_type(ScheduleListResponse, schedule, path=["response"])
@@ -1204,6 +1205,7 @@ class TestAsyncSchedules:
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         schedule = await async_client.agents.schedules.list(
             agent_id="agent_id",
+            include_live=True,
             limit=1,
         )
         assert_matches_type(ScheduleListResponse, schedule, path=["response"])
