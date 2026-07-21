@@ -91,6 +91,24 @@ def _validate_interceptors(interceptors: list) -> None:
             )
 
 
+def _build_otel_interceptors() -> list:
+    """Return an OpenTelemetry Temporal interceptor when an OTel observability
+    mode is active (SGP_OBS_MODE in {dual, lgtm}), so trace context propagates
+    across the workflow -> activity boundary. This lets business spans created
+    inside the model-loop activity adopt the caller's observability trace_id.
+
+    Empty in the default dd_only mode, or when the temporalio OTel contrib is
+    unavailable (safe no-op).
+    """
+    if os.getenv("SGP_OBS_MODE", "").strip().lower() not in ("dual", "lgtm"):
+        return []
+    try:
+        from temporalio.contrib.opentelemetry import TracingInterceptor
+    except ImportError:
+        return []
+    return [TracingInterceptor()]
+
+
 async def get_temporal_client(
     temporal_address: str,
     metrics_url: str | None = None,
@@ -135,6 +153,10 @@ async def get_temporal_client(
         if payload_codec:
             dc = dataclasses.replace(dc, payload_codec=payload_codec)
         connect_kwargs["data_converter"] = dc
+
+    otel_interceptors = _build_otel_interceptors()
+    if otel_interceptors:
+        connect_kwargs["interceptors"] = otel_interceptors
 
     if not metrics_url:
         client = await Client.connect(**connect_kwargs)
