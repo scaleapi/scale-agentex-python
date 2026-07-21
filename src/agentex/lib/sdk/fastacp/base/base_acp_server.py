@@ -46,6 +46,41 @@ logger = make_logger(__name__)
 task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
 
 
+def _attach_incoming_trace_context(scope: Scope) -> Any:
+    """Extract the W3C trace context (traceparent/tracestate) from the inbound
+    request headers and attach it as the current OpenTelemetry context, so spans
+    created while handling this request adopt the caller's observability trace.
+
+    Returns a detach token (pass to opentelemetry.context.detach) or None if OTel
+    is unavailable or no context could be established. Best-effort: never raises.
+    """
+    try:
+        from opentelemetry import context as otel_context
+        from opentelemetry.propagate import extract
+    except ImportError:
+        return None
+    try:
+        carrier = {
+            k.decode("latin-1"): v.decode("latin-1")
+            for k, v in scope.get("headers", [])
+        }
+        ctx = extract(carrier)
+        return otel_context.attach(ctx)
+    except Exception:  # pragma: no cover - propagation must never break a request
+        return None
+
+
+def _detach_trace_context(token: Any) -> None:
+    if token is None:
+        return
+    try:
+        from opentelemetry import context as otel_context
+
+        otel_context.detach(token)
+    except Exception:  # pragma: no cover
+        pass
+
+
 class RequestIDMiddleware:
     """Pure ASGI middleware to set request IDs without buffering streaming responses."""
 
@@ -53,12 +88,23 @@ class RequestIDMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "http":
-            headers = dict(scope.get("headers", []))
-            raw_request_id = headers.get(b"x-request-id", b"")
-            request_id = raw_request_id.decode() if raw_request_id else uuid.uuid4().hex
-            ctx_var_request_id.set(request_id)
-        await self.app(scope, receive, send)
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        raw_request_id = headers.get(b"x-request-id", b"")
+        request_id = raw_request_id.decode() if raw_request_id else uuid.uuid4().hex
+        ctx_var_request_id.set(request_id)
+
+        # Establish the caller's W3C trace context for the duration of the
+        # request so business spans created here (and any downstream Temporal
+        # workflow started from this request) share the same observability trace.
+        token = _attach_incoming_trace_context(scope)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            _detach_trace_context(token)
 
 
 class BaseACPServer(FastAPI):
