@@ -19,6 +19,7 @@ from agents.models.openai_provider import OpenAIProvider
 from agentex import AsyncAgentex
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.core.tracing.lineage import merge_refs_into_data, resolve_refs_from_items
 
 logger = make_logger(__name__)
 
@@ -185,6 +186,9 @@ class SyncStreamingModel(Model):
                         "new_items": new_items,
                         "final_output": final_output,
                     }
+                    lineage_refs = resolve_refs_from_items(new_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
 
                 return response
         else:
@@ -303,6 +307,9 @@ class SyncStreamingModel(Model):
                     "new_items": new_items,
                     "final_output": final_response_text if final_response_text else None,
                 }
+                lineage_refs = resolve_refs_from_items(new_items)
+                if lineage_refs:
+                    span.data = merge_refs_into_data(span.data, lineage_refs)
             finally:
                 # End the span after all events have been yielded
                 await trace.end_span(span)

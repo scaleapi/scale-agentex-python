@@ -29,6 +29,10 @@ from agentex.lib.adk._modules.streaming import StreamingModule
 from agentex.lib.adk._modules.tasks import TasksModule
 from agentex.lib.adk._modules.tracing import TracingModule, TurnSpan
 
+# Data-source refs for lineage (SGP-6513); implementation lives in core.tracing
+from agentex.lib.core.tracing import lineage
+from agentex.lib.core.tracing.lineage import DataSourceRef, data_sources
+
 # Unified harness surface (AGX1-375)
 from agentex.lib.core.harness import (
     UnifiedEmitter,
@@ -67,6 +71,10 @@ __all__ = [
     "events",
     "agent_task_tracker",
     "TurnSpan",
+    # Lineage data-source refs (SGP-6513)
+    "lineage",
+    "DataSourceRef",
+    "data_sources",
     # Checkpointing / LangGraph
     "create_checkpointer",
     "stream_langgraph_events",

@@ -24,6 +24,7 @@ class EnvVarKeys(str, Enum):
     AGENT_NAME = "AGENT_NAME"
     AGENT_DESCRIPTION = "AGENT_DESCRIPTION"
     AGENT_ID = "AGENT_ID"
+    AGENT_VERSION = "AGENT_VERSION"
     AGENT_API_KEY = "AGENT_API_KEY"
     # ACP Configuration
     ACP_URL = "ACP_URL"
@@ -66,6 +67,8 @@ class EnvironmentVariables(BaseModel):
     AGENT_NAME: str
     AGENT_DESCRIPTION: str | None = None
     AGENT_ID: str | None = None
+    # Build/version discriminator (image tag or git sha), set by the deployment
+    AGENT_VERSION: str | None = None
     AGENT_API_KEY: str | None = None
     ACP_TYPE: str | None = "async"
     AGENT_INPUT_TYPE: str | None = None
