@@ -65,6 +65,8 @@ def _add_source_to_span(span: Span, env_vars: EnvironmentVariables) -> None:
             span.data["__agent_name__"] = env_vars.AGENT_NAME
         if env_vars.AGENT_ID is not None:
             span.data["__agent_id__"] = env_vars.AGENT_ID
+        if env_vars.AGENT_VERSION is not None:
+            span.data["__agent_version__"] = env_vars.AGENT_VERSION
 
 
 def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:

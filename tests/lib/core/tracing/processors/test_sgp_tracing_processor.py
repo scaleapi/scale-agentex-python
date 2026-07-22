@@ -39,6 +39,30 @@ def _make_mock_sgp_span() -> MagicMock:
     return sgp_span
 
 
+class TestSourceStamps:
+    def test_agent_identity_and_version_stamped_into_span_data(self):
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _add_source_to_span
+
+        env = MagicMock(ACP_TYPE="async", AGENT_NAME="emu-tax", AGENT_ID="a1", AGENT_VERSION="sha-abc123")
+        span = _make_span()
+        _add_source_to_span(span, env)
+        assert span.data == {
+            "__source__": "agentex",
+            "__acp_type__": "async",
+            "__agent_name__": "emu-tax",
+            "__agent_id__": "a1",
+            "__agent_version__": "sha-abc123",
+        }
+
+    def test_unset_identity_fields_are_omitted(self):
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _add_source_to_span
+
+        env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
+        span = _make_span()
+        _add_source_to_span(span, env)
+        assert span.data == {"__source__": "agentex"}
+
+
 # ---------------------------------------------------------------------------
 # Sync processor tests
 # ---------------------------------------------------------------------------
@@ -48,7 +72,7 @@ class TestSGPSyncTracingProcessor:
     @staticmethod
     def _make_processor():
         mock_env = MagicMock()
-        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
         mock_create_span = MagicMock(side_effect=lambda **kwargs: _make_mock_sgp_span())
 
         with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.SGPClient"), patch(
@@ -150,7 +174,7 @@ class TestSGPAsyncTracingProcessor:
     @staticmethod
     def _make_processor():
         mock_env = MagicMock()
-        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
         mock_create_span = MagicMock(side_effect=lambda **kwargs: _make_mock_sgp_span())
 
         mock_async_client = MagicMock()
@@ -319,11 +343,9 @@ class TestSGPAsyncTracingProcessor:
         keepalive instead of paying a TLS handshake per span.
         """
         mock_env = MagicMock()
-        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(
-            f"{MODULE}.AsyncSGPClient"
-        ) as mock_sgp_cls:
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.AsyncSGPClient") as mock_sgp_cls:
             mock_sgp_cls.side_effect = lambda **kwargs: MagicMock()
 
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
@@ -365,11 +387,11 @@ class TestSGPAsyncTracingProcessor:
             return original_async_client(*args, **kwargs)
 
         mock_env = MagicMock()
-        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(
-            f"{MODULE}.AsyncSGPClient"
-        ), patch("httpx.AsyncClient", side_effect=capture_limits):
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.AsyncSGPClient"), patch(
+            "httpx.AsyncClient", side_effect=capture_limits
+        ):
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
                 SGPAsyncTracingProcessor,
             )
@@ -380,8 +402,7 @@ class TestSGPAsyncTracingProcessor:
         assert len(captured_limits) == 1
         max_keepalive = captured_limits[0].max_keepalive_connections
         assert max_keepalive is not None and max_keepalive > 0, (
-            f"SGP async client should have keepalive enabled, got "
-            f"max_keepalive_connections={max_keepalive}"
+            f"SGP async client should have keepalive enabled, got max_keepalive_connections={max_keepalive}"
         )
 
     def test_cache_is_weakkeydict_and_evicts_dead_loops(self):
@@ -395,7 +416,7 @@ class TestSGPAsyncTracingProcessor:
         import weakref
 
         mock_env = MagicMock()
-        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
 
         with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.AsyncSGPClient"):
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
@@ -428,18 +449,14 @@ class TestSGPAsyncTracingProcessor:
         from agentex.lib.types.tracing import SGPTracingProcessorConfig
 
         mock_env = MagicMock()
-        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+        mock_env.refresh.return_value = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
 
-        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(
-            f"{MODULE}.AsyncSGPClient"
-        ) as mock_sgp_cls:
+        with patch(f"{MODULE}.EnvironmentVariables", mock_env), patch(f"{MODULE}.AsyncSGPClient") as mock_sgp_cls:
             from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
                 SGPAsyncTracingProcessor,
             )
 
-            processor = SGPAsyncTracingProcessor(
-                SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id="")
-            )
+            processor = SGPAsyncTracingProcessor(SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id=""))
 
             assert processor._get_client() is None
             assert mock_sgp_cls.call_count == 0
