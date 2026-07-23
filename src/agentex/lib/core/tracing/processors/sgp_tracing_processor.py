@@ -54,11 +54,30 @@ def _get_span_type(span: Span) -> str:
     return "STANDALONE"
 
 
+def _active_otel_trace_id() -> str | None:
+    """Active OpenTelemetry/W3C trace id as 32-char hex, or None when OTel is absent or no span is recording."""
+    try:
+        from opentelemetry import trace as otel_trace
+    except ImportError:
+        return None
+    context = otel_trace.get_current_span().get_span_context()
+    if not context.is_valid:
+        return None
+    return format(context.trace_id, "032x")
+
+
+def _resolve_trace_id(agentex_trace_id: str) -> str:
+    """Prefer the ambient W3C/OTel trace id so agent spans share the request's observability trace, else keep agentex's own id."""
+    return _active_otel_trace_id() or agentex_trace_id
+
+
 def _add_source_to_span(span: Span, env_vars: EnvironmentVariables) -> None:
     if span.data is None:
         span.data = {}
     if isinstance(span.data, dict):
         span.data["__source__"] = "agentex"
+        # Preserve agentex's own id so the task linkage survives when the SGP trace_id adopts the W3C id.
+        span.data["__agentex_trace_id__"] = span.trace_id
         if env_vars.ACP_TYPE is not None:
             span.data["__acp_type__"] = env_vars.ACP_TYPE
         if env_vars.AGENT_NAME is not None:
@@ -77,7 +96,7 @@ def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:
             span_type=_get_span_type(span),
             span_id=span.id,
             parent_id=span.parent_id,
-            trace_id=span.trace_id,
+            trace_id=_resolve_trace_id(span.trace_id),
             input=span.input,
             output=span.output,
             metadata=span.data,

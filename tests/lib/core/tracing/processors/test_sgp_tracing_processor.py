@@ -494,3 +494,64 @@ class TestSkipSpanStartEnv:
     def test_other_values_keep_skip_enabled(self, monkeypatch, val):
         monkeypatch.setenv("AGENTEX_TRACING_SKIP_SPAN_START", val)
         assert self._fn()() is True
+
+
+class TestResolveTraceId:
+    def _mod(self):
+        import agentex.lib.core.tracing.processors.sgp_tracing_processor as m
+
+        return m
+
+    def test_prefers_active_otel_trace_id(self, monkeypatch):
+        m = self._mod()
+        monkeypatch.setattr(m, "_active_otel_trace_id", lambda: "4bf92f3577b34da6a3ce929d0e0e4736")
+        assert m._resolve_trace_id("task-123") == "4bf92f3577b34da6a3ce929d0e0e4736"
+
+    def test_falls_back_to_agentex_id_without_otel(self, monkeypatch):
+        m = self._mod()
+        monkeypatch.setattr(m, "_active_otel_trace_id", lambda: None)
+        assert m._resolve_trace_id("task-123") == "task-123"
+
+    def test_active_otel_trace_id_none_without_span(self):
+        pytest.importorskip("opentelemetry")
+        assert self._mod()._active_otel_trace_id() is None
+
+    def test_active_otel_trace_id_returns_w3c_hex(self):
+        otel_trace = pytest.importorskip("opentelemetry.trace")
+        otel_context = pytest.importorskip("opentelemetry.context")
+
+        span_context = otel_trace.SpanContext(
+            trace_id=0x4BF92F3577B34DA6A3CE929D0E0E4736,
+            span_id=0x00F067AA0BA902B7,
+            is_remote=False,
+            trace_flags=otel_trace.TraceFlags(otel_trace.TraceFlags.SAMPLED),
+        )
+        token = otel_context.attach(otel_trace.set_span_in_context(otel_trace.NonRecordingSpan(span_context)))
+        try:
+            resolved = self._mod()._active_otel_trace_id()
+        finally:
+            otel_context.detach(token)
+        assert resolved == "4bf92f3577b34da6a3ce929d0e0e4736"
+
+
+class TestBuildSgpSpanTraceId:
+    def _build(self, monkeypatch, otel_id):
+        import agentex.lib.core.tracing.processors.sgp_tracing_processor as m
+
+        monkeypatch.setattr(m, "_active_otel_trace_id", lambda: otel_id)
+        captured = {}
+        monkeypatch.setattr(m, "create_span", lambda **kw: captured.update(kw) or _make_mock_sgp_span())
+        env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None)
+        span = _make_span()
+        m._build_sgp_span(span, env)
+        return captured, span
+
+    def test_adopts_otel_trace_id_and_preserves_agentex_id(self, monkeypatch):
+        captured, span = self._build(monkeypatch, "4bf92f3577b34da6a3ce929d0e0e4736")
+        assert captured["trace_id"] == "4bf92f3577b34da6a3ce929d0e0e4736"
+        assert span.data["__agentex_trace_id__"] == "trace-1"
+
+    def test_keeps_agentex_trace_id_without_otel(self, monkeypatch):
+        captured, span = self._build(monkeypatch, None)
+        assert captured["trace_id"] == "trace-1"
+        assert span.data["__agentex_trace_id__"] == "trace-1"
