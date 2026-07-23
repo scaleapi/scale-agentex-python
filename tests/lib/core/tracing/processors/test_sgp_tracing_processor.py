@@ -549,9 +549,11 @@ class TestBuildSgpSpanTraceId:
     def test_adopts_otel_trace_id_and_preserves_agentex_id(self, monkeypatch):
         captured, span = self._build(monkeypatch, "4bf92f3577b34da6a3ce929d0e0e4736")
         assert captured["trace_id"] == "4bf92f3577b34da6a3ce929d0e0e4736"
+        assert isinstance(span.data, dict)
         assert span.data["__agentex_trace_id__"] == "trace-1"
 
     def test_keeps_agentex_trace_id_without_otel(self, monkeypatch):
         captured, span = self._build(monkeypatch, None)
         assert captured["trace_id"] == "trace-1"
+        assert isinstance(span.data, dict)
         assert span.data["__agentex_trace_id__"] == "trace-1"
