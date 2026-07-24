@@ -33,6 +33,7 @@ from agentex.lib.utils.registration import register_agent
 from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
 from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
 from agentex.types.task_message_content import TaskMessageContent
+from agentex.lib.core.tracing.obs_ids import sync_ddtrace_to_lgtm as _sync_ddtrace_to_lgtm
 from agentex.lib.core.tracing.span_queue import shutdown_default_span_queue
 from agentex.lib.core.compat.version_guard import assert_backend_compatible
 from agentex.lib.sdk.fastacp.base.constants import (
@@ -101,6 +102,9 @@ class RequestIDMiddleware:
         # request so business spans created here (and any downstream Temporal
         # workflow started from this request) share the same observability trace.
         token = _attach_incoming_trace_context(scope)
+        # In dual mode, make ddtrace adopt this OTel trace id so its best-effort
+        # Datadog spans share the same trace_id. No-op outside dual mode.
+        _sync_ddtrace_to_lgtm()
         try:
             await self.app(scope, receive, send)
         finally:
