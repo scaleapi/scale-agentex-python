@@ -86,6 +86,12 @@ class ScheduleCreateResponse(BaseModel):
     last_action_time: Optional[datetime] = None
     """When the schedule last fired."""
 
+    live_data_available: Optional[bool] = None
+    """Whether requested live Temporal fields were retrieved successfully.
+
+    Null when live enrichment was not requested.
+    """
+
     next_action_times: Optional[List[datetime]] = None
     """Upcoming scheduled fire times."""
 

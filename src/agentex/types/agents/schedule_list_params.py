@@ -8,4 +8,7 @@ __all__ = ["ScheduleListParams"]
 
 
 class ScheduleListParams(TypedDict, total=False):
+    include_live: bool
+    """Include live Temporal state and upcoming action times."""
+
     limit: int

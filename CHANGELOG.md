@@ -12,6 +12,15 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.21.0 (2026-07-24)
+
+Full Changelog: [agentex-client-v0.20.0...agentex-client-v0.21.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.20.0...agentex-client-v0.21.0)
+
+### Features
+
+* **api:** add include_live parameter to schedules list method ([199fd6a](https://github.com/scaleapi/scale-agentex-python/commit/199fd6a633bc82626a4629ee1ac52a40e6f10271))
+* **stlc:** configurable CI runner and private-production-repo support in workflow templates ([23c1b6b](https://github.com/scaleapi/scale-agentex-python/commit/23c1b6b8dc60f16c5e19a1aab68d244d286caffc))
+
 ## 0.20.0 (2026-07-16)
 
 Full Changelog: [agentex-client-v0.19.0...agentex-client-v0.20.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.19.0...agentex-client-v0.20.0)
