@@ -25,6 +25,7 @@ from agentex.lib.utils.mcp import redact_mcp_server_params
 from agentex.lib.utils.temporal import heartbeat_if_in_workflow
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
+from agentex.lib.core.tracing.lineage import merge_refs_into_data, resolve_refs_from_items
 from agentex.types.task_message_update import StreamTaskMessageFull
 from agentex.types.task_message_content import (
     TextContent,
@@ -286,13 +287,17 @@ class OpenAIService:
                     result = await Runner.run(starting_agent=agent, input=input_list)
 
                 if span:
+                    serialized_items = [
+                        item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                        for item in result.new_items
+                    ]
                     span.output = {
-                        "new_items": [
-                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
-                            for item in result.new_items
-                        ],
+                        "new_items": serialized_items,
                         "final_output": result.final_output,
                     }
+                    lineage_refs = resolve_refs_from_items(serialized_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
 
         return result
 
@@ -431,13 +436,17 @@ class OpenAIService:
                     result = await Runner.run(starting_agent=agent, input=input_list)
 
                 if span:
+                    serialized_items = [
+                        item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                        for item in result.new_items
+                    ]
                     span.output = {
-                        "new_items": [
-                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
-                            for item in result.new_items
-                        ],
+                        "new_items": serialized_items,
                         "final_output": result.final_output,
                     }
+                    lineage_refs = resolve_refs_from_items(serialized_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
 
                 tool_call_map: dict[str, Any] = {}
 
@@ -646,13 +655,17 @@ class OpenAIService:
                     result = Runner.run_streamed(starting_agent=agent, input=input_list)
 
                 if span:
+                    serialized_items = [
+                        item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                        for item in result.new_items
+                    ]
                     span.output = {
-                        "new_items": [
-                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
-                            for item in result.new_items
-                        ],
+                        "new_items": serialized_items,
                         "final_output": result.final_output,
                     }
+                    lineage_refs = resolve_refs_from_items(serialized_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
 
         return result
 
@@ -906,12 +919,16 @@ class OpenAIService:
                     raise
 
                 if span:
+                    serialized_items = [
+                        item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                        for item in result.new_items
+                    ]
                     span.output = {
-                        "new_items": [
-                            item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
-                            for item in result.new_items
-                        ],
+                        "new_items": serialized_items,
                         "final_output": result.final_output,
                     }
+                    lineage_refs = resolve_refs_from_items(serialized_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
 
         return result
