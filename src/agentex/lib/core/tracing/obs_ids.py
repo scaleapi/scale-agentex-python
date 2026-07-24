@@ -24,7 +24,7 @@ from __future__ import annotations
 import os
 from typing import Dict, Optional, Tuple
 
-__all__ = ("get_obs_mode", "obs_correlation")
+__all__ = ("get_obs_mode", "obs_correlation", "sync_ddtrace_to_lgtm")
 
 DD_ONLY = "dd_only"
 DUAL = "dual"
@@ -81,3 +81,31 @@ def obs_correlation() -> Dict[str, str]:
     if not ids:
         return {}
     return {"obs.trace_id": ids[0], "obs.span_id": ids[1]}
+
+
+def sync_ddtrace_to_lgtm() -> None:
+    """In ``dual`` mode, make ddtrace adopt the active OpenTelemetry/LGTM trace
+    context so ddtrace-emitted spans (best-effort Datadog) share the SAME
+    trace_id as the OTel trace. Call at request ingress once the OTel span is
+    active, and after any context boundary (e.g. entering a Temporal activity).
+
+    No-op outside ``dual`` mode, or when OTel/ddtrace is unavailable or no OTel
+    span is active. Never raises.
+    """
+    if get_obs_mode() != DUAL:
+        return
+    try:
+        from opentelemetry import trace
+
+        try:
+            from ddtrace.trace import Context  # ddtrace 3.x
+        except ImportError:  # pragma: no cover - older ddtrace layout
+            from ddtrace.context import Context  # type: ignore[no-redef]
+        from ddtrace import tracer
+    except ImportError:
+        return
+
+    sc = trace.get_current_span().get_span_context()
+    if not (sc and sc.is_valid):
+        return
+    tracer.context_provider.activate(Context(trace_id=sc.trace_id, span_id=sc.span_id))
