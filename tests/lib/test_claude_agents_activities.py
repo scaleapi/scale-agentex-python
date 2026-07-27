@@ -59,6 +59,7 @@ for _name, _mock in _stubs.items():
     sys.modules.setdefault(_name, _mock)
 
 # Also ensure parent packages exist as stubs so Python resolves the dotted path
+_created_pkg_stubs: list[str] = []
 for _pkg in [
     "agentex.lib.core.temporal.plugins",
     "agentex.lib.core.temporal.plugins.claude_agents",
@@ -70,6 +71,7 @@ for _pkg in [
         _mod.__path__ = []  # type: ignore[attr-defined]
         _mod.__package__ = _pkg
         sys.modules[_pkg] = _mod
+        _created_pkg_stubs.append(_pkg)
 
 # Load activities.py directly from its file path
 _spec = importlib.util.spec_from_file_location(
@@ -80,6 +82,13 @@ assert _spec is not None and _spec.loader is not None
 _activities_mod = importlib.util.module_from_spec(_spec)
 sys.modules[_spec.name] = _activities_mod
 _spec.loader.exec_module(_activities_mod)
+
+# Drop the placeholder packages now that the module is loaded: their empty
+# __path__ would otherwise block real imports of agentex.lib.core.temporal.*
+# submodules in every test collected after this file. The loaded module keeps
+# its bindings.
+for _pkg in _created_pkg_stubs:
+    sys.modules.pop(_pkg, None)
 
 _reconstruct_agent_defs = _activities_mod._reconstruct_agent_defs  # type: ignore[attr-defined]
 claude_options_to_dict = _activities_mod.claude_options_to_dict  # type: ignore[attr-defined]

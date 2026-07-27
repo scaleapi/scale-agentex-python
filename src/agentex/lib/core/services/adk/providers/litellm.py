@@ -25,6 +25,20 @@ from agentex.lib.core.adapters.llm.adapter_litellm import LiteLLMGateway
 logger = logging.make_logger(__name__)
 
 
+def _stream_kwargs_with_usage(llm_config: LLMConfig) -> dict:
+    """Completion kwargs with usage reporting enabled on the final stream chunk.
+
+    litellm only reports usage for streaming calls when
+    ``stream_options={"include_usage": True}`` is set; default it on so usage
+    reaches the span. Callers can still opt out by explicitly passing
+    ``stream_options={"include_usage": False}``.
+    """
+    kwargs = llm_config.model_dump()
+    stream_options = kwargs.get("stream_options") or {}
+    kwargs["stream_options"] = {"include_usage": True, **stream_options}
+    return kwargs
+
+
 class LiteLLMService:
     def __init__(
         self,
@@ -121,7 +135,11 @@ class LiteLLMService:
 
             if span:
                 if streaming_context.task_message:
-                    span.output = streaming_context.task_message.model_dump()
+                    output = streaming_context.task_message.model_dump()
+                    # Per-call usage for billing; deduped against any turn aggregate
+                    if completion.usage is not None:
+                        output["usage"] = completion.usage.model_dump()
+                    span.output = output
             return streaming_context.task_message if streaming_context.task_message else None
 
     async def chat_completion_stream(
@@ -150,18 +168,21 @@ class LiteLLMService:
         if self.llm_gateway is None:
             raise ValueError("LLM Gateway is not set")
 
+        completion_kwargs = _stream_kwargs_with_usage(llm_config)
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
             name="chat_completion_stream",
-            input=llm_config.model_dump(),
+            input=completion_kwargs,
         ) as span:
             # Direct streaming outside temporal - yield each chunk as it comes
             chunks: list[Completion] = []
-            async for chunk in self.llm_gateway.acompletion_stream(**llm_config.model_dump()):
+            async for chunk in self.llm_gateway.acompletion_stream(**completion_kwargs):
                 chunks.append(chunk)
                 yield chunk
             if span:
+                # The usage-bearing final chunk survives concat, so the dumped
+                # completion carries usage for billing
                 span.output = concat_completion_chunks(chunks).model_dump()
 
     async def chat_completion_stream_auto_send(
@@ -190,11 +211,12 @@ class LiteLLMService:
         if not llm_config.stream:
             llm_config.stream = True
 
+        completion_kwargs = _stream_kwargs_with_usage(llm_config)
         trace = self.tracer.trace(trace_id)
         async with trace.span(
             parent_id=parent_span_id,
             name="chat_completion_stream_auto_send",
-            input=llm_config.model_dump(),
+            input=completion_kwargs,
         ) as span:
             # Use streaming context manager
             async with self.streaming_service.streaming_task_message_context(
@@ -208,8 +230,11 @@ class LiteLLMService:
             ) as streaming_context:
                 # Get the streaming response
                 chunks = []
-                async for response in self.llm_gateway.acompletion_stream(**llm_config.model_dump()):
+                async for response in self.llm_gateway.acompletion_stream(**completion_kwargs):
                     heartbeat_if_in_workflow("chat completion streaming")
+                    # Store every chunk for final message assembly, including
+                    # the usage-only final chunk, which has no choices
+                    chunks.append(response)
                     if response.choices and len(response.choices) > 0 and response.choices[0].delta:
                         delta = response.choices[0].delta.content
                         if delta:
@@ -222,9 +247,6 @@ class LiteLLMService:
                                 ),
                             )
                             heartbeat_if_in_workflow("content chunk streamed")
-
-                        # Store the chunk for final message assembly
-                        chunks.append(response)
 
                 # Update the final message content
                 complete_message = concat_completion_chunks(chunks)
@@ -246,6 +268,10 @@ class LiteLLMService:
 
             if span:
                 if streaming_context.task_message:
-                    span.output = streaming_context.task_message.model_dump()
+                    output = streaming_context.task_message.model_dump()
+                    # Per-call usage for billing; deduped against any turn aggregate
+                    if complete_message.usage is not None:
+                        output["usage"] = complete_message.usage.model_dump()
+                    span.output = output
 
         return streaming_context.task_message if streaming_context.task_message else None

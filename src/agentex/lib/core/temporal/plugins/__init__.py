@@ -11,7 +11,6 @@ The streaming implementation works by:
 Example:
     >>> from agentex.lib.core.temporal.plugins.openai_agents import (
     ...     TemporalStreamingModelProvider,
-    ...     TemporalTracingModelProvider,
     ...     ContextInterceptor,
     ... )
     >>> from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
@@ -37,7 +36,6 @@ from agentex.lib.core.temporal.plugins.openai_agents import (
     ContextInterceptor,
     TemporalStreamingHooks,
     TemporalStreamingModel,
-    TemporalTracingModelProvider,
     TemporalStreamingModelProvider,
     streaming_task_id,
     streaming_trace_id,
@@ -48,7 +46,6 @@ from agentex.lib.core.temporal.plugins.openai_agents import (
 __all__ = [
     "TemporalStreamingModel",
     "TemporalStreamingModelProvider",
-    "TemporalTracingModelProvider",
     "ContextInterceptor",
     "streaming_task_id",
     "streaming_trace_id",

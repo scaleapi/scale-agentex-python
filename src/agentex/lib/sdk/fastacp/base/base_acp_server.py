@@ -22,6 +22,7 @@ from agentex.protocol.acp import (
     CancelTaskParams,
     CreateTaskParams,
     SendMessageParams,
+    InterruptTaskParams,
 )
 from agentex.lib.utils.logging import make_logger, ctx_var_request_id
 from agentex.protocol.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
@@ -68,6 +69,7 @@ class BaseACPServer(FastAPI):
     Available methods:
     - event/send → Send a message to a task
     - task/cancel → Cancel a task
+    - task/interrupt → Interrupt the in-flight turn (non-terminal; task stays continuable)
     - task/approve → Approve a task
     """
 
@@ -324,6 +326,7 @@ class BaseACPServer(FastAPI):
     - on_task_create
     - on_task_event_send
     - on_task_cancel
+    - on_task_interrupt
 
     ACP Type: Sync
     Decorators:
@@ -360,6 +363,18 @@ class BaseACPServer(FastAPI):
         """Handle task/cancel method"""
         wrapped = self._wrap_handler(fn)
         self._handlers[RPCMethod.TASK_CANCEL] = wrapped
+        return fn
+
+    # Type: Async
+    def on_task_interrupt(self, fn: Callable[[InterruptTaskParams], Awaitable[Any]]):
+        """Handle task/interrupt method.
+
+        Non-terminal counterpart to ``on_task_cancel``: forwards the interrupt to
+        the agent so it can stop the in-flight turn while leaving the task
+        continuable. See the interrupt-and-queue design doc, section 7.
+        """
+        wrapped = self._wrap_handler(fn)
+        self._handlers[RPCMethod.TASK_INTERRUPT] = wrapped
         return fn
 
     # Type: Sync

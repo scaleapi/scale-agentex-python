@@ -118,10 +118,20 @@ class ClaudeCodeTurn:
     def __init__(self, lines: AsyncIterator[str | dict[str, Any]]) -> None:
         self._lines = lines
         self._result_envelope: dict[str, Any] | None = None
+        # session_id captured from the early system/init envelope. This is what
+        # keeps an interrupted-before-completion turn resumable: the terminal
+        # ``result`` envelope never arrives when a turn is cut short, so we must
+        # capture the session id up front (from init) rather than only at the end.
+        self._init_session_id: str | None = None
         self._events_stream: AsyncIterator[StreamTaskMessage] | None = None
 
     async def _on_result(self, envelope: dict[str, Any]) -> None:
         self._result_envelope = envelope
+
+    async def _on_init(self, envelope: dict[str, Any]) -> None:
+        sid = envelope.get("session_id")
+        if sid:
+            self._init_session_id = sid
 
     @property
     def events(self) -> AsyncIterator[StreamTaskMessage]:
@@ -129,6 +139,7 @@ class ClaudeCodeTurn:
             self._events_stream = convert_claude_code_to_agentex_events(
                 self._lines,
                 on_result=self._on_result,
+                on_init=self._on_init,
             )
         return self._events_stream
 
@@ -136,13 +147,16 @@ class ClaudeCodeTurn:
     def session_id(self) -> str | None:
         """The Claude Code session id, for resuming a multi-turn session.
 
-        Valid only after ``events`` has been fully consumed (populated by the
-        ``result`` envelope). Returns ``None`` if the stream was truncated or
-        Claude Code reported no session id.
+        Prefers the id from the terminal ``result`` envelope (fully-complete
+        turn), then falls back to the id captured from the early ``system/init``
+        envelope. The init fallback is what makes a turn that was interrupted
+        before completion still resumable (no ``result`` is emitted then).
+        Returns ``None`` only if neither envelope was seen (e.g. the stream was
+        truncated before init) or Claude Code reported no session id.
         """
-        if not self._result_envelope:
-            return None
-        return self._result_envelope.get("session_id")
+        if self._result_envelope and self._result_envelope.get("session_id"):
+            return self._result_envelope.get("session_id")
+        return self._init_session_id
 
     def usage(self) -> TurnUsage:
         """Return normalised usage for this turn.

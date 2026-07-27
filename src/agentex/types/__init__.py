@@ -56,6 +56,7 @@ from .checkpoint_put_params import CheckpointPutParams as CheckpointPutParams
 from .message_create_params import MessageCreateParams as MessageCreateParams
 from .message_list_response import MessageListResponse as MessageListResponse
 from .message_update_params import MessageUpdateParams as MessageUpdateParams
+from .task_interrupt_params import TaskInterruptParams as TaskInterruptParams
 from .task_terminate_params import TaskTerminateParams as TaskTerminateParams
 from .tool_response_content import ToolResponseContent as ToolResponseContent
 from .tracker_list_response import TrackerListResponse as TrackerListResponse

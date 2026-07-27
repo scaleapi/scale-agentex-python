@@ -23,7 +23,9 @@ class TaskListParams(TypedDict, total=False):
 
     relationships: List[Literal["agents"]]
 
-    status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]]
+    status: Optional[
+        Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "INTERRUPTED", "TERMINATED", "TIMED_OUT", "DELETED"]
+    ]
     """Filter tasks by status (e.g. RUNNING, COMPLETED)."""
 
     task_metadata: Optional[str]

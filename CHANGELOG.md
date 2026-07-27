@@ -12,6 +12,30 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.20.0 (2026-07-16)
+
+Full Changelog: [agentex-client-v0.19.0...agentex-client-v0.20.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.19.0...agentex-client-v0.20.0)
+
+### Features
+
+* **api:** add interrupt task ([936a2b1](https://github.com/scaleapi/scale-agentex-python/commit/936a2b1d28a5409bd7548d59b0f18491495c805b))
+* **api:** add task/interrupt method and INTERRUPTED status to agents/tasks ([4f1c093](https://github.com/scaleapi/scale-agentex-python/commit/4f1c09348c2ddffeb8c78738fb9b7aa14ed4b752))
+* **interrupt:** task/interrupt hook + protocol + resume-safe session capture (AGX1-391) ([#462](https://github.com/scaleapi/scale-agentex-python/issues/462)) ([eaa3dd5](https://github.com/scaleapi/scale-agentex-python/commit/eaa3dd526b88c454fc604d0e617f7191b66952bb))
+
+## 0.19.0 (2026-07-14)
+
+Full Changelog: [agentex-client-v0.18.0...agentex-client-v0.19.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.18.0...agentex-client-v0.19.0)
+
+### Features
+
+* **tracing:** emit token usage on spans for SGP billing ([#458](https://github.com/scaleapi/scale-agentex-python/issues/458)) ([7d19ada](https://github.com/scaleapi/scale-agentex-python/commit/7d19ada2db5d1eca5268a10fe04dfc85a367cf7f))
+
+
+### Bug Fixes
+
+* **internal:** resolve build failures ([9245b70](https://github.com/scaleapi/scale-agentex-python/commit/9245b700ceee95be9a0c478e518d9c06228d4b9f))
+* **tracing:** capture span body exceptions and export SGP status=ERROR ([#460](https://github.com/scaleapi/scale-agentex-python/issues/460)) ([6c23d76](https://github.com/scaleapi/scale-agentex-python/commit/6c23d7625ccf58ac9793dcf5219e4f7f4de38353))
+
 ## 0.18.0 (2026-07-10)
 
 Full Changelog: [agentex-client-v0.17.0...agentex-client-v0.18.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.17.0...agentex-client-v0.18.0)

@@ -8,7 +8,8 @@ from temporalio.exceptions import ActivityError
 
 import agentex.lib.adk._modules.tracing as _tracing_mod
 from agentex.types.span import Span
-from agentex.lib.adk._modules.tracing import TracingModule
+from agentex.lib.core.harness.types import TurnUsage
+from agentex.lib.adk._modules.tracing import TurnSpan, TracingModule
 from agentex.lib.core.services.adk.tracing import TracingService
 
 
@@ -113,10 +114,11 @@ class TestTracingModuleTemporalPath:
         mock_service, module = _make_module()
         mock_meter = _make_metric_meter()
 
-        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), \
-                patch.object(_tracing_mod, "ActivityHelpers") as mock_helpers, \
-                patch.object(_tracing_mod.workflow, "logger") as mock_logger, \
-                patch.object(_tracing_mod.workflow, "metric_meter", return_value=mock_meter):
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), patch.object(
+            _tracing_mod, "ActivityHelpers"
+        ) as mock_helpers, patch.object(_tracing_mod.workflow, "logger") as mock_logger, patch.object(
+            _tracing_mod.workflow, "metric_meter", return_value=mock_meter
+        ):
             mock_helpers.execute_activity = AsyncMock(side_effect=_make_activity_error())
             result = await module.start_span(trace_id="trace-123", name="test-span")
 
@@ -127,9 +129,7 @@ class TestTracingModuleTemporalPath:
             description="Temporal tracing span activities dropped after fail-open",
             unit="1",
         )
-        mock_meter.create_counter.return_value.add.assert_called_once_with(
-            1, {"event_type": "start"}
-        )
+        mock_meter.create_counter.return_value.add.assert_called_once_with(1, {"event_type": "start"})
         mock_helpers.execute_activity.assert_called_once()
         mock_service.start_span.assert_not_called()
 
@@ -138,10 +138,11 @@ class TestTracingModuleTemporalPath:
         span = _make_span()
         mock_meter = _make_metric_meter()
 
-        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), \
-                patch.object(_tracing_mod, "ActivityHelpers") as mock_helpers, \
-                patch.object(_tracing_mod.workflow, "logger") as mock_logger, \
-                patch.object(_tracing_mod.workflow, "metric_meter", return_value=mock_meter):
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), patch.object(
+            _tracing_mod, "ActivityHelpers"
+        ) as mock_helpers, patch.object(_tracing_mod.workflow, "logger") as mock_logger, patch.object(
+            _tracing_mod.workflow, "metric_meter", return_value=mock_meter
+        ):
             mock_helpers.execute_activity = AsyncMock(side_effect=_make_activity_error())
             result = await module.end_span(trace_id="trace-123", span=span)
 
@@ -152,18 +153,16 @@ class TestTracingModuleTemporalPath:
             description="Temporal tracing span activities dropped after fail-open",
             unit="1",
         )
-        mock_meter.create_counter.return_value.add.assert_called_once_with(
-            1, {"event_type": "end"}
-        )
+        mock_meter.create_counter.return_value.add.assert_called_once_with(1, {"event_type": "end"})
         mock_helpers.execute_activity.assert_called_once()
         mock_service.end_span.assert_not_called()
 
     async def test_context_manager_skips_end_when_temporal_start_fails(self):
         mock_service, module = _make_module()
 
-        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), \
-                patch.object(_tracing_mod, "ActivityHelpers") as mock_helpers, \
-                patch.object(_tracing_mod.workflow, "logger"):
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), patch.object(
+            _tracing_mod, "ActivityHelpers"
+        ) as mock_helpers, patch.object(_tracing_mod.workflow, "logger"):
             mock_helpers.execute_activity = AsyncMock(side_effect=_make_activity_error())
             async with module.span(trace_id="trace-123", name="test-span") as span:
                 assert span is None
@@ -175,8 +174,9 @@ class TestTracingModuleTemporalPath:
     async def test_start_span_in_workflow_propagates_unexpected_errors(self):
         mock_service, module = _make_module()
 
-        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), \
-                patch.object(_tracing_mod, "ActivityHelpers") as mock_helpers:
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), patch.object(
+            _tracing_mod, "ActivityHelpers"
+        ) as mock_helpers:
             mock_helpers.execute_activity = AsyncMock(side_effect=RuntimeError("bad response shape"))
             try:
                 await module.start_span(trace_id="trace-123", name="test-span")
@@ -193,11 +193,11 @@ class TestTracingModuleTemporalPath:
         activity_error = _make_activity_error()
         mock_meter = _make_metric_meter()
 
-        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), \
-                patch.object(_tracing_mod, "ActivityHelpers") as mock_helpers, \
-                patch.object(_tracing_mod, "is_cancelled_exception", return_value=True), \
-                patch.object(_tracing_mod.workflow, "logger") as mock_logger, \
-                patch.object(_tracing_mod.workflow, "metric_meter", return_value=mock_meter):
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), patch.object(
+            _tracing_mod, "ActivityHelpers"
+        ) as mock_helpers, patch.object(_tracing_mod, "is_cancelled_exception", return_value=True), patch.object(
+            _tracing_mod.workflow, "logger"
+        ) as mock_logger, patch.object(_tracing_mod.workflow, "metric_meter", return_value=mock_meter):
             mock_helpers.execute_activity = AsyncMock(side_effect=activity_error)
 
             with pytest.raises(ActivityError):
@@ -214,11 +214,11 @@ class TestTracingModuleTemporalPath:
         activity_error = _make_activity_error()
         mock_meter = _make_metric_meter()
 
-        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), \
-                patch.object(_tracing_mod, "ActivityHelpers") as mock_helpers, \
-                patch.object(_tracing_mod, "is_cancelled_exception", return_value=True), \
-                patch.object(_tracing_mod.workflow, "logger") as mock_logger, \
-                patch.object(_tracing_mod.workflow, "metric_meter", return_value=mock_meter):
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=True), patch.object(
+            _tracing_mod, "ActivityHelpers"
+        ) as mock_helpers, patch.object(_tracing_mod, "is_cancelled_exception", return_value=True), patch.object(
+            _tracing_mod.workflow, "logger"
+        ) as mock_logger, patch.object(_tracing_mod.workflow, "metric_meter", return_value=mock_meter):
             mock_helpers.execute_activity = AsyncMock(side_effect=activity_error)
 
             with pytest.raises(ActivityError):
@@ -255,6 +255,164 @@ class TestSpanContextManager:
         with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
             async with module.span(trace_id="", name="test-span") as span:
                 assert span is None
+
+        mock_service.start_span.assert_not_called()
+        mock_service.end_span.assert_not_called()
+
+
+class TestTurnSpan:
+    async def test_turn_span_records_aggregate_usage_in_data(self):
+        mock_service, module = _make_module()
+        started = _make_span(task_id="task-abc")
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(
+                trace_id="trace-123",
+                name="turn",
+                task_id="task-abc",
+            ) as turn:
+                assert isinstance(turn, TurnSpan)
+                turn.output = {"response": "hello"}
+                turn.record_usage(
+                    usage={"input_tokens": 100, "output_tokens": 40, "total_tokens": 140},
+                    cost_usd=0.0125,
+                )
+
+        ended_span = mock_service.end_span.call_args.kwargs["span"]
+        assert ended_span.data["usage"] == {
+            "input_tokens": 100,
+            "output_tokens": 40,
+            "total_tokens": 140,
+        }
+        assert ended_span.data["cost_usd"] == 0.0125
+        # The aggregate lives in data, never in output — output stays payload-only
+        assert ended_span.output == {"response": "hello"}
+
+    async def test_turn_span_record_usage_with_turn_usage(self):
+        mock_service, module = _make_module()
+        started = _make_span()
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        turn_usage = TurnUsage(
+            model="gpt-4o",
+            input_tokens=10,
+            output_tokens=5,
+            cached_input_tokens=2,
+            total_tokens=15,
+            cost_usd=0.5,
+        )
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                turn.record_usage(turn_usage)
+
+        ended_span = mock_service.end_span.call_args.kwargs["span"]
+        # cost_usd is lifted out of the blob to data["cost_usd"]
+        assert ended_span.data["cost_usd"] == 0.5
+        assert ended_span.data["usage"] == {
+            "model": "gpt-4o",
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "cached_input_tokens": 2,
+            "total_tokens": 15,
+            "num_tool_calls": 0,
+            "num_reasoning_blocks": 0,
+        }
+
+    async def test_turn_span_explicit_cost_overrides_turn_usage_cost(self):
+        mock_service, module = _make_module()
+        started = _make_span()
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                turn.record_usage(TurnUsage(input_tokens=1, cost_usd=0.5), cost_usd=0.75)
+
+        ended_span = mock_service.end_span.call_args.kwargs["span"]
+        assert ended_span.data["cost_usd"] == 0.75
+
+    async def test_turn_span_warns_on_unrecognized_usage_keys(self, caplog):
+        mock_service, module = _make_module()
+        started = _make_span()
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                with caplog.at_level("WARNING"):
+                    turn.record_usage(usage={"inputTokens": 10})
+
+        assert any("no recognized token keys" in message for message in caplog.messages)
+
+    async def test_turn_span_preserves_existing_data(self):
+        mock_service, module = _make_module()
+        started = _make_span(data={"custom": "value"})
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn", data={"custom": "value"}) as turn:
+                turn.record_usage(usage={"prompt_tokens": 3, "completion_tokens": 4})
+
+        ended_span = mock_service.end_span.call_args.kwargs["span"]
+        assert ended_span.data["custom"] == "value"
+        assert ended_span.data["usage"] == {"prompt_tokens": 3, "completion_tokens": 4}
+
+    async def test_turn_span_warns_and_replaces_non_dict_data(self, caplog):
+        mock_service, module = _make_module()
+        started = _make_span(data=[{"item": 1}])
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                with caplog.at_level("WARNING"):
+                    turn.record_usage(usage={"input_tokens": 1, "output_tokens": 2})
+
+        assert any("existing data will be replaced" in message for message in caplog.messages)
+        ended_span = mock_service.end_span.call_args.kwargs["span"]
+        assert ended_span.data == {"usage": {"input_tokens": 1, "output_tokens": 2}}
+
+    async def test_turn_span_dict_data_does_not_warn(self, caplog):
+        mock_service, module = _make_module()
+        started = _make_span(data={"custom": "value"})
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                with caplog.at_level("WARNING"):
+                    turn.record_usage(usage={"input_tokens": 1})
+
+        assert not any("existing data will be replaced" in message for message in caplog.messages)
+
+    async def test_turn_span_cost_only(self):
+        mock_service, module = _make_module()
+        started = _make_span()
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="trace-123", name="turn") as turn:
+                turn.record_usage(cost_usd=0.5)
+
+        ended_span = mock_service.end_span.call_args.kwargs["span"]
+        assert ended_span.data == {"cost_usd": 0.5}
+        assert "usage" not in ended_span.data
+
+    async def test_turn_span_noop_when_no_trace_id(self):
+        mock_service, module = _make_module()
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            async with module.turn_span(trace_id="", name="turn") as turn:
+                assert turn.span is None
+                # Must not raise when tracing is disabled
+                turn.record_usage(usage={"input_tokens": 1}, cost_usd=0.1)
+                turn.output = {"response": "x"}
+                assert turn.output is None
 
         mock_service.start_span.assert_not_called()
         mock_service.end_span.assert_not_called()

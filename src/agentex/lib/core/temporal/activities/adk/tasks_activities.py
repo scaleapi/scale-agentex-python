@@ -18,6 +18,7 @@ class TasksActivityName(str, Enum):
     GET_TASK = "get-task"
     DELETE_TASK = "delete-task"
     CANCEL_TASK = "cancel-task"
+    INTERRUPT_TASK = "interrupt-task"
     COMPLETE_TASK = "complete-task"
     FAIL_TASK = "fail-task"
     TERMINATE_TASK = "terminate-task"
@@ -77,6 +78,15 @@ class TasksActivities:
     @activity.defn(name=TasksActivityName.CANCEL_TASK)
     async def cancel_task(self, params: TaskStatusTransitionParams) -> Task:
         return await self._tasks_service.cancel_task(
+            task_id=params.task_id,
+            reason=params.reason,
+            trace_id=params.trace_id,
+            parent_span_id=params.parent_span_id,
+        )
+
+    @activity.defn(name=TasksActivityName.INTERRUPT_TASK)
+    async def interrupt_task(self, params: TaskStatusTransitionParams) -> Task:
+        return await self._tasks_service.interrupt_task(
             task_id=params.task_id,
             reason=params.reason,
             trace_id=params.trace_id,

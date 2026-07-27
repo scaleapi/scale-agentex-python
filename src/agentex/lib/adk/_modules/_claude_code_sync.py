@@ -74,6 +74,35 @@ def _extract_summary(text: str, max_len: int = 300) -> str:
 async def convert_claude_code_to_agentex_events(
     lines: AsyncIterator[str | dict[str, Any]],
     on_result: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    on_init: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+) -> AsyncIterator[StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone]:
+    """Public tap: convert a claude-code ``stream-json`` line stream to events.
+
+    Thin wrapper over :func:`_convert_claude_code_impl` that owns the
+    cancellation backstop: a ``finally`` closes the underlying ``lines`` iterator
+    (when it exposes ``aclose``) whenever this generator is closed — including on
+    the ``GeneratorExit``/``CancelledError`` raised when a consuming task is
+    cancelled mid-turn by an interrupt. This terminates the CLI stdout handle /
+    subprocess instead of leaking it. Kept as a wrapper (rather than a
+    ``try/finally`` inside the impl) so the large parser body stays untouched.
+    """
+    inner = _convert_claude_code_impl(lines, on_result=on_result, on_init=on_init)
+    try:
+        async for event in inner:
+            yield event
+    finally:
+        inner_aclose = getattr(inner, "aclose", None)
+        if inner_aclose is not None:
+            await inner_aclose()
+        aclose = getattr(lines, "aclose", None)
+        if aclose is not None:
+            await aclose()
+
+
+async def _convert_claude_code_impl(
+    lines: AsyncIterator[str | dict[str, Any]],
+    on_result: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    on_init: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
 ) -> AsyncIterator[StreamTaskMessageStart | StreamTaskMessageDelta | StreamTaskMessageFull | StreamTaskMessageDone]:
     """Convert a claude-code ``stream-json`` line stream into Agentex ``StreamTaskMessage*`` events.
 
@@ -85,7 +114,20 @@ async def convert_claude_code_to_agentex_events(
     caller can capture usage and cost. It is awaited before the generator
     continues. When ``None``, the result envelope is silently dropped.
 
+    ``on_init`` is called with the ``system``/``init`` envelope the moment it
+    arrives (the FIRST envelope of a claude-code stream), so the caller can
+    capture ``session_id`` EARLY — before the turn completes. This is what makes
+    an interrupted-before-completion turn resumable: the terminal ``result``
+    envelope (which ``on_result`` reads) never arrives when a turn is cut short,
+    so relying on it alone loses the session id. Mirrors how the inline
+    ``claude_agents`` activity captures session_id from its SystemMessage init.
+    When ``None``, the init envelope's session metadata is not surfaced early.
+
     Envelope → canonical mapping is documented in this module's docstring.
+
+    A ``finally`` closes the underlying ``lines`` iterator (when it exposes
+    ``aclose``) as a backstop, so a cancellation mid-turn (e.g. an interrupt that
+    cancels the consuming task) does not leak the CLI stdout handle / subprocess.
     """
     next_index = 0
     tool_call_count = 0
@@ -355,9 +397,14 @@ async def convert_claude_code_to_agentex_events(
         # system / init — session metadata (ignored at this layer)
         # -----------------------------------------------------------------------
         elif evt_type == "system":
-            # Session ID tracking and MCP status logging are provider concerns.
-            # This pure parser layer intentionally emits nothing for system events.
-            pass
+            # Session ID tracking and MCP status logging are provider concerns:
+            # this pure parser layer emits no StreamTaskMessage for system events.
+            # It DOES surface the init envelope's session metadata early via
+            # on_init so a caller can capture session_id before the turn's
+            # terminal ``result`` arrives — required for resuming a turn that was
+            # interrupted before completion (no ``result`` is ever emitted then).
+            if on_init is not None and evt.get("subtype") == "init":
+                await on_init(evt)
 
         # -----------------------------------------------------------------------
         # result — carries usage + cost; fired to on_result, not emitted as msgs

@@ -14,6 +14,7 @@ from ..types import (
     task_timeout_params,
     task_complete_params,
     task_retrieve_params,
+    task_interrupt_params,
     task_terminate_params,
     task_update_by_id_params,
     task_update_by_name_params,
@@ -109,7 +110,9 @@ class TasksResource(SyncAPIResource):
         order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         relationships: List[Literal["agents"]] | Omit = omit,
-        status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]]
+        status: Optional[
+            Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "INTERRUPTED", "TERMINATED", "TIMED_OUT", "DELETED"]
+        ]
         | Omit = omit,
         task_metadata: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -119,12 +122,13 @@ class TasksResource(SyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskListResponse:
-        """List all tasks.
+        """List tasks.
+
+        Returns a lean summary per task and omits `params`; fetch GET
+        /tasks/{task_id} for the full record including `params`.
 
         Args:
-          status: Filter tasks by status (e.g.
-
-        RUNNING, COMPLETED).
+          status: Filter tasks by status (e.g. RUNNING, COMPLETED).
 
           task_metadata:
               JSON-encoded object used to filter tasks via JSONB containment. Example:
@@ -328,6 +332,44 @@ class TasksResource(SyncAPIResource):
         return self._post(
             path_template("/tasks/{task_id}/fail", task_id=task_id),
             body=maybe_transform({"reason": reason}, task_fail_params.TaskFailParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Task,
+        )
+
+    def interrupt(
+        self,
+        task_id: str,
+        *,
+        reason: Optional[str] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> Task:
+        """Stop the in-flight turn without terminating the task.
+
+        Transitions a running task
+        to the non-terminal INTERRUPTED status; the task stays continuable and the next
+        message or event resumes it.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not task_id:
+            raise ValueError(f"Expected a non-empty value for `task_id` but received {task_id!r}")
+        return self._post(
+            path_template("/tasks/{task_id}/interrupt", task_id=task_id),
+            body=maybe_transform({"reason": reason}, task_interrupt_params.TaskInterruptParams),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -705,7 +747,9 @@ class AsyncTasksResource(AsyncAPIResource):
         order_direction: str | Omit = omit,
         page_number: int | Omit = omit,
         relationships: List[Literal["agents"]] | Omit = omit,
-        status: Optional[Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "TERMINATED", "TIMED_OUT", "DELETED"]]
+        status: Optional[
+            Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "INTERRUPTED", "TERMINATED", "TIMED_OUT", "DELETED"]
+        ]
         | Omit = omit,
         task_metadata: Optional[str] | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
@@ -715,12 +759,13 @@ class AsyncTasksResource(AsyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskListResponse:
-        """List all tasks.
+        """List tasks.
+
+        Returns a lean summary per task and omits `params`; fetch GET
+        /tasks/{task_id} for the full record including `params`.
 
         Args:
-          status: Filter tasks by status (e.g.
-
-        RUNNING, COMPLETED).
+          status: Filter tasks by status (e.g. RUNNING, COMPLETED).
 
           task_metadata:
               JSON-encoded object used to filter tasks via JSONB containment. Example:
@@ -924,6 +969,44 @@ class AsyncTasksResource(AsyncAPIResource):
         return await self._post(
             path_template("/tasks/{task_id}/fail", task_id=task_id),
             body=await async_maybe_transform({"reason": reason}, task_fail_params.TaskFailParams),
+            options=make_request_options(
+                extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
+            ),
+            cast_to=Task,
+        )
+
+    async def interrupt(
+        self,
+        task_id: str,
+        *,
+        reason: Optional[str] | Omit = omit,
+        # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
+        # The extra values given here take precedence over values defined on the client or passed to this method.
+        extra_headers: Headers | None = None,
+        extra_query: Query | None = None,
+        extra_body: Body | None = None,
+        timeout: float | httpx.Timeout | None | NotGiven = not_given,
+    ) -> Task:
+        """Stop the in-flight turn without terminating the task.
+
+        Transitions a running task
+        to the non-terminal INTERRUPTED status; the task stays continuable and the next
+        message or event resumes it.
+
+        Args:
+          extra_headers: Send extra headers
+
+          extra_query: Add additional query parameters to the request
+
+          extra_body: Add additional JSON properties to the request
+
+          timeout: Override the client-level default timeout for this request, in seconds
+        """
+        if not task_id:
+            raise ValueError(f"Expected a non-empty value for `task_id` but received {task_id!r}")
+        return await self._post(
+            path_template("/tasks/{task_id}/interrupt", task_id=task_id),
+            body=await async_maybe_transform({"reason": reason}, task_interrupt_params.TaskInterruptParams),
             options=make_request_options(
                 extra_headers=extra_headers, extra_query=extra_query, extra_body=extra_body, timeout=timeout
             ),
@@ -1256,6 +1339,9 @@ class TasksResourceWithRawResponse:
         self.fail = to_raw_response_wrapper(
             tasks.fail,
         )
+        self.interrupt = to_raw_response_wrapper(
+            tasks.interrupt,
+        )
         self.query_workflow = to_raw_response_wrapper(
             tasks.query_workflow,
         )
@@ -1306,6 +1392,9 @@ class AsyncTasksResourceWithRawResponse:
         )
         self.fail = async_to_raw_response_wrapper(
             tasks.fail,
+        )
+        self.interrupt = async_to_raw_response_wrapper(
+            tasks.interrupt,
         )
         self.query_workflow = async_to_raw_response_wrapper(
             tasks.query_workflow,
@@ -1358,6 +1447,9 @@ class TasksResourceWithStreamingResponse:
         self.fail = to_streamed_response_wrapper(
             tasks.fail,
         )
+        self.interrupt = to_streamed_response_wrapper(
+            tasks.interrupt,
+        )
         self.query_workflow = to_streamed_response_wrapper(
             tasks.query_workflow,
         )
@@ -1408,6 +1500,9 @@ class AsyncTasksResourceWithStreamingResponse:
         )
         self.fail = async_to_streamed_response_wrapper(
             tasks.fail,
+        )
+        self.interrupt = async_to_streamed_response_wrapper(
+            tasks.interrupt,
         )
         self.query_workflow = async_to_streamed_response_wrapper(
             tasks.query_workflow,

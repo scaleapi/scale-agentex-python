@@ -527,6 +527,34 @@ class _CodexStreamProcessor:
 async def convert_codex_to_agentex_events(
     events: AsyncIterator[str | dict[str, Any]],
     on_result: Callable[[dict[str, Any]], None] | None = None,
+    on_init: Callable[[dict[str, Any]], None] | None = None,
+) -> AsyncIterator[StreamTaskMessage]:
+    """Public tap: convert a ``codex exec --json`` event stream to events.
+
+    Thin wrapper over :func:`_convert_codex_impl` that owns the cancellation
+    backstop: a ``finally`` closes the underlying ``events`` iterator (when it
+    exposes ``aclose``) whenever this generator is closed — including on the
+    ``GeneratorExit``/``CancelledError`` raised when a consuming task is
+    cancelled mid-turn by an interrupt. This terminates the CLI stdout handle /
+    subprocess instead of leaking it.
+    """
+    inner = _convert_codex_impl(events, on_result=on_result, on_init=on_init)
+    try:
+        async for event in inner:
+            yield event
+    finally:
+        inner_aclose = getattr(inner, "aclose", None)
+        if inner_aclose is not None:
+            await inner_aclose()
+        aclose = getattr(events, "aclose", None)
+        if aclose is not None:
+            await aclose()
+
+
+async def _convert_codex_impl(
+    events: AsyncIterator[str | dict[str, Any]],
+    on_result: Callable[[dict[str, Any]], None] | None = None,
+    on_init: Callable[[dict[str, Any]], None] | None = None,
 ) -> AsyncIterator[StreamTaskMessage]:
     """Convert a ``codex exec --json`` event stream into Agentex stream events.
 
@@ -546,6 +574,12 @@ async def convert_codex_to_agentex_events(
                 ``reasoning_count`` — int
             Use this to record turn-level metrics / usage in the caller's span
             without coupling this module to span/tracing APIs.
+        on_init: Optional callback invoked once when the ``thread.started`` event
+            is seen (the first event of a codex stream). Receives ``{"session_id":
+            <thread_id or None>}``. This surfaces the session id EARLY — before
+            the turn completes — so a turn interrupted before completion is still
+            resumable (``turn.completed`` / ``on_result`` never fires then). The
+            codex counterpart of the claude-code ``system/init`` early capture.
 
     Yields:
         Canonical ``StreamTaskMessage*`` events (Start/Delta/Full/Done) with
@@ -589,6 +623,11 @@ async def convert_codex_to_agentex_events(
         messages = processor.process(evt)
         for msg in messages:
             yield msg
+
+        # Surface session_id early (processor sets it while handling
+        # thread.started) so an interrupted turn is still resumable.
+        if on_init is not None and evt.get("type") == "thread.started":
+            on_init({"session_id": processor.session_id})
 
     if on_result is not None:
         on_result(

@@ -277,6 +277,7 @@ class SchedulesResource(SyncAPIResource):
         self,
         agent_id: str,
         *,
+        include_live: bool | Omit = omit,
         limit: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -289,6 +290,8 @@ class SchedulesResource(SyncAPIResource):
         List run schedules for an agent.
 
         Args:
+          include_live: Include live Temporal state and upcoming action times.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -306,7 +309,13 @@ class SchedulesResource(SyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=maybe_transform({"limit": limit}, schedule_list_params.ScheduleListParams),
+                query=maybe_transform(
+                    {
+                        "include_live": include_live,
+                        "limit": limit,
+                    },
+                    schedule_list_params.ScheduleListParams,
+                ),
             ),
             cast_to=ScheduleListResponse,
         )
@@ -1056,6 +1065,7 @@ class AsyncSchedulesResource(AsyncAPIResource):
         self,
         agent_id: str,
         *,
+        include_live: bool | Omit = omit,
         limit: int | Omit = omit,
         # Use the following arguments if you need to pass additional parameters to the API that aren't available via kwargs.
         # The extra values given here take precedence over values defined on the client or passed to this method.
@@ -1068,6 +1078,8 @@ class AsyncSchedulesResource(AsyncAPIResource):
         List run schedules for an agent.
 
         Args:
+          include_live: Include live Temporal state and upcoming action times.
+
           extra_headers: Send extra headers
 
           extra_query: Add additional query parameters to the request
@@ -1085,7 +1097,13 @@ class AsyncSchedulesResource(AsyncAPIResource):
                 extra_query=extra_query,
                 extra_body=extra_body,
                 timeout=timeout,
-                query=await async_maybe_transform({"limit": limit}, schedule_list_params.ScheduleListParams),
+                query=await async_maybe_transform(
+                    {
+                        "include_live": include_live,
+                        "limit": limit,
+                    },
+                    schedule_list_params.ScheduleListParams,
+                ),
             ),
             cast_to=ScheduleListResponse,
         )

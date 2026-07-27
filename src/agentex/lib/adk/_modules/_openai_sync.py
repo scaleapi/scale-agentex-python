@@ -145,6 +145,25 @@ def _extract_tool_response_info(tool_map: dict[str, Any], tool_output_item: Any)
 
 
 async def convert_openai_to_agentex_events(stream_response):
+    """Public OpenAI tap: parse the event stream, closing the source on exit.
+
+    Thin wrapper over ``_convert_openai_impl`` that adds a cancellation-safe
+    ``finally`` so an interrupted turn tears down the source event stream instead
+    of leaking it. (Resume state is carried by the OpenAI Agents SDK input list,
+    not a session id, so there is no early-session_id capture like the CLI taps.)
+    """
+    inner = _convert_openai_impl(stream_response)
+    try:
+        async for event in inner:
+            yield event
+    finally:
+        for _src in (inner, stream_response):
+            _aclose = getattr(_src, "aclose", None)
+            if _aclose is not None:
+                await _aclose()
+
+
+async def _convert_openai_impl(stream_response):
     """Convert OpenAI streaming events to AgentEx TaskMessageUpdate events with reasoning support.
 
     This is an enhanced version of the base converter that includes support for:

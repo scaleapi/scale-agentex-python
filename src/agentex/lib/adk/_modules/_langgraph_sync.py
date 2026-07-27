@@ -33,6 +33,27 @@ async def convert_langgraph_to_agentex_events(
     stream: Any,
     on_final_ai_message: Optional[Callable[..., None]] = None,
 ) -> AsyncGenerator[Any, None]:
+    """Public LangGraph tap: convert events, closing the source stream on exit.
+
+    Thin wrapper over ``_convert_langgraph_impl`` that adds a cancellation-safe
+    ``finally`` so an interrupted turn tears down the LangGraph ``astream`` source
+    instead of leaking it.
+    """
+    inner = _convert_langgraph_impl(stream, on_final_ai_message=on_final_ai_message)
+    try:
+        async for event in inner:
+            yield event
+    finally:
+        for _src in (inner, stream):
+            _aclose = getattr(_src, "aclose", None)
+            if _aclose is not None:
+                await _aclose()
+
+
+async def _convert_langgraph_impl(
+    stream: Any,
+    on_final_ai_message: Optional[Callable[..., None]] = None,
+) -> AsyncGenerator[Any, None]:
     """Convert LangGraph streaming events to Agentex TaskMessageUpdate events.
 
     Expects the stream from graph.astream() called with

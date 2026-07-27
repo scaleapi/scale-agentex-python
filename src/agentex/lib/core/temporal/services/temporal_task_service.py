@@ -6,7 +6,7 @@ from datetime import timedelta
 from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
-from agentex.protocol.acp import SendEventParams, CreateTaskParams
+from agentex.protocol.acp import SendEventParams, CreateTaskParams, InterruptTaskParams
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.clients.temporal.types import WorkflowState
 from agentex.lib.core.temporal.types.workflow import SignalName
@@ -70,6 +70,23 @@ class TemporalTaskService:
                 agent=agent,
                 task=task,
                 event=event,
+                request=request,
+            ).model_dump(),
+        )
+
+    async def interrupt(self, agent: Agent, task: Task, request: dict | None = None) -> None:
+        """Forward a task/interrupt to the running workflow as a dedicated signal.
+
+        Non-terminal: unlike ``cancel``/``terminate`` this does NOT tear down the
+        workflow. It signals ``interrupt_turn`` so the workflow's ``on_interrupt``
+        hook can stop the in-flight turn while leaving the task continuable.
+        """
+        return await self._temporal_client.send_signal(
+            workflow_id=task.id,
+            signal=SignalName.INTERRUPT_TURN.value,
+            payload=InterruptTaskParams(
+                agent=agent,
+                task=task,
                 request=request,
             ).model_dump(),
         )
