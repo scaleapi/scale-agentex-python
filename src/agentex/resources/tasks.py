@@ -122,12 +122,13 @@ class TasksResource(SyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskListResponse:
-        """List all tasks.
+        """List tasks.
+
+        Returns a lean summary per task and omits `params`; fetch GET
+        /tasks/{task_id} for the full record including `params`.
 
         Args:
-          status: Filter tasks by status (e.g.
-
-        RUNNING, COMPLETED).
+          status: Filter tasks by status (e.g. RUNNING, COMPLETED).
 
           task_metadata:
               JSON-encoded object used to filter tasks via JSONB containment. Example:
@@ -758,12 +759,13 @@ class AsyncTasksResource(AsyncAPIResource):
         extra_body: Body | None = None,
         timeout: float | httpx.Timeout | None | NotGiven = not_given,
     ) -> TaskListResponse:
-        """List all tasks.
+        """List tasks.
+
+        Returns a lean summary per task and omits `params`; fetch GET
+        /tasks/{task_id} for the full record including `params`.
 
         Args:
-          status: Filter tasks by status (e.g.
-
-        RUNNING, COMPLETED).
+          status: Filter tasks by status (e.g. RUNNING, COMPLETED).
 
           task_metadata:
               JSON-encoded object used to filter tasks via JSONB containment. Example:
