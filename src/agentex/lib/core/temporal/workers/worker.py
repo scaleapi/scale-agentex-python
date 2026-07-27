@@ -151,6 +151,7 @@ class AgentexWorker:
         task_queue,
         max_workers: int = 10,
         max_concurrent_activities: int = 10,
+        max_cached_workflows: int = 1000,
         health_check_port: int | None = None,
         plugins: list = [],
         interceptors: list = [],
@@ -162,6 +163,7 @@ class AgentexWorker:
         self.activity_handles = []
         self.max_workers = max_workers
         self.max_concurrent_activities = max_concurrent_activities
+        self.max_cached_workflows = max_cached_workflows
         self.health_check_server_running = False
         self.healthy = False
         self.health_check_port = (
@@ -227,6 +229,7 @@ class AgentexWorker:
             activities=activities,
             workflow_runner=UnsandboxedWorkflowRunner(),
             max_concurrent_activities=self.max_concurrent_activities,
+            max_cached_workflows=self.max_cached_workflows,
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
             interceptors=self.interceptors,  # Pass interceptors to Worker
