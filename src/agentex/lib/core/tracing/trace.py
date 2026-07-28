@@ -11,6 +11,7 @@ from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
+from agentex.lib.core.tracing.obs_ids import obs_correlation
 from agentex.lib.core.tracing.span_error import set_span_error
 from agentex.lib.core.tracing.span_queue import (
     SpanEventType,
@@ -79,6 +80,12 @@ class Trace:
 
         serialized_input = recursive_model_dump(input) if input else None
         serialized_data = recursive_model_dump(data) if data else None
+        # Tag the business span with the active observability trace_id/span_id
+        # (OTel/ddtrace) so it can be correlated to the per-turn obs trace. The
+        # business trace_id stays the run-level task id -- see obs_ids.py.
+        obs = obs_correlation()
+        if obs:
+            serialized_data = {**(serialized_data or {}), **obs}
         id = str(uuid.uuid4())
 
         span = Span(
@@ -229,6 +236,12 @@ class AsyncTrace:
 
         serialized_input = recursive_model_dump(input) if input else None
         serialized_data = recursive_model_dump(data) if data else None
+        # Tag the business span with the active observability trace_id/span_id
+        # (OTel/ddtrace) so it can be correlated to the per-turn obs trace. The
+        # business trace_id stays the run-level task id -- see obs_ids.py.
+        obs = obs_correlation()
+        if obs:
+            serialized_data = {**(serialized_data or {}), **obs}
         id = str(uuid.uuid4())
 
         span = Span(

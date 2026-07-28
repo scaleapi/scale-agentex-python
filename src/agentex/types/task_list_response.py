@@ -11,7 +11,12 @@ __all__ = ["TaskListResponse", "TaskListResponseItem"]
 
 
 class TaskListResponseItem(BaseModel):
-    """Task response model with optional related data based on relationships"""
+    """Lean list-response shape.
+
+    Omits `params` (the arbitrary create-time
+    payload, which can carry per-caller secrets and PII); fetch GET /tasks/{id}
+    for the full record.
+    """
 
     id: str
 
@@ -22,8 +27,6 @@ class TaskListResponseItem(BaseModel):
     created_at: Optional[datetime] = None
 
     name: Optional[str] = None
-
-    params: Optional[Dict[str, object]] = None
 
     status: Optional[
         Literal["CANCELED", "COMPLETED", "FAILED", "RUNNING", "INTERRUPTED", "TERMINATED", "TIMED_OUT", "DELETED"]

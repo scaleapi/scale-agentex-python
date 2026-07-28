@@ -60,7 +60,13 @@ Item sub-types (item.started / item.updated / item.completed)
                              a synthetic ToolRequestContent Full is emitted before the response.
   mcp_tool_call           -> same as command_execution
   web_search              -> same as command_execution
-  todo_list               -> same as command_execution
+  todo_list               -> same as command_execution, plus:
+                               item.updated -> StreamTaskMessageFull(ToolResponseContent)
+                             Codex ticks one in-place todo_list item through
+                             item.updated; each revision is republished under
+                             the same tool_call_id so consumers can render the
+                             checklist filling in rather than jumping to its
+                             final state at end of turn.
   collab_tool_call        -> same as command_execution
   error (item type)       -> StreamTaskMessageFull(TextContent, error text) on completed only
 
@@ -75,9 +81,10 @@ UNMAPPED / PARTIALLY MAPPED EVENTS
                           without this module needing to know about spans.
   item.updated (reasoning): the intermediate cumulative text is discarded;
                             only item.completed carries the final text.
-  item.updated (tool):    tool item types other than agent_message do not
-                          emit updates; item.started opens the request and
-                          item.completed closes it.
+  item.updated (tool):    only todo_list is republished (see above). For the
+                          other tool item types item.started opens the request
+                          and item.completed closes it; any updates in between
+                          carry no state a consumer could act on.
 """
 
 from __future__ import annotations
@@ -110,6 +117,11 @@ _MAX_RESULT_LENGTH = 4000
 
 def _truncate(text: str, max_len: int = _MAX_RESULT_LENGTH) -> str:
     return str(text)[:max_len]
+
+
+# Tool items codex revises in place rather than reopening. Their item.updated
+# events carry real intermediate state, so they are forwarded as responses.
+_PROGRESSIVE_TOOL_ITEMS = frozenset({"todo_list"})
 
 
 def _tool_name_for(item_type: str, payload: dict[str, Any]) -> str:
@@ -466,6 +478,33 @@ class _CodexStreamProcessor:
                     )
                 )
                 out.append(StreamTaskMessageDone(type="done", index=req_idx))
+
+            elif evt_type == "item.updated" and item_type in _PROGRESSIVE_TOOL_ITEMS:
+                # Codex revises its plan in place: one todo_list item is opened
+                # at the start of the turn and ticked off through item.updated,
+                # with item.completed only arriving at the very end. Forwarding
+                # each revision as a response for the SAME tool_call_id lets a
+                # consumer show the checklist filling in as the turn runs; the
+                # last response received is the current state.
+                if item_id in self._tool_open:
+                    actual_type = self._tool_item_types.get(item_id, item_type)
+                    result_text, is_error = _tool_output_for(actual_type, item)
+                    resp_content: dict[str, Any] = {"result": result_text}
+                    if is_error:
+                        resp_content["is_error"] = True
+                    out.append(
+                        StreamTaskMessageFull(
+                            type="full",
+                            index=self._alloc(),
+                            content=ToolResponseContent(
+                                type="tool_response",
+                                author="agent",
+                                tool_call_id=tool_call_id,
+                                name=_tool_name_for(actual_type, item),
+                                content=resp_content,
+                            ),
+                        )
+                    )
 
             elif evt_type == "item.completed":
                 # file_change items may only emit item.completed (no started).
