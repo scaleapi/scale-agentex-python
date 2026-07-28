@@ -22,7 +22,7 @@ an empty dict and the span is simply not tagged.
 from __future__ import annotations
 
 import os
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple, Optional
 
 __all__ = ("get_obs_mode", "obs_correlation")
 
@@ -55,7 +55,7 @@ def _lgtm_ids() -> Optional[Tuple[str, str]]:
 
 def _ddtrace_ids() -> Optional[Tuple[str, str]]:
     try:
-        from ddtrace import tracer
+        from ddtrace.trace import tracer
     except ImportError:
         return None
     ctx = tracer.current_trace_context()
