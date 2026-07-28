@@ -4,6 +4,8 @@ This module provides reusable Temporal activities for streaming content
 to the AgentEx UI, designed to work with TemporalStreamingHooks.
 """
 
+from __future__ import annotations
+
 from typing import Any, Dict
 
 from temporalio import activity
