@@ -71,6 +71,7 @@ from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     streaming_task_id,
     streaming_trace_id,
+    streaming_agent_path,
     streaming_parent_span_id,
 )
 
@@ -635,6 +636,7 @@ class TemporalStreamingModel(Model):
         task_id = streaming_task_id.get()
         trace_id = streaming_trace_id.get()
         parent_span_id = streaming_parent_span_id.get()
+        agent_path = streaming_agent_path.get()
 
         if not task_id or not trace_id or not parent_span_id:
             raise ValueError("task_id, trace_id, and parent_span_id are required for streaming with Responses API")
@@ -843,6 +845,7 @@ class TemporalStreamingModel(Model):
                                         style="active",
                                     ),
                                     streaming_mode=self.streaming_mode,
+                                    agent_path=agent_path,
                                 ).__aenter__()
                         elif item and getattr(item, 'type', None) == 'function_call':
                             # Open a streaming context per function call so argument
@@ -859,6 +862,7 @@ class TemporalStreamingModel(Model):
                                     arguments={},
                                 ),
                                 streaming_mode=self.streaming_mode,
+                                agent_path=agent_path,
                             ).__aenter__()
                             function_calls_in_progress[output_index] = {
                                 'id': getattr(item, 'id', ''),
@@ -879,6 +883,7 @@ class TemporalStreamingModel(Model):
                                     format="markdown",
                                 ),
                                 streaming_mode=self.streaming_mode,
+                                agent_path=agent_path,
                             ).__aenter__()
 
                     elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):

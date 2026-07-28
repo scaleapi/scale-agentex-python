@@ -54,6 +54,7 @@ class StreamingModule:
         initial_content: TaskMessageContent,
         streaming_mode: StreamingMode = "coalesced",
         created_at: datetime | None = None,
+        agent_path: str | list[str] | None = None,
     ) -> StreamingTaskMessageContext:
         """
         Create a streaming context for managing TaskMessage lifecycle.
@@ -86,4 +87,5 @@ class StreamingModule:
             initial_content=initial_content,
             streaming_mode=streaming_mode,
             created_at=created_at,
+            agent_path=agent_path,
         )

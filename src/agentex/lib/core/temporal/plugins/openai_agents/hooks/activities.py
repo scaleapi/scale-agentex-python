@@ -38,6 +38,7 @@ def _deserialize_content(data: Dict[str, Any]):
 async def stream_lifecycle_content(
     task_id: str,
     content: Dict[str, Any],
+    agent_path: str | list[str] | None = None,
 ) -> None:
     """Stream agent lifecycle content to the AgentEx UI.
 
@@ -58,6 +59,9 @@ async def stream_lifecycle_content(
             - type="text": TextContent (plain text messages, handoff notifications)
             - type="tool_request": ToolRequestContent (tool invocation with call_id)
             - type="tool_response": ToolResponseContent (tool result with call_id)
+        agent_path: Optional emitting-agent identifier stamped on the streamed
+            envelope so consumers can attribute events when multiple agents share
+            one task stream.
 
     Note:
         This activity is non-blocking and will not throw exceptions to the workflow.
@@ -69,6 +73,7 @@ async def stream_lifecycle_content(
         async with adk.streaming.streaming_task_message_context(
             task_id=task_id,
             initial_content=typed_content,
+            agent_path=agent_path,
         ) as streaming_context:
             await streaming_context.stream_update(
                 StreamTaskMessageFull(

@@ -379,10 +379,12 @@ class StreamingTaskMessageContext:
         streaming_service: "StreamingService",
         streaming_mode: StreamingMode = "coalesced",
         created_at: datetime | None = None,
+        agent_path: str | list[str] | None = None,
     ):
         self.task_id = task_id
         self.initial_content = initial_content
         self.task_message: TaskMessage | None = None
+        self.agent_path = agent_path
         self._agentex_client = agentex_client
         self._streaming_service = streaming_service
         self._is_closed = False
@@ -406,6 +408,11 @@ class StreamingTaskMessageContext:
             streaming_status="IN_PROGRESS",
             created_at=self._created_at if self._created_at is not None else omit,
         )
+        # Stamped on the in-memory envelope only: every start/delta/full/done event
+        # carries it via parent_task_message. Not sent to messages.create/update —
+        # the persisted-message contract is unchanged; this is a stream-only tag.
+        if self.agent_path is not None:
+            self.task_message.agent_path = self.agent_path
 
         # Send the START event
         start_event = StreamTaskMessageStart(
@@ -540,6 +547,7 @@ class StreamingService:
         initial_content: TaskMessageContent,
         streaming_mode: StreamingMode = "coalesced",
         created_at: datetime | None = None,
+        agent_path: str | list[str] | None = None,
     ) -> StreamingTaskMessageContext:
         return StreamingTaskMessageContext(
             task_id=task_id,
@@ -548,6 +556,7 @@ class StreamingService:
             streaming_service=self,
             streaming_mode=streaming_mode,
             created_at=created_at,
+            agent_path=agent_path,
         )
 
     async def stream_update(self, update: TaskMessageUpdate) -> TaskMessageUpdate | None:

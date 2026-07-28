@@ -7,7 +7,7 @@ to use for streaming, tracing, or other purposes.
 """
 
 import logging
-from typing import Any, Type, Optional, override
+from typing import Any, List, Type, Union, Optional, override
 from contextvars import ContextVar
 
 from temporalio import workflow
@@ -30,11 +30,13 @@ logger = logging.getLogger("context.interceptor")
 streaming_task_id: ContextVar[Optional[str]] = ContextVar('streaming_task_id', default=None)
 streaming_trace_id: ContextVar[Optional[str]] = ContextVar('streaming_trace_id', default=None)
 streaming_parent_span_id: ContextVar[Optional[str]] = ContextVar('streaming_parent_span_id', default=None)
+streaming_agent_path: ContextVar[Optional[Union[str, List[str]]]] = ContextVar('streaming_agent_path', default=None)
 
 # Header keys for passing context
 TASK_ID_HEADER = "context-task-id"
 TRACE_ID_HEADER = "context-trace-id"
 PARENT_SPAN_ID_HEADER = "context-parent-span-id"
+AGENT_PATH_HEADER = "context-agent-path"
 
 class ContextInterceptor(Interceptor):
     """Main interceptor that enables context threading through Temporal."""
@@ -90,6 +92,7 @@ class ContextWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
             task_id = getattr(workflow_instance, '_task_id', None)
             trace_id = getattr(workflow_instance, '_trace_id', None)
             parent_span_id = getattr(workflow_instance, '_parent_span_id', None)
+            agent_path = getattr(workflow_instance, '_agent_path', None)
 
             if task_id and trace_id and parent_span_id:
                 if not input.headers:
@@ -101,6 +104,14 @@ class ContextWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
                 logger.debug(f"[OutboundInterceptor] Added task_id, trace_id, and parent_span_id to activity headers: {task_id}, {trace_id}, {parent_span_id}")
             else:
                 logger.warning("[OutboundInterceptor] No _task_id, _trace_id, or _parent_span_id found in workflow instance")
+
+            # Independent of the three-tuple gate: a child-workflow sub-agent sets
+            # only _agent_path (task_id/trace/span come from the parent), and events
+            # from any agent need it to be attributable in a shared task stream.
+            if agent_path is not None:
+                if not input.headers:
+                    input.headers = {}
+                input.headers[AGENT_PATH_HEADER] = self._payload_converter.to_payload(agent_path)  # type: ignore[index]
         except Exception as e:
             logger.error(f"[OutboundInterceptor] Failed to get task_id, trace_id, or parent_span_id from workflow instance: {e}")
 
@@ -139,6 +150,15 @@ class ContextActivityInboundInterceptor(ActivityInboundInterceptor):
         else:
             logger.debug("[ActivityInterceptor] No task_id, trace_id, or parent_span_id in headers")
 
+        # Threaded independently — present only when the emitting agent set it.
+        if input.headers and AGENT_PATH_HEADER in input.headers:
+            # Any (not str) — the value is str or list[str]; Any passes the decoded
+            # JSON through untouched instead of coercing to one variant.
+            agent_path_value = self._payload_converter.from_payload(
+                input.headers[AGENT_PATH_HEADER], Any
+            )
+            streaming_agent_path.set(agent_path_value)
+
         try:
             # Execute the activity
             # The TemporalStreamingModel can now read streaming_task_id.get()
@@ -149,5 +169,6 @@ class ContextActivityInboundInterceptor(ActivityInboundInterceptor):
             streaming_task_id.set(None)
             streaming_trace_id.set(None)
             streaming_parent_span_id.set(None)
+            streaming_agent_path.set(None)
             logger.debug("[ActivityInterceptor] Cleared task_id, trace_id, and parent_span_id from context")
 
