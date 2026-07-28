@@ -13,21 +13,28 @@ from agentex.lib.sdk.state_machine.state_workflow import StateWorkflow
 
 logger = make_logger(__name__)
 
+# These reference MCP servers still import the mcp 1.x API (``McpError``), which
+# mcp 2.0.0 renamed to ``MCPError``. uvx gives each server its own isolated env and
+# resolves ``mcp`` unpinned there, ignoring the version this project pins, so without
+# this constraint every server dies at import and the agent silently makes zero tool
+# calls. Drop the pin once the servers support mcp 2.x.
+_MCP_PIN = ["--with", "mcp<2"]
+
 MCP_SERVERS = [
     StdioServerParameters(
         command="uvx",
-        args=["mcp-server-time", "--local-timezone", "America/Los_Angeles"],
+        args=[*_MCP_PIN, "mcp-server-time", "--local-timezone", "America/Los_Angeles"],
     ),
     StdioServerParameters(
         command="uvx",
-        args=["openai-websearch-mcp"],
+        args=[*_MCP_PIN, "openai-websearch-mcp"],
         env={
             "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")
         }
     ),
     StdioServerParameters(
         command="uvx",
-        args=["mcp-server-fetch"],
+        args=[*_MCP_PIN, "mcp-server-fetch"],
     ),
 ]
 

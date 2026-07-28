@@ -47,6 +47,13 @@ async def _collect(stream: AsyncIterator[Any]) -> list[Any]:
     return [e async for e in stream]
 
 
+def _result_text(event: StreamTaskMessageFull) -> str:
+    content = event.content
+    assert isinstance(content, ToolResponseContent)
+    assert isinstance(content.content, dict)
+    return str(content.content["result"])
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -358,6 +365,107 @@ class TestToolCallStreaming:
         )
         assert req.index is not None and resp.index is not None
         assert req.index < resp.index
+
+
+# ---------------------------------------------------------------------------
+# Progressive tool items (todo_list)
+# ---------------------------------------------------------------------------
+
+
+def _todo_item(item_id: str, *completed: bool) -> dict[str, Any]:
+    return {
+        "id": item_id,
+        "type": "todo_list",
+        "items": [{"text": f"step {i + 1}", "completed": done} for i, done in enumerate(completed)],
+    }
+
+
+class TestTodoListUpdates:
+    async def test_each_update_republishes_the_checklist(self) -> None:
+        """Codex ticks ONE in-place todo_list item, so every item.updated is
+        forwarded as a response under the same tool_call_id. Without this a
+        consumer only sees the plan as first written and then, at end of turn,
+        as finished."""
+        events = [
+            {"type": "item.started", "item": _todo_item("item_1", False, False)},
+            {"type": "item.updated", "item": _todo_item("item_1", True, False)},
+            {"type": "item.updated", "item": _todo_item("item_1", True, True)},
+            {"type": "item.completed", "item": _todo_item("item_1", True, True)},
+        ]
+        out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
+
+        requests = [
+            e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, ToolRequestContent)
+        ]
+        responses = [
+            e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ToolResponseContent)
+        ]
+
+        assert len(requests) == 1
+        assert len(responses) == 3
+
+        request_content = requests[0].content
+        assert isinstance(request_content, ToolRequestContent)
+        for response in responses:
+            content = response.content
+            assert isinstance(content, ToolResponseContent)
+            assert content.name == "todo_list"
+            assert content.tool_call_id == request_content.tool_call_id
+
+        first, second, final = (json.loads(_result_text(r)) for r in responses)
+        assert [i["completed"] for i in first["items"]] == [True, False]
+        assert [i["completed"] for i in second["items"]] == [True, True]
+        assert [i["completed"] for i in final["items"]] == [True, True]
+
+    async def test_counts_the_call_once_across_its_updates(self) -> None:
+        events = [
+            {"type": "item.started", "item": _todo_item("item_1", False)},
+            {"type": "item.updated", "item": _todo_item("item_1", True)},
+            {"type": "item.completed", "item": _todo_item("item_1", True)},
+        ]
+        counters: dict[str, Any] = {}
+        await _collect(convert_codex_to_agentex_events(_aiter(events), on_result=counters.update))
+        assert counters.get("tool_call_count") == 1
+
+    async def test_ignores_an_update_for_an_unopened_item(self) -> None:
+        """An update with no preceding start has no request to answer; a
+        response would dangle with a tool_call_id nothing points at."""
+        events = [{"type": "item.updated", "item": _todo_item("orphan", True)}]
+        out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
+        assert [e for e in out if isinstance(e, StreamTaskMessageFull)] == []
+
+    async def test_does_not_republish_other_tool_items(self) -> None:
+        events = [
+            {
+                "type": "item.started",
+                "item": {"id": "cmd1", "type": "command_execution", "command": "sleep 1"},
+            },
+            {
+                "type": "item.updated",
+                "item": {
+                    "id": "cmd1",
+                    "type": "command_execution",
+                    "command": "sleep 1",
+                    "aggregated_output": "partial",
+                },
+            },
+            {
+                "type": "item.completed",
+                "item": {
+                    "id": "cmd1",
+                    "type": "command_execution",
+                    "command": "sleep 1",
+                    "aggregated_output": "done",
+                    "exit_code": 0,
+                },
+            },
+        ]
+        out = await _collect(convert_codex_to_agentex_events(_aiter(events)))
+        responses = [
+            e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, ToolResponseContent)
+        ]
+        assert len(responses) == 1
+        assert _result_text(responses[0]) == "done"
 
 
 # ---------------------------------------------------------------------------
