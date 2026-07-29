@@ -39,7 +39,7 @@ def build_agent(
     secret: str | None = None,
     tag: str | None = None,
     build_args: list[str] | None = None,
-    cache: bool = True,
+    cache: bool = False,
 ) -> str:
     """Build the agent locally and optionally push to registry
 
@@ -50,10 +50,10 @@ def build_agent(
         secret: Docker build secret in format 'id=secret-id,src=path-to-secret-file'
         tag: Image tag to use (defaults to 'latest')
         build_args: List of Docker build arguments in format 'KEY=VALUE'
-        cache: Whether to use the build cache. Defaults to True. Set to False (passes
-            --no-cache to buildx) when republishing a moving tag like ':latest' so a
-            stale cached layer can't silently ship source that no longer matches the
-            checkout.
+        cache: Whether to use the build cache. Defaults to False (passes --no-cache to
+            buildx) so a stale cached layer can't silently ship source that no longer
+            matches the checkout, notably when republishing a moving tag like ':latest'.
+            Pass True to opt back in for faster local rebuilds.
 
     Returns:
         The image URL
