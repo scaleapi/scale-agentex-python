@@ -181,30 +181,43 @@ jobs:
           AGENT_NAME="${{ steps.image-name.outputs.agent_name }}"
           REPOSITORY_NAME="${{ github.repository }}/tutorial-agents/${AGENT_NAME}"
 
-          # Determine if we should push based on event type
+          # Determine if we should publish based on event type.
+          # Publish path: push to an immutable candidate tag (the commit SHA) first,
+          # validate that exact pushed artifact, then promote :latest onto it. This
+          # keeps an unvalidated image off :latest — if validation fails, :latest is
+          # left pointing at the last known-good build, and only the SHA tag is dirty.
           if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.rebuild_all }}" = "true" ]; then
             SHOULD_PUSH=true
-            VERSION_TAG="latest"
-            echo "🚀 Building agent (will push after validation): ${{ matrix.agent_path }}"
+            PROMOTE_LATEST=true
+            VERSION_TAG="${{ github.sha }}"
+            echo "🚀 Building agent (push candidate ${VERSION_TAG}, promote :latest after validation): ${{ matrix.agent_path }}"
           else
             SHOULD_PUSH=false
+            PROMOTE_LATEST=false
             VERSION_TAG="${{ github.sha }}"
             echo "🔍 Building agent for validation: ${{ matrix.agent_path }}"
-            # Set full image name for validation step (local build)
-            echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
             # Skip image validation for PRs since Buildx doesn't load multi-platform images locally
             echo "SKIP_VALIDATION=true" >> $GITHUB_ENV
           fi
 
-          # Always build locally first (without push)
+          # Build the image. On the publish path, push straight from buildx to the
+          # candidate tag: a multi-platform build cannot be loaded into the local
+          # Docker store, so it must be pushed by the build itself rather than by a
+          # later `docker push` (which would have no fresh local image and would
+          # re-push a stale tag instead).
           BUILD_ARGS="--manifest ${{ matrix.agent_path }}/manifest.yaml --registry ${REGISTRY} --tag ${VERSION_TAG} --platforms linux/amd64,linux/arm64 --repository-name ${REPOSITORY_NAME}"
+          if [ "$SHOULD_PUSH" = "true" ]; then
+            BUILD_ARGS="$BUILD_ARGS --push"
+          fi
 
           agentex agents build $BUILD_ARGS
           echo "✅ Successfully built: ${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"
 
           # Set environment variables for subsequent steps
           echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
+          echo "LATEST_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:latest" >> $GITHUB_ENV
           echo "SHOULD_PUSH=${SHOULD_PUSH}" >> $GITHUB_ENV
+          echo "PROMOTE_LATEST=${PROMOTE_LATEST}" >> $GITHUB_ENV
 
       - name: Validate agent image
         if: env.SKIP_VALIDATION != 'true'
@@ -279,13 +292,15 @@ jobs:
 
           echo "✅ All validations passed for: $FULL_IMAGE"
 
-      - name: Push Agent Image
-        if: env.SHOULD_PUSH == 'true'
+      - name: Promote validated image to :latest
+        if: env.PROMOTE_LATEST == 'true'
         run: |
-          FULL_IMAGE="${{ env.FULL_IMAGE }}"
-          echo "🚀 Pushing validated image: $FULL_IMAGE"
-          docker push "$FULL_IMAGE"
-          echo "✅ Successfully pushed: $FULL_IMAGE"
+          echo "🏷️  Promoting validated ${{ env.FULL_IMAGE }} -> ${{ env.LATEST_IMAGE }}"
+          # Registry-side manifest copy: no rebuild, preserves the multi-arch
+          # manifest list, and only runs after validation passed — so :latest never
+          # points at an unvalidated image.
+          docker buildx imagetools create --tag "${{ env.LATEST_IMAGE }}" "${{ env.FULL_IMAGE }}"
+          echo "✅ Promoted to ${{ env.LATEST_IMAGE }}"
 
   deprecate-agents:
     name: "Deprecate Removed Agents"

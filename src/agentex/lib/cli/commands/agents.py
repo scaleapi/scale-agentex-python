@@ -128,11 +128,9 @@ def build(
         help="Docker build argument in the format 'KEY=VALUE' (can be used multiple times)",
     ),
     cache: bool = typer.Option(
-        False,
+        True,
         "--cache/--no-cache",
-        help="Whether to use the build cache. Defaults to off so a stale cached layer "
-        "can't silently ship source that no longer matches the checkout (notably when "
-        "republishing a moving tag like ':latest'). Pass --cache to opt back in.",
+        help="Whether to use the build cache (default on). Pass --no-cache for a clean rebuild.",
     ),
 ):
     """
