@@ -12,6 +12,14 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.22.1 (2026-07-29)
+
+Full Changelog: [agentex-client-v0.22.0...agentex-client-v0.22.1](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.22.0...agentex-client-v0.22.1)
+
+### Bug Fixes
+
+* **ci:** push tutorial images from buildx instead of re-pushing a stale local tag ([#478](https://github.com/scaleapi/scale-agentex-python/issues/478)) ([a7c8f5a](https://github.com/scaleapi/scale-agentex-python/commit/a7c8f5af8e0acf6ba2eab82f3e9c700c40ec4265))
+
 ## 0.22.0 (2026-07-29)
 
 Full Changelog: [agentex-client-v0.21.0...agentex-client-v0.22.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.21.0...agentex-client-v0.22.0)
