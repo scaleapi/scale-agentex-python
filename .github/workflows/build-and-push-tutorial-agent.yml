@@ -185,10 +185,15 @@ jobs:
           if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.rebuild_all }}" = "true" ]; then
             SHOULD_PUSH=true
             VERSION_TAG="latest"
+            # ':latest' is a moving tag, so build without cache: a stale cached layer
+            # must never silently ship source that differs from the checkout.
+            CACHE_FLAG="--no-cache"
             echo "🚀 Building agent (will push after validation): ${{ matrix.agent_path }}"
           else
             SHOULD_PUSH=false
             VERSION_TAG="${{ github.sha }}"
+            # SHA-tagged validation build is immutable, so the cache is safe (and faster).
+            CACHE_FLAG="--cache"
             echo "🔍 Building agent for validation: ${{ matrix.agent_path }}"
             # Set full image name for validation step (local build)
             echo "FULL_IMAGE=${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}" >> $GITHUB_ENV
@@ -197,7 +202,7 @@ jobs:
           fi
 
           # Always build locally first (without push)
-          BUILD_ARGS="--manifest ${{ matrix.agent_path }}/manifest.yaml --registry ${REGISTRY} --tag ${VERSION_TAG} --platforms linux/amd64,linux/arm64 --repository-name ${REPOSITORY_NAME}"
+          BUILD_ARGS="--manifest ${{ matrix.agent_path }}/manifest.yaml --registry ${REGISTRY} --tag ${VERSION_TAG} --platforms linux/amd64,linux/arm64 --repository-name ${REPOSITORY_NAME} ${CACHE_FLAG}"
 
           agentex agents build $BUILD_ARGS
           echo "✅ Successfully built: ${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"

@@ -127,6 +127,12 @@ def build(
         None,
         help="Docker build argument in the format 'KEY=VALUE' (can be used multiple times)",
     ),
+    cache: bool = typer.Option(
+        True,
+        "--cache/--no-cache",
+        help="Use the build cache (default). Pass --no-cache when republishing a moving "
+        "tag like ':latest' so a stale cached layer can't ship outdated source.",
+    ),
 ):
     """
     Build an agent image locally from the given manifest.
@@ -155,6 +161,7 @@ def build(
             secret=secret or "",  # Provide default empty string
             tag=tag or "latest",  # Provide default
             build_args=build_arg or [],  # Provide default empty list
+            cache=cache,
         )
         if image_url:
             typer.echo(f"Successfully built image: {image_url}")
