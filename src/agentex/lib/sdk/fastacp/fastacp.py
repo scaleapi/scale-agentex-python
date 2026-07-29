@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import os
-import inspect
 from typing import Any, Literal
-from pathlib import Path
 from typing_extensions import deprecated
 
 from agentex.lib.types.fastacp import (
@@ -83,14 +80,6 @@ class FastACP:
         return FastACP.create_async_acp(config, **kwargs)
 
     @staticmethod
-    def locate_build_info_path() -> None:
-        """If a build-info.json file is present, set the BUILD_INFO_PATH environment variable"""
-        acp_root = Path(inspect.stack()[2].filename).resolve().parents[0]
-        build_info_path = acp_root / "build-info.json"
-        if build_info_path.exists():
-            os.environ["BUILD_INFO_PATH"] = str(build_info_path)
-
-    @staticmethod
     def create(
         acp_type: Literal["sync", "async", "agentic"],
         config: BaseACPConfig | None = None,
@@ -104,8 +93,6 @@ class FastACP:
             config: Configuration object. Required for async/agentic type.
             **kwargs: Additional configuration parameters
         """
-
-        FastACP.locate_build_info_path()
 
         if acp_type == "sync":
             sync_config = config if isinstance(config, SyncACPConfig) else None
