@@ -31,6 +31,11 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.registration import register_agent
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.compat.version_guard import assert_backend_compatible
+from agentex.lib.core.temporal.interceptors.baggage_interceptor import (
+    DISABLE_TRACE_BAGGAGE_ENV,
+    TraceBaggageInterceptor,
+    trace_baggage_disabled,
+)
 
 logger = make_logger(__name__)
 
@@ -89,6 +94,18 @@ def _validate_interceptors(interceptors: list) -> None:
                 f"Interceptor at index {i} must be an instance of temporalio.worker.Interceptor, "
                 f"got {type(interceptor).__name__}"
             )
+
+
+def _with_default_interceptors(interceptors: list) -> list:
+    """Prepend the framework's own interceptors, first so user ones see their effect."""
+    if trace_baggage_disabled():
+        logger.info(f"Trace baggage propagation disabled via {DISABLE_TRACE_BAGGAGE_ENV}")
+        return list(interceptors)
+
+    if any(isinstance(i, TraceBaggageInterceptor) for i in interceptors):
+        return list(interceptors)
+
+    return [TraceBaggageInterceptor(), *interceptors]
 
 
 async def get_temporal_client(
@@ -203,6 +220,8 @@ class AgentexWorker:
         if self.interceptors:
             _validate_interceptors(self.interceptors)
 
+        interceptors = _with_default_interceptors(self.interceptors)
+
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
             plugins=self.plugins,
@@ -229,7 +248,7 @@ class AgentexWorker:
             max_concurrent_activities=self.max_concurrent_activities,
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
-            interceptors=self.interceptors,  # Pass interceptors to Worker
+            interceptors=interceptors,  # Pass interceptors to Worker
         )
 
         logger.info(f"Starting workers for task queue: {self.task_queue}")

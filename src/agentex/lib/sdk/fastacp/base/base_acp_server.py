@@ -28,6 +28,7 @@ from agentex.lib.utils.logging import make_logger, ctx_var_request_id
 from agentex.protocol.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.registration import register_agent
+from agentex.lib.core.tracing.baggage import set_end_user_id
 
 # from agentex.lib.sdk.fastacp.types import BaseACPConfig
 from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
@@ -196,6 +197,11 @@ class BaseACPServer(FastAPI):
             if custom_headers:
                 params_data["request"] = {"headers": custom_headers}
             params = params_model.model_validate(params_data)
+
+            # Not reset: each request runs in its own asyncio task, so contexts are
+            # already isolated, and a reset here would fire before a streaming
+            # generator had finished producing spans.
+            set_end_user_id(getattr(params, "end_user_id", None))
 
             if method in RPC_SYNC_METHODS:
                 handler = self._handlers[method]

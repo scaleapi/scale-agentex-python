@@ -27,7 +27,13 @@ class TemporalTaskService:
         self._env_vars = env_vars
 
 
-    async def submit_task(self, agent: Agent, task: Task, params: dict[str, Any] | None) -> str:
+    async def submit_task(
+        self,
+        agent: Agent,
+        task: Task,
+        params: dict[str, Any] | None,
+        end_user_id: str | None = None,
+    ) -> str:
         """
         Submit a task to the async runtime for execution.
 
@@ -48,6 +54,7 @@ class TemporalTaskService:
                 agent=agent,
                 task=task,
                 params=params,
+                end_user_id=end_user_id,
             ),
             id=task.id,
             task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
@@ -62,7 +69,14 @@ class TemporalTaskService:
             workflow_id=task_id,
         )
 
-    async def send_event(self, agent: Agent, task: Task, event: Event, request: dict | None = None) -> None:
+    async def send_event(
+        self,
+        agent: Agent,
+        task: Task,
+        event: Event,
+        request: dict | None = None,
+        end_user_id: str | None = None,
+    ) -> None:
         return await self._temporal_client.send_signal(
             workflow_id=task.id,
             signal=SignalName.RECEIVE_EVENT.value,
@@ -71,6 +85,7 @@ class TemporalTaskService:
                 task=task,
                 event=event,
                 request=request,
+                end_user_id=end_user_id,
             ).model_dump(),
         )
 

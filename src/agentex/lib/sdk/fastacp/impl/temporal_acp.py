@@ -105,7 +105,10 @@ class TemporalACP(BaseACPServer):
             logger.info(f"TemporalACP received task create rpc call for task {params.task.id}")
             if self._temporal_task_service is not None:
                 await self._temporal_task_service.submit_task(
-                    agent=params.agent, task=params.task, params=params.params
+                    agent=params.agent,
+                    task=params.task,
+                    params=params.params,
+                    end_user_id=params.end_user_id,
                 )
 
         @self.on_task_event_send
@@ -118,6 +121,7 @@ class TemporalACP(BaseACPServer):
                         task=params.task,
                         event=params.event,
                         request=params.request,
+                        end_user_id=params.end_user_id,
                     )
 
             except Exception as e:

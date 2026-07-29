@@ -21,6 +21,14 @@ class RPCMethod(str, Enum):
     TASK_INTERRUPT = "task/interrupt"
 
 
+END_USER_ID_DESCRIPTION = (
+    "Opaque identifier for the end user this call is made on behalf of. Not "
+    "persisted on the task, so it is only present on the calls whose caller "
+    "supplied it. The framework stamps it onto trace spans as __end_user_id__ so "
+    "agents do not have to thread it through their own code."
+)
+
+
 class CreateTaskParams(BaseModel):
     """Parameters for task/create method.
 
@@ -29,18 +37,20 @@ class CreateTaskParams(BaseModel):
         task: The task to be created.
         params: The parameters for the task as inputted by the user.
         request: Additional request context including headers forwarded to this agent.
+        end_user_id: The end user this call was made on behalf of.
     """
 
     agent: Agent = Field(..., description="The agent that the task was sent to")
     task: Task = Field(..., description="The task to be created")
     params: dict[str, Any] | None = Field(
-        None,
+        default=None,
         description="The parameters for the task as inputted by the user",
     )
     request: dict[str, Any] | None = Field(
         default=None,
         description="Additional request context including headers forwarded to this agent",
     )
+    end_user_id: str | None = Field(default=None, description=END_USER_ID_DESCRIPTION)
 
 
 class SendMessageParams(BaseModel):
@@ -52,6 +62,7 @@ class SendMessageParams(BaseModel):
         content: The message that was sent to the agent.
         stream: Whether to stream the message back to the agentex server from the agent.
         request: Additional request context including headers forwarded to this agent.
+        end_user_id: The end user this call was made on behalf of.
     """
 
     agent: Agent = Field(..., description="The agent that the message was sent to")
@@ -67,6 +78,7 @@ class SendMessageParams(BaseModel):
         default=None,
         description="Additional request context including headers forwarded to this agent",
     )
+    end_user_id: str | None = Field(default=None, description=END_USER_ID_DESCRIPTION)
 
 
 class SendEventParams(BaseModel):
@@ -77,6 +89,7 @@ class SendEventParams(BaseModel):
         task: The task that the message was sent to.
         event: The event that was sent to the agent.
         request: Additional request context including headers forwarded to this agent.
+        end_user_id: The end user this call was made on behalf of.
     """
 
     agent: Agent = Field(..., description="The agent that the event was sent to")
@@ -86,6 +99,7 @@ class SendEventParams(BaseModel):
         default=None,
         description="Additional request context including headers forwarded to this agent",
     )
+    end_user_id: str | None = Field(default=None, description=END_USER_ID_DESCRIPTION)
 
 
 class CancelTaskParams(BaseModel):
@@ -95,6 +109,7 @@ class CancelTaskParams(BaseModel):
         agent: The agent that the task was sent to.
         task: The task that was cancelled.
         request: Additional request context including headers forwarded to this agent.
+        end_user_id: The end user this call was made on behalf of.
     """
 
     agent: Agent = Field(..., description="The agent that the task was sent to")
@@ -103,6 +118,7 @@ class CancelTaskParams(BaseModel):
         default=None,
         description="Additional request context including headers forwarded to this agent",
     )
+    end_user_id: str | None = Field(default=None, description=END_USER_ID_DESCRIPTION)
 
 
 class InterruptTaskParams(BaseModel):

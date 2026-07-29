@@ -11,6 +11,7 @@ from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
+from agentex.lib.core.tracing.baggage import merge_baggage_into_span_data
 from agentex.lib.core.tracing.span_error import set_span_error
 from agentex.lib.core.tracing.span_queue import (
     SpanEventType,
@@ -79,6 +80,7 @@ class Trace:
 
         serialized_input = recursive_model_dump(input) if input else None
         serialized_data = recursive_model_dump(data) if data else None
+        serialized_data = merge_baggage_into_span_data(serialized_data)
         id = str(uuid.uuid4())
 
         span = Span(
@@ -116,6 +118,9 @@ class Trace:
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
         span.data = recursive_model_dump(span.data) if span.data else None
+        # Redundant unless the caller assigned ``span.data`` wholesale after start,
+        # which would otherwise drop the baggage merged in there.
+        span.data = merge_baggage_into_span_data(span.data)
 
         for processor in self.processors:
             processor.on_span_end(span)
@@ -229,6 +234,7 @@ class AsyncTrace:
 
         serialized_input = recursive_model_dump(input) if input else None
         serialized_data = recursive_model_dump(data) if data else None
+        serialized_data = merge_baggage_into_span_data(serialized_data)
         id = str(uuid.uuid4())
 
         span = Span(
@@ -266,6 +272,9 @@ class AsyncTrace:
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
         span.data = recursive_model_dump(span.data) if span.data else None
+        # Redundant unless the caller assigned ``span.data`` wholesale after start,
+        # which would otherwise drop the baggage merged in there.
+        span.data = merge_baggage_into_span_data(span.data)
 
         if self.processors:
             self._span_queue.enqueue(SpanEventType.END, span.model_copy(deep=True), self.processors)

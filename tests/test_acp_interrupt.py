@@ -60,8 +60,15 @@ class TestInterruptProtocol:
         assert PARAMS_MODEL_BY_METHOD[RPCMethod.TASK_INTERRUPT] is InterruptTaskParams
 
     def test_params_mirror_cancel_shape(self) -> None:
-        """InterruptTaskParams mirrors CancelTaskParams field-for-field."""
-        assert set(InterruptTaskParams.model_fields) == set(CancelTaskParams.model_fields)
+        """InterruptTaskParams mirrors CancelTaskParams, minus ``end_user_id``.
+
+        ``end_user_id`` is the one intentional divergence: the control plane only
+        accepts it on the four RPCs an end user's request can originate
+        (task/create, message/send, event/send, task/cancel). task/interrupt is
+        driven by the agent itself via the REST API, so there is no end user to
+        attribute.
+        """
+        assert set(InterruptTaskParams.model_fields) == set(CancelTaskParams.model_fields) - {"end_user_id"}
         assert set(InterruptTaskParams.model_fields) == {"agent", "task", "request"}
 
     def test_params_validate_round_trip(self) -> None:
