@@ -196,8 +196,16 @@ jobs:
             echo "SKIP_VALIDATION=true" >> $GITHUB_ENV
           fi
 
-          # Always build locally first (without push)
+          # Build the image. On the publish path, push straight from buildx.
+          # A multi-platform build cannot be loaded into the local Docker image
+          # store, so a subsequent `docker push` has no freshly-built image to send
+          # and ends up re-pushing whatever :latest was pulled during validation —
+          # i.e. the previous, stale image. Pushing from the build itself is the
+          # only way the newly-built multi-arch image actually lands on the tag.
           BUILD_ARGS="--manifest ${{ matrix.agent_path }}/manifest.yaml --registry ${REGISTRY} --tag ${VERSION_TAG} --platforms linux/amd64,linux/arm64 --repository-name ${REPOSITORY_NAME}"
+          if [ "$SHOULD_PUSH" = "true" ]; then
+            BUILD_ARGS="$BUILD_ARGS --push"
+          fi
 
           agentex agents build $BUILD_ARGS
           echo "✅ Successfully built: ${REGISTRY}/${REPOSITORY_NAME}:${VERSION_TAG}"
@@ -278,14 +286,6 @@ jobs:
           docker rm "$CONTAINER_NAME" > /dev/null 2>&1 || true
 
           echo "✅ All validations passed for: $FULL_IMAGE"
-
-      - name: Push Agent Image
-        if: env.SHOULD_PUSH == 'true'
-        run: |
-          FULL_IMAGE="${{ env.FULL_IMAGE }}"
-          echo "🚀 Pushing validated image: $FULL_IMAGE"
-          docker push "$FULL_IMAGE"
-          echo "✅ Successfully pushed: $FULL_IMAGE"
 
   deprecate-agents:
     name: "Deprecate Removed Agents"
