@@ -358,40 +358,39 @@ class TestRegisterAgentCardMerge:
         card = AgentCard(input_types=["text"], data_events=["result"])
         mock_client = self._make_mock_client()
 
-        with patch("agentex.lib.utils.registration.get_build_info", return_value={"version": "1.0"}):
-            with patch("agentex.lib.utils.registration.httpx.AsyncClient", return_value=mock_client):
-                from agentex.lib.utils.registration import register_agent
-                await register_agent(mock_env_vars, agent_card=card)
+        with patch("agentex.lib.utils.registration.httpx.AsyncClient", return_value=mock_client):
+            from agentex.lib.utils.registration import register_agent
 
-                sent_data = mock_client.post.call_args.kwargs["json"]
-                metadata = sent_data["registration_metadata"]
+            await register_agent(mock_env_vars, agent_card=card)
 
-                assert "agent_card" in metadata
-                assert metadata["agent_card"]["input_types"] == ["text"]
-                assert metadata["agent_card"]["data_events"] == ["result"]
-                assert metadata["version"] == "1.0"
+            sent_data = mock_client.post.call_args.kwargs["json"]
+            metadata = sent_data["registration_metadata"]
 
-    async def test_none_preserved_when_no_card_no_build_info(self, mock_env_vars):
+            assert "agent_card" in metadata
+            assert metadata["agent_card"]["input_types"] == ["text"]
+            assert metadata["agent_card"]["data_events"] == ["result"]
+
+    async def test_none_preserved_when_no_card(self, mock_env_vars):
         mock_client = self._make_mock_client()
 
-        with patch("agentex.lib.utils.registration.get_build_info", return_value=None):
-            with patch("agentex.lib.utils.registration.httpx.AsyncClient", return_value=mock_client):
-                from agentex.lib.utils.registration import register_agent
-                await register_agent(mock_env_vars, agent_card=None)
+        with patch("agentex.lib.utils.registration.httpx.AsyncClient", return_value=mock_client):
+            from agentex.lib.utils.registration import register_agent
 
-                sent_data = mock_client.post.call_args.kwargs["json"]
-                assert sent_data["registration_metadata"] is None
+            await register_agent(mock_env_vars, agent_card=None)
 
-    async def test_card_creates_metadata_when_build_info_none(self, mock_env_vars):
+            sent_data = mock_client.post.call_args.kwargs["json"]
+            assert sent_data["registration_metadata"] is None
+
+    async def test_card_creates_metadata(self, mock_env_vars):
         card = AgentCard(input_types=["text"])
         mock_client = self._make_mock_client()
 
-        with patch("agentex.lib.utils.registration.get_build_info", return_value=None):
-            with patch("agentex.lib.utils.registration.httpx.AsyncClient", return_value=mock_client):
-                from agentex.lib.utils.registration import register_agent
-                await register_agent(mock_env_vars, agent_card=card)
+        with patch("agentex.lib.utils.registration.httpx.AsyncClient", return_value=mock_client):
+            from agentex.lib.utils.registration import register_agent
 
-                sent_data = mock_client.post.call_args.kwargs["json"]
-                metadata = sent_data["registration_metadata"]
-                assert metadata is not None
-                assert "agent_card" in metadata
+            await register_agent(mock_env_vars, agent_card=card)
+
+            sent_data = mock_client.post.call_args.kwargs["json"]
+            metadata = sent_data["registration_metadata"]
+            assert metadata is not None
+            assert "agent_card" in metadata

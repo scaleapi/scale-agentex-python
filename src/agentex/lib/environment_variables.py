@@ -37,8 +37,6 @@ class EnvVarKeys(str, Enum):
     HEALTH_CHECK_PORT = "HEALTH_CHECK_PORT"
     # Auth Configuration
     AUTH_PRINCIPAL_B64 = "AUTH_PRINCIPAL_B64"
-    # Build Information
-    BUILD_INFO_PATH = "BUILD_INFO_PATH"
     AGENT_INPUT_TYPE = "AGENT_INPUT_TYPE"
     # Deployment
     AGENTEX_DEPLOYMENT_ID = "AGENTEX_DEPLOYMENT_ID"
@@ -87,8 +85,6 @@ class EnvironmentVariables(BaseModel):
     HEALTH_CHECK_PORT: int = 80
     # Auth Configuration
     AUTH_PRINCIPAL_B64: str | None = None
-    # Build Information
-    BUILD_INFO_PATH: str | None = None
     # Deployment
     AGENTEX_DEPLOYMENT_ID: str | None = None
     # Claude Agents SDK Configuration
