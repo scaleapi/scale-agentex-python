@@ -39,7 +39,7 @@ COPY 10_async/00_base/090_multi_agent_non_temporal/tests /app/090_multi_agent_no
 COPY test_utils /app/test_utils
 
 # Install the required Python packages with dev dependencies
-RUN uv pip install --system .[dev]
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 # Set environment variables
 ENV PYTHONPATH=/app

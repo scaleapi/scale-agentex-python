@@ -37,7 +37,7 @@ COPY 10_async/00_base/140_codex/project /app/140_codex/project
 COPY 10_async/00_base/140_codex/tests /app/140_codex/tests
 COPY test_utils /app/test_utils
 
-RUN uv pip install --system .[dev]
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 ENV PYTHONPATH=/app
 ENV AGENT_NAME=ab140-codex

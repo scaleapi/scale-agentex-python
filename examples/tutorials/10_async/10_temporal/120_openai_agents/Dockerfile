@@ -31,7 +31,7 @@ COPY 10_async/10_temporal/120_openai_agents/project /app/120_openai_agents/proje
 COPY 10_async/10_temporal/120_openai_agents/tests /app/120_openai_agents/tests
 COPY test_utils /app/test_utils
 
-RUN uv pip install --system .[dev]
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 ENV PYTHONPATH=/app
 

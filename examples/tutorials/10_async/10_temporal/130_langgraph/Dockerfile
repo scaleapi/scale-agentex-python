@@ -31,7 +31,7 @@ COPY 10_async/10_temporal/130_langgraph/project /app/130_langgraph/project
 COPY 10_async/10_temporal/130_langgraph/tests /app/130_langgraph/tests
 COPY test_utils /app/test_utils
 
-RUN uv pip install --system .[dev]
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 ENV PYTHONPATH=/app
 

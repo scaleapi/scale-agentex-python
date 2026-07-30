@@ -34,7 +34,7 @@ COPY 10_async/10_temporal/140_claude_code/project /app/140_claude_code/project
 COPY 10_async/10_temporal/140_claude_code/tests /app/140_claude_code/tests
 COPY test_utils /app/test_utils
 
-RUN uv pip install --system .[dev]
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 ENV PYTHONPATH=/app
 

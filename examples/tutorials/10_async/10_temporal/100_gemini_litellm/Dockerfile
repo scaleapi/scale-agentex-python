@@ -40,7 +40,7 @@ WORKDIR /app/100_gemini_litellm
 COPY 10_async/10_temporal/100_gemini_litellm/project /app/100_gemini_litellm/project
 
 # Install the required Python packages
-RUN uv pip install --system .
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 WORKDIR /app/100_gemini_litellm
 

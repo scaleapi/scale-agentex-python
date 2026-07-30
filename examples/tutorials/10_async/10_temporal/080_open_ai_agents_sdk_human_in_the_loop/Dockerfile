@@ -46,7 +46,7 @@ COPY 10_async/10_temporal/080_open_ai_agents_sdk_human_in_the_loop/tests /app/08
 COPY test_utils /app/test_utils
 
 # Install the required Python packages with dev dependencies
-RUN uv pip install --system .[dev]
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 WORKDIR /app/080_open_ai_agents_sdk_human_in_the_loop
 

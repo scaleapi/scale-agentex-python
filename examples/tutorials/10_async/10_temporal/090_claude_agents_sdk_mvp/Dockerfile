@@ -46,7 +46,7 @@ COPY 10_async/10_temporal/090_claude_agents_sdk_mvp/tests /app/090_claude_agents
 COPY test_utils /app/test_utils
 
 # Install the required Python packages with dev dependencies
-RUN uv pip install --system .[dev]
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 WORKDIR /app/090_claude_agents_sdk_mvp
 

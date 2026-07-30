@@ -31,7 +31,7 @@ COPY 10_async/10_temporal/110_pydantic_ai/project /app/110_pydantic_ai/project
 COPY 10_async/10_temporal/110_pydantic_ai/tests /app/110_pydantic_ai/tests
 COPY test_utils /app/test_utils
 
-RUN uv pip install --system .[dev]
+RUN uv pip install --system .[dev] pytest-asyncio httpx
 
 ENV PYTHONPATH=/app
 
