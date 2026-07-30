@@ -1,6 +1,6 @@
 # File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
 
-from typing import Optional
+from typing import List, Union, Optional
 from datetime import datetime
 from typing_extensions import Literal
 
@@ -26,6 +26,15 @@ class TaskMessage(BaseModel):
 
     task_id: str
     """ID of the task this message belongs to"""
+
+    # MANUAL PATCH — mirror into the upstream OpenAPI spec (see .stats.yml
+    # openapi_spec_url) or the next Stainless regen drops it.
+    agent_path: Optional[Union[str, List[str]]] = None
+    """Identifier of the agent that emitted this message.
+
+    A single agent id, or a root->emitter path (e.g. ["researcher", "subagent-abc"])
+    when nested sub-agents share one task stream. Consumers group/filter events by it.
+    """
 
     id: Optional[str] = None
     """The task message's unique id"""

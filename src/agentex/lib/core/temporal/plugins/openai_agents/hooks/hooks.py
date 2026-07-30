@@ -121,6 +121,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         emit_handoffs: Whether to stream the handoff text message
         trace_id: When set, tool calls are traced to SGP (input + output)
         parent_span_id: Parent span for the per-tool spans
+        agent_path: Emitting-agent identifier stamped on streamed events
     """
 
     def __init__(
@@ -133,6 +134,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         emit_handoffs: bool = True,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
+        agent_path: str | list[str] | None = None,
     ):
         """Initialize the streaming hooks.
 
@@ -158,6 +160,10 @@ class TemporalStreamingHooks(LLMMetricsHooks):
                 the tool) with the arguments as input and the result as output. When None,
                 no tool spans are created (token-usage metrics still emit).
             parent_span_id: Parent span id the per-tool spans attach to.
+            agent_path: Identifier of the agent these hooks stream for — a single
+                id or a root->emitter path (e.g. ["researcher", "subagent-abc"]).
+                Stamped on every emitted event so consumers can attribute it when
+                multiple agents share one task stream. Defaults to None (untagged).
         """
         super().__init__()
         self.task_id = task_id
@@ -167,6 +173,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         self.emit_handoffs = emit_handoffs
         self.trace_id = trace_id
         self.parent_span_id = parent_span_id
+        self.agent_path = agent_path
         # tool_call_id -> open SGP span, so on_tool_end closes the right one.
         self._tool_spans: dict[str, Any] = {}
 
@@ -247,6 +254,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
                         name=tool.name,
                         arguments=tool_arguments,
                     ).model_dump(),
+                    self.agent_path,
                 ],
                 start_to_close_timeout=self.timeout,
             )
@@ -286,6 +294,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
                         name=tool.name,
                         content=result,
                     ).model_dump(),
+                    self.agent_path,
                 ],
                 start_to_close_timeout=self.timeout,
             )
@@ -320,6 +329,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
                     content=f"Handoff from {from_agent.name} to {to_agent.name}",
                     type="text",
                 ).model_dump(),
+                self.agent_path,
             ],
             start_to_close_timeout=self.timeout,
         )
