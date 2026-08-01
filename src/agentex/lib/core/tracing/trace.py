@@ -17,7 +17,7 @@ from agentex.lib.core.tracing.obs_span import (
     close_obs_span,
     open_obs_span,
 )
-from agentex.lib.core.tracing.span_error import set_span_error
+from agentex.lib.core.tracing.span_error import get_span_error, set_span_error
 from agentex.lib.core.tracing.span_queue import (
     SpanEventType,
     AsyncSpanQueue,
@@ -135,8 +135,9 @@ class Trace:
         if span.end_time is None:
             span.end_time = datetime.now(UTC)
 
-        # Close the dedicated obs wrapper span (detach context + end it).
-        close_obs_span(self._obs_handles.pop(span.id, None))
+        # Close the dedicated obs wrapper span; propagate the business-span error
+        # (if any) so the obs span reflects failure, not a false green.
+        close_obs_span(self._obs_handles.pop(span.id, None), error=get_span_error(span))
 
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
@@ -304,8 +305,9 @@ class AsyncTrace:
         if span.end_time is None:
             span.end_time = datetime.now(UTC)
 
-        # Close the dedicated obs wrapper span (detach context + end it).
-        close_obs_span(self._obs_handles.pop(span.id, None))
+        # Close the dedicated obs wrapper span; propagate the business-span error
+        # (if any) so the obs span reflects failure, not a false green.
+        close_obs_span(self._obs_handles.pop(span.id, None), error=get_span_error(span))
 
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None

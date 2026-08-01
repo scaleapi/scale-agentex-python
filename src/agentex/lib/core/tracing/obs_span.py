@@ -47,7 +47,11 @@ class ObsSpanHandle:
 
     __slots__ = ("correlation", "_close")
 
-    def __init__(self, correlation: Dict[str, str], close: Callable[[], None]):
+    def __init__(
+        self,
+        correlation: Dict[str, str],
+        close: Callable[[Optional[Dict[str, str]]], None],
+    ):
         self.correlation = correlation
         self._close = close
 
@@ -79,11 +83,21 @@ def _open_otel_span(
         sc = span.get_span_context()
         correlation = _hex_ids(sc.trace_id, sc.span_id) if (sc and sc.is_valid) else {}
 
-        def _close() -> None:
+        def _close(error: Optional[Dict[str, str]] = None) -> None:
             try:
-                context.detach(token)
+                if error:
+                    # Reflect the business-step failure on the obs span so it
+                    # isn't a false green when you pivot from a failed span.
+                    span.set_status(
+                        trace.Status(trace.StatusCode.ERROR, error.get("message"))
+                    )
+                    if error.get("type"):
+                        span.set_attribute("error.type", error["type"])
             finally:
-                span.end()
+                try:
+                    context.detach(token)
+                finally:
+                    span.end()
 
         return ObsSpanHandle(correlation, _close)
     except Exception:  # pragma: no cover - best-effort; never break the business span
@@ -110,7 +124,20 @@ def _open_ddtrace_span(
         if business_trace_id:
             span.set_tag(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
         correlation = _hex_ids(span.trace_id, span.span_id) if span.trace_id else {}
-        return ObsSpanHandle(correlation, span.finish)
+
+        def _close(error: Optional[Dict[str, str]] = None) -> None:
+            try:
+                if error:
+                    # Reflect the business-step failure on the obs span.
+                    span.error = 1
+                    if error.get("type"):
+                        span.set_tag("error.type", error["type"])
+                    if error.get("message"):
+                        span.set_tag("error.message", error["message"])
+            finally:
+                span.finish()
+
+        return ObsSpanHandle(correlation, _close)
     except Exception:  # pragma: no cover - best-effort
         return None
 
@@ -143,11 +170,16 @@ def open_obs_span(
         return None
 
 
-def close_obs_span(handle: Optional[ObsSpanHandle]) -> None:
-    """Close the wrapper span (detach + end, or finish). Safe on ``None``."""
+def close_obs_span(
+    handle: Optional[ObsSpanHandle],
+    error: Optional[Dict[str, str]] = None,
+) -> None:
+    """Close the wrapper span (detach + end, or finish). When ``error`` is given
+    (the business span failed), mark the obs span errored first so it reflects
+    failure rather than a false green. Safe on ``None``."""
     if handle is None:
         return
     try:
-        handle._close()
+        handle._close(error)
     except Exception:  # pragma: no cover - best-effort
         pass

@@ -4,6 +4,8 @@ import sys
 import types
 from unittest.mock import MagicMock
 
+import pytest
+
 from agentex.lib.core.tracing import obs_span
 from agentex.lib.core.tracing.trace import Trace
 
@@ -18,15 +20,29 @@ class _FakeSpanContext:
         self.is_valid = is_valid
 
 
+class _FakeStatusCode:
+    ERROR = "ERROR"
+    OK = "OK"
+    UNSET = "UNSET"
+
+
+def _FakeStatus(code, description=None):
+    return {"code": code, "description": description}
+
+
 class _FakeOtelSpan:
     def __init__(self, name: str, trace_id: int, span_id: int):
         self.name = name
         self._ctx = _FakeSpanContext(trace_id, span_id)
         self.ended = False
         self.attributes: dict = {}
+        self.status = None
 
     def set_attribute(self, key, value):
         self.attributes[key] = value
+
+    def set_status(self, status):
+        self.status = status
 
     def get_span_context(self):
         return self._ctx
@@ -47,6 +63,8 @@ def _install_fake_otel(monkeypatch, *, trace_id=0xABC, span_id=0xFF):
     fake_trace = types.SimpleNamespace(
         get_tracer=lambda _name: tracer,
         set_span_in_context=lambda span: {"span": span},
+        Status=_FakeStatus,
+        StatusCode=_FakeStatusCode,
     )
     fake_context = types.SimpleNamespace(
         attach=lambda ctx: record["attached"].append(ctx) or object(),
@@ -65,6 +83,7 @@ class _FakeDDSpan:
         self.trace_id = trace_id
         self.span_id = span_id
         self.finished = False
+        self.error = 0
         self.tags: dict = {}
 
     def set_tag(self, key, value):
@@ -149,6 +168,27 @@ class TestOtelWrapper:
     def test_close_none_is_noop(self):
         obs_span.close_obs_span(None)  # must not raise
 
+    def test_close_with_error_marks_otel_status(self, monkeypatch):
+        monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
+        record = _install_fake_otel(monkeypatch)
+        handle = obs_span.open_obs_span("step")
+
+        obs_span.close_obs_span(handle, error={"type": "ValueError", "message": "boom"})
+
+        assert record["span"].status == {"code": "ERROR", "description": "boom"}
+        assert record["span"].attributes.get("error.type") == "ValueError"
+        assert record["span"].ended is True
+
+    def test_close_without_error_leaves_otel_status_unset(self, monkeypatch):
+        monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
+        record = _install_fake_otel(monkeypatch)
+        handle = obs_span.open_obs_span("step")
+
+        obs_span.close_obs_span(handle)  # success path
+
+        assert record["span"].status is None
+        assert record["span"].ended is True
+
 
 # --------------------------------------------------------------------------- #
 # dd_only -> ddtrace wrapper (only when a request trace is active)
@@ -185,6 +225,18 @@ class TestDdtraceWrapper:
 
         assert obs_span.open_obs_span("step") is None
         assert record["span"] is None  # never created a span
+
+    def test_close_with_error_marks_ddtrace_span(self, monkeypatch):
+        monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
+        record = _install_fake_ddtrace(monkeypatch, active=True)
+        handle = obs_span.open_obs_span("step")
+
+        obs_span.close_obs_span(handle, error={"type": "ValueError", "message": "boom"})
+
+        assert record["span"].error == 1
+        assert record["span"].tags.get("error.type") == "ValueError"
+        assert record["span"].tags.get("error.message") == "boom"
+        assert record["span"].finished is True
 
 
 # --------------------------------------------------------------------------- #
@@ -232,6 +284,21 @@ class TestTraceIntegration:
         trace.end_span(span)
         assert record["span"].finished is True
         assert span.id not in trace._obs_handles
+
+    def test_lgtm_wrapper_marked_error_when_business_step_raises(self, monkeypatch):
+        monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
+        record = _install_fake_otel(monkeypatch, trace_id=0x111, span_id=0x222)
+
+        trace = Trace(processors=[], client=MagicMock(), trace_id="task-run-err")
+        with pytest.raises(ValueError):
+            with trace.span(name="chat_completion"):
+                raise ValueError("boom")
+
+        # the failed step's obs span reflects the failure, not a false green
+        assert record["span"].name == "chat_completion"
+        assert record["span"].ended is True
+        assert record["span"].status == {"code": "ERROR", "description": "boom"}
+        assert record["span"].attributes.get("error.type") == "ValueError"
 
     def test_dd_only_no_ctx_falls_back_to_ambient(self, monkeypatch):
         monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
@@ -335,6 +402,8 @@ def _install_fake_otel_sequence(monkeypatch, *, trace_id: int, first_span_id: in
     fake_trace = types.SimpleNamespace(
         get_tracer=lambda _name: tracer,
         set_span_in_context=lambda span: {"span": span},
+        Status=_FakeStatus,
+        StatusCode=_FakeStatusCode,
     )
     fake_context = types.SimpleNamespace(
         attach=lambda ctx: object(),
