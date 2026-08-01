@@ -12,6 +12,11 @@ from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
 from agentex.lib.core.tracing.obs_ids import obs_correlation
+from agentex.lib.core.tracing.obs_span import (
+    ObsSpanHandle,
+    close_obs_span,
+    open_obs_span,
+)
 from agentex.lib.core.tracing.span_error import set_span_error
 from agentex.lib.core.tracing.span_queue import (
     SpanEventType,
@@ -49,6 +54,8 @@ class Trace:
         self.processors = processors
         self.client = client
         self.trace_id = trace_id
+        # Live per-business-span obs wrapper spans, keyed by business span id.
+        self._obs_handles: dict[str, ObsSpanHandle] = {}
 
     def start_span(
         self,
@@ -80,13 +87,19 @@ class Trace:
 
         serialized_input = recursive_model_dump(input) if input else None
         serialized_data = recursive_model_dump(data) if data else None
-        # Tag the business span with the active observability trace_id/span_id
-        # (OTel/ddtrace) so it can be correlated to the per-turn obs trace. The
-        # business trace_id stays the run-level task id -- see obs_ids.py.
-        obs = obs_correlation()
+        # Open a dedicated obs wrapper span named for this step and make it
+        # active, so obs_span_id is stable/meaningful (not an arbitrary innermost
+        # httpx span). It also carries the reverse tag (business span/trace id)
+        # so you can pivot obs -> business in Tempo/DD. Falls back to the ambient
+        # obs context (ddtrace) when not in lgtm mode. Business trace_id stays the
+        # run-level task id.
+        id = str(uuid.uuid4())
+        obs_handle = open_obs_span(
+            name, business_span_id=id, business_trace_id=self.trace_id
+        )
+        obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
         if obs:
             serialized_data = {**(serialized_data or {}), **obs}
-        id = str(uuid.uuid4())
 
         span = Span(
             id=id,
@@ -98,6 +111,8 @@ class Trace:
             data=serialized_data,
             task_id=task_id,
         )
+        if obs_handle is not None:
+            self._obs_handles[span.id] = obs_handle
 
         for processor in self.processors:
             processor.on_span_start(span)
@@ -119,6 +134,9 @@ class Trace:
         """
         if span.end_time is None:
             span.end_time = datetime.now(UTC)
+
+        # Close the dedicated obs wrapper span (detach context + end it).
+        close_obs_span(self._obs_handles.pop(span.id, None))
 
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
@@ -206,6 +224,8 @@ class AsyncTrace:
         self.client = client
         self.trace_id = trace_id
         self._span_queue = span_queue or get_default_span_queue()
+        # Live per-business-span obs wrapper spans, keyed by business span id.
+        self._obs_handles: dict[str, ObsSpanHandle] = {}
 
     async def start_span(
         self,
@@ -236,13 +256,19 @@ class AsyncTrace:
 
         serialized_input = recursive_model_dump(input) if input else None
         serialized_data = recursive_model_dump(data) if data else None
-        # Tag the business span with the active observability trace_id/span_id
-        # (OTel/ddtrace) so it can be correlated to the per-turn obs trace. The
-        # business trace_id stays the run-level task id -- see obs_ids.py.
-        obs = obs_correlation()
+        # Open a dedicated obs wrapper span named for this step and make it
+        # active, so obs_span_id is stable/meaningful (not an arbitrary innermost
+        # httpx span). It also carries the reverse tag (business span/trace id)
+        # so you can pivot obs -> business in Tempo/DD. Falls back to the ambient
+        # obs context (ddtrace) when not in lgtm mode. Business trace_id stays the
+        # run-level task id.
+        id = str(uuid.uuid4())
+        obs_handle = open_obs_span(
+            name, business_span_id=id, business_trace_id=self.trace_id
+        )
+        obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
         if obs:
             serialized_data = {**(serialized_data or {}), **obs}
-        id = str(uuid.uuid4())
 
         span = Span(
             id=id,
@@ -254,6 +280,8 @@ class AsyncTrace:
             data=serialized_data,
             task_id=task_id,
         )
+        if obs_handle is not None:
+            self._obs_handles[span.id] = obs_handle
 
         if self.processors:
             self._span_queue.enqueue(SpanEventType.START, span.model_copy(deep=True), self.processors)
@@ -275,6 +303,9 @@ class AsyncTrace:
         """
         if span.end_time is None:
             span.end_time = datetime.now(UTC)
+
+        # Close the dedicated obs wrapper span (detach context + end it).
+        close_obs_span(self._obs_handles.pop(span.id, None))
 
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
