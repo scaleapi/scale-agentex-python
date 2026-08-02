@@ -95,15 +95,17 @@ class _FakeDDSpan:
 
 def _install_fake_ddtrace(monkeypatch, *, active=True, trace_id=0xABC, span_id=0xFF):
     record: dict = {"span": None, "started": []}
+    ctx_obj = object() if active else None
+    record["ctx"] = ctx_obj
 
-    def start_span(name, activate=False):
+    def start_span(name, child_of=None, activate=False):
         span = _FakeDDSpan(name, trace_id, span_id)
         record["span"] = span
-        record["started"].append((name, activate))
+        record["started"].append({"name": name, "child_of": child_of, "activate": activate})
         return span
 
     tracer = types.SimpleNamespace(
-        current_trace_context=lambda: (object() if active else None),
+        current_trace_context=lambda: ctx_obj,
         start_span=start_span,
     )
     fake_ddtrace = types.ModuleType("ddtrace")
@@ -204,7 +206,12 @@ class TestDdtraceWrapper:
 
         assert handle is not None
         assert record["span"].name == "rocket.tool.fetch"
-        assert record["started"] == [("rocket.tool.fetch", True)]  # activated
+        started = record["started"][0]
+        assert started["name"] == "rocket.tool.fetch"
+        assert started["activate"] is True
+        # child_of is the active request/turn context -> the wrapper nests under
+        # it instead of minting a new root trace (ddtrace does not auto-parent).
+        assert started["child_of"] is record["ctx"]
         assert handle.correlation == {
             "obs_trace_id": "00000000000000000000000000000abc",
             "obs_span_id": "000000000000000000ff"[-16:],

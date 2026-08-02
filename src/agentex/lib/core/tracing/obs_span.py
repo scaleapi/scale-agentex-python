@@ -116,9 +116,15 @@ def _open_ddtrace_span(
     try:
         # Only wrap when ddtrace is actually tracing the request; otherwise a
         # wrapper would be an orphan root trace in an un-instrumented process.
-        if tracer.current_trace_context() is None:
+        ctx = tracer.current_trace_context()
+        if ctx is None:
             return None
-        span = tracer.start_span(name, activate=True)
+        # child_of=ctx is load-bearing: ddtrace's start_span does NOT auto-parent
+        # to the active span (unlike OTel), so start_span(name) alone mints a NEW
+        # root trace every call -- scattering a turn's business spans across N
+        # Datadog traces. Parenting to the active request/turn context rolls them
+        # into one trace while obs_span_id stays distinct per step.
+        span = tracer.start_span(name, child_of=ctx, activate=True)
         if business_span_id:
             span.set_tag(_ATTR_BUSINESS_SPAN_ID, business_span_id)
         if business_trace_id:
