@@ -7,7 +7,18 @@ from unittest.mock import MagicMock
 import pytest
 
 from agentex.lib.core.tracing import obs_span
+from agentex.lib.core.tracing import trace as trace_module
 from agentex.lib.core.tracing.trace import Trace
+
+
+@pytest.fixture(autouse=True)
+def _clear_obs_handles():
+    """The obs-handle registry is module-level (survives across Trace instances,
+    which is the whole point of the fix). Clear it around each test so leftover
+    handles never leak between tests."""
+    trace_module._OBS_HANDLES.clear()
+    yield
+    trace_module._OBS_HANDLES.clear()
 
 
 # --------------------------------------------------------------------------- #
@@ -261,7 +272,7 @@ class TestTraceIntegration:
         assert span.data["obs_trace_id"] == "00000000000000000000000000000111"
         assert span.data["obs_span_id"] == "0000000000000222"
         assert span.trace_id == "task-run-1"                # business id unchanged
-        assert span.id in trace._obs_handles
+        assert span.id in trace_module._OBS_HANDLES
         # bidirectional: the obs span carries the business ids (reverse tag),
         # and the business span carries the obs ids (forward edge).
         assert record["span"].attributes == {
@@ -271,7 +282,31 @@ class TestTraceIntegration:
 
         trace.end_span(span)
         assert record["span"].ended is True
-        assert span.id not in trace._obs_handles
+        assert span.id not in trace_module._OBS_HANDLES
+
+    def test_wrapper_ends_across_separate_trace_instances(self, monkeypatch):
+        # Regression for the export bug: TracingService creates a FRESH trace
+        # object for start_span AND for end_span (self._tracer.trace(trace_id) in
+        # both). The obs handle is stored in the module-level registry, so a
+        # DIFFERENT instance ending the span still finds it and calls .end() on
+        # the OTel wrapper. With an instance-local dict this regressed: end_span's
+        # new instance had an empty dict -> close_obs_span(None) -> the wrapper
+        # span was never ended -> never exported to Tempo (recording, ids stored,
+        # but absent from the trace backend).
+        monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
+        record = _install_fake_otel(monkeypatch, trace_id=0x111, span_id=0x222)
+
+        starter = Trace(processors=[], client=MagicMock(), trace_id="task-run-x")
+        span = starter.start_span(name="chat_completion")
+        assert record["span"].ended is False
+        assert span.id in trace_module._OBS_HANDLES
+
+        # A completely separate Trace instance ends the span.
+        ender = Trace(processors=[], client=MagicMock(), trace_id="task-run-x")
+        ender.end_span(span)
+
+        assert record["span"].ended is True             # wrapper WAS ended -> exportable
+        assert span.id not in trace_module._OBS_HANDLES  # handle cleaned up
 
     def test_dd_only_business_span_tagged_via_ddtrace(self, monkeypatch):
         monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
@@ -290,7 +325,7 @@ class TestTraceIntegration:
 
         trace.end_span(span)
         assert record["span"].finished is True
-        assert span.id not in trace._obs_handles
+        assert span.id not in trace_module._OBS_HANDLES
 
     def test_lgtm_wrapper_marked_error_when_business_step_raises(self, monkeypatch):
         monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
@@ -315,7 +350,7 @@ class TestTraceIntegration:
         trace = Trace(processors=[], client=MagicMock(), trace_id="task-run-3")
         span = trace.start_span(name="get_state")
 
-        assert trace._obs_handles == {}   # no wrapper opened
+        assert span.id not in trace_module._OBS_HANDLES   # no wrapper opened
         assert span.data is None          # nothing tagged
         trace.end_span(span)              # must not raise
 
@@ -389,7 +424,7 @@ class TestNeverFails:
         span = trace.start_span(name="safe")
 
         assert span.trace_id == "task-run-4"
-        assert trace._obs_handles == {}   # no wrapper
+        assert span.id not in trace_module._OBS_HANDLES   # no wrapper
         trace.end_span(span)              # must not raise
 
 

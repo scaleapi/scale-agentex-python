@@ -30,6 +30,17 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 
 logger = make_logger(__name__)
 
+# Live per-business-span obs wrapper spans, keyed by the (uuid4) business span id,
+# in a MODULE-LEVEL registry -- deliberately NOT on the Trace/AsyncTrace instance.
+# TracingService creates a FRESH trace object for every call
+# (`self._tracer.trace(trace_id)` in both start_span and end_span), so an
+# instance-local dict loses the handle between start and end: end_span's new
+# instance can't find it, close_obs_span(None) is a no-op, and the OTel wrapper
+# span is never .end()ed -> never exported (Simple/Batch processors only emit on
+# end). A module-level dict keyed by the unique span id survives across instances;
+# uuid4 span ids cannot collide across concurrent traces.
+_OBS_HANDLES: dict[str, ObsSpanHandle] = {}
+
 
 class Trace:
     """
@@ -54,8 +65,9 @@ class Trace:
         self.processors = processors
         self.client = client
         self.trace_id = trace_id
-        # Live per-business-span obs wrapper spans, keyed by business span id.
-        self._obs_handles: dict[str, ObsSpanHandle] = {}
+        # Obs wrapper spans are tracked in the module-level _OBS_HANDLES registry
+        # (see comment there): a fresh trace object is created per start/end call,
+        # so the handle must not live on the instance.
 
     def start_span(
         self,
@@ -112,7 +124,7 @@ class Trace:
             task_id=task_id,
         )
         if obs_handle is not None:
-            self._obs_handles[span.id] = obs_handle
+            _OBS_HANDLES[span.id] = obs_handle
 
         for processor in self.processors:
             processor.on_span_start(span)
@@ -137,7 +149,7 @@ class Trace:
 
         # Close the dedicated obs wrapper span; propagate the business-span error
         # (if any) so the obs span reflects failure, not a false green.
-        close_obs_span(self._obs_handles.pop(span.id, None), error=get_span_error(span))
+        close_obs_span(_OBS_HANDLES.pop(span.id, None), error=get_span_error(span))
 
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
@@ -225,8 +237,9 @@ class AsyncTrace:
         self.client = client
         self.trace_id = trace_id
         self._span_queue = span_queue or get_default_span_queue()
-        # Live per-business-span obs wrapper spans, keyed by business span id.
-        self._obs_handles: dict[str, ObsSpanHandle] = {}
+        # Obs wrapper spans are tracked in the module-level _OBS_HANDLES registry
+        # (see comment there): a fresh trace object is created per start/end call,
+        # so the handle must not live on the instance.
 
     async def start_span(
         self,
@@ -282,7 +295,7 @@ class AsyncTrace:
             task_id=task_id,
         )
         if obs_handle is not None:
-            self._obs_handles[span.id] = obs_handle
+            _OBS_HANDLES[span.id] = obs_handle
 
         if self.processors:
             self._span_queue.enqueue(SpanEventType.START, span.model_copy(deep=True), self.processors)
@@ -307,7 +320,7 @@ class AsyncTrace:
 
         # Close the dedicated obs wrapper span; propagate the business-span error
         # (if any) so the obs span reflects failure, not a false green.
-        close_obs_span(self._obs_handles.pop(span.id, None), error=get_span_error(span))
+        close_obs_span(_OBS_HANDLES.pop(span.id, None), error=get_span_error(span))
 
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
