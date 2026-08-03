@@ -14,8 +14,8 @@ from agentex.lib.utils.model_utils import recursive_model_dump
 from agentex.lib.core.tracing.obs_ids import obs_correlation
 from agentex.lib.core.tracing.obs_span import (
     ObsSpanHandle,
-    close_obs_span,
     open_obs_span,
+    close_obs_span,
 )
 from agentex.lib.core.tracing.span_error import get_span_error, set_span_error
 from agentex.lib.core.tracing.span_queue import (
@@ -106,9 +106,7 @@ class Trace:
         # obs context (ddtrace) when not in lgtm mode. Business trace_id stays the
         # run-level task id.
         id = str(uuid.uuid4())
-        obs_handle = open_obs_span(
-            name, business_span_id=id, business_trace_id=self.trace_id
-        )
+        obs_handle = open_obs_span(name, business_span_id=id, business_trace_id=self.trace_id)
         obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
         if obs:
             serialized_data = {**(serialized_data or {}), **obs}
@@ -277,9 +275,7 @@ class AsyncTrace:
         # obs context (ddtrace) when not in lgtm mode. Business trace_id stays the
         # run-level task id.
         id = str(uuid.uuid4())
-        obs_handle = open_obs_span(
-            name, business_span_id=id, business_trace_id=self.trace_id
-        )
+        obs_handle = open_obs_span(name, business_span_id=id, business_trace_id=self.trace_id)
         obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
         if obs:
             serialized_data = {**(serialized_data or {}), **obs}

@@ -6,8 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from agentex.lib.core.tracing import obs_span
-from agentex.lib.core.tracing import trace as trace_module
+from agentex.lib.core.tracing import trace as trace_module, obs_span
 from agentex.lib.core.tracing.trace import Trace
 
 
@@ -135,13 +134,11 @@ class TestOtelWrapper:
         monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
         record = _install_fake_otel(monkeypatch, trace_id=0xABC, span_id=0xFF)
 
-        handle = obs_span.open_obs_span(
-            "rocket.tool.fetch", business_span_id="bspan-1", business_trace_id="btrace-1"
-        )
+        handle = obs_span.open_obs_span("rocket.tool.fetch", business_span_id="bspan-1", business_trace_id="btrace-1")
 
         assert handle is not None
-        assert record["span"].name == "rocket.tool.fetch"   # named for the step
-        assert len(record["attached"]) == 1                 # made active
+        assert record["span"].name == "rocket.tool.fetch"  # named for the step
+        assert len(record["attached"]) == 1  # made active
         assert handle.correlation == {
             "obs_trace_id": "00000000000000000000000000000abc",
             "obs_span_id": "000000000000000000ff"[-16:],
@@ -161,9 +158,7 @@ class TestOtelWrapper:
             span._ctx = _FakeSpanContext(0, 0, is_valid=False)
             return span
 
-        sys.modules["opentelemetry"].trace.get_tracer = lambda _n: types.SimpleNamespace(
-            start_span=start_span
-        )
+        sys.modules["opentelemetry"].trace.get_tracer = lambda _n: types.SimpleNamespace(start_span=start_span)
         handle = obs_span.open_obs_span("step")
         assert handle is not None
         assert handle.correlation == {}
@@ -211,9 +206,7 @@ class TestDdtraceWrapper:
         monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
         record = _install_fake_ddtrace(monkeypatch, active=True, trace_id=0xABC, span_id=0xFF)
 
-        handle = obs_span.open_obs_span(
-            "rocket.tool.fetch", business_span_id="bspan-9", business_trace_id="btrace-9"
-        )
+        handle = obs_span.open_obs_span("rocket.tool.fetch", business_span_id="bspan-9", business_trace_id="btrace-9")
 
         assert handle is not None
         assert record["span"].name == "rocket.tool.fetch"
@@ -268,10 +261,10 @@ class TestTraceIntegration:
         trace = Trace(processors=[], client=MagicMock(), trace_id="task-run-1")
         span = trace.start_span(name="chat_completion")
 
-        assert record["span"].name == "chat_completion"     # dedicated named span
+        assert record["span"].name == "chat_completion"  # dedicated named span
         assert span.data["obs_trace_id"] == "00000000000000000000000000000111"
         assert span.data["obs_span_id"] == "0000000000000222"
-        assert span.trace_id == "task-run-1"                # business id unchanged
+        assert span.trace_id == "task-run-1"  # business id unchanged
         assert span.id in trace_module._OBS_HANDLES
         # bidirectional: the obs span carries the business ids (reverse tag),
         # and the business span carries the obs ids (forward edge).
@@ -305,7 +298,7 @@ class TestTraceIntegration:
         ender = Trace(processors=[], client=MagicMock(), trace_id="task-run-x")
         ender.end_span(span)
 
-        assert record["span"].ended is True             # wrapper WAS ended -> exportable
+        assert record["span"].ended is True  # wrapper WAS ended -> exportable
         assert span.id not in trace_module._OBS_HANDLES  # handle cleaned up
 
     def test_dd_only_business_span_tagged_via_ddtrace(self, monkeypatch):
@@ -350,9 +343,9 @@ class TestTraceIntegration:
         trace = Trace(processors=[], client=MagicMock(), trace_id="task-run-3")
         span = trace.start_span(name="get_state")
 
-        assert span.id not in trace_module._OBS_HANDLES   # no wrapper opened
-        assert span.data is None          # nothing tagged
-        trace.end_span(span)              # must not raise
+        assert span.id not in trace_module._OBS_HANDLES  # no wrapper opened
+        assert span.data is None  # nothing tagged
+        trace.end_span(span)  # must not raise
 
 
 # --------------------------------------------------------------------------- #
@@ -366,8 +359,8 @@ class TestNonInterference:
 
         obs_span.open_obs_span("step")
 
-        assert otel["span"] is not None    # OTel wrapper opened
-        assert dd["span"] is None          # ddtrace never touched
+        assert otel["span"] is not None  # OTel wrapper opened
+        assert dd["span"] is None  # ddtrace never touched
 
     def test_dd_only_touches_only_ddtrace(self, monkeypatch):
         monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
@@ -376,8 +369,8 @@ class TestNonInterference:
 
         obs_span.open_obs_span("step")
 
-        assert dd["span"] is not None      # ddtrace wrapper opened
-        assert otel["span"] is None        # OTel never touched
+        assert dd["span"] is not None  # ddtrace wrapper opened
+        assert otel["span"] is None  # OTel never touched
 
 
 # --------------------------------------------------------------------------- #
@@ -402,7 +395,7 @@ class TestNeverFails:
             raise RuntimeError("tracer blew up")
 
         sys.modules["opentelemetry"].trace.get_tracer = boom
-        assert obs_span.open_obs_span("step") is None   # inner guard
+        assert obs_span.open_obs_span("step") is None  # inner guard
 
     def test_top_level_guard_swallows_get_mode_error(self, monkeypatch):
         # Even if mode resolution itself raises, open_obs_span must not.
@@ -424,8 +417,8 @@ class TestNeverFails:
         span = trace.start_span(name="safe")
 
         assert span.trace_id == "task-run-4"
-        assert span.id not in trace_module._OBS_HANDLES   # no wrapper
-        trace.end_span(span)              # must not raise
+        assert span.id not in trace_module._OBS_HANDLES  # no wrapper
+        trace.end_span(span)  # must not raise
 
 
 def _install_fake_otel_sequence(monkeypatch, *, trace_id: int, first_span_id: int):
@@ -492,8 +485,8 @@ class TestTurn2Example:
 
         for biz, wrapper, exp_span in zip(business, state["spans"], expected_obs_span):
             # forward edge: business span carries the wrapper's ids
-            assert biz.data["obs_trace_id"] == obs_trace_B      # all under trace B
-            assert biz.data["obs_span_id"] == exp_span          # distinct wBn
+            assert biz.data["obs_trace_id"] == obs_trace_B  # all under trace B
+            assert biz.data["obs_span_id"] == exp_span  # distinct wBn
             # reverse tag: wrapper carries the business ids
             assert wrapper.attributes == {
                 "agentex.business_span_id": biz.id,

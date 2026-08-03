@@ -13,14 +13,14 @@ class TestGetObsMode:
     @pytest.mark.parametrize(
         "raw, expected",
         [
-            (None, "dd_only"),        # unset
-            ("", "dd_only"),          # empty
+            (None, "dd_only"),  # unset
+            ("", "dd_only"),  # empty
             ("dd_only", "dd_only"),
             ("lgtm", "lgtm"),
-            ("LGTM", "lgtm"),         # case-insensitive
-            ("  lgtm  ", "lgtm"),     # trimmed
-            ("dual", "dd_only"),      # removed mode -> safe degrade
-            ("garbage", "dd_only"),   # unrecognized -> safe degrade
+            ("LGTM", "lgtm"),  # case-insensitive
+            ("  lgtm  ", "lgtm"),  # trimmed
+            ("dual", "dd_only"),  # removed mode -> safe degrade
+            ("garbage", "dd_only"),  # unrecognized -> safe degrade
         ],
     )
     def test_mode_resolution(self, monkeypatch, raw, expected):
@@ -36,9 +36,7 @@ class TestObsCorrelation:
         monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
         monkeypatch.setattr(obs_ids, "_lgtm_ids", lambda: ("otel_trace", "otel_span"))
         # In lgtm mode ddtrace must NOT be consulted.
-        monkeypatch.setattr(
-            obs_ids, "_ddtrace_ids", lambda: pytest.fail("ddtrace read in lgtm mode")
-        )
+        monkeypatch.setattr(obs_ids, "_ddtrace_ids", lambda: pytest.fail("ddtrace read in lgtm mode"))
 
         assert obs_correlation() == {
             "obs_trace_id": "otel_trace",
@@ -48,9 +46,7 @@ class TestObsCorrelation:
     def test_dd_only_mode_reads_ddtrace(self, monkeypatch):
         monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
         monkeypatch.setattr(obs_ids, "_ddtrace_ids", lambda: ("dd_trace", "dd_span"))
-        monkeypatch.setattr(
-            obs_ids, "_lgtm_ids", lambda: pytest.fail("otel read in dd_only mode")
-        )
+        monkeypatch.setattr(obs_ids, "_lgtm_ids", lambda: pytest.fail("otel read in dd_only mode"))
 
         assert obs_correlation() == {
             "obs_trace_id": "dd_trace",
@@ -61,9 +57,7 @@ class TestObsCorrelation:
         """A leftover SGP_OBS_MODE=dual must behave as dd_only, not read OTel."""
         monkeypatch.setenv("SGP_OBS_MODE", "dual")
         monkeypatch.setattr(obs_ids, "_ddtrace_ids", lambda: ("dd_trace", "dd_span"))
-        monkeypatch.setattr(
-            obs_ids, "_lgtm_ids", lambda: pytest.fail("otel read for stale dual mode")
-        )
+        monkeypatch.setattr(obs_ids, "_lgtm_ids", lambda: pytest.fail("otel read for stale dual mode"))
 
         assert obs_correlation() == {
             "obs_trace_id": "dd_trace",

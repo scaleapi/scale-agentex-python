@@ -24,6 +24,7 @@ An unrecognized SGP_OBS_MODE -- including a stale "dual" -- degrades to dd_only.
 This never fabricates ids -- if no observability context is active, it returns
 an empty dict and the span is simply not tagged.
 """
+
 from __future__ import annotations
 
 import os

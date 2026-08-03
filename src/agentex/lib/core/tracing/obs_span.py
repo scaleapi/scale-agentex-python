@@ -24,9 +24,10 @@ Backend follows ``SGP_OBS_MODE``:
 No-op when the relevant tracer isn't importable. Never raises -- observability
 must never break a business span.
 """
+
 from __future__ import annotations
 
-from typing import Callable, Dict, Optional
+from typing import Dict, Callable, Optional
 
 from agentex.lib.core.tracing.obs_ids import LGTM, get_obs_mode
 
@@ -70,7 +71,7 @@ def _open_otel_span(
     business_trace_id: Optional[str],
 ) -> Optional[ObsSpanHandle]:
     try:
-        from opentelemetry import context, trace
+        from opentelemetry import trace, context
     except ImportError:
         return None
     try:
@@ -88,9 +89,7 @@ def _open_otel_span(
                 if error:
                     # Reflect the business-step failure on the obs span so it
                     # isn't a false green when you pivot from a failed span.
-                    span.set_status(
-                        trace.Status(trace.StatusCode.ERROR, error.get("message"))
-                    )
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, error.get("message")))
                     if error.get("type"):
                         span.set_attribute("error.type", error["type"])
             finally:
