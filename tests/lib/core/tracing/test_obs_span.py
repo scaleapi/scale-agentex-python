@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -62,7 +63,7 @@ class _FakeOtelSpan:
 
 
 def _install_fake_otel(monkeypatch, *, trace_id=0xABC, span_id=0xFF):
-    record: dict = {"span": None, "attached": [], "detached": []}
+    record: dict[str, Any] = {"span": None, "attached": [], "detached": []}
 
     def start_span(name):
         span = _FakeOtelSpan(name, trace_id, span_id)
@@ -80,7 +81,7 @@ def _install_fake_otel(monkeypatch, *, trace_id=0xABC, span_id=0xFF):
         attach=lambda ctx: record["attached"].append(ctx) or object(),
         detach=lambda token: record["detached"].append(token),
     )
-    fake_otel = types.ModuleType("opentelemetry")
+    fake_otel: Any = types.ModuleType("opentelemetry")
     fake_otel.trace = fake_trace
     fake_otel.context = fake_context
     monkeypatch.setitem(sys.modules, "opentelemetry", fake_otel)
@@ -104,7 +105,7 @@ class _FakeDDSpan:
 
 
 def _install_fake_ddtrace(monkeypatch, *, active=True, trace_id=0xABC, span_id=0xFF):
-    record: dict = {"span": None, "started": []}
+    record: dict[str, Any] = {"span": None, "started": []}
     ctx_obj = object() if active else None
     record["ctx"] = ctx_obj
 
@@ -118,8 +119,8 @@ def _install_fake_ddtrace(monkeypatch, *, active=True, trace_id=0xABC, span_id=0
         current_trace_context=lambda: ctx_obj,
         start_span=start_span,
     )
-    fake_ddtrace = types.ModuleType("ddtrace")
-    fake_trace = types.ModuleType("ddtrace.trace")
+    fake_ddtrace: Any = types.ModuleType("ddtrace")
+    fake_trace: Any = types.ModuleType("ddtrace.trace")
     fake_trace.tracer = tracer
     monkeypatch.setitem(sys.modules, "ddtrace", fake_ddtrace)
     monkeypatch.setitem(sys.modules, "ddtrace.trace", fake_trace)
@@ -262,6 +263,7 @@ class TestTraceIntegration:
         span = trace.start_span(name="chat_completion")
 
         assert record["span"].name == "chat_completion"  # dedicated named span
+        assert isinstance(span.data, dict)
         assert span.data["obs_trace_id"] == "00000000000000000000000000000111"
         assert span.data["obs_span_id"] == "0000000000000222"
         assert span.trace_id == "task-run-1"  # business id unchanged
@@ -309,6 +311,7 @@ class TestTraceIntegration:
         span = trace.start_span(name="get_state")
 
         assert record["span"].name == "get_state"
+        assert isinstance(span.data, dict)
         assert span.data["obs_trace_id"] == "00000000000000000000000000000111"
         assert span.data["obs_span_id"] == "0000000000000222"
         assert record["span"].tags == {
@@ -444,7 +447,7 @@ def _install_fake_otel_sequence(monkeypatch, *, trace_id: int, first_span_id: in
         attach=lambda ctx: object(),
         detach=lambda token: None,
     )
-    fake_otel = types.ModuleType("opentelemetry")
+    fake_otel: Any = types.ModuleType("opentelemetry")
     fake_otel.trace = fake_trace
     fake_otel.context = fake_context
     monkeypatch.setitem(sys.modules, "opentelemetry", fake_otel)

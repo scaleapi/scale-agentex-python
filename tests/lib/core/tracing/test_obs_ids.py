@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from typing import Any
 
 import pytest
 
@@ -87,13 +88,15 @@ class TestIdFormatting:
     def test_ddtrace_ids_formats_w3c_hex(self, monkeypatch):
         ctx = types.SimpleNamespace(trace_id=0xABC, span_id=0xFF)
         tracer = types.SimpleNamespace(current_trace_context=lambda: ctx)
-        fake_ddtrace = types.ModuleType("ddtrace")
-        fake_trace = types.ModuleType("ddtrace.trace")
+        fake_ddtrace: Any = types.ModuleType("ddtrace")
+        fake_trace: Any = types.ModuleType("ddtrace.trace")
         fake_trace.tracer = tracer
         monkeypatch.setitem(sys.modules, "ddtrace", fake_ddtrace)
         monkeypatch.setitem(sys.modules, "ddtrace.trace", fake_trace)
 
-        trace_id, span_id = obs_ids._ddtrace_ids()
+        result = obs_ids._ddtrace_ids()
+        assert result is not None
+        trace_id, span_id = result
         assert trace_id == "00000000000000000000000000000abc"
         assert span_id == "000000000000000000ff"[-16:]  # 16-hex
         assert len(trace_id) == 32 and len(span_id) == 16
@@ -102,18 +105,20 @@ class TestIdFormatting:
         span_ctx = types.SimpleNamespace(trace_id=0xABC, span_id=0xFF, is_valid=True)
         current_span = types.SimpleNamespace(get_span_context=lambda: span_ctx)
         fake_trace_mod = types.SimpleNamespace(get_current_span=lambda: current_span)
-        fake_otel = types.ModuleType("opentelemetry")
+        fake_otel: Any = types.ModuleType("opentelemetry")
         fake_otel.trace = fake_trace_mod
         monkeypatch.setitem(sys.modules, "opentelemetry", fake_otel)
 
-        trace_id, span_id = obs_ids._lgtm_ids()
+        result = obs_ids._lgtm_ids()
+        assert result is not None
+        trace_id, span_id = result
         assert trace_id == "00000000000000000000000000000abc"
         assert len(trace_id) == 32 and len(span_id) == 16
 
     def test_ddtrace_ids_none_when_no_context(self, monkeypatch):
         tracer = types.SimpleNamespace(current_trace_context=lambda: None)
-        fake_ddtrace = types.ModuleType("ddtrace")
-        fake_trace = types.ModuleType("ddtrace.trace")
+        fake_ddtrace: Any = types.ModuleType("ddtrace")
+        fake_trace: Any = types.ModuleType("ddtrace.trace")
         fake_trace.tracer = tracer
         monkeypatch.setitem(sys.modules, "ddtrace", fake_ddtrace)
         monkeypatch.setitem(sys.modules, "ddtrace.trace", fake_trace)
