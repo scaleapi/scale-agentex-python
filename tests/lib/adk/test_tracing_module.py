@@ -10,6 +10,7 @@ import agentex.lib.adk._modules.tracing as _tracing_mod
 from agentex.types.span import Span
 from agentex.lib.core.harness.types import TurnUsage
 from agentex.lib.adk._modules.tracing import TurnSpan, TracingModule
+from agentex.lib.core.tracing.span_error import get_span_error
 from agentex.lib.core.services.adk.tracing import TracingService
 
 
@@ -248,6 +249,24 @@ class TestSpanContextManager:
 
         assert mock_service.start_span.call_args.kwargs["task_id"] == "task-abc"
         mock_service.end_span.assert_called_once()
+
+    async def test_span_context_manager_records_and_reraises_body_error(self):
+        mock_service, module = _make_module()
+        started = _make_span()
+        mock_service.start_span.return_value = started
+        mock_service.end_span.return_value = started
+
+        with patch.object(_tracing_mod, "in_temporal_workflow", return_value=False):
+            with pytest.raises(RuntimeError, match="boom"):
+                async with module.span(trace_id="trace-123", name="test-span"):
+                    raise RuntimeError("boom")
+
+        assert get_span_error(started) == {
+            "type": "RuntimeError",
+            "message": "boom",
+            "category": "unknown",
+        }
+        mock_service.end_span.assert_called_once_with(trace_id="trace-123", span=started)
 
     async def test_span_context_manager_noop_when_no_trace_id(self):
         mock_service, module = _make_module()

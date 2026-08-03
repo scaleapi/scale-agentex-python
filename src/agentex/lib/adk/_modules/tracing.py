@@ -19,6 +19,7 @@ from agentex.lib.core.temporal.activities.adk.tracing_activities import (
     StartSpanParams,
     TracingActivityName,
 )
+from agentex.lib.core.tracing.span_error import set_span_error
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.core.harness.types import TurnUsage
 from agentex.types.span import Span
@@ -236,6 +237,10 @@ class TracingModule:
         )
         try:
             yield span
+        except Exception as exc:
+            if span:
+                set_span_error(span, exc)
+            raise
         finally:
             if span:
                 await self.end_span(
