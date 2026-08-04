@@ -11,6 +11,8 @@ from agentex.types.span import Span
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.lib.core.tracing.span_error import (
     SPAN_ERROR_KEY,
+    PlatformError,
+    ApplicationError,
     get_span_error,
     set_span_error,
 )
@@ -50,30 +52,30 @@ class TestSpanErrorHelpers:
         }
 
     def test_set_uses_explicit_exception_category(self):
-        class PlatformFailure(RuntimeError):
-            error_category = " PLATFORM "
-
         span = _make_span(data=None)
-        set_span_error(span, PlatformFailure("unavailable"))
+        set_span_error(span, PlatformError("unavailable"))
         assert get_span_error(span) == {
-            "type": "PlatformFailure",
+            "type": "PlatformError",
             "message": "unavailable",
             "category": "platform",
         }
 
     def test_explicit_category_takes_precedence(self):
-        class PlatformFailure(RuntimeError):
+        span = _make_span(data=None)
+        set_span_error(span, PlatformError("bad input"), error_category="application")
+        assert get_span_error(span)["category"] == "application"  # type: ignore[index]
+
+    def test_set_uses_application_error_category(self):
+        span = _make_span(data=None)
+        set_span_error(span, ApplicationError("bad input"))
+        assert get_span_error(span)["category"] == "application"  # type: ignore[index]
+
+    def test_bare_exception_attribute_does_not_opt_in(self):
+        class ImplicitlyCategorizedError(RuntimeError):
             error_category = "platform"
 
         span = _make_span(data=None)
-        set_span_error(span, PlatformFailure("bad input"), error_category="application")
-        assert get_span_error(span)["category"] == "application"  # type: ignore[index]
-
-    def test_set_rejects_invalid_exception_category(self):
-        exc = RuntimeError("boom")
-        exc.error_category = "infrastructure"  # type: ignore[attr-defined]
-        span = _make_span(data=None)
-        set_span_error(span, exc)
+        set_span_error(span, ImplicitlyCategorizedError("boom"))
         assert get_span_error(span)["category"] == "unknown"  # type: ignore[index]
 
     def test_set_preserves_existing_dict_keys(self):

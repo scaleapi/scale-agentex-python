@@ -18,6 +18,31 @@ ERROR_CATEGORY_UNKNOWN: ErrorCategory = "unknown"
 _ERROR_CATEGORIES = frozenset({"application", "platform", "unknown"})
 
 
+class CategorizedError(Exception):
+    """Base class for failures with known operational ownership.
+
+    Use ``ApplicationError`` for failures owned by agent or caller code, such
+    as business logic, user input, tools, or application configuration. Use
+    ``PlatformError`` only at a known Agentex/SGP-owned boundary, such as
+    managed runtime, tracing, persistence, or platform networking. Leave
+    unclassified failures as ordinary exceptions so they remain ``unknown``.
+    """
+
+    error_category: ErrorCategory = ERROR_CATEGORY_UNKNOWN
+
+
+class ApplicationError(CategorizedError):
+    """Failure owned by the agent application or its caller."""
+
+    error_category: ErrorCategory = "application"
+
+
+class PlatformError(CategorizedError):
+    """Failure owned by Agentex/SGP or a platform-managed dependency."""
+
+    error_category: ErrorCategory = "platform"
+
+
 def _normalize_error_category(value: object) -> ErrorCategory | None:
     if isinstance(value, str):
         normalized = value.strip().lower()
@@ -33,7 +58,7 @@ def _error_category(
     """Return an explicit producer classification, defaulting safely to unknown."""
     return (
         _normalize_error_category(explicit_category)
-        or _normalize_error_category(getattr(exc, "error_category", None))
+        or (exc.error_category if isinstance(exc, CategorizedError) else None)
         or ERROR_CATEGORY_UNKNOWN
     )
 
@@ -46,8 +71,8 @@ def set_span_error(
 ) -> None:
     """Record an exception on ``span`` under ``data[SPAN_ERROR_KEY]``.
 
-    An explicit ``error_category`` takes precedence over an exception's
-    ``error_category`` attribute. Invalid or absent categories become unknown.
+    An explicit ``error_category`` takes precedence over a ``CategorizedError``
+    classification. Invalid or absent categories become unknown.
     No-op when ``span.data`` is a list (matching ``_add_source_to_span``, which
     only attaches metadata to dict-shaped data).
     """
