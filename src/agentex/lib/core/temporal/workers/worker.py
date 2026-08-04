@@ -29,6 +29,7 @@ from temporalio.converter import (
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.registration import register_agent
+from agentex.lib.core.tracing.temporal import temporal_tracing_interceptors
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.compat.version_guard import assert_backend_compatible
 
@@ -126,6 +127,9 @@ async def get_temporal_client(
     connect_kwargs: dict[str, Any] = {
         "target_host": temporal_address,
         "plugins": plugins,
+        # Propagate OTel trace context on outbound start_workflow / execute_activity
+        # (enabled by default; AGENTEX_TEMPORAL_TRACE_INTERCEPTOR_ENABLED=false to disable).
+        "interceptors": temporal_tracing_interceptors(),
     }
 
     if data_converter is not None:
@@ -229,7 +233,9 @@ class AgentexWorker:
             max_concurrent_activities=self.max_concurrent_activities,
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
-            interceptors=self.interceptors,  # Pass interceptors to Worker
+            # Tracing interceptor OUTERMOST so business interceptors (and the spans
+            # they create) nest under the propagated workflow/activity span.
+            interceptors=[*temporal_tracing_interceptors(), *self.interceptors],
         )
 
         logger.info(f"Starting workers for task queue: {self.task_queue}")
