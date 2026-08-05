@@ -26,6 +26,7 @@ from agentex.protocol.acp import (
 )
 from agentex.lib.utils.logging import make_logger, ctx_var_request_id
 from agentex.protocol.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
+from agentex.lib.utils._tp_debug import log_tp  # TEMP(obs-debug)
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.registration import register_agent
 
@@ -197,6 +198,8 @@ class BaseACPServer(FastAPI):
                 params_data["request"] = {"headers": custom_headers}
             params = params_model.model_validate(params_data)
 
+            log_tp("acp.handle_jsonrpc", method=method, inbound=request.headers.get("traceparent"))  # TEMP(obs-debug)
+
             if method in RPC_SYNC_METHODS:
                 handler = self._handlers[method]
                 result = await handler(params)
@@ -223,6 +226,7 @@ class BaseACPServer(FastAPI):
                     return JSONRPCResponse(id=None)
 
                 # For regular requests, start processing in background but return immediately
+                log_tp("acp.before_create_task", method=method)  # TEMP(obs-debug)
                 asyncio.create_task(
                     self._process_request(rpc_request.id, method, params)
                 )
@@ -304,6 +308,7 @@ class BaseACPServer(FastAPI):
     ):
         """Process a request in the background"""
         try:
+            log_tp("acp.process_request(bg-task)", method=method)  # TEMP(obs-debug)
             handler = self._handlers[method]
             await handler(params)
             # Note: In a real implementation, you might want to store the result somewhere

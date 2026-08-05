@@ -8,6 +8,7 @@ from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
 from agentex.protocol.acp import SendEventParams, CreateTaskParams, InterruptTaskParams
+from agentex.lib.utils._tp_debug import log_tp  # TEMP(obs-debug)
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.clients.temporal.types import WorkflowState
 from agentex.lib.core.temporal.types.workflow import SignalName
@@ -67,6 +68,7 @@ class TemporalTaskService:
         timeout_seconds = self._env_vars.WORKFLOW_EXECUTION_TIMEOUT_SECONDS
         execution_timeout = timedelta(seconds=timeout_seconds) if timeout_seconds and timeout_seconds > 0 else None
         with _acp_dispatch_span(f"acp.task_create:{task.id}"):
+            log_tp("svc.submit_task(before start_workflow)", task=task.id)  # TEMP(obs-debug)
             return await self._temporal_client.start_workflow(
                 workflow=self._env_vars.WORKFLOW_NAME,
                 arg=CreateTaskParams(
@@ -89,6 +91,7 @@ class TemporalTaskService:
 
     async def send_event(self, agent: Agent, task: Task, event: Event, request: dict | None = None) -> None:
         with _acp_dispatch_span(f"acp.event_send:{task.id}"):
+            log_tp("svc.send_event(before send_signal)", task=task.id)  # TEMP(obs-debug)
             return await self._temporal_client.send_signal(
                 workflow_id=task.id,
                 signal=SignalName.RECEIVE_EVENT.value,

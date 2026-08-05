@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils._tp_debug import log_tp  # TEMP(obs-debug)
 from agentex.lib.utils.model_utils import recursive_model_dump
 from agentex.lib.core.tracing.obs_ids import obs_correlation
 from agentex.lib.core.tracing.obs_span import (
@@ -151,6 +152,7 @@ class Trace:
         # _in_temporal_activity().
         id = str(uuid.uuid4())
         if _in_temporal_activity():
+            log_tp("worker.activity.start_span", span=name, biz_trace=self.trace_id)  # TEMP(obs-debug)
             tag_ambient_obs_span(business_span_id=id, business_trace_id=self.trace_id)
             obs_handle = None
             obs = obs_correlation()
@@ -331,6 +333,7 @@ class AsyncTrace:
         # _in_temporal_activity().
         id = str(uuid.uuid4())
         if _in_temporal_activity():
+            log_tp("worker.activity.start_span", span=name, biz_trace=self.trace_id)  # TEMP(obs-debug)
             tag_ambient_obs_span(business_span_id=id, business_trace_id=self.trace_id)
             obs_handle = None
             obs = obs_correlation()

@@ -10,6 +10,7 @@ from temporalio.service import RPCError, RPCStatusCode
 from temporalio.converter import PayloadCodec, DataConverter
 
 from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils._tp_debug import log_tp  # TEMP(obs-debug)
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.core.clients.temporal.types import (
     TaskStatus,
@@ -157,6 +158,11 @@ class TemporalClient:
         **kwargs: Any,
     ) -> str:
         temporal_retry_policy = TemporalRetryPolicy(**retry_policy.model_dump(exclude_unset=True))
+        try:
+            _ics = [type(i).__name__ for i in self.client.config().get("interceptors", [])]
+        except Exception as _e:  # pragma: no cover - debug only
+            _ics = [f"<err:{_e}>"]
+        log_tp("client.start_workflow(before start)", interceptors=_ics)  # TEMP(obs-debug)
         workflow_handle = await self.client.start_workflow(
             *args,
             retry_policy=temporal_retry_policy,
@@ -174,6 +180,12 @@ class TemporalClient:
         payload: dict[str, Any] | list[Any] | str | int | float | bool | BaseModel,
     ) -> None:
         handle = self.client.get_workflow_handle(workflow_id=workflow_id)
+        # TEMP(obs-debug): also report how many interceptors the live client has
+        try:
+            _ics = [type(i).__name__ for i in self.client.config().get("interceptors", [])]
+        except Exception as _e:  # pragma: no cover - debug only
+            _ics = [f"<err:{_e}>"]
+        log_tp("client.send_signal(before handle.signal)", wf=workflow_id, interceptors=_ics)  # TEMP(obs-debug)
         await handle.signal(signal, payload)  # type: ignore[misc]
 
     async def query_workflow(
