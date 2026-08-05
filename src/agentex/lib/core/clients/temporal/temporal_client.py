@@ -5,7 +5,11 @@ from datetime import timedelta
 from collections.abc import Callable
 
 from temporalio.client import Client, WorkflowExecutionStatus
-from temporalio.common import RetryPolicy as TemporalRetryPolicy, WorkflowIDReusePolicy
+from temporalio.common import (
+    RetryPolicy as TemporalRetryPolicy,
+    WorkflowIDReusePolicy,
+    WorkflowIDConflictPolicy,
+)
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.converter import PayloadCodec, DataConverter
 
@@ -151,6 +155,7 @@ class TemporalClient:
         self,
         *args: Any,
         duplicate_policy: DuplicateWorkflowPolicy = DuplicateWorkflowPolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: WorkflowIDConflictPolicy = WorkflowIDConflictPolicy.UNSPECIFIED,
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
         task_timeout: timedelta = timedelta(seconds=10),
         execution_timeout: timedelta | None = None,
@@ -163,6 +168,7 @@ class TemporalClient:
             task_timeout=task_timeout,
             execution_timeout=execution_timeout,
             id_reuse_policy=DUPLICATE_POLICY_TO_ID_REUSE_POLICY[duplicate_policy],
+            id_conflict_policy=id_conflict_policy,
             **kwargs,
         )
         return workflow_handle.id

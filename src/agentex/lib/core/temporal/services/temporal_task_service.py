@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 from datetime import timedelta
 
+from temporalio.common import WorkflowIDConflictPolicy
+
 from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
@@ -42,6 +44,8 @@ class TemporalTaskService:
             if timeout_seconds and timeout_seconds > 0
             else None
         )
+        # USE_EXISTING makes task/create idempotent
+        # If same task ID is already running Temporal returns a handle to the existing run instead of raising WorkflowAlreadyStarted
         return await self._temporal_client.start_workflow(
             workflow=self._env_vars.WORKFLOW_NAME,
             arg=CreateTaskParams(
@@ -52,6 +56,7 @@ class TemporalTaskService:
             id=task.id,
             task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
             execution_timeout=execution_timeout,
+            id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
         )
 
     async def get_state(self, task_id: str) -> WorkflowState:
