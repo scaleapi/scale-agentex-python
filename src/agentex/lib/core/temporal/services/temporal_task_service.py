@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterator
 from datetime import timedelta
+from contextlib import contextmanager
 
 from agentex.types.task import Task
 from agentex.types.agent import Agent
@@ -11,6 +12,34 @@ from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.clients.temporal.types import WorkflowState
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
+
+
+@contextmanager
+def _acp_dispatch_span(name: str) -> Iterator[None]:
+    """Wrap an ACP -> Temporal dispatch (start_workflow / signal) in an OTel span.
+
+    The Temporal OpenTelemetry interceptor propagates trace context by injecting
+    the CURRENTLY ACTIVE span into the Temporal message headers on the caller
+    side (``start_workflow`` / ``signal_workflow``); the worker then extracts it
+    and roots the workflow / activity spans under it. But the ACP server dispatches
+    from a bare async handler with no active span, so nothing is injected and the
+    workflow's activities become DETACHED trace roots -- the business work shows up
+    in Tempo as a fresh trace with no link back to the ``task/create`` /
+    ``event/send`` that triggered it.
+
+    Opening a span here gives the interceptor something to inject. It becomes a
+    child of the ingress request span when one is active (front-of-request
+    propagation), or a fresh per-turn root otherwise. Fail-open: never raises if
+    OpenTelemetry isn't importable.
+    """
+    try:
+        from opentelemetry import trace as _otel_trace
+    except Exception:  # pragma: no cover - obs must never break a dispatch
+        yield
+        return
+    tracer = _otel_trace.get_tracer("agentex.acp")
+    with tracer.start_as_current_span(name, kind=_otel_trace.SpanKind.PRODUCER):
+        yield
 
 
 class TemporalTaskService:
@@ -26,7 +55,6 @@ class TemporalTaskService:
         self._temporal_client = temporal_client
         self._env_vars = env_vars
 
-
     async def submit_task(self, agent: Agent, task: Task, params: dict[str, Any] | None) -> str:
         """
         Submit a task to the async runtime for execution.
@@ -37,22 +65,19 @@ class TemporalTaskService:
         # indefinitely, which long-lived chat/session agents rely on). A positive
         # value bounds the whole continue-as-new chain's wall-clock lifetime.
         timeout_seconds = self._env_vars.WORKFLOW_EXECUTION_TIMEOUT_SECONDS
-        execution_timeout = (
-            timedelta(seconds=timeout_seconds)
-            if timeout_seconds and timeout_seconds > 0
-            else None
-        )
-        return await self._temporal_client.start_workflow(
-            workflow=self._env_vars.WORKFLOW_NAME,
-            arg=CreateTaskParams(
-                agent=agent,
-                task=task,
-                params=params,
-            ),
-            id=task.id,
-            task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
-            execution_timeout=execution_timeout,
-        )
+        execution_timeout = timedelta(seconds=timeout_seconds) if timeout_seconds and timeout_seconds > 0 else None
+        with _acp_dispatch_span(f"acp.task_create:{task.id}"):
+            return await self._temporal_client.start_workflow(
+                workflow=self._env_vars.WORKFLOW_NAME,
+                arg=CreateTaskParams(
+                    agent=agent,
+                    task=task,
+                    params=params,
+                ),
+                id=task.id,
+                task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
+                execution_timeout=execution_timeout,
+            )
 
     async def get_state(self, task_id: str) -> WorkflowState:
         """
@@ -63,16 +88,17 @@ class TemporalTaskService:
         )
 
     async def send_event(self, agent: Agent, task: Task, event: Event, request: dict | None = None) -> None:
-        return await self._temporal_client.send_signal(
-            workflow_id=task.id,
-            signal=SignalName.RECEIVE_EVENT.value,
-            payload=SendEventParams(
-                agent=agent,
-                task=task,
-                event=event,
-                request=request,
-            ).model_dump(),
-        )
+        with _acp_dispatch_span(f"acp.event_send:{task.id}"):
+            return await self._temporal_client.send_signal(
+                workflow_id=task.id,
+                signal=SignalName.RECEIVE_EVENT.value,
+                payload=SendEventParams(
+                    agent=agent,
+                    task=task,
+                    event=event,
+                    request=request,
+                ).model_dump(),
+            )
 
     async def interrupt(self, agent: Agent, task: Task, request: dict | None = None) -> None:
         """Forward a task/interrupt to the running workflow as a dedicated signal.
