@@ -6,6 +6,8 @@ from datetime import timedelta
 from contextlib import contextmanager
 from collections.abc import Iterator
 
+from temporalio.common import WorkflowIDConflictPolicy
+
 from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
@@ -89,6 +91,8 @@ class TemporalTaskService:
         # value bounds the whole continue-as-new chain's wall-clock lifetime.
         timeout_seconds = self._env_vars.WORKFLOW_EXECUTION_TIMEOUT_SECONDS
         execution_timeout = timedelta(seconds=timeout_seconds) if timeout_seconds and timeout_seconds > 0 else None
+        # USE_EXISTING makes task/create idempotent
+        # If same task ID is already running Temporal returns a handle to the existing run instead of raising WorkflowAlreadyStarted
         with _acp_dispatch_span("acp.task_create", task_id=task.id):
             return await self._temporal_client.start_workflow(
                 workflow=self._env_vars.WORKFLOW_NAME,
@@ -100,6 +104,7 @@ class TemporalTaskService:
                 id=task.id,
                 task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
                 execution_timeout=execution_timeout,
+                id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
             )
 
     async def get_state(self, task_id: str) -> WorkflowState:
