@@ -46,6 +46,43 @@ logger = make_logger(__name__)
 task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
 
 
+def _attach_incoming_otel_context(scope_headers: list[tuple[bytes, bytes]]) -> object | None:
+    """Extract the inbound W3C trace context (traceparent/tracestate/baggage) from
+    ASGI headers and make it the active OpenTelemetry context for the request.
+
+    FastACP is not otherwise instrumented to *continue* an incoming trace: the
+    gateway forwards the traceparent header, but nothing on the Python side
+    extracts it, so the active context stays empty. Downstream that means the
+    Temporal ``start_workflow`` / ``signal`` (including the work dispatched via
+    ``asyncio.create_task``) fires with no active span, the interceptor injects
+    nothing, and the workflow + activities detach into fresh traces.
+
+    Attaching here (in the ASGI middleware that wraps the whole request) fixes
+    that: the request handler and the background task both run under the ingress
+    trace, so the interceptor propagates it across the Temporal boundary.
+    Returns a detach token (or None); fail-open.
+    """
+    try:
+        from opentelemetry import context as _otel_context
+        from opentelemetry.propagate import extract
+
+        carrier = {k.decode("latin-1"): v.decode("latin-1") for k, v in scope_headers}
+        return _otel_context.attach(extract(carrier))
+    except Exception:  # pragma: no cover - obs must never break a request
+        return None
+
+
+def _detach_otel_context(token: object | None) -> None:
+    if token is None:
+        return
+    try:
+        from opentelemetry import context as _otel_context
+
+        _otel_context.detach(token)  # type: ignore[arg-type]
+    except Exception:  # pragma: no cover - best-effort
+        pass
+
+
 class RequestIDMiddleware:
     """Pure ASGI middleware to set request IDs without buffering streaming responses."""
 
@@ -53,12 +90,20 @@ class RequestIDMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        otel_token: object | None = None
         if scope["type"] == "http":
-            headers = dict(scope.get("headers", []))
+            scope_headers = scope.get("headers", [])
+            headers = dict(scope_headers)
             raw_request_id = headers.get(b"x-request-id", b"")
             request_id = raw_request_id.decode() if raw_request_id else uuid.uuid4().hex
             ctx_var_request_id.set(request_id)
-        await self.app(scope, receive, send)
+            # Continue the ingress trace for this request (and its background
+            # Temporal dispatch); see _attach_incoming_otel_context.
+            otel_token = _attach_incoming_otel_context(scope_headers)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            _detach_otel_context(otel_token)
 
 
 class BaseACPServer(FastAPI):
