@@ -16,6 +16,7 @@ from agentex.lib.core.tracing.obs_span import (
     ObsSpanHandle,
     open_obs_span,
     close_obs_span,
+    tag_ambient_obs_span,
 )
 from agentex.lib.core.tracing.span_error import get_span_error, set_span_error
 from agentex.lib.core.tracing.span_queue import (
@@ -40,6 +41,43 @@ logger = make_logger(__name__)
 # end). A module-level dict keyed by the unique span id survives across instances;
 # uuid4 span ids cannot collide across concurrent traces.
 _OBS_HANDLES: dict[str, ObsSpanHandle] = {}
+
+
+def _in_temporal_activity() -> bool:
+    """True when executing inside a Temporal activity.
+
+    On the Temporal path ``start_span`` and ``end_span`` run as SEPARATE
+    activities (START_SPAN / END_SPAN) that Temporal can route to DIFFERENT
+    worker processes. A wrapper obs span opened in the START_SPAN activity could
+    therefore never be closed by END_SPAN -- its handle lives in another
+    process's ``_OBS_HANDLES`` -- so it would leak (unbounded, OOM risk) and its
+    persisted ``obs_span_id`` would dangle (the span is never .end()ed, so never
+    exported to Tempo).
+
+    So inside an activity we do NOT open our own wrapper. We lean on the span the
+    Temporal OTel ``TracingInterceptor`` (see ``core/tracing/temporal.py`` +
+    scale-agentex-python#485) already made active for this activity -- which is
+    rooted under the turn's propagated trace -- and merely stamp the reverse tag
+    onto it (``tag_ambient_obs_span``). That keeps trace-level correlation with
+    no cross-process handle to leak.
+
+    Never raises; returns False when temporalio isn't importable.
+
+    TODO(obs-followup): this intentionally drops the *named per-step* wrapper on
+    the Temporal path (obs_span_id becomes the ambient activity span, not a
+    step-named span) and does NOT add TurnTrace RETRY/ASYNC roll-up -- retried
+    turns still surface as N unlinked spans. Follow-up diff should (a) optionally
+    materialize a self-contained named wrapper inside a single activity using the
+    span's own start/end timestamps, and (b) build the TurnTrace roll-up.
+    Test-later: on a multi-replica worker fleet, assert _OBS_HANDLES stays
+    bounded (no leak / OOM) and that obs_trace_id resolves to the turn trace.
+    """
+    try:
+        from temporalio import activity
+
+        return activity.in_activity()
+    except Exception:
+        return False
 
 
 class Trace:
@@ -105,9 +143,20 @@ class Trace:
         # so you can pivot obs -> business in Tempo/DD. Falls back to the ambient
         # obs context (ddtrace) when not in lgtm mode. Business trace_id stays the
         # run-level task id.
+        #
+        # Inside a Temporal activity we skip the wrapper entirely and only tag the
+        # interceptor-propagated ambient span: opening a wrapper there would leak,
+        # since start_span / end_span run as separate activities on possibly
+        # different workers and the handle could never be closed. See
+        # _in_temporal_activity().
         id = str(uuid.uuid4())
-        obs_handle = open_obs_span(name, business_span_id=id, business_trace_id=self.trace_id)
-        obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
+        if _in_temporal_activity():
+            tag_ambient_obs_span(business_span_id=id, business_trace_id=self.trace_id)
+            obs_handle = None
+            obs = obs_correlation()
+        else:
+            obs_handle = open_obs_span(name, business_span_id=id, business_trace_id=self.trace_id)
+            obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
         if obs:
             serialized_data = {**(serialized_data or {}), **obs}
 
@@ -274,9 +323,20 @@ class AsyncTrace:
         # so you can pivot obs -> business in Tempo/DD. Falls back to the ambient
         # obs context (ddtrace) when not in lgtm mode. Business trace_id stays the
         # run-level task id.
+        #
+        # Inside a Temporal activity we skip the wrapper entirely and only tag the
+        # interceptor-propagated ambient span: opening a wrapper there would leak,
+        # since start_span / end_span run as separate activities on possibly
+        # different workers and the handle could never be closed. See
+        # _in_temporal_activity().
         id = str(uuid.uuid4())
-        obs_handle = open_obs_span(name, business_span_id=id, business_trace_id=self.trace_id)
-        obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
+        if _in_temporal_activity():
+            tag_ambient_obs_span(business_span_id=id, business_trace_id=self.trace_id)
+            obs_handle = None
+            obs = obs_correlation()
+        else:
+            obs_handle = open_obs_span(name, business_span_id=id, business_trace_id=self.trace_id)
+            obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
         if obs:
             serialized_data = {**(serialized_data or {}), **obs}
 

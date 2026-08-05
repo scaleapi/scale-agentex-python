@@ -31,7 +31,7 @@ from typing import Dict, Callable, Optional
 
 from agentex.lib.core.tracing.obs_ids import LGTM, get_obs_mode
 
-__all__ = ("ObsSpanHandle", "open_obs_span", "close_obs_span")
+__all__ = ("ObsSpanHandle", "open_obs_span", "close_obs_span", "tag_ambient_obs_span")
 
 # Instrumentation scope name so these wrapper spans are identifiable in Tempo/DD.
 _TRACER_NAME = "agentex.business"
@@ -173,6 +173,43 @@ def open_obs_span(
         return _open_ddtrace_span(name, business_span_id, business_trace_id)
     except Exception:  # pragma: no cover - backstop; obs must never break a call
         return None
+
+
+def tag_ambient_obs_span(
+    business_span_id: Optional[str] = None,
+    business_trace_id: Optional[str] = None,
+) -> None:
+    """Stamp the reverse tag onto the CURRENTLY ACTIVE obs span -- without opening
+    a new one.
+
+    Used on the Temporal path (see ``trace._in_temporal_activity``): there we must
+    NOT open our own wrapper span, because start_span/end_span run as separate
+    activities on possibly different workers and the wrapper could never be
+    closed. Instead we lean on the span the Temporal OTel ``TracingInterceptor``
+    already made active for this activity and just add
+    ``agentex.business_span_id`` / ``agentex.business_trace_id`` so the obs -> business
+    pivot still works. Best-effort; never raises."""
+    try:
+        if get_obs_mode() == LGTM:
+            from opentelemetry import trace
+
+            span = trace.get_current_span()
+            if span is not None and span.get_span_context().is_valid:
+                if business_span_id:
+                    span.set_attribute(_ATTR_BUSINESS_SPAN_ID, business_span_id)
+                if business_trace_id:
+                    span.set_attribute(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
+        else:
+            from ddtrace.trace import tracer
+
+            span = tracer.current_span()
+            if span is not None:
+                if business_span_id:
+                    span.set_tag(_ATTR_BUSINESS_SPAN_ID, business_span_id)
+                if business_trace_id:
+                    span.set_tag(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
+    except Exception:  # pragma: no cover - best-effort; obs must never break a call
+        pass
 
 
 def close_obs_span(
