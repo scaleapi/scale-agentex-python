@@ -2,6 +2,7 @@ from agentex.types.span import Span
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.lib.core.tracing.tracer import Tracer, AsyncTracer
 from agentex.lib.core.tracing.span_error import (
+    ErrorCategory,
     PlatformError,
     ApplicationError,
     CategorizedError,
@@ -21,6 +22,7 @@ __all__ = [
     "CategorizedError",
     "ApplicationError",
     "PlatformError",
+    "ErrorCategory",
     "AsyncSpanQueue",
     "get_default_span_queue",
     "shutdown_default_span_queue",

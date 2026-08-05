@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Literal, cast
+from typing import Any, cast
+
+from scale_gp_beta.lib.tracing import (
+    PlatformError as PlatformError,
+    ApplicationError as ApplicationError,
+    CategorizedError,
+)
+from scale_gp_beta.lib.tracing.types import ErrorCategory
 
 from agentex.types.span import Span
 
@@ -13,34 +20,8 @@ from agentex.types.span import Span
 # SGP and agentex-native span stores.
 SPAN_ERROR_KEY = "__error__"
 
-ErrorCategory = Literal["application", "platform", "unknown"]
 ERROR_CATEGORY_UNKNOWN: ErrorCategory = "unknown"
 _ERROR_CATEGORIES = frozenset({"application", "platform", "unknown"})
-
-
-class CategorizedError(Exception):
-    """Base class for failures with known operational ownership.
-
-    Use ``ApplicationError`` for failures owned by agent or caller code, such
-    as business logic, user input, tools, or application configuration. Use
-    ``PlatformError`` only at a known Agentex/SGP-owned boundary, such as
-    managed runtime, tracing, persistence, or platform networking. Leave
-    unclassified failures as ordinary exceptions so they remain ``unknown``.
-    """
-
-    error_category: ErrorCategory = ERROR_CATEGORY_UNKNOWN
-
-
-class ApplicationError(CategorizedError):
-    """Failure owned by the agent application or its caller."""
-
-    error_category: ErrorCategory = "application"
-
-
-class PlatformError(CategorizedError):
-    """Failure owned by Agentex/SGP or a platform-managed dependency."""
-
-    error_category: ErrorCategory = "platform"
 
 
 def _normalize_error_category(value: object) -> ErrorCategory | None:

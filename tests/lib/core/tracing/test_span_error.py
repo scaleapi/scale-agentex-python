@@ -6,6 +6,11 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from scale_gp_beta.lib.tracing import (
+    PlatformError as SGPPlatformError,
+    ApplicationError as SGPApplicationError,
+    CategorizedError as SGPCategorizedError,
+)
 
 from agentex.types.span import Span
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
@@ -13,6 +18,7 @@ from agentex.lib.core.tracing.span_error import (
     SPAN_ERROR_KEY,
     PlatformError,
     ApplicationError,
+    CategorizedError,
     get_span_error,
     set_span_error,
 )
@@ -36,6 +42,11 @@ def _make_span(data=None) -> Span:
 
 
 class TestSpanErrorHelpers:
+    def test_uses_canonical_sgp_error_types(self):
+        assert CategorizedError is SGPCategorizedError
+        assert ApplicationError is SGPApplicationError
+        assert PlatformError is SGPPlatformError
+
     def test_set_then_get_on_none_data(self):
         span = _make_span(data=None)
         set_span_error(span, ValueError("boom"))
