@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import Any
 from datetime import timedelta
 from contextlib import contextmanager
@@ -30,20 +31,38 @@ def _acp_dispatch_span(name: str, task_id: str | None = None) -> Iterator[None]:
 
     Opening a span here gives the interceptor something to inject. It becomes a
     child of the ingress request span when one is active (front-of-request
-    propagation), or a fresh per-turn root otherwise. Fail-open: never raises if
-    OpenTelemetry isn't importable.
+    propagation), or a fresh per-turn root otherwise.
+
+    Fail-open across the WHOLE obs setup, not just the import: ``get_tracer`` and
+    entering ``start_as_current_span`` run the sampler and every
+    ``SpanProcessor.on_start`` (the SDK does not guard those), so a broken
+    provider or a custom sampler/processor that raises would otherwise fail the
+    dispatch itself. If any of it fails we run the dispatch untraced. The dispatch
+    body (the ``yield``) is OUTSIDE the guard so its exceptions still propagate.
     """
+    span_cm = None
     try:
         from opentelemetry import trace as _otel_trace
+
+        tracer = _otel_trace.get_tracer("agentex.acp")
+        # task_id goes on an attribute, NOT in the span name: a per-task span name is
+        # high-cardinality and breaks span-name aggregation in Tempo.
+        attributes = {"agentex.task_id": task_id} if task_id else None
+        span_cm = tracer.start_as_current_span(name, kind=_otel_trace.SpanKind.PRODUCER, attributes=attributes)
+        span_cm.__enter__()
     except Exception:  # pragma: no cover - obs must never break a dispatch
+        span_cm = None
+
+    try:
         yield
-        return
-    tracer = _otel_trace.get_tracer("agentex.acp")
-    # task_id goes on an attribute, NOT in the span name: a per-task span name is
-    # high-cardinality and breaks span-name aggregation in Tempo.
-    attributes = {"agentex.task_id": task_id} if task_id else None
-    with tracer.start_as_current_span(name, kind=_otel_trace.SpanKind.PRODUCER, attributes=attributes):
-        yield
+    finally:
+        if span_cm is not None:
+            # Pass exc info so the span reflects a failed dispatch; guard __exit__
+            # so closing the span can never mask the dispatch outcome.
+            try:
+                span_cm.__exit__(*sys.exc_info())
+            except Exception:  # pragma: no cover - best-effort close
+                pass
 
 
 class TemporalTaskService:
