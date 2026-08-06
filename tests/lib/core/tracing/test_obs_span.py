@@ -150,19 +150,29 @@ class TestOtelWrapper:
             "agentex.business_trace_id": "btrace-1",
         }
 
-    def test_invalid_span_context_yields_empty_correlation(self, monkeypatch):
+    def test_invalid_span_context_returns_none_for_fallback(self, monkeypatch):
+        """Invalid wrapper context (proxy NonRecordingSpan / no TracerProvider):
+        open_obs_span returns None so the caller falls back to the ambient
+        obs_correlation() instead of taking an empty-correlation handle (which
+        would suppress the fallback and strip obs_* ids). It also detaches the
+        context it attached and ends the no-op span, so nothing leaks."""
         monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
-        _install_fake_otel(monkeypatch)
+        record = _install_fake_otel(monkeypatch)
+
+        made: dict = {}
 
         def start_span(name):
             span = _FakeOtelSpan(name, 0, 0)
             span._ctx = _FakeSpanContext(0, 0, is_valid=False)
+            made["span"] = span
             return span
 
         sys.modules["opentelemetry"].trace.get_tracer = lambda _n: types.SimpleNamespace(start_span=start_span)
         handle = obs_span.open_obs_span("step")
-        assert handle is not None
-        assert handle.correlation == {}
+        assert handle is None
+        # cleaned up: the attached context was detached and the no-op span ended
+        assert len(record["detached"]) == 1
+        assert made["span"].ended is True
 
     def test_close_detaches_and_ends(self, monkeypatch):
         monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
