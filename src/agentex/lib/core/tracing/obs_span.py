@@ -56,6 +56,11 @@ class ObsSpanHandle:
         self.correlation = correlation
         self._close = close
 
+    def close(self, error: Optional[Dict[str, str]] = None) -> None:
+        """Run the backend-specific closer (detach+end for OTel, finish for
+        ddtrace). ``error`` marks the obs span failed so it isn't a false green."""
+        self._close(error)
+
 
 def _hex_ids(trace_id: int, span_id: int) -> Dict[str, str]:
     """W3C-hex form: 32-hex trace, 16-hex span."""
@@ -82,7 +87,19 @@ def _open_otel_span(
             span.set_attribute(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
         token = context.attach(trace.set_span_in_context(span))
         sc = span.get_span_context()
-        correlation = _hex_ids(sc.trace_id, sc.span_id) if (sc and sc.is_valid) else {}
+        if not (sc and sc.is_valid):
+            # No real TracerProvider installed (lgtm mode but the agent has no
+            # OTel provider yet): the proxy tracer hands back a NonRecordingSpan
+            # with an invalid context. Returning a handle with empty correlation
+            # here would make the caller (trace.py) take obs_handle.correlation
+            # == {} and NEVER consult the obs_correlation() ambient fallback --
+            # so the business span would get no obs_* ids at all, strictly worse
+            # than falling back. Detach the useless context, end the no-op span,
+            # and return None so the caller uses the ambient ids instead.
+            context.detach(token)
+            span.end()
+            return None
+        correlation = _hex_ids(sc.trace_id, sc.span_id)
 
         def _close(error: Optional[Dict[str, str]] = None) -> None:
             try:
@@ -124,11 +141,18 @@ def _open_ddtrace_span(
         # Datadog traces. Parenting to the active request/turn context rolls them
         # into one trace while obs_span_id stays distinct per step.
         span = tracer.start_span(name, child_of=ctx, activate=True)
+        if not span.trace_id:
+            # Symmetry with the OTel path: a handle carrying empty correlation
+            # would suppress the ambient obs_correlation() fallback in trace.py.
+            # (child_of=ctx normally guarantees a real trace_id, so this is
+            # belt-and-braces.) Finish the span and fall back to ambient ids.
+            span.finish()
+            return None
         if business_span_id:
             span.set_tag(_ATTR_BUSINESS_SPAN_ID, business_span_id)
         if business_trace_id:
             span.set_tag(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
-        correlation = _hex_ids(span.trace_id, span.span_id) if span.trace_id else {}
+        correlation = _hex_ids(span.trace_id, span.span_id)
 
         def _close(error: Optional[Dict[str, str]] = None) -> None:
             try:
@@ -175,9 +199,44 @@ def open_obs_span(
         return None
 
 
+def _tag_otel_ambient(business_span_id: Optional[str], business_trace_id: Optional[str]) -> bool:
+    """Stamp the reverse tag onto the active OTel span. Returns True iff a valid
+    OTel span was found and tagged."""
+    try:
+        from opentelemetry import trace
+    except ImportError:
+        return False
+    span = trace.get_current_span()
+    if span is not None and span.get_span_context().is_valid:
+        if business_span_id:
+            span.set_attribute(_ATTR_BUSINESS_SPAN_ID, business_span_id)
+        if business_trace_id:
+            span.set_attribute(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
+        return True
+    return False
+
+
+def _tag_ddtrace_ambient(business_span_id: Optional[str], business_trace_id: Optional[str]) -> bool:
+    """Stamp the reverse tag onto the active ddtrace span. Returns True iff a
+    ddtrace span was found and tagged."""
+    try:
+        from ddtrace.trace import tracer
+    except ImportError:
+        return False
+    span = tracer.current_span()
+    if span is not None:
+        if business_span_id:
+            span.set_tag(_ATTR_BUSINESS_SPAN_ID, business_span_id)
+        if business_trace_id:
+            span.set_tag(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
+        return True
+    return False
+
+
 def tag_ambient_obs_span(
     business_span_id: Optional[str] = None,
     business_trace_id: Optional[str] = None,
+    prefer_otel: bool = False,
 ) -> None:
     """Stamp the reverse tag onto the CURRENTLY ACTIVE obs span -- without opening
     a new one.
@@ -188,26 +247,23 @@ def tag_ambient_obs_span(
     closed. Instead we lean on the span the Temporal OTel ``TracingInterceptor``
     already made active for this activity and just add
     ``agentex.business_span_id`` / ``agentex.business_trace_id`` so the obs -> business
-    pivot still works. Best-effort; never raises."""
+    pivot still works. Best-effort; never raises.
+
+    ``prefer_otel``: on the Temporal path the ambient span is the temporalio OTel
+    ``TracingInterceptor`` span REGARDLESS of ``SGP_OBS_MODE`` -- so callers there
+    pass ``prefer_otel=True`` to tag OTel first (falling back to ddtrace only if
+    no valid OTel span is active). Without this, the default ``dd_only`` mode would
+    tag an unrelated ddtrace span (or nothing) instead of the real activity span."""
     try:
+        if prefer_otel:
+            if _tag_otel_ambient(business_span_id, business_trace_id):
+                return
+            _tag_ddtrace_ambient(business_span_id, business_trace_id)
+            return
         if get_obs_mode() == LGTM:
-            from opentelemetry import trace
-
-            span = trace.get_current_span()
-            if span is not None and span.get_span_context().is_valid:
-                if business_span_id:
-                    span.set_attribute(_ATTR_BUSINESS_SPAN_ID, business_span_id)
-                if business_trace_id:
-                    span.set_attribute(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
+            _tag_otel_ambient(business_span_id, business_trace_id)
         else:
-            from ddtrace.trace import tracer
-
-            span = tracer.current_span()
-            if span is not None:
-                if business_span_id:
-                    span.set_tag(_ATTR_BUSINESS_SPAN_ID, business_span_id)
-                if business_trace_id:
-                    span.set_tag(_ATTR_BUSINESS_TRACE_ID, business_trace_id)
+            _tag_ddtrace_ambient(business_span_id, business_trace_id)
     except Exception:  # pragma: no cover - best-effort; obs must never break a call
         pass
 
@@ -222,6 +278,6 @@ def close_obs_span(
     if handle is None:
         return
     try:
-        handle._close(error)
+        handle.close(error)
     except Exception:  # pragma: no cover - best-effort
         pass

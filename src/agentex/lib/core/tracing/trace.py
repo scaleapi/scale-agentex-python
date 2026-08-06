@@ -4,6 +4,7 @@ import uuid
 from typing import Any, AsyncGenerator
 from datetime import UTC, datetime
 from contextlib import contextmanager, asynccontextmanager
+from collections import OrderedDict
 
 from pydantic import BaseModel
 
@@ -40,7 +41,69 @@ logger = make_logger(__name__)
 # span is never .end()ed -> never exported (Simple/Batch processors only emit on
 # end). A module-level dict keyed by the unique span id survives across instances;
 # uuid4 span ids cannot collide across concurrent traces.
-_OBS_HANDLES: dict[str, ObsSpanHandle] = {}
+#
+# Bounded (OrderedDict + cap): a correct start_span/end_span pair pops its own
+# entry, so the registry normally hovers near the live-span count. The cap only
+# bites when a caller starts a span and never ends it -- adk.tracing.start_span /
+# end_span are public, unpaired API, so a caller-side bug (crash / early return
+# between start and end) would otherwise grow this unbounded in a long-lived ACP
+# process. Past the cap we evict+close the OLDEST handle so the leak degrades
+# gracefully instead of OOMing (and the evicted span still .end()s -> exports).
+_OBS_HANDLES_MAX = 2048
+_OBS_HANDLES: OrderedDict[str, ObsSpanHandle] = OrderedDict()
+
+
+def _register_obs_handle(span_id: str, handle: ObsSpanHandle) -> None:
+    """Register an open obs wrapper handle, bounding the registry at
+    ``_OBS_HANDLES_MAX``. When over the cap, evict and close the oldest handle
+    first. close_obs_span is best-effort (detach may warn since it runs on a
+    different stack than the attach) and always .end()s the span, so an evicted
+    span still exports rather than dangling."""
+    _OBS_HANDLES[span_id] = handle
+    _OBS_HANDLES.move_to_end(span_id)
+    while len(_OBS_HANDLES) > _OBS_HANDLES_MAX:
+        _evicted_id, evicted = _OBS_HANDLES.popitem(last=False)
+        logger.warning(
+            "obs handle registry over cap (%d); evicting+closing oldest span %r. "
+            "This means a caller started a span without ending it.",
+            _OBS_HANDLES_MAX,
+            _evicted_id,
+        )
+        close_obs_span(evicted)
+
+
+def _run_on_span_start(processor: SyncTracingProcessor, span: Span) -> None:
+    """Invoke ``on_span_start`` such that a processor bug can NEVER crash the app.
+
+    Observability must degrade, not propagate: if this raised, the caller's
+    start_span would never return, the caller would never end_span, and the obs
+    handle would leak (dict entry + attached OTel context + unended span). By
+    swallowing here, start_span returns normally and the standard end_span path
+    pops and closes the handle -- no leak, no app-path failure."""
+    try:
+        processor.on_span_start(span)
+    except Exception:
+        logger.warning(
+            "on_span_start raised for processor %r; skipping (observability must not fail the app path)",
+            type(processor).__name__,
+            exc_info=True,
+        )
+
+
+def _run_on_span_end(processor: SyncTracingProcessor, span: Span) -> None:
+    """Invoke ``on_span_end`` such that a processor bug can NEVER crash the app.
+
+    Symmetric with :func:`_run_on_span_start`. The obs wrapper is already closed
+    before this runs (see end_span), so this only guards the app path against a
+    buggy processor -- there is no handle left to leak here."""
+    try:
+        processor.on_span_end(span)
+    except Exception:
+        logger.warning(
+            "on_span_end raised for processor %r; skipping (observability must not fail the app path)",
+            type(processor).__name__,
+            exc_info=True,
+        )
 
 
 def _in_temporal_activity() -> bool:
@@ -78,6 +141,35 @@ def _in_temporal_activity() -> bool:
         return activity.in_activity()
     except Exception:
         return False
+
+
+def _begin_obs(
+    name: str,
+    span_id: str,
+    trace_id: str | None,
+) -> tuple[ObsSpanHandle | None, dict[str, str]]:
+    """Open the obs wrapper for a business span (or, inside a Temporal activity,
+    tag the ambient interceptor span) and return ``(handle, correlation)``.
+
+    Shared by ``Trace.start_span`` and ``AsyncTrace.start_span`` so the two paths
+    can't drift. The wrapper is named for the step so ``obs_span_id`` is
+    stable/meaningful (not an arbitrary innermost httpx span), and it carries the
+    reverse tag (business span/trace id) for the obs -> business pivot.
+
+    Temporal path: we do NOT open our own wrapper -- start_span / end_span run as
+    separate activities on possibly different workers, so the handle could never
+    be closed. Instead we tag the span the temporalio OTel ``TracingInterceptor``
+    already made active. That span is OTel REGARDLESS of ``SGP_OBS_MODE``, so we
+    pass ``prefer_otel=True`` to both the tag and the correlation read -- otherwise
+    the default ``dd_only`` mode would tag/read an unrelated ddtrace span and the
+    ids would point at the wrong trace. See ``_in_temporal_activity``.
+    """
+    if _in_temporal_activity():
+        tag_ambient_obs_span(business_span_id=span_id, business_trace_id=trace_id, prefer_otel=True)
+        return None, obs_correlation(prefer_otel=True)
+    handle = open_obs_span(name, business_span_id=span_id, business_trace_id=trace_id)
+    correlation = handle.correlation if handle is not None else obs_correlation()
+    return handle, correlation
 
 
 class Trace:
@@ -137,26 +229,10 @@ class Trace:
 
         serialized_input = recursive_model_dump(input) if input else None
         serialized_data = recursive_model_dump(data) if data else None
-        # Open a dedicated obs wrapper span named for this step and make it
-        # active, so obs_span_id is stable/meaningful (not an arbitrary innermost
-        # httpx span). It also carries the reverse tag (business span/trace id)
-        # so you can pivot obs -> business in Tempo/DD. Falls back to the ambient
-        # obs context (ddtrace) when not in lgtm mode. Business trace_id stays the
-        # run-level task id.
-        #
-        # Inside a Temporal activity we skip the wrapper entirely and only tag the
-        # interceptor-propagated ambient span: opening a wrapper there would leak,
-        # since start_span / end_span run as separate activities on possibly
-        # different workers and the handle could never be closed. See
-        # _in_temporal_activity().
+        # Open the obs wrapper (or tag the ambient Temporal-activity span); see
+        # _begin_obs. Business trace_id stays the run-level task id.
         id = str(uuid.uuid4())
-        if _in_temporal_activity():
-            tag_ambient_obs_span(business_span_id=id, business_trace_id=self.trace_id)
-            obs_handle = None
-            obs = obs_correlation()
-        else:
-            obs_handle = open_obs_span(name, business_span_id=id, business_trace_id=self.trace_id)
-            obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
+        obs_handle, obs = _begin_obs(name, id, self.trace_id)
         if obs:
             serialized_data = {**(serialized_data or {}), **obs}
 
@@ -171,10 +247,10 @@ class Trace:
             task_id=task_id,
         )
         if obs_handle is not None:
-            _OBS_HANDLES[span.id] = obs_handle
+            _register_obs_handle(span.id, obs_handle)
 
         for processor in self.processors:
-            processor.on_span_start(span)
+            _run_on_span_start(processor, span)
 
         return span
 
@@ -203,7 +279,7 @@ class Trace:
         span.data = recursive_model_dump(span.data) if span.data else None
 
         for processor in self.processors:
-            processor.on_span_end(span)
+            _run_on_span_end(processor, span)
 
         return span
 
@@ -317,26 +393,10 @@ class AsyncTrace:
 
         serialized_input = recursive_model_dump(input) if input else None
         serialized_data = recursive_model_dump(data) if data else None
-        # Open a dedicated obs wrapper span named for this step and make it
-        # active, so obs_span_id is stable/meaningful (not an arbitrary innermost
-        # httpx span). It also carries the reverse tag (business span/trace id)
-        # so you can pivot obs -> business in Tempo/DD. Falls back to the ambient
-        # obs context (ddtrace) when not in lgtm mode. Business trace_id stays the
-        # run-level task id.
-        #
-        # Inside a Temporal activity we skip the wrapper entirely and only tag the
-        # interceptor-propagated ambient span: opening a wrapper there would leak,
-        # since start_span / end_span run as separate activities on possibly
-        # different workers and the handle could never be closed. See
-        # _in_temporal_activity().
+        # Open the obs wrapper (or tag the ambient Temporal-activity span); see
+        # _begin_obs. Business trace_id stays the run-level task id.
         id = str(uuid.uuid4())
-        if _in_temporal_activity():
-            tag_ambient_obs_span(business_span_id=id, business_trace_id=self.trace_id)
-            obs_handle = None
-            obs = obs_correlation()
-        else:
-            obs_handle = open_obs_span(name, business_span_id=id, business_trace_id=self.trace_id)
-            obs = obs_handle.correlation if obs_handle is not None else obs_correlation()
+        obs_handle, obs = _begin_obs(name, id, self.trace_id)
         if obs:
             serialized_data = {**(serialized_data or {}), **obs}
 
@@ -351,10 +411,20 @@ class AsyncTrace:
             task_id=task_id,
         )
         if obs_handle is not None:
-            _OBS_HANDLES[span.id] = obs_handle
+            _register_obs_handle(span.id, obs_handle)
 
+        # Enqueueing the START event must not crash the app path either (same
+        # principle as _run_on_span_start): swallow so start_span still returns
+        # and end_span cleans up the handle. The processors' on_span_start runs
+        # later on the queue worker, off the request path.
         if self.processors:
-            self._span_queue.enqueue(SpanEventType.START, span.model_copy(deep=True), self.processors)
+            try:
+                self._span_queue.enqueue(SpanEventType.START, span.model_copy(deep=True), self.processors)
+            except Exception:
+                logger.warning(
+                    "failed to enqueue START span event; skipping (observability must not fail the app path)",
+                    exc_info=True,
+                )
 
         return span
 
@@ -383,7 +453,13 @@ class AsyncTrace:
         span.data = recursive_model_dump(span.data) if span.data else None
 
         if self.processors:
-            self._span_queue.enqueue(SpanEventType.END, span.model_copy(deep=True), self.processors)
+            try:
+                self._span_queue.enqueue(SpanEventType.END, span.model_copy(deep=True), self.processors)
+            except Exception:
+                logger.warning(
+                    "failed to enqueue END span event; skipping (observability must not fail the app path)",
+                    exc_info=True,
+                )
 
         return span
 

@@ -69,7 +69,7 @@ def _ddtrace_ids() -> Optional[Tuple[str, str]]:
     return None
 
 
-def obs_correlation() -> Dict[str, str]:
+def obs_correlation(prefer_otel: bool = False) -> Dict[str, str]:
     """Return ``{"obs_trace_id": ..., "obs_span_id": ...}`` for the active
     observability context, or ``{}`` if none is active.
 
@@ -79,10 +79,18 @@ def obs_correlation() -> Dict[str, str]:
     dotted) keep them addressable via Postgres JSON paths
     (``operation_metadata->>'obs_trace_id'``).
 
+    ``prefer_otel``: on the Temporal path the active span is the temporalio OTel
+    ``TracingInterceptor`` span regardless of ``SGP_OBS_MODE``, so callers there
+    read OTel first (falling back to ddtrace) -- otherwise the default ``dd_only``
+    mode would read ids for an unrelated ddtrace trace, not the activity span.
+
     Never fabricates ids -- this is a correlation tag, not the span's id.
     """
     try:
-        ids = _lgtm_ids() if get_obs_mode() == LGTM else _ddtrace_ids()
+        if prefer_otel:
+            ids = _lgtm_ids() or _ddtrace_ids()
+        else:
+            ids = _lgtm_ids() if get_obs_mode() == LGTM else _ddtrace_ids()
     except Exception:  # obs must never fail an app call
         return {}
 

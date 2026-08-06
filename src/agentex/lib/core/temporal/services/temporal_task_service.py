@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Iterator
+from typing import Any
 from datetime import timedelta
 from contextlib import contextmanager
+from collections.abc import Iterator
 
 from agentex.types.task import Task
 from agentex.types.agent import Agent
