@@ -15,7 +15,7 @@ from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
 
 
 @contextmanager
-def _acp_dispatch_span(name: str) -> Iterator[None]:
+def _acp_dispatch_span(name: str, task_id: str | None = None) -> Iterator[None]:
     """Wrap an ACP -> Temporal dispatch (start_workflow / signal) in an OTel span.
 
     The Temporal OpenTelemetry interceptor propagates trace context by injecting
@@ -38,7 +38,10 @@ def _acp_dispatch_span(name: str) -> Iterator[None]:
         yield
         return
     tracer = _otel_trace.get_tracer("agentex.acp")
-    with tracer.start_as_current_span(name, kind=_otel_trace.SpanKind.PRODUCER):
+    # task_id goes on an attribute, NOT in the span name: a per-task span name is
+    # high-cardinality and breaks span-name aggregation in Tempo.
+    attributes = {"agentex.task_id": task_id} if task_id else None
+    with tracer.start_as_current_span(name, kind=_otel_trace.SpanKind.PRODUCER, attributes=attributes):
         yield
 
 
@@ -66,7 +69,7 @@ class TemporalTaskService:
         # value bounds the whole continue-as-new chain's wall-clock lifetime.
         timeout_seconds = self._env_vars.WORKFLOW_EXECUTION_TIMEOUT_SECONDS
         execution_timeout = timedelta(seconds=timeout_seconds) if timeout_seconds and timeout_seconds > 0 else None
-        with _acp_dispatch_span(f"acp.task_create:{task.id}"):
+        with _acp_dispatch_span("acp.task_create", task_id=task.id):
             return await self._temporal_client.start_workflow(
                 workflow=self._env_vars.WORKFLOW_NAME,
                 arg=CreateTaskParams(
@@ -88,7 +91,7 @@ class TemporalTaskService:
         )
 
     async def send_event(self, agent: Agent, task: Task, event: Event, request: dict | None = None) -> None:
-        with _acp_dispatch_span(f"acp.event_send:{task.id}"):
+        with _acp_dispatch_span("acp.event_send", task_id=task.id):
             return await self._temporal_client.send_signal(
                 workflow_id=task.id,
                 signal=SignalName.RECEIVE_EVENT.value,
