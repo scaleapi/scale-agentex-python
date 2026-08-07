@@ -11,14 +11,20 @@ across trace granularities rather than merging them). You can then pivot from a
 persisted business span to the Tempo/Datadog trace for the turn that produced it,
 while the business trace still groups the entire run by task id.
 
-Source selection follows SGP_OBS_MODE, matching egp-api-backend:
+Source selection follows SGP_OBS_MODE:
   - unset / "dd_only": ddtrace context (current stack)
-  - "dual":            OTel/LGTM preferred, ddtrace fallback
   - "lgtm":            OTel/LGTM only
+
+("dual" was removed: co-resident ddtrace+OTel can't be bridged in-process --
+you can't run ddtrace-run and the OTel operator's auto-instrumentation in the
+same process, and DD_TRACE_OTEL_ENABLED yields a single tracer with nothing to
+bridge. Two-backend export is a collector fan-out under "lgtm", not a mode here.
+An unrecognized SGP_OBS_MODE -- including a stale "dual" -- degrades to dd_only.)
 
 This never fabricates ids -- if no observability context is active, it returns
 an empty dict and the span is simply not tagged.
 """
+
 from __future__ import annotations
 
 import os
@@ -27,10 +33,9 @@ from typing import Dict, Tuple, Optional
 __all__ = ("get_obs_mode", "obs_correlation")
 
 DD_ONLY = "dd_only"
-DUAL = "dual"
 LGTM = "lgtm"
 _DEFAULT_MODE = DD_ONLY
-_VALID_MODES = (DD_ONLY, DUAL, LGTM)
+_VALID_MODES = (DD_ONLY, LGTM)
 
 
 def get_obs_mode() -> str:
@@ -64,20 +69,31 @@ def _ddtrace_ids() -> Optional[Tuple[str, str]]:
     return None
 
 
-def obs_correlation() -> Dict[str, str]:
-    """Return ``{"obs.trace_id": ..., "obs.span_id": ...}`` for the active
+def obs_correlation(prefer_otel: bool = False) -> Dict[str, str]:
+    """Return ``{"obs_trace_id": ..., "obs_span_id": ...}`` for the active
     observability context, or ``{}`` if none is active.
+
+    These land in the business span's ``data`` -> egp ``operation_metadata``
+    (an existing JSONB column, GIN-indexed) -> ClickHouse ``metadata_raw``, so
+    the correlation edge needs no schema migration. Underscored keys (not
+    dotted) keep them addressable via Postgres JSON paths
+    (``operation_metadata->>'obs_trace_id'``).
+
+    ``prefer_otel``: on the Temporal path the active span is the temporalio OTel
+    ``TracingInterceptor`` span regardless of ``SGP_OBS_MODE``, so callers there
+    read OTel first (falling back to ddtrace) -- otherwise the default ``dd_only``
+    mode would read ids for an unrelated ddtrace trace, not the activity span.
 
     Never fabricates ids -- this is a correlation tag, not the span's id.
     """
-    mode = get_obs_mode()
-    if mode == LGTM:
-        ids = _lgtm_ids()
-    elif mode == DUAL:
-        ids = _lgtm_ids() or _ddtrace_ids()
-    else:  # dd_only
-        ids = _ddtrace_ids()
+    try:
+        if prefer_otel:
+            ids = _lgtm_ids() or _ddtrace_ids()
+        else:
+            ids = _lgtm_ids() if get_obs_mode() == LGTM else _ddtrace_ids()
+    except Exception:  # obs must never fail an app call
+        return {}
 
     if not ids:
         return {}
-    return {"obs.trace_id": ids[0], "obs.span_id": ids[1]}
+    return {"obs_trace_id": ids[0], "obs_span_id": ids[1]}

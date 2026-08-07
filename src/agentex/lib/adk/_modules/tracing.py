@@ -238,8 +238,22 @@ class TracingModule:
         try:
             yield span
         except Exception as exc:
+            # Record the failure on the span so the obs span reflects the error
+            # instead of a false green. Agents use THIS context manager (not
+            # AsyncTrace.span, which is the only other place set_span_error is
+            # called), so without this a failed step closes green. end_span (in
+            # finally) reads it via get_span_error and propagates it to
+            # close_obs_span. Stored on span.data, so it round-trips through the
+            # END_SPAN activity on the Temporal path too.
+            #
+            # Guard set_span_error itself: it's obs work and must never replace
+            # the app's exception on the way out. We always re-raise the ORIGINAL
+            # exc regardless.
             if span:
-                set_span_error(span, exc)
+                try:
+                    set_span_error(span, exc)
+                except Exception:  # pragma: no cover - obs must not break app path
+                    pass
             raise
         finally:
             if span:
