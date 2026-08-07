@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.observability import tracing_metrics_recording as _metrics
+from agentex.lib.core.tracing.suppression import suppress_export_instrumentation
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     AsyncTracingProcessor,
 )
@@ -341,11 +342,14 @@ class AsyncSpanQueue:
         spans = [item.span for item in items]
         try:
             # Hold a concurrency slot only for the duration of the HTTP call.
+            # Suppress instrumentation for the export so the export's own HTTP
+            # call to egp/Agentex isn't traced back into the trace being exported.
             async with self._send_sema:
-                if event_type == SpanEventType.START:
-                    await p.on_spans_start(spans)
-                else:
-                    await p.on_spans_end(spans)
+                with suppress_export_instrumentation():
+                    if event_type == SpanEventType.START:
+                        await p.on_spans_start(spans)
+                    else:
+                        await p.on_spans_end(spans)
         except Exception as exc:
             self._handle_failure(p, items, event_type, exc)
 

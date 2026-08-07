@@ -25,6 +25,7 @@ from agentex.lib.core.tracing.span_queue import (
     AsyncSpanQueue,
     get_default_span_queue,
 )
+from agentex.lib.core.tracing.suppression import suppress_export_instrumentation
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     SyncTracingProcessor,
     AsyncTracingProcessor,
@@ -81,7 +82,10 @@ def _run_on_span_start(processor: SyncTracingProcessor, span: Span) -> None:
     swallowing here, start_span returns normally and the standard end_span path
     pops and closes the handle -- no leak, no app-path failure."""
     try:
-        processor.on_span_start(span)
+        # Suppress instrumentation while the processor exports so the export's
+        # own HTTP call to egp/Agentex isn't traced back into this trace.
+        with suppress_export_instrumentation():
+            processor.on_span_start(span)
     except Exception:
         logger.warning(
             "on_span_start raised for processor %r; skipping (observability must not fail the app path)",
@@ -97,7 +101,8 @@ def _run_on_span_end(processor: SyncTracingProcessor, span: Span) -> None:
     before this runs (see end_span), so this only guards the app path against a
     buggy processor -- there is no handle left to leak here."""
     try:
-        processor.on_span_end(span)
+        with suppress_export_instrumentation():
+            processor.on_span_end(span)
     except Exception:
         logger.warning(
             "on_span_end raised for processor %r; skipping (observability must not fail the app path)",
