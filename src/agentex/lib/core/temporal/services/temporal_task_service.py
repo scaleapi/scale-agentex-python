@@ -11,7 +11,7 @@ from agentex.types.agent import Agent
 from agentex.types.event import Event
 from agentex.protocol.acp import SendEventParams, CreateTaskParams, InterruptTaskParams
 from agentex.lib.environment_variables import EnvironmentVariables
-from agentex.lib.core.clients.temporal.types import WorkflowState
+from agentex.lib.core.clients.temporal.types import WorkflowState, ConflictWorkflowPolicy
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
 
@@ -89,6 +89,8 @@ class TemporalTaskService:
         # value bounds the whole continue-as-new chain's wall-clock lifetime.
         timeout_seconds = self._env_vars.WORKFLOW_EXECUTION_TIMEOUT_SECONDS
         execution_timeout = timedelta(seconds=timeout_seconds) if timeout_seconds and timeout_seconds > 0 else None
+        # USE_EXISTING makes task/create idempotent
+        # If same task ID is already running Temporal returns a handle to the existing run instead of raising WorkflowAlreadyStarted
         with _acp_dispatch_span("acp.task_create", task_id=task.id):
             return await self._temporal_client.start_workflow(
                 workflow=self._env_vars.WORKFLOW_NAME,
@@ -100,6 +102,7 @@ class TemporalTaskService:
                 id=task.id,
                 task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
                 execution_timeout=execution_timeout,
+                conflict_policy=ConflictWorkflowPolicy.USE_EXISTING,
             )
 
     async def get_state(self, task_id: str) -> WorkflowState:

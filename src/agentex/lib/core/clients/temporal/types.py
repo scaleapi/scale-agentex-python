@@ -40,6 +40,13 @@ class DuplicateWorkflowPolicy(str, Enum):
     TERMINATE_IF_RUNNING = "TERMINATE_IF_RUNNING"
 
 
+class ConflictWorkflowPolicy(str, Enum):
+    UNSPECIFIED = "UNSPECIFIED"
+    FAIL = "FAIL"
+    USE_EXISTING = "USE_EXISTING"
+    TERMINATE_EXISTING = "TERMINATE_EXISTING"
+
+
 class TaskStatus(str, Enum):
     CANCELED = "CANCELED"
     COMPLETED = "COMPLETED"
