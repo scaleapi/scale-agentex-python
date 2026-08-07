@@ -148,28 +148,55 @@ def _in_temporal_activity() -> bool:
         return False
 
 
+def _in_tracing_dispatch_activity() -> bool:
+    """True only when running inside the SDK's OWN dispatched START_SPAN / END_SPAN
+    activity (the ``in_temporal_workflow()`` path, where a workflow runs span start
+    and end as SEPARATE activities that Temporal can route to different workers).
+
+    That is the one case a per-step obs wrapper can't work: the wrapper opened in
+    the START_SPAN activity could never be closed by the END_SPAN activity. A span
+    created directly inside a *business* activity (an agent turn's own
+    ``adk.tracing.span``) runs start AND end in the same activity process, so a
+    wrapper there is safe -- it nests under the interceptor's ambient RunActivity
+    span and closes in-process. The tracing dispatch activities are named
+    ``start-span`` / ``end-span`` (``TracingActivityName``). Never raises; False
+    when temporalio isn't importable or we're not in an activity."""
+    try:
+        from temporalio import activity
+
+        if not activity.in_activity():
+            return False
+        return activity.info().activity_type in ("start-span", "end-span")
+    except Exception:
+        return False
+
+
 def _begin_obs(
     name: str,
     span_id: str,
     trace_id: str | None,
 ) -> tuple[ObsSpanHandle | None, dict[str, str]]:
-    """Open the obs wrapper for a business span (or, inside a Temporal activity,
-    tag the ambient interceptor span) and return ``(handle, correlation)``.
+    """Open the obs wrapper for a business span and return ``(handle, correlation)``.
 
     Shared by ``Trace.start_span`` and ``AsyncTrace.start_span`` so the two paths
     can't drift. The wrapper is named for the step so ``obs_span_id`` is
     stable/meaningful (not an arbitrary innermost httpx span), and it carries the
     reverse tag (business span/trace id) for the obs -> business pivot.
 
-    Temporal path: we do NOT open our own wrapper -- start_span / end_span run as
-    separate activities on possibly different workers, so the handle could never
-    be closed. Instead we tag the span the temporalio OTel ``TracingInterceptor``
-    already made active. That span is OTel REGARDLESS of ``SGP_OBS_MODE``, so we
-    pass ``prefer_otel=True`` to both the tag and the correlation read -- otherwise
-    the default ``dd_only`` mode would tag/read an unrelated ddtrace span and the
-    ids would point at the wrong trace. See ``_in_temporal_activity``.
+    We open a real per-step wrapper on the sync path AND inside a *business*
+    Temporal activity -- there the wrapper nests under the interceptor's ambient
+    RunActivity span and start/end run in-process, so it closes cleanly and each
+    business step gets its own obs span (1:1), just like sync.
+
+    The ONE exception is the SDK's own dispatched START_SPAN / END_SPAN activity
+    (a workflow calling ``adk.tracing`` -- see ``_in_tracing_dispatch_activity``):
+    there start and end are separate activities on possibly different workers, so
+    a wrapper could never be closed. We fall back to tagging the ambient
+    interceptor span instead, with ``prefer_otel=True`` (the interceptor span is
+    OTel regardless of ``SGP_OBS_MODE``, so a plain ``dd_only`` read would
+    otherwise point at an unrelated ddtrace span).
     """
-    if _in_temporal_activity():
+    if _in_tracing_dispatch_activity():
         tag_ambient_obs_span(business_span_id=span_id, business_trace_id=trace_id, prefer_otel=True)
         return None, obs_correlation(prefer_otel=True)
     handle = open_obs_span(name, business_span_id=span_id, business_trace_id=trace_id)
