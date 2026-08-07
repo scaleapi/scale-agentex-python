@@ -6,14 +6,12 @@ from datetime import timedelta
 from contextlib import contextmanager
 from collections.abc import Iterator
 
-from temporalio.common import WorkflowIDConflictPolicy
-
 from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
 from agentex.protocol.acp import SendEventParams, CreateTaskParams, InterruptTaskParams
 from agentex.lib.environment_variables import EnvironmentVariables
-from agentex.lib.core.clients.temporal.types import WorkflowState
+from agentex.lib.core.clients.temporal.types import WorkflowState, ConflictWorkflowPolicy
 from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.core.clients.temporal.temporal_client import TemporalClient
 
@@ -104,7 +102,7 @@ class TemporalTaskService:
                 id=task.id,
                 task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
                 execution_timeout=execution_timeout,
-                id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+                conflict_policy=ConflictWorkflowPolicy.USE_EXISTING,
             )
 
     async def get_state(self, task_id: str) -> WorkflowState:
