@@ -6,11 +6,19 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from scale_gp_beta.lib.tracing import (
+    PlatformError as SGPPlatformError,
+    ApplicationError as SGPApplicationError,
+    CategorizedError as SGPCategorizedError,
+)
 
 from agentex.types.span import Span
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.lib.core.tracing.span_error import (
     SPAN_ERROR_KEY,
+    PlatformError,
+    ApplicationError,
+    CategorizedError,
     get_span_error,
     set_span_error,
 )
@@ -34,12 +42,52 @@ def _make_span(data=None) -> Span:
 
 
 class TestSpanErrorHelpers:
+    def test_uses_canonical_sgp_error_types(self):
+        assert CategorizedError is SGPCategorizedError
+        assert ApplicationError is SGPApplicationError
+        assert PlatformError is SGPPlatformError
+
     def test_set_then_get_on_none_data(self):
         span = _make_span(data=None)
         set_span_error(span, ValueError("boom"))
-        assert get_span_error(span) == {"type": "ValueError", "message": "boom"}
+        assert get_span_error(span) == {
+            "type": "ValueError",
+            "message": "boom",
+            "category": "unknown",
+        }
         assert isinstance(span.data, dict)
-        assert span.data[SPAN_ERROR_KEY] == {"type": "ValueError", "message": "boom"}
+        assert span.data[SPAN_ERROR_KEY] == {
+            "type": "ValueError",
+            "message": "boom",
+            "category": "unknown",
+        }
+
+    def test_set_uses_explicit_exception_category(self):
+        span = _make_span(data=None)
+        set_span_error(span, PlatformError("unavailable"))
+        assert get_span_error(span) == {
+            "type": "PlatformError",
+            "message": "unavailable",
+            "category": "platform",
+        }
+
+    def test_explicit_category_takes_precedence(self):
+        span = _make_span(data=None)
+        set_span_error(span, PlatformError("bad input"), error_category="application")
+        assert get_span_error(span)["category"] == "application"  # type: ignore[index]
+
+    def test_set_uses_application_error_category(self):
+        span = _make_span(data=None)
+        set_span_error(span, ApplicationError("bad input"))
+        assert get_span_error(span)["category"] == "application"  # type: ignore[index]
+
+    def test_bare_exception_attribute_does_not_opt_in(self):
+        class ImplicitlyCategorizedError(RuntimeError):
+            error_category = "platform"
+
+        span = _make_span(data=None)
+        set_span_error(span, ImplicitlyCategorizedError("boom"))
+        assert get_span_error(span)["category"] == "unknown"  # type: ignore[index]
 
     def test_set_preserves_existing_dict_keys(self):
         span = _make_span(data={"__span_type__": "LLM"})
@@ -76,7 +124,11 @@ class TestContextManagerCapture:
                 captured["span"] = span
                 raise ValueError("boom")
         err = get_span_error(captured["span"])
-        assert err == {"type": "ValueError", "message": "boom"}
+        assert err == {
+            "type": "ValueError",
+            "message": "boom",
+            "category": "unknown",
+        }
 
     def test_sync_span_success_has_no_error(self):
         trace = Trace(processors=[], client=MagicMock(), trace_id="t1")
@@ -93,7 +145,11 @@ class TestContextManagerCapture:
                 captured["span"] = span
                 raise RuntimeError("kaboom")
         err = get_span_error(captured["span"])
-        assert err == {"type": "RuntimeError", "message": "kaboom"}
+        assert err == {
+            "type": "RuntimeError",
+            "message": "kaboom",
+            "category": "unknown",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +167,7 @@ class _FakeSGPSpan:
         self,
         error_type: str | None = None,
         error_message: str | None = None,
-        exception: BaseException | None = None,
+        exception: BaseException | None = None,  # noqa: ARG002
     ) -> None:
         self.status = "ERROR"
         self.metadata["error"] = True
@@ -131,7 +187,15 @@ class TestBuildSGPSpanMapping:
     def test_error_maps_to_status_error(self):
         from agentex.lib.core.tracing.processors.sgp_tracing_processor import _build_sgp_span
 
-        span = _make_span(data={SPAN_ERROR_KEY: {"type": "ValueError", "message": "boom"}})
+        span = _make_span(
+            data={
+                SPAN_ERROR_KEY: {
+                    "type": "ValueError",
+                    "message": "boom",
+                    "category": "application",
+                }
+            }
+        )
         with patch(f"{PROCESSOR_MODULE}.create_span", side_effect=_fake_create_span):
             sgp_span = _build_sgp_span(span, self._env())
 
@@ -139,6 +203,7 @@ class TestBuildSGPSpanMapping:
         assert sgp_span.metadata["error"] is True
         assert sgp_span.metadata["error_type"] == "ValueError"
         assert sgp_span.metadata["error_message"] == "boom"
+        assert sgp_span.metadata["error_category"] == "application"
 
     def test_no_error_leaves_status_success(self):
         from agentex.lib.core.tracing.processors.sgp_tracing_processor import _build_sgp_span

@@ -9,6 +9,8 @@ from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
 from temporalio.converter import PayloadCodec, DataConverter
 from temporalio.contrib.pydantic import pydantic_data_converter
 
+from agentex.lib.core.tracing.temporal import temporal_tracing_interceptors
+
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
 #     def default(self, o: Any) -> Any:
 #         if isinstance(o, datetime.datetime):
@@ -136,6 +138,9 @@ async def get_temporal_client(
     connect_kwargs: dict[str, Any] = {
         "target_host": temporal_address,
         "plugins": plugins,
+        # Propagate OTel trace context on outbound start_workflow / execute_activity
+        # (enabled by default; AGENTEX_TEMPORAL_TRACE_INTERCEPTOR_ENABLED=false to disable).
+        "interceptors": temporal_tracing_interceptors(),
     }
 
     if data_converter is not None:
