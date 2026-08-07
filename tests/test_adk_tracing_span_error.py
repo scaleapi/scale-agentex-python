@@ -48,13 +48,21 @@ async def test_span_records_error_and_reraises() -> None:
             raise ValueError("boom")
 
     error = get_span_error(span)
-    assert error == {"type": "ValueError", "message": "boom"}
+    assert error == {
+        "type": "ValueError",
+        "message": "boom",
+        "category": "unknown",
+    }
 
     # end_span still ran (finally) and saw the span with the error already set,
     # so the failure is what gets persisted -- not a false green.
     end_span.assert_awaited_once()
     persisted_span = end_span.await_args.kwargs["span"]
-    assert get_span_error(persisted_span) == {"type": "ValueError", "message": "boom"}
+    assert get_span_error(persisted_span) == {
+        "type": "ValueError",
+        "message": "boom",
+        "category": "unknown",
+    }
 
 
 async def test_span_success_records_no_error() -> None:
@@ -104,5 +112,9 @@ async def test_turn_span_records_error_and_reraises() -> None:
             assert turn.span is span
             raise ValueError("boom")
 
-    assert get_span_error(span) == {"type": "ValueError", "message": "boom"}
+    assert get_span_error(span) == {
+        "type": "ValueError",
+        "message": "boom",
+        "category": "unknown",
+    }
     end_span.assert_awaited_once()

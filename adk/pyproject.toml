@@ -53,7 +53,7 @@ dependencies = [
     "pydantic-ai-slim>=1.0,<2",
     "langgraph-checkpoint>=2.0.0",
     "scale-gp>=0.1.0a59",
-    "scale-gp-beta>=0.2.0",
+    "scale-gp-beta>=0.5.0",
     "mcp>=1.4.1",
     # Observability
     "ddtrace>=3.13.0",
