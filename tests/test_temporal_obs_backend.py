@@ -67,8 +67,10 @@ def _activate_otel_span(monkeypatch: pytest.MonkeyPatch) -> _RecordingOtelSpan:
 
 def test_temporal_path_tags_and_reads_otel_in_dd_only(monkeypatch: pytest.MonkeyPatch) -> None:
     # Default/dd_only mode is exactly where the old code went to ddtrace.
+    # Option A (tag the ambient interceptor span, no wrapper) now applies only
+    # inside the SDK's dispatched START_SPAN/END_SPAN activity, not any activity.
     monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
-    monkeypatch.setattr(trace_mod, "_in_temporal_activity", lambda: True)
+    monkeypatch.setattr(trace_mod, "_in_tracing_dispatch_activity", lambda: True)
     activity_span = _activate_otel_span(monkeypatch)
 
     trace_obj = Trace(processors=[], client=cast(Any, object()), trace_id="trace-1")
@@ -132,3 +134,34 @@ def test_tag_ambient_prefer_otel_falls_back_to_ddtrace(monkeypatch: pytest.Monke
     assert tagged["agentex.business_trace_id"] == "bt"
     # The invalid OTel span was NOT tagged.
     assert invalid.attributes == {}
+
+
+class _FakeHandle:
+    def __init__(self, corr):
+        self.correlation = corr
+
+
+def test_begin_obs_opens_wrapper_outside_dispatch_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sync path or inside a business Temporal activity: open a per-step wrapper
+    (1:1), NOT Option A. Each business span gets its own obs span."""
+    monkeypatch.setattr(trace_mod, "_in_tracing_dispatch_activity", lambda: False)
+    monkeypatch.setattr(
+        trace_mod, "open_obs_span",
+        lambda *a, **k: _FakeHandle({"obs_trace_id": "t1", "obs_span_id": "s1"}),
+    )
+    handle, corr = trace_mod._begin_obs("mortgage.classify_intent", "bs", "bt")
+    assert handle is not None
+    assert corr == {"obs_trace_id": "t1", "obs_span_id": "s1"}
+
+
+def test_begin_obs_tags_ambient_inside_dispatch_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Inside the dispatched START_SPAN/END_SPAN activity: no wrapper (would leak
+    across activities); tag the ambient interceptor span instead (Option A)."""
+    monkeypatch.setattr(trace_mod, "_in_tracing_dispatch_activity", lambda: True)
+    tagged: dict = {}
+    monkeypatch.setattr(trace_mod, "tag_ambient_obs_span", lambda **k: tagged.update(k))
+    monkeypatch.setattr(trace_mod, "obs_correlation", lambda **k: {"obs_trace_id": "amb", "obs_span_id": "amb"})
+    handle, corr = trace_mod._begin_obs("mortgage.advisor.turn", "bs", "bt")
+    assert handle is None
+    assert tagged.get("business_span_id") == "bs" and tagged.get("prefer_otel") is True
+    assert corr == {"obs_trace_id": "amb", "obs_span_id": "amb"}
