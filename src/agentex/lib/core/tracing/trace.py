@@ -122,19 +122,21 @@ def _in_tracing_dispatch_activity() -> bool:
     try:
         from temporalio import activity
 
-        # Lazy import: TracingActivityName lives in the activities package whose
-        # module graph imports back into this one (activities -> TracingService ->
-        # AsyncTracer -> trace), so a top-level import would be circular. At call
-        # time (inside an activity) that graph is fully loaded, so this is safe --
-        # and it keeps the discriminator keyed on the enum, not on drifting string
-        # literals. ``activity_type`` round-trips as the enum's str value, which a
-        # str-Enum member compares equal to.
+        if not activity.in_activity():
+            return False
+        # Import only AFTER the in_activity() guard: the pure-sync ACP path never
+        # runs this, so it doesn't pull the temporal activities module graph
+        # (activities -> TracingService -> AsyncTracer -> trace, also circular at
+        # import time) into a process that never runs a workflow, and a broken
+        # import can't silently disable the guard on that path. Inside an activity
+        # the graph is fully loaded, so the lazy import is safe -- and it keeps the
+        # discriminator keyed on the enum, not on drifting string literals.
+        # ``activity_type`` round-trips as the enum's str value, which a str-Enum
+        # member compares equal to.
         from agentex.lib.core.temporal.activities.adk.tracing_activities import (
             TracingActivityName,
         )
 
-        if not activity.in_activity():
-            return False
         return activity.info().activity_type in (
             TracingActivityName.START_SPAN,
             TracingActivityName.END_SPAN,
