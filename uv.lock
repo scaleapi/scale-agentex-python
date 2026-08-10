@@ -155,7 +155,7 @@ requires-dist = [
     { name = "redis", specifier = ">=5.2.0,<8" },
     { name = "rich", specifier = ">=13.9.2,<14" },
     { name = "scale-gp", specifier = ">=0.1.0a59" },
-    { name = "scale-gp-beta", specifier = ">=0.2.0" },
+    { name = "scale-gp-beta", specifier = ">=0.5.0" },
     { name = "starlette", specifier = ">=0.49.1" },
     { name = "temporalio", specifier = ">=1.26.0,<2" },
     { name = "typer", specifier = ">=0.16,<0.17" },
@@ -2791,7 +2791,7 @@ wheels = [
 
 [[package]]
 name = "scale-gp-beta"
-version = "0.2.0"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -2801,9 +2801,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3e/13/181f6b5a0e3fe5c2ca8b7b39e024ed11feba2cf0c879a6d77d84c8060383/scale_gp_beta-0.2.0.tar.gz", hash = "sha256:d4eac4a178ea4b7f21cfe2b421107009b69c4a5c1cbd2c7c864142c30ffda01c", size = 434620, upload-time = "2026-05-04T16:35:53.879Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/a6/623e122dd271f3c01852a65d57343bafbfd4b712068f63d49144c6210faa/scale_gp_beta-0.5.0.tar.gz", hash = "sha256:9f0de217d7bacd1880a7b9df6cf4f8be5d0620e24c382da14f7c0bd55423977e", size = 480740, upload-time = "2026-08-05T20:57:09.495Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/e0/84d284fd5268c4dcaa54dd7209d43dbe41d2120834ee7a8b245184fe13d5/scale_gp_beta-0.2.0-py3-none-any.whl", hash = "sha256:87946b4618c464711bb7c8b132540112a1a558a57b31999f93cccb5da8339643", size = 410408, upload-time = "2026-05-04T16:35:52.286Z" },
+    { url = "https://files.pythonhosted.org/packages/50/95/4580c7e8d5e6d2354b09eb010d666f6359946a177b32dee8511d50a35f73/scale_gp_beta-0.5.0-py3-none-any.whl", hash = "sha256:1b1c6415a2c476c47ce5658bc0d8d2487b9aa61d95adb1002e0d5fbbe0b256c2", size = 472607, upload-time = "2026-08-05T20:57:07.9Z" },
 ]
 
 [[package]]

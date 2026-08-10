@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.23.0 (2026-08-07)
+
+Full Changelog: [agentex-sdk-v0.22.2...agentex-sdk-v0.23.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.22.2...agentex-sdk-v0.23.0)
+
+### Features
+
+* propagate error categories to SGP spans ([#486](https://github.com/scaleapi/scale-agentex-python/issues/486)) ([f2b1808](https://github.com/scaleapi/scale-agentex-python/commit/f2b18087c5049f7e2a159f8e1ad3bf069b01eb23))
+
 ## 0.22.2 (2026-07-30)
 
 Full Changelog: [agentex-sdk-v0.22.1...agentex-sdk-v0.22.2](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.22.1...agentex-sdk-v0.22.2)

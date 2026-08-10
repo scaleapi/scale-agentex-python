@@ -5,7 +5,11 @@ from datetime import timedelta
 from collections.abc import Callable
 
 from temporalio.client import Client, WorkflowExecutionStatus
-from temporalio.common import RetryPolicy as TemporalRetryPolicy, WorkflowIDReusePolicy
+from temporalio.common import (
+    RetryPolicy as TemporalRetryPolicy,
+    WorkflowIDReusePolicy,
+    WorkflowIDConflictPolicy,
+)
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.converter import PayloadCodec, DataConverter
 
@@ -15,6 +19,7 @@ from agentex.lib.core.clients.temporal.types import (
     TaskStatus,
     RetryPolicy,
     WorkflowState,
+    ConflictWorkflowPolicy,
     DuplicateWorkflowPolicy,
 )
 from agentex.lib.core.clients.temporal.utils import get_temporal_client
@@ -73,6 +78,13 @@ DUPLICATE_POLICY_TO_ID_REUSE_POLICY = {
     DuplicateWorkflowPolicy.ALLOW_DUPLICATE_FAILED_ONLY: WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY,
     DuplicateWorkflowPolicy.REJECT_DUPLICATE: WorkflowIDReusePolicy.REJECT_DUPLICATE,
     DuplicateWorkflowPolicy.TERMINATE_IF_RUNNING: WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
+}
+
+CONFLICT_POLICY_TO_ID_CONFLICT_POLICY = {
+    ConflictWorkflowPolicy.UNSPECIFIED: WorkflowIDConflictPolicy.UNSPECIFIED,
+    ConflictWorkflowPolicy.FAIL: WorkflowIDConflictPolicy.FAIL,
+    ConflictWorkflowPolicy.USE_EXISTING: WorkflowIDConflictPolicy.USE_EXISTING,
+    ConflictWorkflowPolicy.TERMINATE_EXISTING: WorkflowIDConflictPolicy.TERMINATE_EXISTING,
 }
 
 
@@ -151,11 +163,20 @@ class TemporalClient:
         self,
         *args: Any,
         duplicate_policy: DuplicateWorkflowPolicy = DuplicateWorkflowPolicy.ALLOW_DUPLICATE,
+        conflict_policy: ConflictWorkflowPolicy = ConflictWorkflowPolicy.UNSPECIFIED,
         retry_policy: RetryPolicy = DEFAULT_RETRY_POLICY,
         task_timeout: timedelta = timedelta(seconds=10),
         execution_timeout: timedelta | None = None,
         **kwargs: Any,
     ) -> str:
+        if (
+            duplicate_policy == DuplicateWorkflowPolicy.TERMINATE_IF_RUNNING
+            and conflict_policy != ConflictWorkflowPolicy.UNSPECIFIED
+        ):
+            raise ValueError(
+                "conflict_policy cannot be set when duplicate_policy is TERMINATE_IF_RUNNING; "
+                "use ConflictWorkflowPolicy.TERMINATE_EXISTING instead"
+            )
         temporal_retry_policy = TemporalRetryPolicy(**retry_policy.model_dump(exclude_unset=True))
         workflow_handle = await self.client.start_workflow(
             *args,
@@ -163,6 +184,7 @@ class TemporalClient:
             task_timeout=task_timeout,
             execution_timeout=execution_timeout,
             id_reuse_policy=DUPLICATE_POLICY_TO_ID_REUSE_POLICY[duplicate_policy],
+            id_conflict_policy=CONFLICT_POLICY_TO_ID_CONFLICT_POLICY[conflict_policy],
             **kwargs,
         )
         return workflow_handle.id

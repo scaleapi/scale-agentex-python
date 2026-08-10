@@ -87,6 +87,7 @@ def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:
     error = get_span_error(span)
     if error is not None:
         sgp_span.set_error(error_type=error["type"], error_message=error["message"])
+        sgp_span.metadata["error_category"] = error.get("category", "unknown")
     return sgp_span
 
 
