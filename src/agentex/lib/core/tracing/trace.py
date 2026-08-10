@@ -12,7 +12,7 @@ from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
-from agentex.lib.core.tracing.obs_ids import obs_correlation
+from agentex.lib.core.tracing.obs_ids import obs_correlation, warn_on_backend_drift
 from agentex.lib.core.tracing.obs_span import (
     ObsSpanHandle,
     open_obs_span,
@@ -181,11 +181,11 @@ def _begin_obs(
     (a workflow calling ``adk.tracing`` -- see ``_in_tracing_dispatch_activity``):
     there start and end are separate activities on possibly different workers, so
     a wrapper could never be closed. We fall back to tagging the ambient
-    interceptor span instead, with ``prefer_otel=True`` (the interceptor span is
+    interceptor span instead, with ``expect_otel=True`` (the interceptor span is
     OTel regardless of ``SGP_OBS_MODE``, so a plain ``dd_only`` read would
     otherwise point at an unrelated ddtrace span).
 
-    Inside ANY activity we also pass ``prefer_otel`` to the wrapper and the ambient
+    Inside ANY activity we also pass ``expect_otel`` to the wrapper and the ambient
     fallback: the ambient span is the interceptor's OTel span regardless of mode,
     so a per-step OTel wrapper nests under it and yields valid ids, whereas the
     default ``dd_only`` path would open a ddtrace wrapper -- which finds no request
@@ -193,8 +193,9 @@ def _begin_obs(
     obs_* ids.
     """
     if _in_tracing_dispatch_activity():
-        tag_ambient_obs_span(business_span_id=span_id, business_trace_id=trace_id, prefer_otel=True)
-        return None, obs_correlation(prefer_otel=True)
+        warn_on_backend_drift(expect_otel=True)
+        tag_ambient_obs_span(business_span_id=span_id, business_trace_id=trace_id, expect_otel=True)
+        return None, obs_correlation(expect_otel=True)
     # TODO(obs-followup): two items formerly tracked on the (now-deleted)
     # _in_temporal_activity docstring, still open after this change:
     #   (1) TurnTrace RETRY/ASYNC roll-up. A retried business activity now emits a
@@ -204,11 +205,12 @@ def _begin_obs(
     #       sets rather than one PRIMARY + N RETRY view.
     #   (2) On a multi-replica worker fleet, assert _OBS_HANDLES stays bounded (no
     #       leak / OOM) and that obs_trace_id resolves to the turn trace.
-    prefer_otel = _in_temporal_activity()
+    expect_otel = _in_temporal_activity()
+    warn_on_backend_drift(expect_otel)
     handle = open_obs_span(
-        name, business_span_id=span_id, business_trace_id=trace_id, prefer_otel=prefer_otel
+        name, business_span_id=span_id, business_trace_id=trace_id, expect_otel=expect_otel
     )
-    correlation = handle.correlation if handle is not None else obs_correlation(prefer_otel=prefer_otel)
+    correlation = handle.correlation if handle is not None else obs_correlation(expect_otel=expect_otel)
     return handle, correlation
 
 

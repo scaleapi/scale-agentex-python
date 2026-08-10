@@ -28,14 +28,21 @@ an empty dict and the span is simply not tagged.
 from __future__ import annotations
 
 import os
+import logging
 from typing import Dict, Tuple, Optional
 
-__all__ = ("get_obs_mode", "obs_correlation")
+__all__ = ("get_obs_mode", "obs_correlation", "warn_on_backend_drift")
 
 DD_ONLY = "dd_only"
 LGTM = "lgtm"
 _DEFAULT_MODE = DD_ONLY
 _VALID_MODES = (DD_ONLY, LGTM)
+
+_log = logging.getLogger(__name__)
+# Deduped (expected, actual) drift directions already warned about, so a genuine
+# mismatch logs once instead of once per span. Bounded by construction: at most
+# the 2 direction pairs ("otel"/"ddtrace" either way).
+_WARNED_DRIFT: set[Tuple[str, str]] = set()
 
 
 def get_obs_mode() -> str:
@@ -69,7 +76,7 @@ def _ddtrace_ids() -> Optional[Tuple[str, str]]:
     return None
 
 
-def obs_correlation(prefer_otel: bool = False) -> Dict[str, str]:
+def obs_correlation(expect_otel: bool = False) -> Dict[str, str]:
     """Return ``{"obs_trace_id": ..., "obs_span_id": ...}`` for the active
     observability context, or ``{}`` if none is active.
 
@@ -79,7 +86,7 @@ def obs_correlation(prefer_otel: bool = False) -> Dict[str, str]:
     dotted) keep them addressable via Postgres JSON paths
     (``operation_metadata->>'obs_trace_id'``).
 
-    ``prefer_otel``: on the Temporal path the active span is the temporalio OTel
+    ``expect_otel``: on the Temporal path the active span is the temporalio OTel
     ``TracingInterceptor`` span regardless of ``SGP_OBS_MODE``, so callers there
     read OTel first (falling back to ddtrace) -- otherwise the default ``dd_only``
     mode would read ids for an unrelated ddtrace trace, not the activity span.
@@ -87,7 +94,7 @@ def obs_correlation(prefer_otel: bool = False) -> Dict[str, str]:
     Never fabricates ids -- this is a correlation tag, not the span's id.
     """
     try:
-        if prefer_otel:
+        if expect_otel:
             ids = _lgtm_ids() or _ddtrace_ids()
         else:
             ids = _lgtm_ids() if get_obs_mode() == LGTM else _ddtrace_ids()
@@ -97,3 +104,44 @@ def obs_correlation(prefer_otel: bool = False) -> Dict[str, str]:
     if not ids:
         return {}
     return {"obs_trace_id": ids[0], "obs_span_id": ids[1]}
+
+
+def warn_on_backend_drift(expect_otel: bool = False) -> None:
+    """Log once when the EXPECTED obs backend has no active span but the OTHER one
+    does.
+
+    Expected backend = OTel when ``expect_otel`` (the Temporal path, where the
+    interceptor span is OTel regardless of ``SGP_OBS_MODE``), otherwise the backend
+    the mode implies. A mismatch means the mode does not match the tracer actually
+    running at this call site -- e.g. ``dd_only`` configured but the live span is
+    OTel -- which is a real config/instrumentation drift worth surfacing rather
+    than silently correlating against whatever happens to be live.
+
+    Not a hard failure: obs stays fail-open (the caller still reads and falls back,
+    so no correlation is lost). The warning is deduped per direction, so a standing
+    mismatch logs once, not once per span. Never raises."""
+    try:
+        otel = _lgtm_ids()
+        ddt = _ddtrace_ids()
+        if expect_otel or get_obs_mode() == LGTM:
+            expected, expected_live = "otel", otel
+            other_live = ddt
+        else:
+            expected, expected_live = "ddtrace", ddt
+            other_live = otel
+        if expected_live is None and other_live is not None:
+            actual = "ddtrace" if expected == "otel" else "otel"
+            if (expected, actual) not in _WARNED_DRIFT:
+                _WARNED_DRIFT.add((expected, actual))
+                _log.warning(
+                    "obs backend drift: expected %s here (SGP_OBS_MODE=%s%s) but the "
+                    "active span is %s; correlating against %s. Check SGP_OBS_MODE and "
+                    "the running instrumentation.",
+                    expected,
+                    get_obs_mode(),
+                    ", temporal path" if expect_otel else "",
+                    actual,
+                    actual,
+                )
+    except Exception:  # obs must never fail an app call
+        pass
