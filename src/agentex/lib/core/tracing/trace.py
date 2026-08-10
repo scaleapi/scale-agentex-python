@@ -129,6 +129,23 @@ def _in_tracing_dispatch_activity() -> bool:
         return False
 
 
+def _in_temporal_activity() -> bool:
+    """True inside ANY Temporal activity. There the ambient span is the temporalio
+    OTel ``TracingInterceptor`` span REGARDLESS of ``SGP_OBS_MODE``, so callers
+    prefer OTel for both the wrapper backend and the correlation read: a plain
+    ``dd_only`` read would target ddtrace, which has no request context in a worker
+    (no inbound HTTP), so ``open_obs_span`` would return None and the fallback ids
+    would be empty -- the business span would persist with no obs_* ids at all.
+    Never raises; False when temporalio isn't importable or we're not in an
+    activity."""
+    try:
+        from temporalio import activity
+
+        return activity.in_activity()
+    except Exception:
+        return False
+
+
 def _begin_obs(
     name: str,
     span_id: str,
@@ -153,12 +170,22 @@ def _begin_obs(
     interceptor span instead, with ``prefer_otel=True`` (the interceptor span is
     OTel regardless of ``SGP_OBS_MODE``, so a plain ``dd_only`` read would
     otherwise point at an unrelated ddtrace span).
+
+    Inside ANY activity we also pass ``prefer_otel`` to the wrapper and the ambient
+    fallback: the ambient span is the interceptor's OTel span regardless of mode,
+    so a per-step OTel wrapper nests under it and yields valid ids, whereas the
+    default ``dd_only`` path would open a ddtrace wrapper -- which finds no request
+    context in a worker and returns None, leaving the business span with empty
+    obs_* ids.
     """
     if _in_tracing_dispatch_activity():
         tag_ambient_obs_span(business_span_id=span_id, business_trace_id=trace_id, prefer_otel=True)
         return None, obs_correlation(prefer_otel=True)
-    handle = open_obs_span(name, business_span_id=span_id, business_trace_id=trace_id)
-    correlation = handle.correlation if handle is not None else obs_correlation()
+    prefer_otel = _in_temporal_activity()
+    handle = open_obs_span(
+        name, business_span_id=span_id, business_trace_id=trace_id, prefer_otel=prefer_otel
+    )
+    correlation = handle.correlation if handle is not None else obs_correlation(prefer_otel=prefer_otel)
     return handle, correlation
 
 

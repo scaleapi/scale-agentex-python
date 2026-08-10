@@ -165,3 +165,26 @@ def test_begin_obs_tags_ambient_inside_dispatch_activity(monkeypatch: pytest.Mon
     assert handle is None
     assert tagged.get("business_span_id") == "bs" and tagged.get("prefer_otel") is True
     assert corr == {"obs_trace_id": "amb", "obs_span_id": "amb"}
+
+
+def test_business_activity_dd_only_reads_otel_not_ddtrace(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: inside a BUSINESS activity (not the dispatched start/end-span)
+    with default dd_only mode, the per-step wrapper branch must prefer OTel. The
+    ambient span is the temporalio OTel interceptor span regardless of mode; a
+    dd_only ddtrace read finds no request context in a worker, so before the fix
+    the business span persisted with empty obs ids. Assert it carries the OTel
+    activity ids, not ddtrace's."""
+    monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
+    monkeypatch.setattr(trace_mod, "_in_tracing_dispatch_activity", lambda: False)
+    monkeypatch.setattr(trace_mod, "_in_temporal_activity", lambda: True)
+    # Make ddtrace resolve to DIFFERENT ids so we can prove which backend won.
+    monkeypatch.setattr(obs_ids_mod, "_ddtrace_ids", lambda: ("d" * 32, "e" * 16))
+    _activate_otel_span(monkeypatch)  # valid OTel span active (the interceptor span)
+
+    trace_obj = Trace(processors=[], client=cast(Any, object()), trace_id="trace-1")
+    span = trace_obj.start_span(name="mortgage.classify_intent")
+
+    assert isinstance(span.data, dict)
+    # OTel ids, not ddtrace's ("d"*32) and not empty.
+    assert span.data["obs_trace_id"] == _TRACE_HEX
+    assert span.data["obs_span_id"] == _SPAN_HEX
