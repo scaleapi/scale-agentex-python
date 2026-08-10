@@ -11,17 +11,20 @@ correlation on the async/Temporal path pointed at the wrong trace (or nowhere).
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import TraceFlags, SpanContext
+from temporalio import activity as temporal_activity
 
 import agentex.lib.core.tracing.trace as trace_mod
 import agentex.lib.core.tracing.obs_ids as obs_ids_mod
 from agentex.lib.core.tracing.trace import _OBS_HANDLES, Trace
 from agentex.lib.core.tracing.obs_ids import obs_correlation
 from agentex.lib.core.tracing.obs_span import tag_ambient_obs_span
+from agentex.lib.core.temporal.activities.adk.tracing_activities import TracingActivityName
 
 _TRACE_ID = 0x0123456789ABCDEF0123456789ABCDEF
 _SPAN_ID = 0x0123456789ABCDEF
@@ -188,3 +191,41 @@ def test_business_activity_dd_only_reads_otel_not_ddtrace(monkeypatch: pytest.Mo
     # OTel ids, not ddtrace's ("d"*32) and not empty.
     assert span.data["obs_trace_id"] == _TRACE_HEX
     assert span.data["obs_span_id"] == _SPAN_HEX
+
+
+# --------------------------------------------------------------------------- #
+# The dispatch discriminator itself (trace.py:_in_tracing_dispatch_activity).
+# This is the one line preventing a cross-worker handle leak inside START_SPAN,
+# so it gets exercised directly with a faked activity.info() -- and against the
+# enum's own .value, so it also fails if TracingActivityName ever drifts from
+# the strings hardcoded in trace.py.
+# --------------------------------------------------------------------------- #
+def test_dispatch_discriminator_true_for_start_and_end_span(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: True)
+    for name in (TracingActivityName.START_SPAN, TracingActivityName.END_SPAN):
+        # activity_type round-trips as the plain string value through protobuf.
+        monkeypatch.setattr(temporal_activity, "info", lambda n=name: SimpleNamespace(activity_type=n.value))
+        assert trace_mod._in_tracing_dispatch_activity() is True, name
+
+
+def test_dispatch_discriminator_false_for_business_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A real agent-turn activity (e.g. process_mortgage_turn) is NOT a dispatch
+    # activity -> it must take the per-step wrapper branch, not Option-A tagging.
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: True)
+    monkeypatch.setattr(temporal_activity, "info", lambda: SimpleNamespace(activity_type="process_mortgage_turn"))
+    assert trace_mod._in_tracing_dispatch_activity() is False
+
+
+def test_dispatch_discriminator_false_when_not_in_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Guard short-circuits on in_activity()==False; info() (here a dispatch value)
+    # must never be consulted, else the sync path would be misclassified.
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: False)
+    monkeypatch.setattr(temporal_activity, "info", lambda: SimpleNamespace(activity_type="start-span"))
+    assert trace_mod._in_tracing_dispatch_activity() is False
+
+
+def test_in_temporal_activity_tracks_in_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: True)
+    assert trace_mod._in_temporal_activity() is True
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: False)
+    assert trace_mod._in_temporal_activity() is False
