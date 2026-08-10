@@ -116,15 +116,29 @@ def _in_tracing_dispatch_activity() -> bool:
     created directly inside a *business* activity (an agent turn's own
     ``adk.tracing.span``) runs start AND end in the same activity process, so a
     wrapper there is safe -- it nests under the interceptor's ambient RunActivity
-    span and closes in-process. The tracing dispatch activities are named
-    ``start-span`` / ``end-span`` (``TracingActivityName``). Never raises; False
+    span and closes in-process. The tracing dispatch activities are named by
+    ``TracingActivityName`` (``start-span`` / ``end-span``). Never raises; False
     when temporalio isn't importable or we're not in an activity."""
     try:
         from temporalio import activity
 
+        # Lazy import: TracingActivityName lives in the activities package whose
+        # module graph imports back into this one (activities -> TracingService ->
+        # AsyncTracer -> trace), so a top-level import would be circular. At call
+        # time (inside an activity) that graph is fully loaded, so this is safe --
+        # and it keeps the discriminator keyed on the enum, not on drifting string
+        # literals. ``activity_type`` round-trips as the enum's str value, which a
+        # str-Enum member compares equal to.
+        from agentex.lib.core.temporal.activities.adk.tracing_activities import (
+            TracingActivityName,
+        )
+
         if not activity.in_activity():
             return False
-        return activity.info().activity_type in ("start-span", "end-span")
+        return activity.info().activity_type in (
+            TracingActivityName.START_SPAN,
+            TracingActivityName.END_SPAN,
+        )
     except Exception:
         return False
 
