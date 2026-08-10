@@ -15,9 +15,9 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+from temporalio import activity as temporal_activity
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import TraceFlags, SpanContext
-from temporalio import activity as temporal_activity
 
 import agentex.lib.core.tracing.trace as trace_mod
 import agentex.lib.core.tracing.obs_ids as obs_ids_mod
