@@ -195,6 +195,15 @@ def _begin_obs(
     if _in_tracing_dispatch_activity():
         tag_ambient_obs_span(business_span_id=span_id, business_trace_id=trace_id, prefer_otel=True)
         return None, obs_correlation(prefer_otel=True)
+    # TODO(obs-followup): two items formerly tracked on the (now-deleted)
+    # _in_temporal_activity docstring, still open after this change:
+    #   (1) TurnTrace RETRY/ASYNC roll-up. A retried business activity now emits a
+    #       full per-step wrapper set PER ATTEMPT, each nested under that attempt's
+    #       RunActivity. Each attempt correlates to the turn on its own, but they
+    #       are not yet rolled up, so a retried turn surfaces as N per-attempt span
+    #       sets rather than one PRIMARY + N RETRY view.
+    #   (2) On a multi-replica worker fleet, assert _OBS_HANDLES stays bounded (no
+    #       leak / OOM) and that obs_trace_id resolves to the turn trace.
     prefer_otel = _in_temporal_activity()
     handle = open_obs_span(
         name, business_span_id=span_id, business_trace_id=trace_id, prefer_otel=prefer_otel
