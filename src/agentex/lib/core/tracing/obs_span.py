@@ -259,8 +259,9 @@ def tag_ambient_obs_span(
     Used inside the SDK's dispatched start-span/end-span activities (see
     ``trace._in_tracing_dispatch_activity``): there we must NOT open our own
     wrapper span, because start_span/end_span run as separate activities on
-    possibly different workers and the wrapper could never be closed. Instead we lean on the span the Temporal OTel ``TracingInterceptor``
-    already made active for this activity and just add
+    possibly different workers and the wrapper could never be closed. Instead we
+    lean on the span the Temporal OTel ``TracingInterceptor`` already made active
+    for this activity and just add
     ``agentex.business_span_id`` / ``agentex.business_trace_id`` so the obs -> business
     pivot still works. Best-effort; never raises.
 

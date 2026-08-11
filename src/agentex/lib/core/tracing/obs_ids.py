@@ -119,29 +119,29 @@ def warn_on_backend_drift(expect_otel: bool = False) -> None:
 
     Not a hard failure: obs stays fail-open (the caller still reads and falls back,
     so no correlation is lost). The warning is deduped per direction, so a standing
-    mismatch logs once, not once per span. Never raises."""
+    mismatch logs once, not once per span. Probes the expected backend first and
+    returns early when it is live, so the healthy common path never touches the
+    other backend. Never raises."""
     try:
-        otel = _lgtm_ids()
-        ddt = _ddtrace_ids()
         if expect_otel or get_obs_mode() == LGTM:
-            expected, expected_live = "otel", otel
-            other_live = ddt
+            expected, expected_probe, other_probe, actual = "otel", _lgtm_ids, _ddtrace_ids, "ddtrace"
         else:
-            expected, expected_live = "ddtrace", ddt
-            other_live = otel
-        if expected_live is None and other_live is not None:
-            actual = "ddtrace" if expected == "otel" else "otel"
-            if (expected, actual) not in _WARNED_DRIFT:
-                _WARNED_DRIFT.add((expected, actual))
-                _log.warning(
-                    "obs backend drift: expected %s here (SGP_OBS_MODE=%s%s) but the "
-                    "active span is %s; correlating against %s. Check SGP_OBS_MODE and "
-                    "the running instrumentation.",
-                    expected,
-                    get_obs_mode(),
-                    ", temporal path" if expect_otel else "",
-                    actual,
-                    actual,
-                )
+            expected, expected_probe, other_probe, actual = "ddtrace", _ddtrace_ids, _lgtm_ids, "otel"
+        if expected_probe() is not None:
+            return  # expected backend is live -> healthy; skip the other probe
+        if other_probe() is None:
+            return  # nothing live at all -> uninstrumented path, not drift
+        if (expected, actual) not in _WARNED_DRIFT:
+            _WARNED_DRIFT.add((expected, actual))
+            _log.warning(
+                "obs backend drift: expected %s here (SGP_OBS_MODE=%s%s) but the "
+                "active span is %s; correlating against %s. Check SGP_OBS_MODE and "
+                "the running instrumentation.",
+                expected,
+                get_obs_mode(),
+                ", temporal path" if expect_otel else "",
+                actual,
+                actual,
+            )
     except Exception:  # obs must never fail an app call
         pass
