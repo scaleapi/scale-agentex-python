@@ -351,7 +351,7 @@ class TestTraceIntegration:
     def test_dd_only_no_ctx_falls_back_to_ambient(self, monkeypatch):
         monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
         _install_fake_ddtrace(monkeypatch, active=False)
-        monkeypatch.setattr("agentex.lib.core.tracing.trace.obs_correlation", lambda: {})
+        monkeypatch.setattr("agentex.lib.core.tracing.trace.obs_correlation", lambda **_k: {})
 
         trace = Trace(processors=[], client=MagicMock(), trace_id="task-run-3")
         span = trace.start_span(name="get_state")
