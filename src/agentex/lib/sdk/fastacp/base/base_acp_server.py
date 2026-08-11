@@ -47,8 +47,8 @@ task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
 
 
 def _attach_incoming_otel_context(scope_headers: list[tuple[bytes, bytes]]) -> object | None:
-    """Extract the inbound W3C trace context (traceparent/tracestate/baggage) from
-    ASGI headers and make it the active OpenTelemetry context for the request.
+    """Extract the inbound W3C trace context (traceparent/tracestate) from ASGI
+    headers and make it the active OpenTelemetry context for the request.
 
     FastACP is not otherwise instrumented to *continue* an incoming trace: the
     gateway forwards the traceparent header, but nothing on the Python side
@@ -64,10 +64,22 @@ def _attach_incoming_otel_context(scope_headers: list[tuple[bytes, bytes]]) -> o
     """
     try:
         from opentelemetry import context as _otel_context
-        from opentelemetry.propagate import extract
+        from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
-        carrier = {k.decode("latin-1"): v.decode("latin-1") for k, v in scope_headers}
-        return _otel_context.attach(extract(carrier))
+        # ASGI headers are a list that can repeat a name, and a dict comprehension
+        # keeps only the last value -- which silently drops repeated `tracestate`
+        # lines (W3C/RFC7230 say they MUST be combined). Build a dict-of-lists so
+        # the propagator's getter sees every value and `TraceState.from_header`
+        # combines them; `traceparent` is single-valued so it is unaffected.
+        carrier: dict[str, list[str]] = {}
+        for k, v in scope_headers:
+            carrier.setdefault(k.decode("latin-1").lower(), []).append(v.decode("latin-1"))
+        # Use the W3C propagator explicitly rather than the ambient global one:
+        # this ingress is W3C by contract, and `OTEL_PROPAGATORS=datadog` (plausible
+        # in a DD shop, and dd_only is the default mode) would otherwise silently
+        # extract nothing. It also parses only traceparent/tracestate, so arbitrary
+        # inbound `baggage` is not pulled into the downstream context.
+        return _otel_context.attach(TraceContextTextMapPropagator().extract(carrier))
     except Exception:  # pragma: no cover - obs must never break a request
         return None
 

@@ -46,5 +46,42 @@ def test_no_inbound_traceparent_is_fail_open() -> None:
     _detach_otel_context(token)
 
 
+def test_repeated_tracestate_headers_are_combined() -> None:
+    # ASGI can deliver tracestate as multiple header lines; W3C/RFC7230 require
+    # combining them. The old dict-comprehension carrier kept only the last.
+    from opentelemetry import trace as _trace
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    headers = [
+        (b"traceparent", f"00-{trace_id}-b7ad6b7169203331-01".encode()),
+        (b"tracestate", b"vendora=1"),
+        (b"tracestate", b"vendorb=2"),
+    ]
+    token = _attach_incoming_otel_context(headers)
+    try:
+        ts = _trace.get_current_span().get_span_context().trace_state
+        assert ts.get("vendora") == "1"
+        assert ts.get("vendorb") == "2"  # would be missing if repeats collapsed
+    finally:
+        _detach_otel_context(token)
+
+
+def test_inbound_baggage_is_not_extracted() -> None:
+    # W3C tracecontext-only extraction: arbitrary inbound baggage (attacker-
+    # controlled keys) must not be pulled into the downstream context.
+    from opentelemetry.baggage import get_all
+
+    trace_id = "0af7651916cd43dd8448eb211c80319c"
+    headers = [
+        (b"traceparent", f"00-{trace_id}-b7ad6b7169203331-01".encode()),
+        (b"baggage", b"user_id=secret,role=admin"),
+    ]
+    token = _attach_incoming_otel_context(headers)
+    try:
+        assert get_all() == {}
+    finally:
+        _detach_otel_context(token)
+
+
 def test_detach_none_is_safe() -> None:
     _detach_otel_context(None)
