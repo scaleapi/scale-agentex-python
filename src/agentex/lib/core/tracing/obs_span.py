@@ -175,6 +175,7 @@ def open_obs_span(
     name: str,
     business_span_id: Optional[str] = None,
     business_trace_id: Optional[str] = None,
+    expect_otel: bool = False,
 ) -> Optional[ObsSpanHandle]:
     """Open an obs span named ``name`` in the active backend, make it the active
     span, and return a handle carrying its ``{"obs_trace_id","obs_span_id"}``.
@@ -182,6 +183,14 @@ def open_obs_span(
     ``business_span_id`` / ``business_trace_id`` are stamped onto the obs span as
     the reverse tag (``agentex.business_span_id`` / ``agentex.business_trace_id``)
     so you can pivot obs -> business by searching them in Tempo/DD.
+
+    ``expect_otel``: open an OTel wrapper first, regardless of ``SGP_OBS_MODE``.
+    Set on the Temporal path, where the ambient span is the temporalio OTel
+    ``TracingInterceptor`` span regardless of mode -- an OTel wrapper nests under
+    it and yields valid ids, whereas the default ``dd_only`` path would open a
+    ddtrace wrapper, which finds no request context in a worker and returns None
+    (dropping the per-step span and its ids). Falls back to ddtrace if no OTel
+    span materializes.
 
     Returns ``None`` (so the caller falls back to ambient behavior) when the
     backend tracer isn't available or, in ``dd_only``, no request trace is
@@ -192,8 +201,14 @@ def open_obs_span(
     never fail an app call.
     """
     try:
-        if get_obs_mode() == LGTM:
-            return _open_otel_span(name, business_span_id, business_trace_id)
+        if expect_otel or get_obs_mode() == LGTM:
+            handle = _open_otel_span(name, business_span_id, business_trace_id)
+            if handle is not None or not expect_otel:
+                # In lgtm mode a None handle means "no OTel span -> caller uses the
+                # ambient fallback". Only when expect_otel is set (Temporal path)
+                # do we try ddtrace as a second choice.
+                return handle
+            return _open_ddtrace_span(name, business_span_id, business_trace_id)
         return _open_ddtrace_span(name, business_span_id, business_trace_id)
     except Exception:  # pragma: no cover - backstop; obs must never break a call
         return None
@@ -236,26 +251,27 @@ def _tag_ddtrace_ambient(business_span_id: Optional[str], business_trace_id: Opt
 def tag_ambient_obs_span(
     business_span_id: Optional[str] = None,
     business_trace_id: Optional[str] = None,
-    prefer_otel: bool = False,
+    expect_otel: bool = False,
 ) -> None:
     """Stamp the reverse tag onto the CURRENTLY ACTIVE obs span -- without opening
     a new one.
 
-    Used on the Temporal path (see ``trace._in_temporal_activity``): there we must
-    NOT open our own wrapper span, because start_span/end_span run as separate
-    activities on possibly different workers and the wrapper could never be
-    closed. Instead we lean on the span the Temporal OTel ``TracingInterceptor``
-    already made active for this activity and just add
+    Used inside the SDK's dispatched start-span/end-span activities (see
+    ``trace._in_tracing_dispatch_activity``): there we must NOT open our own
+    wrapper span, because start_span/end_span run as separate activities on
+    possibly different workers and the wrapper could never be closed. Instead we
+    lean on the span the Temporal OTel ``TracingInterceptor`` already made active
+    for this activity and just add
     ``agentex.business_span_id`` / ``agentex.business_trace_id`` so the obs -> business
     pivot still works. Best-effort; never raises.
 
-    ``prefer_otel``: on the Temporal path the ambient span is the temporalio OTel
+    ``expect_otel``: on the Temporal path the ambient span is the temporalio OTel
     ``TracingInterceptor`` span REGARDLESS of ``SGP_OBS_MODE`` -- so callers there
-    pass ``prefer_otel=True`` to tag OTel first (falling back to ddtrace only if
+    pass ``expect_otel=True`` to tag OTel first (falling back to ddtrace only if
     no valid OTel span is active). Without this, the default ``dd_only`` mode would
     tag an unrelated ddtrace span (or nothing) instead of the real activity span."""
     try:
-        if prefer_otel:
+        if expect_otel:
             if _tag_otel_ambient(business_span_id, business_trace_id):
                 return
             _tag_ddtrace_ambient(business_span_id, business_trace_id)

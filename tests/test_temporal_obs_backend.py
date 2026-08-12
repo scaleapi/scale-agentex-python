@@ -11,9 +11,11 @@ correlation on the async/Temporal path pointed at the wrong trace (or nowhere).
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+from temporalio import activity as temporal_activity
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace import TraceFlags, SpanContext
 
@@ -22,6 +24,7 @@ import agentex.lib.core.tracing.obs_ids as obs_ids_mod
 from agentex.lib.core.tracing.trace import _OBS_HANDLES, Trace
 from agentex.lib.core.tracing.obs_ids import obs_correlation
 from agentex.lib.core.tracing.obs_span import tag_ambient_obs_span
+from agentex.lib.core.temporal.activities.adk.tracing_activities import TracingActivityName
 
 _TRACE_ID = 0x0123456789ABCDEF0123456789ABCDEF
 _SPAN_ID = 0x0123456789ABCDEF
@@ -67,8 +70,10 @@ def _activate_otel_span(monkeypatch: pytest.MonkeyPatch) -> _RecordingOtelSpan:
 
 def test_temporal_path_tags_and_reads_otel_in_dd_only(monkeypatch: pytest.MonkeyPatch) -> None:
     # Default/dd_only mode is exactly where the old code went to ddtrace.
+    # Tagging the ambient interceptor span (no wrapper) now applies only inside
+    # the SDK's dispatched START_SPAN/END_SPAN activity, not any activity.
     monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
-    monkeypatch.setattr(trace_mod, "_in_temporal_activity", lambda: True)
+    monkeypatch.setattr(trace_mod, "_in_tracing_dispatch_activity", lambda: True)
     activity_span = _activate_otel_span(monkeypatch)
 
     trace_obj = Trace(processors=[], client=cast(Any, object()), trace_id="trace-1")
@@ -87,20 +92,20 @@ def test_temporal_path_tags_and_reads_otel_in_dd_only(monkeypatch: pytest.Monkey
     assert span.id not in _OBS_HANDLES
 
 
-def test_obs_correlation_prefer_otel_prefers_otel_over_ddtrace(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_obs_correlation_expect_otel_prefers_otel_over_ddtrace(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
     _activate_otel_span(monkeypatch)
     # Make ddtrace resolve to DIFFERENT ids so we can prove which backend won.
     monkeypatch.setattr(obs_ids_mod, "_ddtrace_ids", lambda: ("d" * 32, "e" * 16))
 
-    # prefer_otel (Temporal path): OTel wins even though mode is dd_only.
-    assert obs_correlation(prefer_otel=True) == {"obs_trace_id": _TRACE_HEX, "obs_span_id": _SPAN_HEX}
+    # expect_otel (Temporal path): OTel wins even though mode is dd_only.
+    assert obs_correlation(expect_otel=True) == {"obs_trace_id": _TRACE_HEX, "obs_span_id": _SPAN_HEX}
     # Default (in-process path): still honors mode -> ddtrace.
     assert obs_correlation() == {"obs_trace_id": "d" * 32, "obs_span_id": "e" * 16}
 
 
-def test_tag_ambient_prefer_otel_falls_back_to_ddtrace(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When no valid OTel span is active, prefer_otel falls back to ddtrace."""
+def test_tag_ambient_expect_otel_falls_back_to_ddtrace(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When no valid OTel span is active, expect_otel falls back to ddtrace."""
     monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
 
     # No valid OTel span active.
@@ -125,10 +130,141 @@ def test_tag_ambient_prefer_otel_falls_back_to_ddtrace(monkeypatch: pytest.Monke
     ddtrace_trace.tracer = _FakeDDTracer()  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "ddtrace.trace", ddtrace_trace)
 
-    tag_ambient_obs_span(business_span_id="bs", business_trace_id="bt", prefer_otel=True)
+    tag_ambient_obs_span(business_span_id="bs", business_trace_id="bt", expect_otel=True)
 
     # OTel was invalid -> fell back to ddtrace, which got the reverse tag.
     assert tagged["agentex.business_span_id"] == "bs"
     assert tagged["agentex.business_trace_id"] == "bt"
     # The invalid OTel span was NOT tagged.
     assert invalid.attributes == {}
+
+
+class _FakeHandle:
+    def __init__(self, corr):
+        self.correlation = corr
+
+
+def test_begin_obs_opens_wrapper_outside_dispatch_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sync path or inside a business Temporal activity: open a per-step wrapper
+    (1:1), not the ambient-span tag. Each business span gets its own obs span."""
+    monkeypatch.setattr(trace_mod, "_in_tracing_dispatch_activity", lambda: False)
+    monkeypatch.setattr(
+        trace_mod, "open_obs_span",
+        lambda *a, **k: _FakeHandle({"obs_trace_id": "t1", "obs_span_id": "s1"}),
+    )
+    handle, corr = trace_mod._begin_obs("mortgage.classify_intent", "bs", "bt")
+    assert handle is not None
+    assert corr == {"obs_trace_id": "t1", "obs_span_id": "s1"}
+
+
+def test_begin_obs_tags_ambient_inside_dispatch_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Inside the dispatched START_SPAN/END_SPAN activity: no wrapper (would leak
+    across activities); tag the ambient interceptor span instead."""
+    monkeypatch.setattr(trace_mod, "_in_tracing_dispatch_activity", lambda: True)
+    tagged: dict = {}
+    monkeypatch.setattr(trace_mod, "tag_ambient_obs_span", lambda **k: tagged.update(k))
+    monkeypatch.setattr(trace_mod, "obs_correlation", lambda **k: {"obs_trace_id": "amb", "obs_span_id": "amb"})
+    handle, corr = trace_mod._begin_obs("mortgage.advisor.turn", "bs", "bt")
+    assert handle is None
+    assert tagged.get("business_span_id") == "bs" and tagged.get("expect_otel") is True
+    assert corr == {"obs_trace_id": "amb", "obs_span_id": "amb"}
+
+
+def test_business_activity_dd_only_reads_otel_not_ddtrace(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: inside a BUSINESS activity (not the dispatched start/end-span)
+    with default dd_only mode, the per-step wrapper branch must prefer OTel. The
+    ambient span is the temporalio OTel interceptor span regardless of mode; a
+    dd_only ddtrace read finds no request context in a worker, so before the fix
+    the business span persisted with empty obs ids. Assert it carries the OTel
+    activity ids, not ddtrace's."""
+    monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
+    monkeypatch.setattr(trace_mod, "_in_tracing_dispatch_activity", lambda: False)
+    monkeypatch.setattr(trace_mod, "_in_temporal_activity", lambda: True)
+    # Make ddtrace resolve to DIFFERENT ids so we can prove which backend won.
+    monkeypatch.setattr(obs_ids_mod, "_ddtrace_ids", lambda: ("d" * 32, "e" * 16))
+    _activate_otel_span(monkeypatch)  # valid OTel span active (the interceptor span)
+
+    trace_obj = Trace(processors=[], client=cast(Any, object()), trace_id="trace-1")
+    span = trace_obj.start_span(name="mortgage.classify_intent")
+
+    assert isinstance(span.data, dict)
+    # OTel ids, not ddtrace's ("d"*32) and not empty.
+    assert span.data["obs_trace_id"] == _TRACE_HEX
+    assert span.data["obs_span_id"] == _SPAN_HEX
+
+
+# --------------------------------------------------------------------------- #
+# The dispatch discriminator itself (trace.py:_in_tracing_dispatch_activity).
+# This is the one line preventing a cross-worker handle leak inside START_SPAN,
+# so it gets exercised directly with a faked activity.info() -- and against the
+# enum's own .value, so it also fails if TracingActivityName ever drifts from
+# the strings hardcoded in trace.py.
+# --------------------------------------------------------------------------- #
+def test_dispatch_discriminator_true_for_start_and_end_span(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: True)
+    for name in (TracingActivityName.START_SPAN, TracingActivityName.END_SPAN):
+        # activity_type round-trips as the plain string value through protobuf.
+        monkeypatch.setattr(temporal_activity, "info", lambda n=name: SimpleNamespace(activity_type=n.value))
+        assert trace_mod._in_tracing_dispatch_activity() is True, name
+
+
+def test_dispatch_discriminator_false_for_business_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A real agent-turn activity (e.g. process_mortgage_turn) is NOT a dispatch
+    # activity -> it must take the per-step wrapper branch, not Option-A tagging.
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: True)
+    monkeypatch.setattr(temporal_activity, "info", lambda: SimpleNamespace(activity_type="process_mortgage_turn"))
+    assert trace_mod._in_tracing_dispatch_activity() is False
+
+
+def test_dispatch_discriminator_false_when_not_in_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Guard short-circuits on in_activity()==False; info() (here a dispatch value)
+    # must never be consulted, else the sync path would be misclassified.
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: False)
+    monkeypatch.setattr(temporal_activity, "info", lambda: SimpleNamespace(activity_type="start-span"))
+    assert trace_mod._in_tracing_dispatch_activity() is False
+
+
+def test_in_temporal_activity_tracks_in_activity(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: True)
+    assert trace_mod._in_temporal_activity() is True
+    monkeypatch.setattr(temporal_activity, "in_activity", lambda: False)
+    assert trace_mod._in_temporal_activity() is False
+
+
+# --------------------------------------------------------------------------- #
+# Backend-drift warning: the mode stays authoritative, and a mode-vs-live
+# mismatch is surfaced once (not silently absorbed by the fallback).
+# --------------------------------------------------------------------------- #
+def test_warn_on_backend_drift_logs_once_on_mismatch(monkeypatch: pytest.MonkeyPatch, caplog) -> None:
+    """dd_only configured but the live span is OTel (config doesn't match the
+    running tracer) -> warn, and only once even across repeated spans."""
+    import logging
+
+    monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
+    obs_ids_mod._WARNED_DRIFT.clear()
+    _activate_otel_span(monkeypatch)  # OTel span live
+    monkeypatch.setattr(obs_ids_mod, "_ddtrace_ids", lambda: None)  # ddtrace absent
+
+    with caplog.at_level(logging.WARNING, logger="agentex.lib.core.tracing.obs_ids"):
+        obs_ids_mod.warn_on_backend_drift(expect_otel=False)
+        obs_ids_mod.warn_on_backend_drift(expect_otel=False)  # deduped
+
+    drift = [r for r in caplog.records if "backend drift" in r.getMessage()]
+    assert len(drift) == 1
+
+
+def test_warn_on_backend_drift_silent_when_expected_backend_is_live(
+    monkeypatch: pytest.MonkeyPatch, caplog
+) -> None:
+    """Temporal path expects OTel and OTel IS the live span -> the by-design case,
+    no warning."""
+    import logging
+
+    monkeypatch.setenv("SGP_OBS_MODE", "dd_only")
+    obs_ids_mod._WARNED_DRIFT.clear()
+    _activate_otel_span(monkeypatch)  # OTel live == what expect_otel expects
+
+    with caplog.at_level(logging.WARNING, logger="agentex.lib.core.tracing.obs_ids"):
+        obs_ids_mod.warn_on_backend_drift(expect_otel=True)
+
+    assert [r for r in caplog.records if "backend drift" in r.getMessage()] == []

@@ -12,6 +12,19 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.24.0 (2026-08-11)
+
+Full Changelog: [agentex-client-v0.23.0...agentex-client-v0.24.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.23.0...agentex-client-v0.24.0)
+
+### Features
+
+* **tracing:** per-step obs wrappers inside business Temporal activities ([#491](https://github.com/scaleapi/scale-agentex-python/issues/491)) ([5c7ee10](https://github.com/scaleapi/scale-agentex-python/commit/5c7ee100cbfc87b4a253b577faca1dbd7af8e686))
+
+
+### Bug Fixes
+
+* **tracing:** continue inbound W3C trace context at the ACP boundary ([#490](https://github.com/scaleapi/scale-agentex-python/issues/490)) ([152c163](https://github.com/scaleapi/scale-agentex-python/commit/152c163aa3a01d9c33031d2cb1134b9787bcde89))
+
 ## 0.23.0 (2026-08-07)
 
 Full Changelog: [agentex-client-v0.22.2...agentex-client-v0.23.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.22.2...agentex-client-v0.23.0)
