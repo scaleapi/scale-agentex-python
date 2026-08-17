@@ -27,7 +27,19 @@ from opentelemetry.trace import (
 import agentex.lib.core.tracing.trace as trace_mod
 from agentex.types.span import Span
 from agentex.lib.core.tracing.trace import _OBS_HANDLES, _OBS_HANDLES_MAX, Trace
-from agentex.lib.core.tracing.obs_span import ObsSpanHandle
+
+
+class _FakeHandle:
+    """Minimal stand-in for a sgp_obs ``ObsSpanHandle`` — the registry only ever
+    calls ``close()`` on eviction, so that's all we implement."""
+
+    def __init__(self, on_close: Any = None) -> None:
+        self.correlation: dict[str, str] = {}
+        self._on_close = on_close
+
+    def close(self, error: Any = None) -> None:
+        if self._on_close is not None:
+            self._on_close(error)
 
 
 @pytest.fixture(autouse=True)
@@ -96,8 +108,8 @@ def test_start_span_survives_raising_processor_and_no_leak(monkeypatch: pytest.M
 def test_registry_is_bounded_and_evicts_and_closes_oldest() -> None:
     closed: list[str] = []
 
-    def _make_handle(marker: str) -> ObsSpanHandle:
-        return ObsSpanHandle(correlation={}, close=lambda _err=None, _m=marker: closed.append(_m))
+    def _make_handle(marker: str) -> _FakeHandle:
+        return _FakeHandle(on_close=lambda _err=None, _m=marker: closed.append(_m))
 
     # Fill exactly to the cap: nothing evicted yet.
     for i in range(_OBS_HANDLES_MAX):
@@ -114,8 +126,8 @@ def test_registry_is_bounded_and_evicts_and_closes_oldest() -> None:
 
 
 def test_reinserting_same_span_id_refreshes_recency() -> None:
-    def _noop_handle() -> ObsSpanHandle:
-        return ObsSpanHandle(correlation={}, close=lambda _err=None: None)
+    def _noop_handle() -> _FakeHandle:
+        return _FakeHandle()
 
     trace_mod._register_obs_handle("a", _noop_handle())
     trace_mod._register_obs_handle("b", _noop_handle())

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import uuid
 from typing import Any, AsyncGenerator
 from datetime import UTC, datetime
@@ -12,11 +13,18 @@ from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
-from agentex.lib.core.tracing.obs_span import (
-    ObsSpanHandle,
-    begin_obs,
-    close_obs_span,
+from sgp_obs.traces import (
+    ObsMode,
+    SpanError,
+    Correlator,
+    BusinessRef,
+    SpanRequest,
+    BusinessSource,
+    temporal as _sgp_temporal,
 )
+from sgp_obs.traces.ports import ObsSpanHandle
+from sgp_obs.traces.backends.otel import OTelBackend
+from sgp_obs.traces.backends.ddtrace import DDTraceBackend
 from agentex.lib.core.tracing.span_error import get_span_error, set_span_error
 from agentex.lib.core.tracing.span_queue import (
     SpanEventType,
@@ -30,12 +38,34 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
 
 logger = make_logger(__name__)
 
+# Stateless sgp_obs backend singletons + the SGP_OBS_MODE -> sgp_obs.ObsMode map.
+# The SDK spells the OTel mode "lgtm"; sgp_obs spells it ObsMode.OTEL.
+_OTEL = OTelBackend()
+_DDTRACE = DDTraceBackend()
+
+
+def _obs_mode() -> ObsMode:
+    """``SGP_OBS_MODE`` mapped to ``sgp_obs.ObsMode`` (``lgtm`` -> OTEL, else DD_ONLY)."""
+    return ObsMode.OTEL if (os.getenv("SGP_OBS_MODE") or "").strip().lower() == "lgtm" else ObsMode.DD_ONLY
+
+
+def _close_obs(handle: ObsSpanHandle | None, error: dict[str, str] | None = None) -> None:
+    """Close a wrapper span (best-effort), marking it errored when the business span
+    carried an error. Safe on ``None``; obs must never fail the app path."""
+    if handle is None:
+        return
+    try:
+        handle.close(SpanError(type=error.get("type"), message=error.get("message")) if error else None)
+    except Exception:  # pragma: no cover - best-effort
+        pass
+
+
 # Live per-business-span obs wrapper spans, keyed by the (uuid4) business span id,
 # in a MODULE-LEVEL registry -- deliberately NOT on the Trace/AsyncTrace instance.
 # TracingService creates a FRESH trace object for every call
 # (`self._tracer.trace(trace_id)` in both start_span and end_span), so an
 # instance-local dict loses the handle between start and end: end_span's new
-# instance can't find it, close_obs_span(None) is a no-op, and the OTel wrapper
+# instance can't find it, _close_obs(None) is a no-op, and the OTel wrapper
 # span is never .end()ed -> never exported (Simple/Batch processors only emit on
 # end). A module-level dict keyed by the unique span id survives across instances;
 # uuid4 span ids cannot collide across concurrent traces.
@@ -54,7 +84,7 @@ _OBS_HANDLES: OrderedDict[str, ObsSpanHandle] = OrderedDict()
 def _register_obs_handle(span_id: str, handle: ObsSpanHandle) -> None:
     """Register an open obs wrapper handle, bounding the registry at
     ``_OBS_HANDLES_MAX``. When over the cap, evict and close the oldest handle
-    first. close_obs_span is best-effort (detach may warn since it runs on a
+    first. _close_obs is best-effort (detach may warn since it runs on a
     different stack than the attach) and always .end()s the span, so an evicted
     span still exports rather than dangling."""
     _OBS_HANDLES[span_id] = handle
@@ -67,7 +97,7 @@ def _register_obs_handle(span_id: str, handle: ObsSpanHandle) -> None:
             _OBS_HANDLES_MAX,
             _evicted_id,
         )
-        close_obs_span(evicted)
+        _close_obs(evicted)
 
 
 def _run_on_span_start(processor: SyncTracingProcessor, span: Span) -> None:
@@ -104,29 +134,6 @@ def _run_on_span_end(processor: SyncTracingProcessor, span: Span) -> None:
         )
 
 
-def _in_tracing_dispatch_activity() -> bool:
-    """True only when running inside the SDK's OWN dispatched START_SPAN / END_SPAN
-    activity (the ``in_temporal_workflow()`` path, where a workflow runs span start
-    and end as SEPARATE activities that Temporal can route to different workers).
-
-    That is the one case a per-step obs wrapper can't work: the wrapper opened in
-    the START_SPAN activity could never be closed by the END_SPAN activity. A span
-    created directly inside a *business* activity (an agent turn's own
-    ``adk.tracing.span``) runs start AND end in the same activity process, so a
-    wrapper there is safe -- it nests under the interceptor's ambient RunActivity
-    span and closes in-process. The tracing dispatch activities are named
-    ``start-span`` / ``end-span`` (``TracingActivityName``). Never raises; False
-    when temporalio isn't importable or we're not in an activity."""
-    try:
-        from temporalio import activity
-
-        if not activity.in_activity():
-            return False
-        return activity.info().activity_type in ("start-span", "end-span")
-    except Exception:
-        return False
-
-
 def _begin_obs(
     name: str,
     span_id: str,
@@ -139,23 +146,23 @@ def _begin_obs(
     stable/meaningful (not an arbitrary innermost httpx span), and it carries the
     reverse tag (business span/trace id) for the obs -> business pivot.
 
-    We open a real per-step wrapper on the sync path AND inside a *business*
-    Temporal activity -- there the wrapper nests under the interceptor's ambient
-    RunActivity span and start/end run in-process, so it closes cleanly and each
-    business step gets its own obs span (1:1), just like sync.
-
-    The ONE exception is the SDK's own dispatched START_SPAN / END_SPAN activity
-    (a workflow calling ``adk.tracing`` -- see ``_in_tracing_dispatch_activity``):
-    there start and end are separate activities on possibly different workers, so
-    a wrapper could never be closed. We fall back to tagging the ambient
-    interceptor span instead, with ``prefer_otel=True`` (the interceptor span is
-    OTel regardless of ``SGP_OBS_MODE``, so a plain ``dd_only`` read would
-    otherwise point at an unrelated ddtrace span).
+    The whole wrapper-vs-ambient decision + backend selection is the sgp_obs
+    ``Correlator``'s job: on the SDK's own dispatched start-span/end-span activity
+    (``is_dispatch_boundary``) it tags the ambient interceptor span instead of
+    opening a wrapper that could never be closed; elsewhere it opens a per-step
+    wrapper. Fail-open — obs must never break the business span.
     """
-    # The wrapper-vs-ambient decision + backend selection are delegated to the
-    # sgp_obs Correlator (see obs_span.begin_obs); this is the single seam both the
-    # sync and async start_span paths share.
-    return begin_obs(name, span_id, trace_id)
+    req = SpanRequest(
+        name=name,
+        business=BusinessRef(trace_id=trace_id, span_id=span_id or "", source=BusinessSource.AGENTEX),
+        in_activity=_sgp_temporal.in_activity(),
+        is_dispatch_boundary=_sgp_temporal.in_dispatch_boundary(),
+    )
+    try:
+        handle, edge = Correlator(_OTEL, _DDTRACE, _obs_mode()).begin(req)
+    except Exception:  # pragma: no cover - obs must never break the business span
+        return None, {}
+    return handle, edge.as_metadata()
 
 
 class Trace:
@@ -258,7 +265,7 @@ class Trace:
 
         # Close the dedicated obs wrapper span; propagate the business-span error
         # (if any) so the obs span reflects failure, not a false green.
-        close_obs_span(_OBS_HANDLES.pop(span.id, None), error=get_span_error(span))
+        _close_obs(_OBS_HANDLES.pop(span.id, None), get_span_error(span))
 
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
@@ -432,7 +439,7 @@ class AsyncTrace:
 
         # Close the dedicated obs wrapper span; propagate the business-span error
         # (if any) so the obs span reflects failure, not a false green.
-        close_obs_span(_OBS_HANDLES.pop(span.id, None), error=get_span_error(span))
+        _close_obs(_OBS_HANDLES.pop(span.id, None), get_span_error(span))
 
         span.input = recursive_model_dump(span.input) if span.input else None
         span.output = recursive_model_dump(span.output) if span.output else None
