@@ -62,7 +62,7 @@ dependencies = [
     # SGP unified observability library: the obs edge (correlation, wrapper span,
     # Temporal/ingress propagation) is delegated to this shared lib. rc pin while
     # it stabilizes; flip to ==0.3.0 once that release publishes.
-    "sgp-obs==0.3.0",
+    "sgp-obs[http]==0.3.0",
     "json_log_formatter>=1.1.1",
 ]
 
