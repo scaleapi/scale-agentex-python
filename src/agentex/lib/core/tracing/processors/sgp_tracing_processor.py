@@ -9,6 +9,7 @@ import scale_gp_beta.lib.tracing as tracing
 from scale_gp_beta import SGPClient, AsyncSGPClient
 from scale_gp_beta.lib.tracing import create_span, flush_queue
 from scale_gp_beta.lib.tracing.span import Span as SGPSpan
+from sgp_obs.traces import suppress_instrumentation
 
 from agentex.types.span import Span
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
@@ -204,7 +205,8 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             return
 
         sgp_spans = [_build_sgp_span(span, self.env_vars) for span in spans]
-        await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
+        with suppress_instrumentation():
+            await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
         _metrics.record_export_success(
             event_type="start", span_count=len(spans), processor="sgp"
         )
@@ -223,7 +225,8 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             sgp_span = _build_sgp_span(span, self.env_vars)
             sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
             sgp_spans.append(sgp_span)
-        await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
+        with suppress_instrumentation():
+            await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
         _metrics.record_export_success(
             event_type="end", span_count=len(spans), processor="sgp"
         )

@@ -3,6 +3,8 @@ import asyncio
 import weakref
 from typing import TYPE_CHECKING, Any, Dict, override
 
+from sgp_obs.traces import suppress_instrumentation
+
 from agentex import Agentex
 from agentex.types.span import Span
 from agentex.lib.types.tracing import AgentexTracingProcessorConfig
@@ -188,14 +190,16 @@ class AgentexAsyncTracingProcessor(AsyncTracingProcessor):
         # _skip_span_start_enabled) so each span is persisted once, on end.
         if self._skip_span_start:
             return
-        await self.client.spans.create(**_create_kwargs(span))
+        with suppress_instrumentation():
+            await self.client.spans.create(**_create_kwargs(span))
 
     @override
     async def on_span_end(self, span: Span) -> None:
         # End-only ingest: the start create was skipped, so persist the complete
         # span as a single INSERT here (a bare spans.update would 404 — no row).
         if self._skip_span_start:
-            await self.client.spans.create(**_create_kwargs(span))
+            with suppress_instrumentation():
+                await self.client.spans.create(**_create_kwargs(span))
             return
 
         update: Dict[str, Any] = {}
