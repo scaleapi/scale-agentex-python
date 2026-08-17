@@ -15,7 +15,7 @@ members = [
 
 [[package]]
 name = "agentex-client"
-version = "0.21.0"
+version = "0.22.2"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
@@ -91,7 +91,7 @@ dev = [
 
 [[package]]
 name = "agentex-sdk"
-version = "0.21.0"
+version = "0.22.2"
 source = { editable = "adk" }
 dependencies = [
     { name = "agentex-client" },
@@ -120,6 +120,7 @@ dependencies = [
     { name = "rich" },
     { name = "scale-gp" },
     { name = "scale-gp-beta" },
+    { name = "sgp-obs" },
     { name = "starlette" },
     { name = "temporalio" },
     { name = "typer" },
@@ -156,6 +157,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13.9.2,<14" },
     { name = "scale-gp", specifier = ">=0.1.0a59" },
     { name = "scale-gp-beta", specifier = ">=0.2.0" },
+    { name = "sgp-obs", specifier = "==0.2.0rc1", index = "https://scale-307185671274.d.codeartifact.us-west-2.amazonaws.com/pypi/scale-pypi/simple/" },
     { name = "starlette", specifier = ">=0.49.1" },
     { name = "temporalio", specifier = ">=1.26.0,<2" },
     { name = "typer", specifier = ">=0.16,<0.17" },
@@ -2804,6 +2806,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3e/13/181f6b5a0e3fe5c2ca8b7b39e024ed11feba2cf0c879a6d77d84c8060383/scale_gp_beta-0.2.0.tar.gz", hash = "sha256:d4eac4a178ea4b7f21cfe2b421107009b69c4a5c1cbd2c7c864142c30ffda01c", size = 434620, upload-time = "2026-05-04T16:35:53.879Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/e0/84d284fd5268c4dcaa54dd7209d43dbe41d2120834ee7a8b245184fe13d5/scale_gp_beta-0.2.0-py3-none-any.whl", hash = "sha256:87946b4618c464711bb7c8b132540112a1a558a57b31999f93cccb5da8339643", size = 410408, upload-time = "2026-05-04T16:35:52.286Z" },
+]
+
+[[package]]
+name = "sgp-obs"
+version = "0.2.0rc1"
+source = { registry = "https://scale-307185671274.d.codeartifact.us-west-2.amazonaws.com/pypi/scale-pypi/simple/" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
+]
+sdist = { url = "https://scale-307185671274.d.codeartifact.us-west-2.amazonaws.com/pypi/scale-pypi/simple/sgp-obs/0.2.0rc1/sgp_obs-0.2.0rc1.tar.gz", hash = "sha512:3f63fe0f1ea4ff4a7e763c33337856f60bda512f908662922ef7d319718c02b74b1a3ca650ae3a6b705783a2ce381d37e3ebcaffbca3af0e6cc719383addee8a", size = 27057, upload-time = "2026-08-16T04:32:33.653Z" }
+wheels = [
+    { url = "https://scale-307185671274.d.codeartifact.us-west-2.amazonaws.com/pypi/scale-pypi/simple/sgp-obs/0.2.0rc1/sgp_obs-0.2.0rc1-py3-none-any.whl", hash = "sha512:c503912f5b72ae0ea6828f15185d8c3d01c9463fed191139db6e3b929860ca54bae68e1519854f43ec8f92c8327b7714a16bf7484f01cea2f5ae158320d9d94f", size = 39094, upload-time = "2026-08-16T04:32:33.26Z" },
 ]
 
 [[package]]

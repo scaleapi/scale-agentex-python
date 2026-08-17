@@ -12,12 +12,10 @@ from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
-from agentex.lib.core.tracing.obs_ids import obs_correlation
 from agentex.lib.core.tracing.obs_span import (
     ObsSpanHandle,
-    open_obs_span,
+    begin_obs,
     close_obs_span,
-    tag_ambient_obs_span,
 )
 from agentex.lib.core.tracing.span_error import get_span_error, set_span_error
 from agentex.lib.core.tracing.span_queue import (
@@ -154,12 +152,10 @@ def _begin_obs(
     OTel regardless of ``SGP_OBS_MODE``, so a plain ``dd_only`` read would
     otherwise point at an unrelated ddtrace span).
     """
-    if _in_tracing_dispatch_activity():
-        tag_ambient_obs_span(business_span_id=span_id, business_trace_id=trace_id, prefer_otel=True)
-        return None, obs_correlation(prefer_otel=True)
-    handle = open_obs_span(name, business_span_id=span_id, business_trace_id=trace_id)
-    correlation = handle.correlation if handle is not None else obs_correlation()
-    return handle, correlation
+    # The wrapper-vs-ambient decision + backend selection are delegated to the
+    # sgp_obs Correlator (see obs_span.begin_obs); this is the single seam both the
+    # sync and async start_span paths share.
+    return begin_obs(name, span_id, trace_id)
 
 
 class Trace:

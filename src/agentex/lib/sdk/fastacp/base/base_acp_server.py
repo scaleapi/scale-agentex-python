@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request
 from pydantic import TypeAdapter, ValidationError
 from starlette.types import Send, Scope, ASGIApp, Receive
 from fastapi.responses import StreamingResponse
+from sgp_obs.traces.ingress import TraceContextASGIMiddleware
 
 from agentex.protocol.acp import (
     RPC_SYNC_METHODS,
@@ -82,6 +83,12 @@ class BaseACPServer(FastAPI):
         # Method handlers
         # this just adds a request ID to the request and response headers
         self.add_middleware(RequestIDMiddleware)
+        # Continue an inbound W3C traceparent as the active OTel context for the
+        # whole request (and its background Temporal dispatch), so a turn's obs
+        # trace stays connected instead of detaching into a fresh root. Added last
+        # = outermost, so it wraps RequestIDMiddleware + the handler. Delegated to
+        # sgp_obs; fail-open.
+        self.add_middleware(TraceContextASGIMiddleware)
         self._handlers: dict[RPCMethod, Callable] = {}
 
         # Agent info to return in healthz
@@ -105,6 +112,22 @@ class BaseACPServer(FastAPI):
     def get_lifespan_function(self):
         @asynccontextmanager
         async def lifespan_context(app: FastAPI):  # noqa: ARG001
+            # Install the obs tracing provider (delegated to sgp_obs) so the per-step
+            # wrapper spans actually record AND export to the OTLP collector. Without
+            # this, get_tracer() resolves to the API-default ProxyTracerProvider — the
+            # forward edge (obs ids in span metadata) still fills from ambient/propagated
+            # context, but no obs span carrying the `<source>.business_trace_id` reverse
+            # anchor is ever exported, so the business->obs pivot has nothing to land on.
+            # Fail-open: init_tracing never raises, but guard the import defensively too.
+            try:
+                import os
+
+                from sgp_obs.traces import init_tracing, TracingConfig
+
+                init_tracing(TracingConfig.from_env(service=os.getenv("OTEL_SERVICE_NAME") or "agentex-agent"))
+            except Exception:
+                logger.warning("sgp_obs tracing init skipped; obs spans will not export", exc_info=True)
+
             env_vars = EnvironmentVariables.refresh()
             if env_vars.AGENTEX_BASE_URL:
                 # Runtime SDK<->backend contract guard: fail fast if the backend is older

@@ -54,10 +54,23 @@ dev = [
 # `src/agentex/lib/` ships only from the heavy (via adk/hatch_build.py).
 members = ["adk"]
 
+[[tool.uv.index]]
+# CodeArtifact scale-pypi, for internal resolution of sgp-obs. `explicit` so ONLY
+# packages that name it via [tool.uv.sources] use it — every other dep still
+# resolves from public PyPI. Auth via UV_INDEX_SCALE_USERNAME/PASSWORD (a
+# CodeArtifact token). External consumers resolve sgp-obs from public PyPI once
+# the dual-publish is live; this pin is a dev/CI resolution hint only.
+name = "scale"
+url = "https://scale-307185671274.d.codeartifact.us-west-2.amazonaws.com/pypi/scale-pypi/simple/"
+explicit = true
+
 [tool.uv.sources]
 # Dev-only: resolve the ADK's agentex-client dep to this root package.
 # Stripped from published wheels — the heavy wheel still pins the PyPI version.
 agentex-client = { workspace = true }
+# Pull sgp-obs from the scale CodeArtifact index (a dev/CI hint; the published
+# wheel just pins sgp-obs==0.2.0rc1 and lets the consumer's index resolve it).
+sgp-obs = { index = "scale" }
 
 [tool.uv]
 managed = true
