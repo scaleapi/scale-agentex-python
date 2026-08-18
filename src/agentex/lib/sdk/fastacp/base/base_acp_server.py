@@ -122,9 +122,13 @@ class BaseACPServer(FastAPI):
             try:
                 import os
 
-                from sgp_obs.traces import init_tracing, TracingConfig
+                from sgp_obs.traces import init_tracing, TracingConfig, install_openai_agents_bridge
 
                 init_tracing(TracingConfig.from_env(service=os.getenv("OTEL_SERVICE_NAME") or "agentex-agent"))
+                # Bridge openai-agents' own tracing (Runner generations/tools/handoffs)
+                # into OTel so a Runner turn's internals show up under the business step
+                # instead of a dark gap. No-op when the agents SDK isn't in use.
+                install_openai_agents_bridge()
             except Exception:
                 logger.warning("sgp_obs tracing init skipped; obs spans will not export", exc_info=True)
 
