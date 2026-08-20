@@ -181,7 +181,7 @@ class TestSpanErrorHelpers:
         assert error is not None
         assert error["category"] == "platform"
         assert error["category_source"] == "mapping"
-        assert error["category_reason"].endswith("builtins.TimeoutError")
+        assert error["category_reason"] == "registered_exception_mapping"
 
     def test_mapping_excludes_subclasses_by_default(self):
         class ProviderTimeout(TimeoutError):

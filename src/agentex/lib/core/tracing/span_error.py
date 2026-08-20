@@ -69,9 +69,7 @@ def _default_ignored_file_roots() -> tuple[str, ...]:
     return tuple(sorted(roots))
 
 
-_AGENTEX_PACKAGE_ROOT = _normalize_file_root(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..")
-)
+_AGENTEX_PACKAGE_ROOT = _normalize_file_root(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
 @dataclass(frozen=True)
@@ -366,11 +364,10 @@ def classify_error(
         )
         if matches:
             mapping = matches[0]
-            exception_name = f"{mapping.exception_type.__module__}.{mapping.exception_type.__qualname__}"
             return ErrorClassification(
                 category=cast(ErrorCategory, mapping.category),
                 source="mapping",
-                reason=f"registered_mapping:{exception_name}",
+                reason="registered_exception_mapping",
             )
 
     return ErrorClassification(
