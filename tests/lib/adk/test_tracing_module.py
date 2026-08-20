@@ -10,7 +10,7 @@ import agentex.lib.adk._modules.tracing as _tracing_mod
 from agentex.types.span import Span
 from agentex.lib.core.harness.types import TurnUsage
 from agentex.lib.adk._modules.tracing import TurnSpan, TracingModule
-from agentex.lib.core.tracing.span_error import get_span_error
+from agentex.lib.core.tracing.span_error import ERROR_CLASSIFIER_VERSION, get_span_error
 from agentex.lib.core.services.adk.tracing import TracingService
 
 
@@ -264,7 +264,10 @@ class TestSpanContextManager:
         assert get_span_error(started) == {
             "type": "RuntimeError",
             "message": "boom",
-            "category": "unknown",
+            "category": "application",
+            "category_source": "stack_trace",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "stack_rule:unowned_absolute_source",
         }
         mock_service.end_span.assert_called_once_with(trace_id="trace-123", span=started)
 

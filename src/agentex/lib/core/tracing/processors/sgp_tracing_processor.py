@@ -88,6 +88,10 @@ def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:
     if error is not None:
         sgp_span.set_error(error_type=error["type"], error_message=error["message"])
         sgp_span.metadata["error_category"] = error.get("category", "unknown")
+        sgp_span.metadata["error_category_source"] = error.get("category_source", "legacy")
+        sgp_span.metadata["error_classifier_version"] = error.get("classifier_version", "legacy")
+        if "category_reason" in error:
+            sgp_span.metadata["error_category_reason"] = error["category_reason"]
     return sgp_span
 
 

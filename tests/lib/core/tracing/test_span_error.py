@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from typing import Any
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ from agentex.types.span import Span
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.lib.core.tracing.span_error import (
     SPAN_ERROR_KEY,
+    ERROR_CLASSIFIER_VERSION,
     PlatformError,
     ApplicationError,
     CategorizedError,
@@ -36,6 +38,12 @@ def _make_span(data=None) -> Span:
     )
 
 
+def _synthetic_function(module_name: str, filename: str, body: str, **values: Any) -> Any:
+    namespace = {"__name__": module_name, **values}
+    exec(compile(f"def run():\n    {body}\n", filename, "exec"), namespace)
+    return namespace["run"]
+
+
 # ---------------------------------------------------------------------------
 # Helpers: set_span_error / get_span_error
 # ---------------------------------------------------------------------------
@@ -54,13 +62,12 @@ class TestSpanErrorHelpers:
             "type": "ValueError",
             "message": "boom",
             "category": "unknown",
+            "category_source": "fallback",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "stack_no_traceback",
         }
         assert isinstance(span.data, dict)
-        assert span.data[SPAN_ERROR_KEY] == {
-            "type": "ValueError",
-            "message": "boom",
-            "category": "unknown",
-        }
+        assert span.data[SPAN_ERROR_KEY] == get_span_error(span)
 
     def test_set_uses_explicit_exception_category(self):
         span = _make_span(data=None)
@@ -69,12 +76,18 @@ class TestSpanErrorHelpers:
             "type": "PlatformError",
             "message": "unavailable",
             "category": "platform",
+            "category_source": "categorized_error",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "canonical_categorized_error",
         }
 
     def test_explicit_category_takes_precedence(self):
         span = _make_span(data=None)
         set_span_error(span, PlatformError("bad input"), error_category="application")
-        assert get_span_error(span)["category"] == "application"  # type: ignore[index]
+        error = get_span_error(span)
+        assert error is not None
+        assert error["category"] == "application"
+        assert error["category_source"] == "explicit"
 
     def test_set_uses_application_error_category(self):
         span = _make_span(data=None)
@@ -88,6 +101,54 @@ class TestSpanErrorHelpers:
         span = _make_span(data=None)
         set_span_error(span, ImplicitlyCategorizedError("boom"))
         assert get_span_error(span)["category"] == "unknown"  # type: ignore[index]
+
+    def test_agentex_internal_origin_is_platform(self):
+        platform = _synthetic_function(
+            "agentex.lib.synthetic_runtime",
+            "/synthetic/agentex/runtime.py",
+            "raise RuntimeError('boom')",
+        )
+        span = _make_span()
+        try:
+            platform()
+        except Exception as exc:
+            set_span_error(span, exc)
+
+        error = get_span_error(span)
+        assert error is not None
+        assert error["category"] == "platform"
+        assert error["category_source"] == "stack_trace"
+        assert error["category_reason"] == "stack_rule:platform_module"
+
+    def test_stdlib_dependency_under_application_is_application(self):
+        application = _synthetic_function(
+            "customer_agent.main",
+            "/synthetic/application/main.py",
+            "parse('{')",
+            parse=json.loads,
+        )
+        span = _make_span()
+        try:
+            application()
+        except Exception as exc:
+            set_span_error(span, exc)
+
+        assert get_span_error(span)["category"] == "application"  # type: ignore[index]
+
+    def test_stdlib_dependency_under_agentex_is_platform(self):
+        platform = _synthetic_function(
+            "agentex.lib.synthetic_runtime",
+            "/synthetic/agentex/runtime.py",
+            "parse('{')",
+            parse=json.loads,
+        )
+        span = _make_span()
+        try:
+            platform()
+        except Exception as exc:
+            set_span_error(span, exc)
+
+        assert get_span_error(span)["category"] == "platform"  # type: ignore[index]
 
     def test_set_preserves_existing_dict_keys(self):
         span = _make_span(data={"__span_type__": "LLM"})
@@ -127,7 +188,10 @@ class TestContextManagerCapture:
         assert err == {
             "type": "ValueError",
             "message": "boom",
-            "category": "unknown",
+            "category": "application",
+            "category_source": "stack_trace",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "stack_rule:unowned_absolute_source",
         }
 
     def test_sync_span_success_has_no_error(self):
@@ -148,7 +212,10 @@ class TestContextManagerCapture:
         assert err == {
             "type": "RuntimeError",
             "message": "kaboom",
-            "category": "unknown",
+            "category": "application",
+            "category_source": "stack_trace",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "stack_rule:unowned_absolute_source",
         }
 
 
@@ -193,6 +260,9 @@ class TestBuildSGPSpanMapping:
                     "type": "ValueError",
                     "message": "boom",
                     "category": "application",
+                    "category_source": "stack_trace",
+                    "classifier_version": ERROR_CLASSIFIER_VERSION,
+                    "category_reason": "stack_rule:application_module",
                 }
             }
         )
@@ -204,6 +274,9 @@ class TestBuildSGPSpanMapping:
         assert sgp_span.metadata["error_type"] == "ValueError"
         assert sgp_span.metadata["error_message"] == "boom"
         assert sgp_span.metadata["error_category"] == "application"
+        assert sgp_span.metadata["error_category_source"] == "stack_trace"
+        assert sgp_span.metadata["error_classifier_version"] == ERROR_CLASSIFIER_VERSION
+        assert sgp_span.metadata["error_category_reason"] == "stack_rule:application_module"
 
     def test_no_error_leaves_status_success(self):
         from agentex.lib.core.tracing.processors.sgp_tracing_processor import _build_sgp_span
