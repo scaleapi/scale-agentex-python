@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any, cast
 
 from scale_gp_beta.lib.tracing import (
@@ -27,11 +26,28 @@ from agentex.types.span import Span
 # SGP and agentex-native span stores.
 SPAN_ERROR_KEY = "__error__"
 
-_AGENTEX_PACKAGE_ROOT = os.path.normcase(os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..")))
+AGENTEX_PLATFORM_MODULE_PREFIXES = (
+    # Trace export is Agentex-owned telemetry delivery, not agent execution.
+    "agentex.lib.core.tracing.processors",
+    "agentex.lib.core.tracing.span_queue",
+    # This repository is the managed Redis stream transport/persistence layer.
+    "agentex.lib.core.adapters.streams.adapter_redis",
+)
+AGENTEX_IGNORED_MODULE_PREFIXES = (
+    # Generic Agentex orchestration/wrappers provide context, not ownership.
+    "agentex",
+    # Database/client packages never decide ownership by exception identity.
+    "sqlalchemy",
+    "pyodbc",
+    "psycopg",
+    "psycopg2",
+    "asyncpg",
+    "redis",
+)
 AGENTEX_ERROR_CLASSIFIER_CONFIG = ErrorClassifierConfig(
     policy=TracebackOwnershipPolicy(
-        platform_module_prefixes=("agentex",),
-        platform_file_roots=(_AGENTEX_PACKAGE_ROOT,),
+        platform_module_prefixes=AGENTEX_PLATFORM_MODULE_PREFIXES,
+        ignored_module_prefixes=AGENTEX_IGNORED_MODULE_PREFIXES,
         infer_application_from_unowned_absolute_paths=True,
     )
 )
