@@ -292,9 +292,9 @@ def merge_deployment_configs(
                 "memory": manifest.deployment.global_config.resources.limits.memory,
             },
         },
-        # Enable autoscaling by default for production deployments
+        # Opt-in only: a crash loop's restart CPU burn reads as load and scales it to max.
         "autoscaling": {
-            "enabled": True,
+            "enabled": False,
             "minReplicas": 1,
             "maxReplicas": 10,
             "targetCPUUtilizationPercentage": 50,
@@ -307,9 +307,8 @@ def merge_deployment_configs(
         if temporal_config:
             helm_values[TEMPORAL_WORKER_KEY] = {
                 "enabled": True,
-                # Enable autoscaling for temporal workers as well
                 "autoscaling": {
-                    "enabled": True,
+                    "enabled": False,
                     "minReplicas": 1,
                     "maxReplicas": 10,
                     "targetCPUUtilizationPercentage": 50,

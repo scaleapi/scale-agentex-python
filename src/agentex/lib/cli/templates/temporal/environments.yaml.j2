@@ -52,6 +52,9 @@ environments:
         limits:
           cpu: "1000m"
           memory: "2Gi"
+      # Autoscaling is opt-in. Unset keys inherit maxReplicas 10 and a 50% CPU target.
+      # autoscaling:
+      #   enabled: true
       temporal-worker:
         enabled: true
         replicaCount: 2
@@ -62,3 +65,6 @@ environments:
           limits:
             cpu: "1000m"
             memory: "2Gi"
+        # Autoscaling here is separate from the block above, so opt in twice.
+        # autoscaling:
+        #   enabled: true
