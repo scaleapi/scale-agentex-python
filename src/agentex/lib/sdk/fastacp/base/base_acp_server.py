@@ -360,9 +360,33 @@ class BaseACPServer(FastAPI):
     - on_message_send
     """
 
+    @staticmethod
+    def _with_business_trace(fn: Callable[..., Any], id_getter: Callable[[Any], Any]) -> Callable[..., Any]:
+        """Auto-apply sgp-obs ``@business_trace`` so every agent handler gets the
+        business<->obs correlation edge with NO per-agent code: it opens the turn
+        anchor and binds the process-local correlation context that the
+        openai-agents bridge and auto-egress read for their reverse tag. The
+        decorator preserves the handler's shape (sync / async / async-generator),
+        so streaming ``message/send`` handlers keep streaming.
+
+        Fail-open + version-tolerant: a no-op (returns ``fn`` unchanged) when the
+        installed sgp-obs predates ``business_trace`` — the same defensive stance
+        as the ``init_tracing`` wiring above, so bumping sgp-obs turns it on with
+        no code change here.
+        """
+        try:
+            from sgp_obs.traces import business_trace
+        except Exception:
+            return fn
+        try:
+            return business_trace(business_trace_id=id_getter)(fn)
+        except Exception:  # pragma: no cover - correlation must never break registration
+            return fn
+
     # Type: Async
     def on_task_create(self, fn: Callable[[CreateTaskParams], Awaitable[Any]]):
         """Handle task/init method"""
+        fn = self._with_business_trace(fn, lambda p: p.task.id)
         wrapped = self._wrap_handler(fn)
         self._handlers[RPCMethod.TASK_CREATE] = wrapped
         return fn
@@ -417,6 +441,9 @@ class BaseACPServer(FastAPI):
         For non-streaming: return a single TaskMessage
         For streaming: return an AsyncGenerator that yields TaskMessageUpdate objects
         """
+        # One annotation, applied for the agent: correlate this turn end-to-end.
+        # Preserves the handler's async-generator shape so streaming still streams.
+        fn = self._with_business_trace(fn, lambda p: p.task.id)
 
         async def message_send_wrapper(params: SendMessageParams):
             """Special wrapper for message_send that handles both regular async functions and async generators"""
