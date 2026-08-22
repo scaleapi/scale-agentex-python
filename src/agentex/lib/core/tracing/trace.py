@@ -49,6 +49,26 @@ def _obs_mode() -> ObsMode:
     return ObsMode.OTEL if (os.getenv("SGP_OBS_MODE") or "").strip().lower() == "lgtm" else ObsMode.DD_ONLY
 
 
+def _correlate_business() -> bool:
+    """``SGP_OBS_CORRELATE_BUSINESS`` — default True. Read from the env directly
+    (mirroring ``_obs_mode``) rather than sgp_obs.TracingConfig, so we don't depend
+    on a specific config-field surface. When false, the Correlator opens the obs
+    span but writes NO business<->obs correlation in either direction."""
+    return (os.getenv("SGP_OBS_CORRELATE_BUSINESS") or "true").strip().lower() not in ("false", "0", "no")
+
+
+def _build_correlator() -> Correlator:
+    """Construct the Correlator, honoring SGP_OBS_CORRELATE_BUSINESS when the
+    installed sgp_obs supports it. Version-resilient: an sgp_obs that predates the
+    ``correlate_business`` parameter raises TypeError on the kwarg — fall back to
+    the no-arg form so correlation keeps working (always-on) instead of dying. The
+    flag takes effect once sgp_obs is bumped to the release that wired it."""
+    try:
+        return Correlator(_OTEL, _DDTRACE, _obs_mode(), correlate_business=_correlate_business())
+    except TypeError:  # sgp_obs predates the flag; correlation stays always-on
+        return Correlator(_OTEL, _DDTRACE, _obs_mode())
+
+
 def _close_obs(handle: ObsSpanHandle | None, error: dict[str, str] | None = None) -> None:
     """Close a wrapper span (best-effort), marking it errored when the business span
     carried an error. Safe on ``None``; obs must never fail the app path."""
@@ -159,7 +179,7 @@ def _begin_obs(
         is_dispatch_boundary=_sgp_temporal.in_dispatch_boundary(),
     )
     try:
-        handle, edge = Correlator(_OTEL, _DDTRACE, _obs_mode()).begin(req)
+        handle, edge = _build_correlator().begin(req)
     except Exception:  # pragma: no cover - obs must never break the business span
         return None, {}
     return handle, edge.as_metadata()
