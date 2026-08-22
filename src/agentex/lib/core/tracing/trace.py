@@ -50,11 +50,14 @@ def _obs_mode() -> ObsMode:
 
 
 def _correlate_business() -> bool:
-    """``SGP_OBS_CORRELATE_BUSINESS`` — default True. Read from the env directly
+    """``SGP_OBS_CORRELATE_BUSINESS`` — OPT-OUT: defaults True, disables ONLY on an
+    explicit {0, false, no, off}. Unset, empty, or an unrecognized value (a typo)
+    stays ON, so correlation is never silently dropped. Read from the env directly
     (mirroring ``_obs_mode``) rather than sgp_obs.TracingConfig, so we don't depend
-    on a specific config-field surface. When false, the Correlator opens the obs
-    span but writes NO business<->obs correlation in either direction."""
-    return (os.getenv("SGP_OBS_CORRELATE_BUSINESS") or "true").strip().lower() not in ("false", "0", "no")
+    on a specific config-field surface; the off-token set matches sgp_obs ``env_off``.
+    When false, the Correlator opens the obs span but writes NO business<->obs
+    correlation in either direction."""
+    return (os.getenv("SGP_OBS_CORRELATE_BUSINESS") or "").strip().lower() not in ("0", "false", "no", "off")
 
 
 def _build_correlator() -> Correlator:

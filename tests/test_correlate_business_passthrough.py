@@ -13,13 +13,15 @@ from sgp_obs.traces.correlator import Correlator
 
 def test_correlate_business_env_parsing(monkeypatch):
     monkeypatch.delenv("SGP_OBS_CORRELATE_BUSINESS", raising=False)
-    assert _correlate_business() is True  # default on
-    for falsey in ("false", "0", "no", "FALSE", " no "):
+    assert _correlate_business() is True  # unset -> on
+    # explicit recognized off-tokens -> off (matches sgp_obs env_off)
+    for falsey in ("false", "0", "no", "off", "FALSE", "Off", " no "):
         monkeypatch.setenv("SGP_OBS_CORRELATE_BUSINESS", falsey)
-        assert _correlate_business() is False
-    for truthy in ("true", "1", "yes", "", "anything"):
+        assert _correlate_business() is False, falsey
+    # on-tokens AND empty / unrecognized (a typo) -> stays ON, never silently off
+    for truthy in ("true", "1", "yes", "on", "", "   ", "ture", "garbage"):
         monkeypatch.setenv("SGP_OBS_CORRELATE_BUSINESS", truthy)
-        assert _correlate_business() is True
+        assert _correlate_business() is True, repr(truthy)
 
 
 def test_build_correlator_never_crashes():
