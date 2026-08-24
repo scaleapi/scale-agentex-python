@@ -7,6 +7,17 @@ from typing import Any
 from agentex.lib.core.harness.types import OpenSpan, CloseSpan, SpanSignal
 
 try:
+    from agentex.lib.core.tracing.lineage import resolve_refs, merge_refs_into_data
+except Exception:  # keep the harness importable without optional tracing deps
+
+    def resolve_refs(tool_name: str, arguments: dict[str, Any] | None) -> list[dict[str, Any]]:  # noqa: ARG001
+        return []
+
+    def merge_refs_into_data(data: dict[str, Any] | None, refs: list[dict[str, Any]]) -> dict[str, Any]:  # noqa: ARG001
+        return dict(data or {})
+
+
+try:
     from agentex.lib.utils.logging import make_logger
 
     logger = make_logger(__name__)
@@ -80,6 +91,11 @@ class SpanTracer:
                     task_id=self.task_id,
                 )
                 if span is not None:
+                    if signal.kind == "tool":
+                        refs = resolve_refs(signal.name, signal.input if isinstance(signal.input, dict) else {})
+                        if refs:
+                            data = span.data if isinstance(span.data, dict) else {}
+                            span.data = merge_refs_into_data(data, refs)
                     self._open[signal.key] = span
             elif isinstance(signal, CloseSpan):
                 span = self._open.pop(signal.key, None)

@@ -64,6 +64,7 @@ from openai.types.responses.response_prompt_param import ResponsePromptParam
 from agentex.lib import adk
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.core.tracing.lineage import merge_refs_into_data, resolve_refs_from_items
 from agentex.types.task_message_delta import TextDelta, ToolRequestDelta, ReasoningContentDelta, ReasoningSummaryDelta
 from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
 from agentex.types.task_message_content import TextContent, ReasoningContent, ToolRequestContent, ToolResponseContent
@@ -1257,6 +1258,9 @@ class TemporalStreamingModel(Model):
                         output_data["tool_outputs"] = tool_outputs
 
                     span.output = output_data
+                    lineage_refs = resolve_refs_from_items(new_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
 
                 # Streaming-only metrics. Token counters and the success request
                 # counter are emitted by LLMMetricsHooks.on_llm_end so they fire
