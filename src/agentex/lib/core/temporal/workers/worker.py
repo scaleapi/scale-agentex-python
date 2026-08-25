@@ -95,10 +95,10 @@ def _validate_interceptors(interceptors: list) -> None:
 async def get_temporal_client(
     temporal_address: str,
     metrics_url: str | None = None,
-    metrics_headers: dict[str, str] | None = None,
     plugins: list = [],
     payload_codec: PayloadCodec | None = None,
     data_converter: DataConverter | None = None,
+    metrics_headers: dict[str, str] | None = None,
 ) -> Client:
     if plugins != []:  # We don't need to validate the plugins if they are empty
         _validate_plugins(plugins)
@@ -163,9 +163,9 @@ class AgentexWorker:
         plugins: list = [],
         interceptors: list = [],
         metrics_url: str | None = None,
-        metrics_headers: dict[str, str] | None = None,
         payload_codec: PayloadCodec | None = None,
         data_converter: DataConverter | None = None,
+        metrics_headers: dict[str, str] | None = None,
     ):
         self.task_queue = task_queue
         self.activity_handles = []
