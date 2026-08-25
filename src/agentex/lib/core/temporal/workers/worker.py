@@ -95,6 +95,7 @@ def _validate_interceptors(interceptors: list) -> None:
 async def get_temporal_client(
     temporal_address: str,
     metrics_url: str | None = None,
+    metrics_headers: dict[str, str] | None = None,
     plugins: list = [],
     payload_codec: PayloadCodec | None = None,
     data_converter: DataConverter | None = None,
@@ -143,7 +144,10 @@ async def get_temporal_client(
     if not metrics_url:
         client = await Client.connect(**connect_kwargs)
     else:
-        runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url)))
+        runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(
+            url=metrics_url,
+            headers=metrics_headers or {},
+        )))
         connect_kwargs["runtime"] = runtime
         client = await Client.connect(**connect_kwargs)
     return client
@@ -159,6 +163,7 @@ class AgentexWorker:
         plugins: list = [],
         interceptors: list = [],
         metrics_url: str | None = None,
+        metrics_headers: dict[str, str] | None = None,
         payload_codec: PayloadCodec | None = None,
         data_converter: DataConverter | None = None,
     ):
@@ -174,6 +179,7 @@ class AgentexWorker:
         self.plugins = plugins
         self.interceptors = interceptors
         self.metrics_url = metrics_url
+        self.metrics_headers = metrics_headers
         self.payload_codec = payload_codec
         self.data_converter = data_converter
 
@@ -211,6 +217,7 @@ class AgentexWorker:
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
             plugins=self.plugins,
             metrics_url=self.metrics_url,
+            metrics_headers=self.metrics_headers,
             payload_codec=self.payload_codec,
             data_converter=self.data_converter,
         )
