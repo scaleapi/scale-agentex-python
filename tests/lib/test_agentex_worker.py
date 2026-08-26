@@ -126,12 +126,10 @@ class TestGetTemporalClientMetricsConfig:
 
         from agentex.lib.core.temporal.workers.worker import get_temporal_client
 
-        with (
-            patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())),
-            patch("agentex.lib.core.temporal.workers.worker.Runtime"),
-            patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"),
-            patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel,
-        ):
+        with patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())), \
+                patch("agentex.lib.core.temporal.workers.worker.Runtime"), \
+                patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"), \
+                patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel:
             await get_temporal_client(
                 "localhost:7233",
                 metrics_url="http://example.com/v1/metrics",
@@ -153,12 +151,10 @@ class TestGetTemporalClientMetricsConfig:
 
         from agentex.lib.core.temporal.workers.worker import get_temporal_client
 
-        with (
-            patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())),
-            patch("agentex.lib.core.temporal.workers.worker.Runtime"),
-            patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"),
-            patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel,
-        ):
+        with patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())), \
+                patch("agentex.lib.core.temporal.workers.worker.Runtime"), \
+                patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"), \
+                patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel:
             await get_temporal_client(
                 "localhost:7233",
                 metrics_url="http://example.com/v1/metrics",
@@ -173,12 +169,10 @@ class TestGetTemporalClientMetricsConfig:
 
         from agentex.lib.core.temporal.workers.worker import get_temporal_client
 
-        with (
-            patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())),
-            patch("agentex.lib.core.temporal.workers.worker.Runtime"),
-            patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"),
-            patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel,
-        ):
+        with patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())), \
+                patch("agentex.lib.core.temporal.workers.worker.Runtime"), \
+                patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"), \
+                patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel:
             await get_temporal_client(
                 "localhost:7233",
                 metrics_url="http://example.com/v1/metrics",
@@ -192,10 +186,8 @@ class TestGetTemporalClientMetricsConfig:
 
         from agentex.lib.core.temporal.workers.worker import get_temporal_client
 
-        with (
-            patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())),
-            patch("agentex.lib.core.temporal.workers.worker.Runtime") as mock_runtime,
-        ):
+        with patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())), \
+                patch("agentex.lib.core.temporal.workers.worker.Runtime") as mock_runtime:
             await get_temporal_client("localhost:7233")
 
         mock_runtime.assert_not_called()
