@@ -16,7 +16,7 @@ from temporalio.worker import (
     Interceptor,
     UnsandboxedWorkflowRunner,
 )
-from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig
+from temporalio.runtime import Runtime, TelemetryConfig, OpenTelemetryConfig, OpenTelemetryMetricTemporality
 from temporalio.converter import (
     PayloadCodec,
     DataConverter,
@@ -99,6 +99,8 @@ async def get_temporal_client(
     payload_codec: PayloadCodec | None = None,
     data_converter: DataConverter | None = None,
     metrics_headers: dict[str, str] | None = None,
+    metrics_use_http: bool = False,
+    metrics_temporality_delta: bool = False,
 ) -> Client:
     if plugins != []:  # We don't need to validate the plugins if they are empty
         _validate_plugins(plugins)
@@ -147,6 +149,12 @@ async def get_temporal_client(
         runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(
             url=metrics_url,
             headers=metrics_headers or {},
+            http=metrics_use_http,
+            metric_temporality=(
+                OpenTelemetryMetricTemporality.DELTA
+                if metrics_temporality_delta
+                else OpenTelemetryMetricTemporality.CUMULATIVE
+            ),
         )))
         connect_kwargs["runtime"] = runtime
         client = await Client.connect(**connect_kwargs)
@@ -166,6 +174,8 @@ class AgentexWorker:
         payload_codec: PayloadCodec | None = None,
         data_converter: DataConverter | None = None,
         metrics_headers: dict[str, str] | None = None,
+        metrics_use_http: bool = False,
+        metrics_temporality_delta: bool = False,
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -180,6 +190,8 @@ class AgentexWorker:
         self.interceptors = interceptors
         self.metrics_url = metrics_url
         self.metrics_headers = metrics_headers
+        self.metrics_use_http = metrics_use_http
+        self.metrics_temporality_delta = metrics_temporality_delta
         self.payload_codec = payload_codec
         self.data_converter = data_converter
 
@@ -218,6 +230,8 @@ class AgentexWorker:
             plugins=self.plugins,
             metrics_url=self.metrics_url,
             metrics_headers=self.metrics_headers,
+            metrics_use_http=self.metrics_use_http,
+            metrics_temporality_delta=self.metrics_temporality_delta,
             payload_codec=self.payload_codec,
             data_converter=self.data_converter,
         )
