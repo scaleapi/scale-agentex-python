@@ -116,6 +116,7 @@ class AgentsResource(SyncAPIResource):
     def list(
         self,
         *,
+        agent_card_metadata: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
         order_by: Optional[str] | Omit = omit,
         order_direction: str | Omit = omit,
@@ -132,6 +133,10 @@ class AgentsResource(SyncAPIResource):
         List all registered agents, optionally filtered by query parameters.
 
         Args:
+          agent_card_metadata: JSON-encoded object filtered against
+              ``registration_metadata.agent_card.metadata`` using exact key/value
+              containment semantics.
+
           limit: Limit
 
           order_by: Field to order by
@@ -159,6 +164,7 @@ class AgentsResource(SyncAPIResource):
                 timeout=timeout,
                 query=maybe_transform(
                     {
+                        "agent_card_metadata": agent_card_metadata,
                         "limit": limit,
                         "order_by": order_by,
                         "order_direction": order_direction,
@@ -777,6 +783,7 @@ class AsyncAgentsResource(AsyncAPIResource):
     async def list(
         self,
         *,
+        agent_card_metadata: Optional[str] | Omit = omit,
         limit: int | Omit = omit,
         order_by: Optional[str] | Omit = omit,
         order_direction: str | Omit = omit,
@@ -793,6 +800,10 @@ class AsyncAgentsResource(AsyncAPIResource):
         List all registered agents, optionally filtered by query parameters.
 
         Args:
+          agent_card_metadata: JSON-encoded object filtered against
+              ``registration_metadata.agent_card.metadata`` using exact key/value
+              containment semantics.
+
           limit: Limit
 
           order_by: Field to order by
@@ -820,6 +831,7 @@ class AsyncAgentsResource(AsyncAPIResource):
                 timeout=timeout,
                 query=await async_maybe_transform(
                     {
+                        "agent_card_metadata": agent_card_metadata,
                         "limit": limit,
                         "order_by": order_by,
                         "order_direction": order_direction,

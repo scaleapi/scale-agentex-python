@@ -9,6 +9,10 @@ __all__ = ["AgentListParams"]
 
 
 class AgentListParams(TypedDict, total=False):
+    agent_card_metadata: Optional[str]
+    """JSON-encoded object filtered against ``registration_metadata.agent_card.metadata``
+    with exact key/value containment semantics."""
+
     limit: int
     """Limit"""
 
