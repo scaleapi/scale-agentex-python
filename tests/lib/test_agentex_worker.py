@@ -1,5 +1,5 @@
 import os
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -88,3 +88,106 @@ class TestAgentexWorker:
         assert worker.health_check_server_running is False
         assert worker.healthy is False
         assert worker.plugins == []
+
+    def test_worker_stores_metrics_params(self):
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        worker = AgentexWorker(
+            task_queue="test-queue",
+            health_check_port=8080,
+            metrics_url="http://example.com/v1/metrics",
+            metrics_headers={"Authorization": "Api-Token tok"},
+            metrics_use_http=True,
+            metrics_temporality_delta=True,
+        )
+
+        assert worker.metrics_url == "http://example.com/v1/metrics"
+        assert worker.metrics_headers == {"Authorization": "Api-Token tok"}
+        assert worker.metrics_use_http is True
+        assert worker.metrics_temporality_delta is True
+
+    def test_worker_metrics_params_default_to_none_and_false(self):
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        worker = AgentexWorker(task_queue="test-queue", health_check_port=8080)
+
+        assert worker.metrics_url is None
+        assert worker.metrics_headers is None
+        assert worker.metrics_use_http is False
+        assert worker.metrics_temporality_delta is False
+
+
+class TestGetTemporalClientMetricsConfig:
+    """Tests that metrics params reach OpenTelemetryConfig correctly."""
+
+    async def test_metrics_params_reach_otel_config(self):
+        from temporalio.client import Client
+        from temporalio.runtime import OpenTelemetryMetricTemporality
+
+        from agentex.lib.core.temporal.workers.worker import get_temporal_client
+
+        with patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())), \
+                patch("agentex.lib.core.temporal.workers.worker.Runtime"), \
+                patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"), \
+                patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel:
+            await get_temporal_client(
+                "localhost:7233",
+                metrics_url="http://example.com/v1/metrics",
+                metrics_headers={"Authorization": "Api-Token tok"},
+                metrics_use_http=True,
+                metrics_temporality_delta=True,
+            )
+
+        mock_otel.assert_called_once_with(
+            url="http://example.com/v1/metrics",
+            headers={"Authorization": "Api-Token tok"},
+            http=True,
+            metric_temporality=OpenTelemetryMetricTemporality.DELTA,
+        )
+
+    async def test_delta_false_maps_to_cumulative(self):
+        from temporalio.client import Client
+        from temporalio.runtime import OpenTelemetryMetricTemporality
+
+        from agentex.lib.core.temporal.workers.worker import get_temporal_client
+
+        with patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())), \
+                patch("agentex.lib.core.temporal.workers.worker.Runtime"), \
+                patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"), \
+                patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel:
+            await get_temporal_client(
+                "localhost:7233",
+                metrics_url="http://example.com/v1/metrics",
+                metrics_temporality_delta=False,
+            )
+
+        _, kwargs = mock_otel.call_args
+        assert kwargs["metric_temporality"] == OpenTelemetryMetricTemporality.CUMULATIVE
+
+    async def test_none_headers_defaults_to_empty_dict(self):
+        from temporalio.client import Client
+
+        from agentex.lib.core.temporal.workers.worker import get_temporal_client
+
+        with patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())), \
+                patch("agentex.lib.core.temporal.workers.worker.Runtime"), \
+                patch("agentex.lib.core.temporal.workers.worker.TelemetryConfig"), \
+                patch("agentex.lib.core.temporal.workers.worker.OpenTelemetryConfig") as mock_otel:
+            await get_temporal_client(
+                "localhost:7233",
+                metrics_url="http://example.com/v1/metrics",
+            )
+
+        _, kwargs = mock_otel.call_args
+        assert kwargs["headers"] == {}
+
+    async def test_no_metrics_url_skips_runtime(self):
+        from temporalio.client import Client
+
+        from agentex.lib.core.temporal.workers.worker import get_temporal_client
+
+        with patch.object(Client, "connect", new=AsyncMock(return_value=MagicMock())), \
+                patch("agentex.lib.core.temporal.workers.worker.Runtime") as mock_runtime:
+            await get_temporal_client("localhost:7233")
+
+        mock_runtime.assert_not_called()
