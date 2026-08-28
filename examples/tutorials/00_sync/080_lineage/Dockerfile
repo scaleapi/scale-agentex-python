@@ -47,8 +47,8 @@ ENV PYTHONPATH=/app
 ENV AGENT_NAME=s080-lineage
 
 # The agent build version stamped onto every span as __agent_version__.
-# Real deployments pass the image tag or git SHA at build time.
-ARG AGENT_VERSION=0.1.0
+# Pass the image tag or git SHA at build time; unlabeled builds stay "unversioned".
+ARG AGENT_VERSION=unversioned
 ENV AGENT_VERSION=${AGENT_VERSION}
 
 # Run the agent using uvicorn

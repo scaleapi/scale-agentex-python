@@ -32,8 +32,9 @@ lineage service; edges are derived later from materialized traces
 
 - **`__agent_version__`** — the SGP tracing processor stamps the
   `AGENT_VERSION` env var onto every span. The Dockerfile sets it from a
-  build arg; real deployments pass the image tag or git SHA. For
-  `agentex agents run`, export it or put it in this directory's `.env`.
+  build arg (pass the image tag or git SHA; unlabeled builds fall back to
+  the explicit sentinel `unversioned` rather than a fabricated version).
+  For `agentex agents run`, export it or put it in this directory's `.env`.
 
 Ref namespaces must use the canonical URI forms from the lineage identifier
 conventions (`packages/sgp-lineage/docs/event-contract.md` in `scaleapi`);
