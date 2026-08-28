@@ -11,6 +11,7 @@ from scale_gp_beta.lib.tracing import create_span, flush_queue
 from scale_gp_beta.lib.tracing.span import Span as SGPSpan
 
 from agentex.types.span import Span
+from agentex.lib.core.tracing import code_revision
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.observability import tracing_metrics_recording as _metrics
@@ -67,6 +68,11 @@ def _add_source_to_span(span: Span, env_vars: EnvironmentVariables) -> None:
             span.data["__agent_id__"] = env_vars.AGENT_ID
         if env_vars.AGENT_VERSION is not None:
             span.data["__agent_version__"] = env_vars.AGENT_VERSION
+        # Opt-in only (adk.code_revision.enable()); None unless the agent asked
+        # for it, so no agent inherits this by upgrading the SDK.
+        commit_sha = code_revision.commit_sha()
+        if commit_sha is not None:
+            span.data[code_revision.COMMIT_SHA_KEY] = commit_sha
 
 
 def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:

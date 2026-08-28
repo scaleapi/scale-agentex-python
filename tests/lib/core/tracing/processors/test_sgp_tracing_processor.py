@@ -54,6 +54,35 @@ class TestSourceStamps:
             "__agent_version__": "sha-abc123",
         }
 
+    def test_commit_sha_is_not_stamped_without_opt_in(self, monkeypatch):
+        """Upgrading the SDK must not start emitting __commit_sha__ on its own,
+        even when the environment carries a perfectly good SHA."""
+        from agentex.lib.core.tracing import code_revision
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _add_source_to_span
+
+        monkeypatch.setenv("AGENT_COMMIT_SHA", "b362b171a9c4e1f09d8e7a6b5c4d3e2f1a0b9c8d")
+        code_revision.disable()
+
+        env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
+        span = _make_span()
+        _add_source_to_span(span, env)
+        assert "__commit_sha__" not in span.data
+
+    def test_commit_sha_is_stamped_after_opt_in(self, monkeypatch):
+        from agentex.lib.core.tracing import code_revision
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _add_source_to_span
+
+        sha = "b362b171a9c4e1f09d8e7a6b5c4d3e2f1a0b9c8d"
+        monkeypatch.setenv("AGENT_COMMIT_SHA", sha)
+        code_revision.enable()
+        try:
+            env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
+            span = _make_span()
+            _add_source_to_span(span, env)
+            assert span.data["__commit_sha__"] == sha
+        finally:
+            code_revision.disable()
+
     def test_unset_identity_fields_are_omitted(self):
         from agentex.lib.core.tracing.processors.sgp_tracing_processor import _add_source_to_span
 
