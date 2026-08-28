@@ -66,6 +66,7 @@ class TestSourceStamps:
         env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
         span = _make_span()
         _add_source_to_span(span, env)
+        assert isinstance(span.data, dict)
         assert "__commit_sha__" not in span.data
 
     def test_commit_sha_is_stamped_after_opt_in(self, monkeypatch):
@@ -79,6 +80,7 @@ class TestSourceStamps:
             env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
             span = _make_span()
             _add_source_to_span(span, env)
+            assert isinstance(span.data, dict)
             assert span.data["__commit_sha__"] == sha
         finally:
             code_revision.disable()
