@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import asyncio
 import weakref
-from typing import cast, override
+from typing import Any, cast, override
 
 import scale_gp_beta.lib.tracing as tracing
 from scale_gp_beta import SGPClient, AsyncSGPClient
@@ -68,11 +68,29 @@ def _add_source_to_span(span: Span, env_vars: EnvironmentVariables) -> None:
             span.data["__agent_id__"] = env_vars.AGENT_ID
         if env_vars.AGENT_VERSION is not None:
             span.data["__agent_version__"] = env_vars.AGENT_VERSION
-        # Opt-in only (adk.code_revision.enable()); None unless the agent asked
-        # for it, so no agent inherits this by upgrading the SDK.
-        commit_sha = code_revision.commit_sha()
-        if commit_sha is not None:
-            span.data[code_revision.COMMIT_SHA_KEY] = commit_sha
+
+
+def _sgp_metadata(span: Span) -> Any:
+    """Metadata for the SGP write: ``span.data`` plus the opt-in commit SHA.
+
+    Returns a COPY rather than mutating ``span``. ``trace.py`` hands the same
+    Span instance to every registered processor, so anything written onto
+    ``span.data`` here would also be serialized by the Agentex processor and
+    show up in caller-visible span data. ``__commit_sha__`` is opt-in and
+    SGP-scoped, so it must not leak that way.
+
+    (The ``__source__`` / ``__agent_*`` keys set by ``_add_source_to_span`` do
+    leak like that today. Left as-is: changing five long-shipped fields is not
+    this change's business.)
+    """
+    commit_sha = code_revision.commit_sha()
+    if commit_sha is None:
+        return span.data
+    if isinstance(span.data, dict):
+        return {**span.data, code_revision.COMMIT_SHA_KEY: commit_sha}
+    # List-shaped data is an accepted `data` shape and has nowhere to put a
+    # metadata key; leave it untouched rather than dropping the caller's data.
+    return span.data
 
 
 def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:
@@ -88,7 +106,7 @@ def _build_sgp_span(span: Span, env_vars: EnvironmentVariables) -> SGPSpan:
             trace_id=span.trace_id,
             input=span.input,
             output=span.output,
-            metadata=span.data,
+            metadata=_sgp_metadata(span),
         ),
     )
     sgp_span.start_time = span.start_time.isoformat()  # type: ignore[union-attr]

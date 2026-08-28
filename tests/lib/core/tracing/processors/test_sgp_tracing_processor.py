@@ -54,34 +54,63 @@ class TestSourceStamps:
             "__agent_version__": "sha-abc123",
         }
 
+    SHA = "b362b171a9c4e1f09d8e7a6b5c4d3e2f1a0b9c8d"
+
     def test_commit_sha_is_not_stamped_without_opt_in(self, monkeypatch):
         """Upgrading the SDK must not start emitting __commit_sha__ on its own,
         even when the environment carries a perfectly good SHA."""
         from agentex.lib.core.tracing import code_revision
-        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _add_source_to_span
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
 
-        monkeypatch.setenv("AGENT_COMMIT_SHA", "b362b171a9c4e1f09d8e7a6b5c4d3e2f1a0b9c8d")
+        monkeypatch.setenv("AGENT_COMMIT_SHA", self.SHA)
         code_revision.disable()
 
-        env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
-        span = _make_span()
-        _add_source_to_span(span, env)
-        assert isinstance(span.data, dict)
-        assert "__commit_sha__" not in span.data
+        span = _make_span(); span.data = {}
+        assert "__commit_sha__" not in (_sgp_metadata(span) or {})
 
     def test_commit_sha_is_stamped_after_opt_in(self, monkeypatch):
         from agentex.lib.core.tracing import code_revision
-        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _add_source_to_span
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
 
-        sha = "b362b171a9c4e1f09d8e7a6b5c4d3e2f1a0b9c8d"
-        monkeypatch.setenv("AGENT_COMMIT_SHA", sha)
+        monkeypatch.setenv("AGENT_COMMIT_SHA", self.SHA)
         code_revision.enable()
         try:
-            env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
-            span = _make_span()
-            _add_source_to_span(span, env)
-            assert isinstance(span.data, dict)
-            assert span.data["__commit_sha__"] == sha
+            span = _make_span(); span.data = {"caller": "kept"}
+            metadata = _sgp_metadata(span)
+            assert metadata["__commit_sha__"] == self.SHA
+            assert metadata["caller"] == "kept"
+        finally:
+            code_revision.disable()
+
+    def test_commit_sha_does_not_leak_onto_the_shared_span(self, monkeypatch):
+        """trace.py hands ONE Span to every processor. If the commit SHA were
+        written onto span.data, a co-registered Agentex processor would
+        serialize it too, and it would surface in caller-visible span data."""
+        from agentex.lib.core.tracing import code_revision
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
+        from agentex.lib.core.tracing.processors.agentex_tracing_processor import _create_kwargs
+
+        monkeypatch.setenv("AGENT_COMMIT_SHA", self.SHA)
+        code_revision.enable()
+        try:
+            span = _make_span(); span.data = {}
+            assert _sgp_metadata(span)["__commit_sha__"] == self.SHA   # SGP sees it
+            assert "__commit_sha__" not in span.data                   # the span does not
+            assert "__commit_sha__" not in (_create_kwargs(span)["data"] or {})
+        finally:
+            code_revision.disable()
+
+    def test_list_shaped_data_is_left_alone(self, monkeypatch):
+        """`data` may be a list of dicts; there is nowhere to put a metadata key,
+        and dropping the caller's data would be worse than omitting the field."""
+        from agentex.lib.core.tracing import code_revision
+        from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
+
+        monkeypatch.setenv("AGENT_COMMIT_SHA", self.SHA)
+        code_revision.enable()
+        try:
+            span = _make_span(); span.data = [{"a": 1}]
+            assert _sgp_metadata(span) == [{"a": 1}]
         finally:
             code_revision.disable()
 
