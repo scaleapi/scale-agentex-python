@@ -31,6 +31,9 @@ from agentex.lib.adk._modules.tracing import TracingModule, TurnSpan
 
 # Data-source refs for lineage (SGP-6513); implementation lives in core.tracing
 from agentex.lib.core.tracing import lineage
+
+# Opt-in commit-SHA stamping (AGX1-969); implementation in core.tracing
+from agentex.lib.core.tracing import code_revision
 from agentex.lib.core.tracing.lineage import DataSourceRef, data_sources
 
 # Unified harness surface (AGX1-375)
@@ -73,6 +76,7 @@ __all__ = [
     "TurnSpan",
     # Lineage data-source refs (SGP-6513)
     "lineage",
+    "code_revision",
     "DataSourceRef",
     "data_sources",
     # Checkpointing / LangGraph
