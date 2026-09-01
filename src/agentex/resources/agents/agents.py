@@ -133,9 +133,9 @@ class AgentsResource(SyncAPIResource):
         List all registered agents, optionally filtered by query parameters.
 
         Args:
-          agent_card_metadata: JSON-encoded object filtered against
-              ``registration_metadata.agent_card.metadata`` using exact key/value
-              containment semantics.
+          agent_card_metadata: JSON-encoded object used to filter agents on
+              `registration_metadata.agent_card.metadata` via JSONB containment. Example:
+              {"permits_capable": true}.
 
           limit: Limit
 
@@ -800,9 +800,9 @@ class AsyncAgentsResource(AsyncAPIResource):
         List all registered agents, optionally filtered by query parameters.
 
         Args:
-          agent_card_metadata: JSON-encoded object filtered against
-              ``registration_metadata.agent_card.metadata`` using exact key/value
-              containment semantics.
+          agent_card_metadata: JSON-encoded object used to filter agents on
+              `registration_metadata.agent_card.metadata` via JSONB containment. Example:
+              {"permits_capable": true}.
 
           limit: Limit
 

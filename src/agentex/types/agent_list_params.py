@@ -10,8 +10,11 @@ __all__ = ["AgentListParams"]
 
 class AgentListParams(TypedDict, total=False):
     agent_card_metadata: Optional[str]
-    """JSON-encoded object filtered against ``registration_metadata.agent_card.metadata``
-    with exact key/value containment semantics."""
+    """
+    JSON-encoded object used to filter agents on
+    `registration_metadata.agent_card.metadata` via JSONB containment. Example:
+    {"permits_capable": true}.
+    """
 
     limit: int
     """Limit"""

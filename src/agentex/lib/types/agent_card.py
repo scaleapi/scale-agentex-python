@@ -5,7 +5,7 @@ import typing
 from enum import Enum
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-from pydantic import BaseModel, Field
+from pydantic import Field, BaseModel
 
 if TYPE_CHECKING:
     from agentex.lib.sdk.state_machine.state import State
@@ -32,8 +32,9 @@ class AgentCard(BaseModel):
     input_types: list[str] = []
     output_schema: dict | None = None
     # Free-form JSON object for opt-in self-description (e.g. protocol-specific
-    # capability flags) that callers can filter agents by via
-    # ``GET /agents?agent_card_metadata=...``. Not interpreted by the platform.
+    # capability flags). Not interpreted by the platform, but callers can filter
+    # agents on it with ``agents.list(agent_card_metadata=...)`` -- see
+    # ``agentex.lib.utils.metadata_filters.encode_metadata_filter``.
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
