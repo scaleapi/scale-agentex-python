@@ -12,6 +12,14 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.26.0 (2026-09-01)
+
+Full Changelog: [agentex-client-v0.25.0...agentex-client-v0.26.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.25.0...agentex-client-v0.26.0)
+
+### Features
+
+* **tracing:** add opt-in commit SHA stamping for SGP spans ([#505](https://github.com/scaleapi/scale-agentex-python/issues/505)) ([76252a9](https://github.com/scaleapi/scale-agentex-python/commit/76252a98f28663e8c95777456d07e42171592c62))
+
 ## 0.25.0 (2026-08-26)
 
 Full Changelog: [agentex-client-v0.24.0...agentex-client-v0.25.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.24.0...agentex-client-v0.25.0)
