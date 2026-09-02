@@ -1,0 +1,26 @@
+name: TruffleHog Weekly Scan
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      since_commit:
+        description: 'Override: Scan from this commit SHA (leave empty to use stored value)'
+        required: false
+        type: string
+      full_scan:
+        description: 'Run full history scan (ignores since_commit)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  scan:
+    uses: scaleapi/required-actions/.github/workflows/trufflehog-weekly-scan.yml@main
+    with:
+      since_commit: ${{ inputs.since_commit || '' }}
+      full_scan: ${{ inputs.full_scan || false }}
+    permissions:
+      contents: read
+      id-token: write
