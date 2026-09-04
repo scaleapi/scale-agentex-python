@@ -26,6 +26,7 @@ class EnvVarKeys(str, Enum):
     AGENT_ID = "AGENT_ID"
     AGENT_VERSION = "AGENT_VERSION"
     AGENT_COMMIT_SHA = "AGENT_COMMIT_SHA"
+    AGENT_SOURCE_REPO = "AGENT_SOURCE_REPO"
     AGENT_API_KEY = "AGENT_API_KEY"
     # ACP Configuration
     ACP_URL = "ACP_URL"
@@ -74,6 +75,8 @@ class EnvironmentVariables(BaseModel):
     # `adk.code_revision.enable()`, which also refuses a value that is not a git
     # object name. See agentex.lib.core.tracing.code_revision.
     AGENT_COMMIT_SHA: str | None = None
+    # Git remote the agent was built from (any URL form; normalized to host/path on use).
+    AGENT_SOURCE_REPO: str | None = None
     AGENT_API_KEY: str | None = None
     ACP_TYPE: str | None = "async"
     AGENT_INPUT_TYPE: str | None = None
