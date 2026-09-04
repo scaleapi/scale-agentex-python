@@ -1,0 +1,139 @@
+"""Temporal activity for the Claude Code tutorial.
+
+Subprocess spawning (and any other I/O) must run inside a Temporal *activity*,
+not in workflow code. Temporal runs workflow + signal-handler bodies on a
+deterministic sandbox event loop that does not implement ``subprocess_exec``
+(or threads / sockets), so spawning the CLI directly in the signal handler
+raises ``NotImplementedError``. This activity runs the Claude Code CLI, drives
+the ``ClaudeCodeTurn`` through ``UnifiedEmitter.auto_send_turn`` (the async
+Redis push path), and returns the turn result to the workflow.
+
+The ``_spawn_claude`` async generator is an injectable seam: offline tests
+provide a fake that yields pre-recorded stdout lines so no real CLI runs.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any, AsyncIterator
+from datetime import datetime
+
+from temporalio import activity
+
+from agentex.lib.adk import ClaudeCodeTurn
+from agentex.lib.core.harness import UnifiedEmitter
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.model_utils import BaseModel
+
+logger = make_logger(__name__)
+
+RUN_CLAUDE_CODE_TURN_ACTIVITY = "run_claude_code_turn"
+
+
+class RunClaudeCodeTurnParams(BaseModel):
+    """Arguments for one Claude Code turn run inside an activity."""
+
+    task_id: str
+    prompt: str
+    trace_id: str | None = None
+    parent_span_id: str | None = None
+    session_id: str | None = None
+    created_at: datetime | None = None
+
+
+class RunClaudeCodeTurnResult(BaseModel):
+    """Result returned from the activity to the workflow."""
+
+    final_text: str
+    session_id: str | None = None
+
+
+async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIterator[str]:
+    """Spawn ``claude -p --output-format stream-json`` locally and yield stdout lines.
+
+    Pass ``session_id`` to resume a previous Claude Code session (multi-turn
+    memory via ``-r <session_id>``).
+
+    Injectable seam: tests monkeypatch this with a fake async iterator so no
+    real CLI invocation is needed offline.
+    """
+    cmd = [
+        "claude",
+        "-p",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+    ]
+    if session_id:
+        cmd.extend(["-r", session_id])
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    assert proc.stdout is not None
+    assert proc.stdin is not None
+
+    proc.stdin.write(prompt.encode())
+    proc.stdin.close()
+
+    # Drain stderr concurrently. With --verbose, Claude Code can write enough to
+    # stderr to fill the OS pipe buffer; if we only read stdout, the CLI blocks
+    # on its stderr write while we block reading stdout — a deadlock. A
+    # background task keeps stderr flowing so stdout never stalls.
+    async def _drain_stderr() -> None:
+        assert proc.stderr is not None
+        async for _ in proc.stderr:
+            pass
+
+    stderr_task = asyncio.create_task(_drain_stderr())
+
+    try:
+        buffer = ""
+        async for chunk in proc.stdout:
+            buffer += chunk.decode("utf-8", errors="replace")
+            while "\n" in buffer:
+                line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                if line:
+                    yield line
+
+        if buffer.strip():
+            yield buffer.strip()
+
+        await proc.wait()
+    finally:
+        # Release the subprocess and stderr drain task even if the consumer
+        # abandons the generator early (task cancellation / client disconnect):
+        # cancel the drain task and terminate+reap the process if it is still
+        # running, so neither is leaked.
+        stderr_task.cancel()
+        try:
+            await stderr_task
+        except asyncio.CancelledError:
+            pass
+        if proc.returncode is None:
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                pass
+            await proc.wait()
+
+
+@activity.defn(name=RUN_CLAUDE_CODE_TURN_ACTIVITY)
+async def run_claude_code_turn(params: RunClaudeCodeTurnParams) -> dict[str, Any]:
+    """Run one Claude Code turn end-to-end and stream events to the task.
+
+    Runs in an activity (real asyncio loop) so subprocess I/O is permitted.
+    """
+    emitter = UnifiedEmitter(
+        task_id=params.task_id,
+        trace_id=params.trace_id,
+        parent_span_id=params.parent_span_id,
+    )
+    turn = ClaudeCodeTurn(_spawn_claude(params.prompt, session_id=params.session_id))
+    result = await emitter.auto_send_turn(turn, created_at=params.created_at)
+
+    return RunClaudeCodeTurnResult(final_text=result.final_text, session_id=turn.session_id).model_dump()

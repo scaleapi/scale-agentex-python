@@ -1,0 +1,121 @@
+# {{ agent_name }} — AgentEx Temporal + LangGraph
+
+A starter template for building AI agents with AgentEx, [LangGraph](https://langchain-ai.github.io/langgraph/),
+and Temporal — where **Temporal is the runtime and LangGraph is the agent framework**.
+
+It uses the official [`temporalio.contrib.langgraph`](https://docs.temporal.io/develop/python/integrations/langgraph)
+plugin: each LangGraph node runs either as a durable **Temporal activity** or
+inline in the **workflow**, configured per node with `execute_in`. You get
+per-node durability, automatic retries, and full visibility in the Temporal UI
+— without LangGraph's own runtime or an external checkpoint database.
+
+> The Temporal LangGraph plugin is currently **experimental**; its API may change.
+
+## What's in the box
+
+- **Nodes as activities** — the LLM (`agent`) node runs as a retried, observable
+  Temporal activity; the `tools` node runs in the workflow (see below).
+- **Human-in-the-loop** — approval-gated tools raise a LangGraph `interrupt`;
+  the workflow pauses on a Temporal signal (`provide_approval`) until a human
+  approves or rejects, then resumes.
+- **Live introspection via Temporal queries** — `get_status`,
+  `get_pending_approval`, `get_graph_state`, and `get_graph_mermaid` /
+  `get_graph_ascii` to render the agent graph while it runs.
+- **Multi-turn memory** — the running message list is kept on the workflow
+  instance, durable for free.
+- **Tracing/observability** — a per-turn span shipped to SGP/AgentEx.
+
+## The agent graph
+
+```
+START --> agent --> (tool calls?) --> tools --> agent
+                --> (no tool calls?) --> END
+```
+
+`project/graph.py` defines this graph. The `agent` node is marked
+`execute_in="activity"`; the `tools` node is `execute_in="workflow"`. Query
+`get_graph_mermaid` at runtime to see it rendered.
+
+### Why the tools node runs in the workflow
+
+The `tools` node runs inline in the workflow (not as an activity) for two
+reasons: the `AIMessage` with tool calls stays intact without crossing an
+activity boundary, and LangGraph `interrupt` (used for human approval) must run
+where the workflow can pause on a Temporal signal. For long-running or heavily
+side-effecting tools, move that work into its own `execute_in="activity"` node.
+The router and tools are `async` so LangGraph awaits them directly (sync
+callables are offloaded via `run_in_executor`, which Temporal workflows forbid).
+
+## Project structure
+
+```
+{{ project_name }}/
+├── project/
+│   ├── __init__.py
+│   ├── acp.py            # Thin async ACP server; registers the LangGraphPlugin
+│   ├── workflow.py       # Temporal runtime: runs the graph, HIL, queries, memory
+│   ├── graph.py          # LangGraph graph; nodes tagged execute_in activity/workflow
+│   ├── tools.py          # Async tool definitions + approval set
+│   └── run_worker.py     # Temporal worker; registers the LangGraphPlugin
+├── Dockerfile
+├── manifest.yaml
+├── environments.yaml
+├── dev.ipynb
+{% if use_uv %}└── pyproject.toml{% else %}└── requirements.txt{% endif %}
+```
+
+## Running the agent
+
+```bash
+{% if use_uv %}agentex uv sync
+source .venv/bin/activate{% else %}pip install -r requirements.txt{% endif %}
+
+# Start the agent (ACP server + Temporal worker)
+agentex agents run --manifest manifest.yaml
+```
+
+The agent starts on port 8000. Open the Temporal UI at http://localhost:8080 to
+watch workflows and activities execute. Use `dev.ipynb` to create a task and
+send messages.
+
+## Human-in-the-loop
+
+Tools listed in `TOOLS_REQUIRING_APPROVAL` (in `project/tools.py`) raise a
+LangGraph `interrupt` before they run. The workflow surfaces the pending call
+(queryable via `get_pending_approval`) and waits — durably, for as long as it
+takes — for a `provide_approval` signal carrying the decision:
+
+```python
+# decision: {"approved": true, "approver": "daniel", "reason": "looks good"}
+```
+
+If rejected, the rejection is fed back to the model so it can adjust.
+
+## Adding tools
+
+1. Define an **async** `@tool` function in `project/tools.py` and add it to `TOOLS`.
+2. (Optional) add its name to `TOOLS_REQUIRING_APPROVAL` to gate it behind
+   human approval.
+
+The model is bound with `TOOLS` and the tool node looks them up by name, so no
+other wiring is needed.
+
+## Configuration
+
+Tune the model in `project/graph.py` (`MODEL_NAME`) and the system prompt
+(`SYSTEM_PROMPT`). Per-node activity timeouts and retry policies live in the
+node `metadata` in `build_graph()`.
+
+## Environment variables
+
+Create a `.env` file (see `.env.example`):
+
+```bash
+LITELLM_API_KEY=your-litellm-key   # copied to OPENAI_API_KEY automatically
+# OPENAI_BASE_URL=                 # optional: point at a different provider
+# SGP_API_KEY=                     # optional: tracing
+# SGP_ACCOUNT_ID=                  # optional: tracing
+# SGP_CLIENT_BASE_URL=             # optional: tracing
+```
+
+Happy building with Temporal + LangGraph!

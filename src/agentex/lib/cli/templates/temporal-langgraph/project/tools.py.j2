@@ -1,0 +1,57 @@
+"""Tool definitions for the LangGraph + Temporal agent.
+
+Each tool is an async LangChain ``@tool``. They're run by the ``tools`` node
+(see ``project/graph.py``), which the Temporal LangGraph plugin executes
+inside the workflow. Tools must be ``async`` so the in-workflow node awaits
+them directly rather than offloading to a thread executor (which Temporal's
+workflow event loop does not allow).
+
+``TOOLS`` is the single source of truth: it's bound to the model (so the LLM
+knows the schemas) and looked up by name when the tool node runs.
+
+``TOOLS_REQUIRING_APPROVAL`` marks tools that pause for human approval before
+they run — the tool node raises a LangGraph ``interrupt`` for those, which the
+workflow surfaces and resolves via a Temporal signal (human-in-the-loop).
+"""
+
+from __future__ import annotations
+
+from langchain_core.tools import tool
+
+
+@tool
+async def get_weather(city: str) -> str:
+    """Get the current weather for a city.
+
+    Args:
+        city: The name of the city to get weather for.
+
+    Returns:
+        A string describing the weather conditions.
+    """
+    # TODO: Replace with a real weather API call.
+    return f"The weather in {city} is sunny and 72°F"
+
+
+@tool
+async def send_notification(recipient: str, message: str) -> str:
+    """Send a notification to a recipient. Requires human approval before sending.
+
+    Args:
+        recipient: Who to notify.
+        message: The message body to send.
+
+    Returns:
+        A confirmation string.
+    """
+    # TODO: Replace with a real side-effecting integration (email, Slack, ...).
+    return f"Notification sent to {recipient}: {message!r}"
+
+
+# All tools available to the agent. Bound to the model and looked up by name
+# when the tool node runs.
+TOOLS = [get_weather, send_notification]
+TOOLS_BY_NAME = {t.name: t for t in TOOLS}
+
+# Tools in this set pause for a human-approval signal before they run.
+TOOLS_REQUIRING_APPROVAL = {"send_notification"}

@@ -1,0 +1,19 @@
+{
+  "description": "Supported server OpenAPI contract window for SDK request-compatibility. Each file is agentex/openapi.yaml from scaleapi/scale-agentex at the pinned sha. Advance 'min-supported' as the oldest deployed server moves forward, then run refresh_specs.py.",
+  "source_repo": "scaleapi/scale-agentex",
+  "source_path": "agentex/openapi.yaml",
+  "specs": [
+    {
+      "label": "current",
+      "file": "current.yaml",
+      "sha": "ab469df91bba043ea25356c89147d29f7df03bad",
+      "note": "scale-agentex main at vendoring time"
+    },
+    {
+      "label": "min-supported",
+      "file": "min-supported.yaml",
+      "sha": "39e3a7118d55b7db4c01f6ee14e68a8167bb001d",
+      "note": "pre-#278; oldest contract still in the field. UpdateStateRequest requires task_id/agent_id in the body — the contract the 0.13.0 client broke."
+    }
+  ]
+}

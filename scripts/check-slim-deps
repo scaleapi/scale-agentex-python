@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Guardrail: the slim agentex-client must keep exactly its 6 bare-client deps
+# — Stainless re-emitting an un-trimmed dashboard dep-list would break the split.
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+python3 - <<'PY'
+import re
+import sys
+import tomllib
+
+EXPECTED = {"httpx", "pydantic", "typing-extensions", "anyio", "distro", "sniffio"}
+
+
+def norm(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name.strip().lower())
+
+
+with open("pyproject.toml", "rb") as f:
+    deps = tomllib.load(f)["project"]["dependencies"]
+
+got = {norm(re.split(r"[<>=!~ \[;]", d, maxsplit=1)[0]) for d in deps}
+expected = {norm(n) for n in EXPECTED}
+
+if got != expected:
+    print("slim dependency drift in root pyproject.toml!", file=sys.stderr)
+    print(f"  expected ({len(expected)}): {sorted(expected)}", file=sys.stderr)
+    print(f"  got      ({len(got)}): {sorted(got)}", file=sys.stderr)
+    print(
+        "If Stainless re-added ADK deps, trim the dashboard dep-list "
+        "(ADK deps belong in adk/pyproject.toml).",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+print(f"slim deps OK ({len(got)}): {sorted(got)}")
+PY

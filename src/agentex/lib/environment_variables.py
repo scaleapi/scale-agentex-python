@@ -1,0 +1,134 @@
+
+from __future__ import annotations
+
+import os
+from enum import Enum
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.model_utils import BaseModel
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+logger = make_logger(__name__)
+
+
+class EnvVarKeys(str, Enum):
+    ENVIRONMENT = "ENVIRONMENT"
+    TEMPORAL_ADDRESS = "TEMPORAL_ADDRESS"
+    REDIS_URL = "REDIS_URL"
+    AGENTEX_BASE_URL = "AGENTEX_BASE_URL"
+    # Agent Identifiers
+    AGENT_NAME = "AGENT_NAME"
+    AGENT_DESCRIPTION = "AGENT_DESCRIPTION"
+    AGENT_ID = "AGENT_ID"
+    AGENT_VERSION = "AGENT_VERSION"
+    AGENT_COMMIT_SHA = "AGENT_COMMIT_SHA"
+    AGENT_API_KEY = "AGENT_API_KEY"
+    # ACP Configuration
+    ACP_URL = "ACP_URL"
+    ACP_PORT = "ACP_PORT"
+    ACP_TYPE = "ACP_TYPE"
+    # Workflow Configuration
+    WORKFLOW_NAME = "WORKFLOW_NAME"
+    WORKFLOW_TASK_QUEUE = "WORKFLOW_TASK_QUEUE"
+    WORKFLOW_EXECUTION_TIMEOUT_SECONDS = "WORKFLOW_EXECUTION_TIMEOUT_SECONDS"
+    # Temporal Worker Configuration
+    HEALTH_CHECK_PORT = "HEALTH_CHECK_PORT"
+    # Auth Configuration
+    AUTH_PRINCIPAL_B64 = "AUTH_PRINCIPAL_B64"
+    AGENT_INPUT_TYPE = "AGENT_INPUT_TYPE"
+    # Deployment
+    AGENTEX_DEPLOYMENT_ID = "AGENTEX_DEPLOYMENT_ID"
+    # Claude Agents SDK Configuration
+    ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
+    CLAUDE_WORKSPACE_ROOT = "CLAUDE_WORKSPACE_ROOT"
+
+
+class Environment(str, Enum):
+    LOCAL = "local"
+    DEV = "development"
+    STAGING = "staging"
+    PROD = "production"
+
+
+refreshed_environment_variables: EnvironmentVariables | None = None
+
+
+class EnvironmentVariables(BaseModel):
+    ENVIRONMENT: str = Environment.DEV
+    TEMPORAL_ADDRESS: str | None = "localhost:7233"
+    REDIS_URL: str | None = None
+    AGENTEX_BASE_URL: str | None = "http://localhost:5003"
+    # Agent Identifiers
+    AGENT_NAME: str
+    AGENT_DESCRIPTION: str | None = None
+    AGENT_ID: str | None = None
+    # Build/version discriminator (image tag or git sha), set by the deployment
+    AGENT_VERSION: str | None = None
+    # The agent's source commit, baked into the image or set by the deployment.
+    # Unlike AGENT_VERSION this is expected to be a git SHA and nothing else, and
+    # it is OPT-IN: nothing is stamped unless the agent calls
+    # `adk.code_revision.enable()`, which also refuses a value that is not a git
+    # object name. See agentex.lib.core.tracing.code_revision.
+    AGENT_COMMIT_SHA: str | None = None
+    AGENT_API_KEY: str | None = None
+    ACP_TYPE: str | None = "async"
+    AGENT_INPUT_TYPE: str | None = None
+    # ACP Configuration
+    ACP_URL: str
+    ACP_PORT: int = 8000
+    # Workflow Configuration
+    WORKFLOW_TASK_QUEUE: str | None = None
+    WORKFLOW_NAME: str | None = None
+    # Maximum total wall-clock time (in seconds) a workflow execution can run,
+    # INCLUDING retries and the entire continue-as-new chain (Temporal does not
+    # reset it on continue-as-new). Defaults to None = no execution timeout, so
+    # long-lived chat/session workflows can stay open indefinitely. None / 0 /
+    # negative are all treated as "no timeout" at the start_workflow call site.
+    # To bound idle workflows, use an explicit durable timer inside the workflow
+    # (e.g. run_until_complete's `timeout`), not this chain-wide ceiling.
+    WORKFLOW_EXECUTION_TIMEOUT_SECONDS: int | None = None
+    # Temporal Worker Configuration
+    HEALTH_CHECK_PORT: int = 80
+    # Auth Configuration
+    AUTH_PRINCIPAL_B64: str | None = None
+    # Deployment
+    AGENTEX_DEPLOYMENT_ID: str | None = None
+    # Claude Agents SDK Configuration
+    ANTHROPIC_API_KEY: str | None = None
+    CLAUDE_WORKSPACE_ROOT: str | None = None  # Defaults to project/workspace if not set
+
+    @classmethod
+    def refresh(cls) -> EnvironmentVariables:
+        global refreshed_environment_variables
+        if refreshed_environment_variables is not None:
+            return refreshed_environment_variables
+
+        logger.info("Refreshing environment variables")
+        if os.environ.get(EnvVarKeys.ENVIRONMENT) == Environment.DEV:
+            # Load global .env file first
+            global_env_path = PROJECT_ROOT / ".env"
+            if global_env_path.exists():
+                logger.debug(f"Loading global environment variables FROM: {global_env_path}")
+                load_dotenv(dotenv_path=global_env_path, override=False)
+
+            # Load local project .env.local file (takes precedence)
+            local_env_path = Path.cwd().parent / ".env.local"
+            if local_env_path.exists():
+                logger.debug(f"Loading local environment variables FROM: {local_env_path}")
+                load_dotenv(dotenv_path=local_env_path, override=True)
+
+        # Create kwargs dict with environment variables, using None for missing values
+        # Pydantic will use the default values when None is passed for optional fields
+        kwargs = {}
+        for key in EnvVarKeys:
+            env_value = os.environ.get(key.value)
+            if env_value is not None:
+                kwargs[key.value] = env_value
+
+        environment_variables = EnvironmentVariables(**kwargs)
+        refreshed_environment_variables = environment_variables
+        return refreshed_environment_variables

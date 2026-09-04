@@ -1,0 +1,1356 @@
+"""Custom Temporal Model Provider with streaming support for OpenAI agents."""
+from __future__ import annotations
+
+import json
+import time
+import uuid
+from typing import Any, List, Union, Optional, override
+
+from agents import (
+    Tool,
+    Model,
+    Handoff,
+    FunctionTool,
+    ModelTracing,
+    ModelProvider,
+    ModelResponse,
+    ModelSettings,
+    TResponseInputItem,
+    AgentOutputSchemaBase,
+)
+from openai import NOT_GIVEN, AsyncOpenAI
+from agents.tool import (
+    ComputerTool,
+    HostedMCPTool,
+    WebSearchTool,
+    FileSearchTool,
+    LocalShellTool,
+    CodeInterpreterTool,
+    ImageGenerationTool,
+)
+from agents.computer import Computer, AsyncComputer
+
+# Re-export the canonical StreamingMode literal from the streaming service so
+# all layers share a single definition.
+from agentex.lib.core.services.adk.streaming import StreamingMode as StreamingMode
+from agentex.lib.core.observability.llm_metrics import get_llm_metrics
+from agentex.lib.core.observability.llm_metrics_hooks import record_llm_failure
+
+try:
+    from agents.tool import ShellTool  # type: ignore[attr-defined]
+except ImportError:
+    ShellTool = None  # type: ignore[assignment,misc]
+from agents.usage import Usage, InputTokensDetails, OutputTokensDetails  # type: ignore[attr-defined]
+from agents.model_settings import MCPToolChoice
+from openai.types.responses import (
+    ResponseOutputText,
+    ResponseOutputMessage,
+    ResponseCompletedEvent,
+    ResponseTextDeltaEvent,
+    ResponseFunctionToolCall,
+    ResponseOutputItemDoneEvent,
+    # Event types for proper type checking
+    ResponseOutputItemAddedEvent,
+    ResponseReasoningTextDeltaEvent,
+    ResponseReasoningSummaryPartDoneEvent,
+    ResponseFunctionCallArgumentsDoneEvent,
+    ResponseReasoningSummaryPartAddedEvent,
+    ResponseReasoningSummaryTextDeltaEvent,
+    ResponseFunctionCallArgumentsDeltaEvent,
+)
+from openai.types.responses.response_prompt_param import ResponsePromptParam
+
+# AgentEx SDK imports
+from agentex.lib import adk
+from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.core.tracing.lineage import merge_refs_into_data, resolve_refs_from_items
+from agentex.types.task_message_delta import TextDelta, ToolRequestDelta, ReasoningContentDelta, ReasoningSummaryDelta
+from agentex.types.task_message_update import StreamTaskMessageFull, StreamTaskMessageDelta
+from agentex.types.task_message_content import TextContent, ReasoningContent, ToolRequestContent, ToolResponseContent
+from agentex.lib.adk.utils._modules.client import create_async_agentex_client
+from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
+    streaming_task_id,
+    streaming_trace_id,
+    streaming_parent_span_id,
+)
+
+# Use the SDK's make_logger so this module's INFO/DEBUG output is actually
+# visible (raw ``logging.getLogger`` returns a logger with no handler/level
+# configured, which silently drops anything below WARNING). Keep the explicit
+# name "agentex.temporal.streaming" so any external logging config targeting
+# that name keeps working.
+logger = make_logger("agentex.temporal.streaming")
+
+
+# LLM metrics live in agentex.lib.core.observability.llm_metrics so other
+# code paths (sync ACP, Claude SDK plugin, future provider integrations)
+# can share the same instrument definitions without redefining names.
+
+
+def _serialize_item(item: Any) -> dict[str, Any]:
+    """
+    Universal serializer for any item type from OpenAI Agents SDK.
+
+    Uses model_dump() for Pydantic models, otherwise extracts attributes manually.
+    Filters out internal Pydantic fields that can't be serialized.
+    """
+    if hasattr(item, 'model_dump'):
+        # Pydantic model - use model_dump for proper serialization
+        try:
+            return item.model_dump(mode='json', exclude_unset=True)
+        except Exception:
+            # Fallback to dict conversion
+            return dict(item) if hasattr(item, '__iter__') else {}
+    else:
+        # Not a Pydantic model - extract attributes manually
+        item_dict = {}
+        for attr_name in dir(item):
+            if not attr_name.startswith('_') and attr_name not in ('model_fields', 'model_config', 'model_computed_fields'):
+                try:
+                    attr_value = getattr(item, attr_name, None)
+                    # Skip methods and None values
+                    if attr_value is not None and not callable(attr_value):
+                        # Convert to JSON-serializable format
+                        if hasattr(attr_value, 'model_dump'):
+                            item_dict[attr_name] = attr_value.model_dump()
+                        elif isinstance(attr_value, (str, int, float, bool, list, dict)):
+                            item_dict[attr_name] = attr_value
+                        else:
+                            item_dict[attr_name] = str(attr_value)
+                except Exception:
+                    # Skip attributes that can't be accessed
+                    pass
+        return item_dict
+
+
+# Responses-API output items for server-side / hosted tools. These execute inside
+# the Responses API, so they never become function_call items AND the SDK's
+# RunHooks (on_tool_start/on_tool_end) never fire for them. The streaming loop
+# must surface them explicitly, as a tool request + response pair, when the item
+# completes (by then it carries the full query/result).
+_HOSTED_TOOL_TYPES = frozenset(
+    {
+        "web_search_call",
+        "file_search_call",
+        "code_interpreter_call",
+        "image_generation_call",
+        "mcp_call",
+        "computer_call",
+        "local_shell_call",
+    }
+)
+
+# Cap on the rendered hosted-tool result string (UI / trace readability).
+_HOSTED_TOOL_RESULT_CAP = 2000
+
+
+def _coerce_args(raw: Any) -> dict[str, Any]:
+    """Best-effort coerce a hosted-tool's arguments to a dict for the UI."""
+    if raw is None:
+        return {}
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else {"value": parsed}
+        except (json.JSONDecodeError, ValueError):
+            return {"raw": raw}
+    serialized = _serialize_item(raw)
+    return serialized if isinstance(serialized, dict) else {"value": str(raw)}
+
+
+def _hosted_tool_request(item: Any) -> tuple[str, str, dict[str, Any]]:
+    """Extract (call_id, display_name, arguments) from a hosted-tool item."""
+    itype = getattr(item, "type", "") or ""
+    call_id = (
+        getattr(item, "id", "")
+        or getattr(item, "call_id", "")
+        or f"hosted_{uuid.uuid4().hex[:8]}"
+    )
+    name = itype[:-5] if itype.endswith("_call") else itype  # web_search_call -> web_search
+    args: dict[str, Any] = {}
+    if itype == "web_search_call":
+        action = getattr(item, "action", None)
+        if action is not None:
+            args = _coerce_args(action)
+    elif itype == "file_search_call":
+        args = {"queries": list(getattr(item, "queries", []) or [])}
+    elif itype == "code_interpreter_call":
+        args = {"code": getattr(item, "code", "") or ""}
+    elif itype in ("computer_call", "local_shell_call"):
+        # Both carry an `action` object: a ComputerAction (click/scroll/type/...)
+        # or a LocalShellCallAction (command/env/cwd). Surface it as the args so
+        # the trace shows what the tool actually did, not just its status.
+        action = getattr(item, "action", None)
+        if action is not None:
+            args = _coerce_args(action)
+    elif itype == "mcp_call":
+        mcp_name = getattr(item, "name", None) or "mcp"
+        server = getattr(item, "server_label", None)
+        name = f"{server}.{mcp_name}" if server else mcp_name
+        args = _coerce_args(getattr(item, "arguments", None))
+    return call_id, name, args
+
+
+def _hosted_tool_result(item: Any) -> str:
+    """Extract a short result string from a completed hosted-tool item."""
+    itype = getattr(item, "type", "") or ""
+    if itype == "mcp_call":
+        err = getattr(item, "error", None)
+        if err:
+            return f"error: {err}"
+        out = getattr(item, "output", None)
+        if out:
+            return str(out)
+    elif itype == "code_interpreter_call":
+        outputs = getattr(item, "outputs", None)
+        if outputs:
+            return json.dumps([_serialize_item(o) for o in outputs])[:_HOSTED_TOOL_RESULT_CAP]
+    elif itype == "file_search_call":
+        results = getattr(item, "results", None)
+        if results:
+            return json.dumps([_serialize_item(r) for r in results])[:_HOSTED_TOOL_RESULT_CAP]
+    elif itype == "image_generation_call":
+        # `result` is base64 image data; surface a compact reference instead of
+        # dumping the (large) payload into the trace.
+        result = getattr(item, "result", None)
+        if result:
+            return f"<image generated: {len(result)} bytes>"
+    return str(getattr(item, "status", "completed") or "completed")
+
+
+class TemporalStreamingModel(Model):
+    """Custom model implementation with streaming support."""
+
+    def __init__(
+        self,
+        model_name: str = "gpt-4o",
+        _use_responses_api: bool = True,
+        openai_client: Optional[AsyncOpenAI] = None,
+        streaming_mode: StreamingMode = "coalesced",
+    ):
+        """Initialize the streaming model with OpenAI client and model name.
+
+        Args:
+            model_name: The name of the OpenAI model to use (default: "gpt-4o")
+            _use_responses_api: Internal flag for responses API (deprecated, always True)
+            openai_client: Optional custom AsyncOpenAI client. If not provided, a default
+                          client with max_retries=0 will be created (since Temporal handles retries)
+            streaming_mode: How per-delta updates flow to consumers. Defaults to
+                          "coalesced" (50ms / 128-char windowed batches with an
+                          immediate first-delta flush) for low latency without
+                          giving up streaming UX. Use "per_token" for legacy
+                          publish-every-delta behavior, or "off" to suppress
+                          per-delta publishes entirely.
+        """
+        # Use provided client or create default (Temporal handles retries)
+        self.client = openai_client if openai_client is not None else AsyncOpenAI(max_retries=0)
+        self.model_name = model_name
+        # Always use Responses API for all models
+        self.use_responses_api = True
+        self.streaming_mode: StreamingMode = streaming_mode
+
+        # Initialize tracer as a class variable
+        agentex_client = create_async_agentex_client()
+        self.tracer = AsyncTracer(agentex_client)
+
+        logger.info(f"[TemporalStreamingModel] Initialized model={self.model_name}, use_responses_api={self.use_responses_api}, custom_client={openai_client is not None}, streaming_mode={self.streaming_mode}, tracer=initialized")
+
+    def _non_null_or_not_given(self, value: Any) -> Any:
+        """Convert None to NOT_GIVEN sentinel, matching OpenAI SDK pattern."""
+        return value if value is not None else NOT_GIVEN
+
+    def _prepare_response_input(self, input: Union[str, list[TResponseInputItem]]) -> List[dict]:
+        """Convert input to Responses API format.
+
+        Args:
+            input: Either a string prompt or list of ResponseInputItem messages
+
+        Returns:
+            List of input items in Responses API format
+        """
+        response_input = []
+
+        if isinstance(input, list):
+            # Process list of ResponseInputItem objects
+            for _idx, item in enumerate(input):
+                # Convert to dict if needed
+                if isinstance(item, dict):
+                    item_dict = item
+                else:
+                    item_dict = item.model_dump() if hasattr(item, 'model_dump') else item
+
+                item_type = item_dict.get("type")
+
+                if item_type == "message":
+                    # ResponseOutputMessage format
+                    role = item_dict.get("role", "assistant")
+                    content_list = item_dict.get("content", [])
+
+                    # Build content array
+                    content_array = []
+                    for content_item in content_list:
+                        if isinstance(content_item, dict):
+                            if content_item.get("type") == "output_text":
+                                # For assistant messages, keep as output_text
+                                # For user messages, convert to input_text
+                                if role == "user":
+                                    content_array.append({
+                                        "type": "input_text",
+                                        "text": content_item.get("text", "")
+                                    })
+                                else:
+                                    content_array.append({
+                                        "type": "output_text",
+                                        "text": content_item.get("text", "")
+                                    })
+                            else:
+                                content_array.append(content_item)
+
+                    response_input.append({
+                        "type": "message",
+                        "role": role,
+                        "content": content_array
+                    })
+
+                elif item_type == "function_call":
+                    # Function call from previous response
+                    logger.debug(f"[Responses API] function_call item keys: {list(item_dict.keys())}")
+                    call_id = item_dict.get("call_id") or item_dict.get("id")
+                    if not call_id:
+                        logger.debug(f"[Responses API] WARNING: No call_id found in function_call item!")
+                        logger.debug(f"[Responses API] Full item: {item_dict}")
+                        # Generate a fallback ID if missing
+                        call_id = f"call_{uuid.uuid4().hex[:8]}"
+                        logger.debug(f"[Responses API] Generated fallback call_id: {call_id}")
+                    logger.debug(f"[Responses API] Adding function_call with call_id={call_id}, name={item_dict.get('name')}")
+                    response_input.append({
+                        "type": "function_call",
+                        "call_id": call_id,  # API expects 'call_id' not 'id'
+                        "name": item_dict.get("name", ""),
+                        "arguments": item_dict.get("arguments", "{}"),
+                    })
+
+                elif item_type == "function_call_output":
+                    # Function output/response
+                    call_id = item_dict.get("call_id")
+                    if not call_id:
+                        logger.debug(f"[Responses API] WARNING: No call_id in function_call_output!")
+                        # Try to find it from id field
+                        call_id = item_dict.get("id")
+                    response_input.append({
+                        "type": "function_call_output",
+                        "call_id": call_id or "",
+                        "output": item_dict.get("output", "")
+                    })
+
+                elif item_dict.get("role") == "user":
+                    # Simple user message
+                    response_input.append({
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": item_dict.get("content", "")}]
+                    })
+
+                elif item_dict.get("role") == "tool":
+                    # Tool message
+                    response_input.append({
+                        "type": "function_call_output",
+                        "call_id": item_dict.get("tool_call_id"),
+                        "output": item_dict.get("content")
+                    })
+                else:
+                    logger.debug(f"[Responses API] Skipping unhandled item type: {item_type}, role: {item_dict.get('role')}")
+
+        elif isinstance(input, str):
+            # Simple string input
+            response_input.append({
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": input}]
+            })
+
+        return response_input
+
+    def _convert_tools(self, tools: list[Tool], handoffs: list[Handoff]) -> tuple[List[dict], List[str]]:
+        """Convert tools and handoffs to Responses API format.
+
+        Args:
+            tools: List of Tool objects
+            handoffs: List of Handoff objects
+
+        Returns:
+            Tuple of (converted_tools, include_list) where include_list contains
+            additional response data to request
+        """
+        response_tools = []
+        tool_includes = []
+
+        # Check for multiple computer tools (only one allowed)
+        computer_tools = [tool for tool in tools if isinstance(tool, ComputerTool)]
+        if len(computer_tools) > 1:
+            raise ValueError(f"You can only provide one computer tool. Got {len(computer_tools)}")
+
+        # Convert each tool based on its type
+        for tool in tools:
+            if isinstance(tool, FunctionTool):
+                response_tools.append({
+                    "type": "function",
+                    "name": tool.name,
+                    "description": tool.description or "",
+                    "parameters": tool.params_json_schema if tool.params_json_schema else {},
+                    "strict": tool.strict_json_schema,
+                })
+
+            elif isinstance(tool, WebSearchTool):
+                tool_config = {
+                    "type": "web_search",
+                }
+                # filters attribute was removed from WebSearchTool API
+                if hasattr(tool, 'user_location') and tool.user_location is not None:
+                    tool_config["user_location"] = tool.user_location
+                if hasattr(tool, 'search_context_size') and tool.search_context_size is not None:
+                    tool_config["search_context_size"] = tool.search_context_size
+                response_tools.append(tool_config)
+
+            elif isinstance(tool, FileSearchTool):
+                tool_config = {
+                    "type": "file_search",
+                    "vector_store_ids": tool.vector_store_ids,
+                }
+                if tool.max_num_results:
+                    tool_config["max_num_results"] = tool.max_num_results
+                if tool.ranking_options:
+                    tool_config["ranking_options"] = tool.ranking_options
+                if tool.filters:
+                    tool_config["filters"] = tool.filters
+                response_tools.append(tool_config)
+
+                # Add include for file search results if needed
+                if tool.include_search_results:
+                    tool_includes.append("file_search_call.results")
+
+            elif isinstance(tool, ComputerTool):
+                # In newer openai-agents, tool.computer may be a factory
+                # (ComputerCreate/ComputerProvider). Only concrete Computer
+                # / AsyncComputer instances expose environment/dimensions.
+                computer = tool.computer
+                if not isinstance(computer, (Computer, AsyncComputer)):
+                    raise ValueError(
+                        "ComputerTool.computer must be a Computer or AsyncComputer "
+                        "instance for Responses API serialization; got "
+                        f"{type(computer).__name__}"
+                    )
+                environment = computer.environment
+                dimensions = computer.dimensions
+                if environment is None or dimensions is None:
+                    raise ValueError(
+                        "ComputerTool requires `environment` and `dimensions` on the "
+                        "Computer/AsyncComputer implementation."
+                    )
+                response_tools.append({
+                    "type": "computer_use_preview",
+                    "environment": environment,
+                    "display_width": dimensions[0],
+                    "display_height": dimensions[1],
+                })
+
+            elif isinstance(tool, HostedMCPTool):
+                response_tools.append(tool.tool_config)
+
+            elif isinstance(tool, ImageGenerationTool):
+                response_tools.append(tool.tool_config)
+
+            elif isinstance(tool, CodeInterpreterTool):
+                response_tools.append(tool.tool_config)
+
+            elif isinstance(tool, LocalShellTool):
+                # LocalShellTool API changed - no longer has working_directory
+                # The executor handles execution details internally
+                response_tools.append({
+                    "type": "local_shell",
+                })
+
+            elif ShellTool is not None and isinstance(tool, ShellTool):
+                environment = dict(tool.environment) if tool.environment else {"type": "local"}
+                response_tools.append({
+                    "type": "shell",
+                    "environment": environment,
+                })
+
+            else:
+                logger.warning(f"Unknown tool type: {type(tool).__name__}, skipping")
+
+        # Convert handoffs (always function tools)
+        for handoff in handoffs:
+            response_tools.append({
+                "type": "function",
+                "name": handoff.tool_name,
+                "description": handoff.tool_description or f"Transfer to {handoff.agent_name}",
+                "parameters": handoff.input_json_schema if handoff.input_json_schema else {},
+            })
+
+        return response_tools, tool_includes
+
+    def _build_reasoning_param(self, model_settings: ModelSettings) -> Any:
+        """Build reasoning parameter from model settings.
+
+        Args:
+            model_settings: Model configuration settings
+
+        Returns:
+            Reasoning parameter dict or NOT_GIVEN
+        """
+        if not model_settings.reasoning:
+            return NOT_GIVEN
+
+        if hasattr(model_settings.reasoning, 'effort') and model_settings.reasoning.effort:
+            # For Responses API, reasoning is an object
+            reasoning_param = {
+                "effort": model_settings.reasoning.effort,
+            }
+            # Add summary if specified (check both 'summary' and 'generate_summary' for compatibility)
+            summary_value = None
+            if hasattr(model_settings.reasoning, 'summary') and model_settings.reasoning.summary is not None:
+                summary_value = model_settings.reasoning.summary
+            elif (
+                hasattr(model_settings.reasoning, 'generate_summary')
+                and model_settings.reasoning.generate_summary is not None
+            ):
+                summary_value = model_settings.reasoning.generate_summary
+
+            if summary_value is not None:
+                reasoning_param["summary"] = summary_value
+
+            logger.debug(f"[TemporalStreamingModel] Using reasoning param: {reasoning_param}")
+            return reasoning_param
+
+        return NOT_GIVEN
+
+    def _convert_tool_choice(self, tool_choice: Any) -> Any:
+        """Convert tool_choice to Responses API format.
+
+        Args:
+            tool_choice: Tool choice from model settings
+
+        Returns:
+            Converted tool choice or NOT_GIVEN
+        """
+        if tool_choice is None:
+            return NOT_GIVEN
+
+        if isinstance(tool_choice, MCPToolChoice):
+            # MCP tool choice with server label
+            return {
+                "server_label": tool_choice.server_label,
+                "type": "mcp",
+                "name": tool_choice.name,
+            }
+        elif tool_choice == "required":
+            return "required"
+        elif tool_choice == "auto":
+            return "auto"
+        elif tool_choice == "none":
+            return "none"
+        elif tool_choice == "file_search":
+            return {"type": "file_search"}
+        elif tool_choice == "web_search":
+            return {"type": "web_search"}
+        elif tool_choice == "web_search_preview":
+            return {"type": "web_search_preview"}
+        elif tool_choice == "computer_use_preview":
+            return {"type": "computer_use_preview"}
+        elif tool_choice == "image_generation":
+            return {"type": "image_generation"}
+        elif tool_choice == "code_interpreter":
+            return {"type": "code_interpreter"}
+        elif tool_choice == "mcp":
+            # Generic MCP without specific tool
+            return {"type": "mcp"}
+        elif isinstance(tool_choice, str):
+            # Specific function tool by name
+            return {
+                "type": "function",
+                "name": tool_choice,
+            }
+        else:
+            # Pass through as-is for other types
+            return tool_choice
+
+    async def _post_tool_message(self, task_id: str, content: Any) -> None:
+        """Post a one-shot tool request/response message (no deltas).
+
+        Used for hosted/server-side tool calls (web_search, file_search,
+        code_interpreter, image generation, server-side mcp, ...) that execute
+        inside the Responses API and so never produce function_call items or fire
+        RunHooks. Each completed hosted tool is surfaced as a ToolRequestContent +
+        ToolResponseContent pair. Posting full (no deltas) means the coalescing
+        path that the streamed reasoning/text contexts use does not apply here.
+        """
+        try:
+            async with adk.streaming.streaming_task_message_context(
+                task_id=task_id,
+                initial_content=content,
+            ) as ctx:
+                await ctx.stream_update(
+                    StreamTaskMessageFull(
+                        parent_task_message=ctx.task_message,
+                        content=content,
+                        type="full",
+                    )
+                )
+        except Exception as e:  # noqa: BLE001 - UI surfacing must never break a turn
+            logger.warning(f"[TemporalStreamingModel] failed to post hosted-tool message: {e}")
+
+    @override
+    async def get_response(
+        self,
+        system_instructions: Optional[str],
+        input: Union[str, list[TResponseInputItem]],
+        model_settings: ModelSettings,
+        tools: list[Tool],
+        output_schema: Optional[AgentOutputSchemaBase],
+        handoffs: list[Handoff],
+        tracing: ModelTracing,  # noqa: ARG002
+        *,
+        previous_response_id: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        prompt: Optional[ResponsePromptParam] = None,
+    ) -> ModelResponse:
+        """Get a non-streaming response from the model with streaming to Redis.
+
+        This method is used by Temporal activities and needs to return a complete
+        response, but we stream the response to Redis while generating it.
+
+        ``previous_response_id``, ``conversation_id``, and ``prompt`` are all
+        Responses API server-state parameters threaded through by the OpenAI
+        Agents SDK. Each is forwarded to ``responses.create`` only when
+        explicitly set — defaults resolve to ``NOT_GIVEN`` and are omitted from
+        the request body. Not all OpenAI-compatible backends recognize these
+        fields, so callers on alternative providers see no wire-level change
+        unless they opt in.
+        """
+        
+        task_id = streaming_task_id.get()
+        trace_id = streaming_trace_id.get()
+        parent_span_id = streaming_parent_span_id.get()
+
+        if not task_id or not trace_id or not parent_span_id:
+            raise ValueError("task_id, trace_id, and parent_span_id are required for streaming with Responses API")
+
+        trace = self.tracer.trace(trace_id)
+
+        async with trace.span(
+            parent_id=parent_span_id,
+            name="streaming_model_get_response",
+            input={
+                "model": self.model_name,
+                "has_system_instructions": system_instructions is not None,
+                "input_type": type(input).__name__,
+                "tools_count": len(tools) if tools else 0,
+                "handoffs_count": len(handoffs) if handoffs else 0,
+            },
+        ) as span:
+            # Always use Responses API for streaming
+            if not task_id:
+                # If no task_id, we can't use streaming - this shouldn't happen normally
+                raise ValueError("task_id is required for streaming with Responses API")
+
+            logger.info(f"[TemporalStreamingModel] Using Responses API for {self.model_name}")
+
+            try:
+                # Prepare input using helper method
+                response_input = self._prepare_response_input(input)
+
+                # Convert tools and handoffs using helper method
+                response_tools, tool_includes = self._convert_tools(tools, handoffs)
+                openai_tools = response_tools if response_tools else None
+
+                # Build reasoning parameter using helper method
+                reasoning_param = self._build_reasoning_param(model_settings)
+
+                # Convert tool_choice using helper method
+                tool_choice = self._convert_tool_choice(model_settings.tool_choice)
+
+                # Build include list for response data
+                include_list = []
+                # Add tool-specific includes
+                if tool_includes:
+                    include_list.extend(tool_includes)
+                # Add user-specified includes
+                if model_settings.response_include:
+                    include_list.extend(model_settings.response_include)
+                # Add logprobs include if top_logprobs is set
+                if model_settings.top_logprobs is not None:
+                    include_list.append("message.output_text.logprobs")
+                # Build response format for verbosity and structured output
+                response_format = NOT_GIVEN
+
+                if output_schema is not None:
+                    # Handle structured output schema for Responses API
+                    # The Responses API expects the schema in the 'text' parameter with a 'format' key
+                    logger.debug(f"[TemporalStreamingModel] Converting output_schema to Responses API format")
+                    try:
+                        # Get the JSON schema from the output schema
+                        schema_dict = output_schema.json_schema()
+                        response_format = {
+                            "format": {
+                                "type": "json_schema",
+                                "name": "final_output",
+                                "schema": schema_dict,
+                                "strict": output_schema.is_strict_json_schema() if hasattr(output_schema, 'is_strict_json_schema') else True,
+                            }
+                        }
+                        logger.debug(f"[TemporalStreamingModel] Built response_format with json_schema: {response_format}")
+                    except Exception as e:
+                        logger.warning(f"Failed to convert output_schema: {e}")
+                        response_format = NOT_GIVEN
+
+                if model_settings.verbosity is not None:
+                    if response_format is not NOT_GIVEN and isinstance(response_format, dict):
+                        response_format["verbosity"] = model_settings.verbosity
+                    else:
+                        response_format = {"verbosity": model_settings.verbosity}
+
+                # Build extra_args dict for additional parameters
+                extra_args = dict(model_settings.extra_args or {})
+                if model_settings.top_logprobs is not None:
+                    extra_args["top_logprobs"] = model_settings.top_logprobs
+
+                # Opt-in prompt_cache_key: forwarded only when the caller supplies it via
+                # model_settings.extra_args["prompt_cache_key"]. Not all OpenAI-compatible
+                # endpoints recognize this parameter, so we don't auto-inject a default.
+                prompt_cache_key = extra_args.pop("prompt_cache_key", NOT_GIVEN)
+
+                # Create the response stream using Responses API.
+                # Bookmark request start *before* the await so ttft captures the full
+                # user-perceived latency (HTTP round-trip + model TTFB), not just the
+                # post-connect event-loop delay.
+                stream_start_perf = time.perf_counter()
+                logger.debug(f"[TemporalStreamingModel] Creating response stream with Responses API")
+                stream = await self.client.responses.create(  # type: ignore[call-overload]
+
+                    model=self.model_name,
+                    input=response_input,
+                    instructions=system_instructions,
+                    tools=openai_tools or NOT_GIVEN,
+                    stream=True,
+                    # Temperature and sampling parameters
+                    temperature=self._non_null_or_not_given(model_settings.temperature),
+                    max_output_tokens=self._non_null_or_not_given(model_settings.max_tokens),
+                    top_p=self._non_null_or_not_given(model_settings.top_p),
+                    # Note: frequency_penalty and presence_penalty are not supported by Responses API
+                    # Tool and reasoning parameters
+                    reasoning=reasoning_param,
+                    tool_choice=tool_choice,
+                    parallel_tool_calls=self._non_null_or_not_given(model_settings.parallel_tool_calls),
+                    # Context and truncation
+                    truncation=self._non_null_or_not_given(model_settings.truncation),
+                    # Response configuration (includes structured output schema)
+                    text=response_format,
+                    include=include_list if include_list else NOT_GIVEN,
+                    # Metadata and storage
+                    metadata=self._non_null_or_not_given(model_settings.metadata),
+                    store=self._non_null_or_not_given(model_settings.store),
+                    # Extra customization
+                    extra_headers=model_settings.extra_headers,
+                    extra_query=model_settings.extra_query,
+                    extra_body=model_settings.extra_body,
+                    prompt_cache_key=prompt_cache_key,
+                    previous_response_id=self._non_null_or_not_given(previous_response_id),
+                    # SDK abstract names this conversation_id; the Responses API
+                    # endpoint kwarg is `conversation` (accepts a str id directly).
+                    conversation=self._non_null_or_not_given(conversation_id),
+                    prompt=self._non_null_or_not_given(prompt),
+                    # Any additional parameters from extra_args
+                    **extra_args,
+                )
+
+                # Process the stream of events from Responses API
+                output_items = []
+                captured_usage = None
+                captured_response_id = None
+                current_text = ""
+                streaming_context = None
+                reasoning_context = None
+                reasoning_summaries = []
+                reasoning_contents = []
+                event_count = 0
+                # ttft / ttat / tps instrumentation. ``stream_start_perf`` is set
+                # above, before the responses.create() await, so it captures the full
+                # request-to-first-token latency. ``first_token_at`` and
+                # ``last_token_at`` bracket the model-generation window for tps.
+                # ``first_answer_at`` is set on the first user-visible answer token
+                # (text or tool-call delta) and excludes reasoning chunks, so ttat
+                # measures the latency users actually perceive on reasoning models.
+                first_token_at: Optional[float] = None
+                last_token_at: Optional[float] = None
+                first_answer_at: Optional[float] = None
+
+                # We expect task_id to always be provided for streaming
+                if not task_id:
+                    raise ValueError("[TemporalStreamingModel] task_id is required for streaming model")
+
+                # Process events from the Responses API stream
+                function_calls_in_progress = {}  # Track function calls being streamed
+
+                async for event in stream:
+                    event_count += 1
+
+                    # Log event type
+                    logger.debug(f"[TemporalStreamingModel] Event {event_count}: {type(event).__name__}")
+
+                    # Bookmark first/last token-producing events for ttft and tps.
+                    # Includes function-call argument deltas so the generation window
+                    # covers every event type whose tokens land in usage.output_tokens.
+                    if isinstance(event, (
+                        ResponseTextDeltaEvent,
+                        ResponseReasoningTextDeltaEvent,
+                        ResponseReasoningSummaryTextDeltaEvent,
+                        ResponseFunctionCallArgumentsDeltaEvent,
+                    )):
+                        now_perf = time.perf_counter()
+                        if first_token_at is None:
+                            first_token_at = now_perf
+                        last_token_at = now_perf
+                        # ttat: first user-visible answer token (text or tool call),
+                        # excluding reasoning chunks. Equal to ttft for non-reasoning
+                        # models; differs by reasoning duration for reasoning models.
+                        if first_answer_at is None and isinstance(event, (
+                            ResponseTextDeltaEvent,
+                            ResponseFunctionCallArgumentsDeltaEvent,
+                        )):
+                            first_answer_at = now_perf
+
+                    # Handle different event types using isinstance for type safety
+                    if isinstance(event, ResponseOutputItemAddedEvent):
+                        # New output item (reasoning, function call, or message)
+                        item = getattr(event, 'item', None)
+                        output_index = getattr(event, 'output_index', 0)
+
+                        if item and getattr(item, 'type', None) == 'reasoning':
+                            logger.debug(f"[TemporalStreamingModel] Starting reasoning item")
+                            if not reasoning_context:
+                                # Start a reasoning context for streaming reasoning to UI
+                                reasoning_context = await adk.streaming.streaming_task_message_context(
+                                    task_id=task_id,
+                                    initial_content=ReasoningContent(
+                                        author="agent",
+                                        summary=[],
+                                        content=[],
+                                        type="reasoning",
+                                        style="active",
+                                    ),
+                                    streaming_mode=self.streaming_mode,
+                                ).__aenter__()
+                        elif item and getattr(item, 'type', None) == 'function_call':
+                            # Open a streaming context per function call so argument
+                            # deltas can be published incrementally. Coalescing and
+                            # mode dispatch are handled by the streaming layer.
+                            call_id = getattr(item, 'call_id', '')
+                            tool_name = getattr(item, 'name', '')
+                            call_context = await adk.streaming.streaming_task_message_context(
+                                task_id=task_id,
+                                initial_content=ToolRequestContent(
+                                    author="agent",
+                                    tool_call_id=call_id,
+                                    name=tool_name,
+                                    arguments={},
+                                ),
+                                streaming_mode=self.streaming_mode,
+                            ).__aenter__()
+                            function_calls_in_progress[output_index] = {
+                                'id': getattr(item, 'id', ''),
+                                'call_id': call_id,
+                                'name': tool_name,
+                                'arguments': getattr(item, 'arguments', ''),
+                                'context': call_context,
+                            }
+                            logger.debug(f"[TemporalStreamingModel] Starting function call: {item.name}")
+
+                        elif item and getattr(item, 'type', None) == 'message':
+                            # Track the message being streamed
+                            streaming_context = await adk.streaming.streaming_task_message_context(
+                                task_id=task_id,
+                                initial_content=TextContent(
+                                    author="agent",
+                                    content="",
+                                    format="markdown",
+                                ),
+                                streaming_mode=self.streaming_mode,
+                            ).__aenter__()
+
+                    elif isinstance(event, ResponseFunctionCallArgumentsDeltaEvent):
+                        # Stream function call arguments
+                        output_index = getattr(event, 'output_index', 0)
+                        delta = getattr(event, 'delta', '')
+
+                        call_data = function_calls_in_progress.get(output_index)
+                        if call_data is not None:
+                            call_data['arguments'] += delta
+                            call_context = call_data.get('context')
+                            if call_context is not None:
+                                try:
+                                    await call_context.stream_update(StreamTaskMessageDelta(
+                                        parent_task_message=call_context.task_message,
+                                        delta=ToolRequestDelta(
+                                            tool_call_id=call_data['call_id'],
+                                            name=call_data['name'],
+                                            arguments_delta=delta,
+                                            type="tool_request",
+                                        ),
+                                        type="delta",
+                                    ))
+                                except Exception as e:
+                                    logger.warning(f"Failed to send tool request delta: {e}")
+                            logger.debug(f"[TemporalStreamingModel] Function call args delta: {delta[:50]}...")
+
+                    elif isinstance(event, ResponseFunctionCallArgumentsDoneEvent):
+                        # Function call arguments complete
+                        output_index = getattr(event, 'output_index', 0)
+                        arguments = getattr(event, 'arguments', '')
+
+                        if output_index in function_calls_in_progress:
+                            function_calls_in_progress[output_index]['arguments'] = arguments
+                            logger.debug(f"[TemporalStreamingModel] Function call args done")
+
+                    elif isinstance(event, (ResponseReasoningTextDeltaEvent, ResponseReasoningSummaryTextDeltaEvent, ResponseTextDeltaEvent)):
+                        # Handle text streaming
+                        delta = getattr(event, 'delta', '')
+
+                        if isinstance(event, ResponseReasoningSummaryTextDeltaEvent) and reasoning_context:
+                            # Stream reasoning summary deltas - these are the actual reasoning tokens!
+                            try:
+                                # Use ReasoningSummaryDelta for reasoning summaries
+                                summary_index = getattr(event, 'summary_index', 0)
+                                delta_obj = ReasoningSummaryDelta(
+                                    summary_index=summary_index,
+                                    summary_delta=delta,
+                                    type="reasoning_summary",
+                                )
+                                update = StreamTaskMessageDelta(
+                                    parent_task_message=reasoning_context.task_message,
+                                    delta=delta_obj,
+                                    type="delta",
+                                )
+                                await reasoning_context.stream_update(update)
+                                # Accumulate the reasoning summary
+                                if len(reasoning_summaries) <= summary_index:
+                                    logger.debug(f"[TemporalStreamingModel] Extending reasoning summaries: {summary_index}")
+                                    reasoning_summaries.extend([""] * (summary_index + 1 - len(reasoning_summaries)))
+                                reasoning_summaries[summary_index] += delta
+                                logger.debug(f"[TemporalStreamingModel] Streamed reasoning summary: {delta[:30]}..." if len(delta) > 30 else f"[TemporalStreamingModel] Streamed reasoning summary: {delta}")
+                            except Exception as e:
+                                logger.warning(f"Failed to send reasoning delta: {e}")
+                        elif isinstance(event, ResponseReasoningTextDeltaEvent) and reasoning_context:
+                            # Regular reasoning delta (if these ever appear)
+                            try:
+                                delta_obj = ReasoningContentDelta(
+                                    content_index=0,
+                                    content_delta=delta,
+                                    type="reasoning_content",
+                                )
+                                update = StreamTaskMessageDelta(
+                                    parent_task_message=reasoning_context.task_message,
+                                    delta=delta_obj,
+                                    type="delta",
+                                )
+                                await reasoning_context.stream_update(update)
+                                reasoning_contents.append(delta)
+                            except Exception as e:
+                                logger.warning(f"Failed to send reasoning delta: {e}")
+                        elif isinstance(event, ResponseTextDeltaEvent):
+                            # Stream regular text output
+                            current_text += delta
+                            try:
+                                delta_obj = TextDelta(
+                                    type="text",
+                                    text_delta=delta,
+                                )
+                                update = StreamTaskMessageDelta(
+                                    parent_task_message=streaming_context.task_message if streaming_context else None,
+                                    delta=delta_obj,
+                                    type="delta",
+                                )
+                                if streaming_context:
+                                    await streaming_context.stream_update(update)
+                            except Exception as e:
+                                logger.warning(f"Failed to send text delta: {e}")
+
+                    elif isinstance(event, ResponseOutputItemDoneEvent):
+                        # Output item completed
+                        item = getattr(event, 'item', None)
+                        output_index = getattr(event, 'output_index', 0)
+
+                        if item and getattr(item, 'type', None) == 'reasoning':
+                            if reasoning_context and reasoning_summaries:
+                                logger.debug(f"[TemporalStreamingModel] Reasoning itme completed, sending final update")
+                                try:
+                                    # Send a full message update with the complete reasoning content
+                                    complete_reasoning_content = ReasoningContent(
+                                        author="agent",
+                                        summary=reasoning_summaries,  # Use accumulated summaries
+                                        content=reasoning_contents if reasoning_contents else [],
+                                        type="reasoning",
+                                        style="static",
+                                    )
+
+                                    await reasoning_context.stream_update(
+                                        update=StreamTaskMessageFull(
+                                            parent_task_message=reasoning_context.task_message,
+                                            content=complete_reasoning_content,
+                                            type="full",
+                                        ),
+                                    )
+
+                                    # Close the reasoning context after sending the final update
+                                    # This matches the reference implementation pattern
+                                    await reasoning_context.close()
+                                    reasoning_context = None
+                                    logger.debug(f"[TemporalStreamingModel] Closed reasoning context after final update")
+                                except Exception as e:
+                                    logger.warning(f"Failed to send reasoning part done update: {e}")
+
+                        elif item and getattr(item, 'type', None) == 'function_call':
+                            # Function call completed - add to output
+                            if output_index in function_calls_in_progress:
+                                call_data = function_calls_in_progress[output_index]
+                                logger.debug(f"[TemporalStreamingModel] Function call completed: {call_data['name']}")
+
+                                # Create proper function call object
+                                tool_call = ResponseFunctionToolCall(
+                                    id=call_data['id'],
+                                    call_id=call_data['call_id'],
+                                    type="function_call",
+                                    name=call_data['name'],
+                                    arguments=call_data['arguments'],
+                                )
+                                output_items.append(tool_call)
+
+                                # Emit the final ToolRequestContent and close the
+                                # per-call streaming context. If the model produced
+                                # invalid JSON args (truncation, hallucination), fall
+                                # back to an empty dict so the streaming layer can
+                                # still persist a message.
+                                call_context = call_data.get('context')
+                                if call_context is not None:
+                                    raw_args = call_data['arguments'] or ''
+                                    try:
+                                        parsed_args = json.loads(raw_args) if raw_args else {}
+                                    except json.JSONDecodeError:
+                                        logger.warning(
+                                            f"Failed to parse tool call arguments for {call_data['name']} "
+                                            f"(raw_args_bytes={len(raw_args)})"
+                                        )
+                                        parsed_args = {}
+                                    try:
+                                        await call_context.stream_update(StreamTaskMessageFull(
+                                            parent_task_message=call_context.task_message,
+                                            content=ToolRequestContent(
+                                                author="agent",
+                                                tool_call_id=call_data['call_id'],
+                                                name=call_data['name'],
+                                                arguments=parsed_args,
+                                            ),
+                                            type="full",
+                                        ))
+                                    except Exception as e:
+                                        logger.warning(f"Failed to send tool request full update: {e}")
+                                    try:
+                                        await call_context.close()
+                                    except Exception as e:
+                                        logger.warning(f"Failed to close tool request context: {e}")
+                                    finally:
+                                        call_data['context'] = None
+
+                        elif item and getattr(item, 'type', None) in _HOSTED_TOOL_TYPES:
+                            # Hosted / server-side tool call (web_search, file_search,
+                            # code_interpreter, image generation, server-side mcp, ...).
+                            # These run inside the Responses API: no function_call item
+                            # and no RunHooks fire, so surface the completed call as a
+                            # tool request + response pair (it carries the full
+                            # query/result by the time it's done).
+                            call_id, name, args = _hosted_tool_request(item)
+                            await self._post_tool_message(
+                                task_id,
+                                ToolRequestContent(
+                                    author="agent",
+                                    tool_call_id=call_id,
+                                    name=name,
+                                    arguments=args,
+                                ),
+                            )
+                            await self._post_tool_message(
+                                task_id,
+                                ToolResponseContent(
+                                    author="agent",
+                                    tool_call_id=call_id,
+                                    name=name,
+                                    # Plain string, matching the function-tool response
+                                    # path (hooks.on_tool_end) so hosted and function
+                                    # tools render identically in the same flow.
+                                    content=_hosted_tool_result(item)[:_HOSTED_TOOL_RESULT_CAP],
+                                ),
+                            )
+
+                    elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
+                        # New reasoning part/summary started - reset accumulator
+                        part = getattr(event, 'part', None)
+                        if part:
+                            part_type = getattr(part, 'type', 'unknown')
+                            logger.debug(f"[TemporalStreamingModel] New reasoning part: type={part_type}")
+                            # Reset the current reasoning summary for this new part
+
+                    elif isinstance(event, ResponseReasoningSummaryPartDoneEvent):
+                        # Reasoning part completed - ResponseOutputItemDoneEvent will handle the final update
+                        logger.debug(f"[TemporalStreamingModel] Reasoning part completed")
+
+                    elif isinstance(event, ResponseCompletedEvent):
+                        # Response completed
+                        logger.debug(f"[TemporalStreamingModel] Response completed")
+                        response = getattr(event, 'response', None)
+                        if response is not None:
+                            if hasattr(response, 'output'):
+                                # Use the final output from the response
+                                output_items = response.output
+                                logger.debug(f"[TemporalStreamingModel] Found {len(output_items)} output items in final response")
+                            captured_usage = getattr(response, 'usage', None)
+                            captured_response_id = getattr(response, 'id', None)
+
+                # End of event processing loop - close any open contexts
+                if reasoning_context:
+                    await reasoning_context.close()
+                    reasoning_context = None
+
+                if streaming_context:
+                    await streaming_context.close()
+                    streaming_context = None
+
+                # Defensive: close any function call contexts that didn't see a
+                # ResponseOutputItemDoneEvent (truncated stream, error mid-call).
+                for call_data in function_calls_in_progress.values():
+                    call_context = call_data.get('context')
+                    if call_context is not None:
+                        try:
+                            await call_context.close()
+                        except Exception as e:
+                            logger.warning(f"Failed to close orphaned tool request context: {e}")
+                        call_data['context'] = None
+
+                # Build the response from output items collected during streaming
+                # Create output from the items we collected
+                response_output = []
+
+                # Process output items from the response
+                if output_items:
+                    for item in output_items:
+                        if isinstance(item, ResponseFunctionToolCall):
+                            response_output.append(item)
+                        elif isinstance(item, ResponseOutputMessage):
+                            response_output.append(item)
+                        else:
+                            response_output.append(item)
+                else:
+                    # No output items - create empty message
+                    message = ResponseOutputMessage(
+                        id=f"msg_{uuid.uuid4().hex[:8]}",
+                        type="message",
+                        status="completed",
+                        role="assistant",
+                        content=[ResponseOutputText(
+                            type="output_text",
+                            text=current_text if current_text else "",
+                            annotations=[]
+                        )]
+                    )
+                    response_output.append(message)
+
+                # Use the real usage from the streaming Response if available;
+                # fall back to zeros only when the stream ended without a
+                # ResponseCompletedEvent (error paths).
+                if captured_usage is not None:
+                    usage = Usage(
+                        input_tokens=captured_usage.input_tokens,
+                        output_tokens=captured_usage.output_tokens,
+                        total_tokens=captured_usage.total_tokens,
+                        input_tokens_details=InputTokensDetails(
+                            cached_tokens=getattr(
+                                captured_usage.input_tokens_details, "cached_tokens", 0
+                            ),
+                        ),
+                        output_tokens_details=OutputTokensDetails(
+                            reasoning_tokens=getattr(
+                                captured_usage.output_tokens_details, "reasoning_tokens", 0
+                            ),
+                        ),
+                    )
+                else:
+                    usage = Usage(
+                        input_tokens=0,
+                        output_tokens=0,
+                        total_tokens=0,
+                        input_tokens_details=InputTokensDetails(cached_tokens=0),
+                        output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
+                    )
+
+                # Serialize response output items for span tracing
+                new_items = []
+                final_output = None
+                tool_calls = []
+                tool_outputs = []
+
+                for item in response_output:
+                    try:
+                        item_dict = _serialize_item(item)
+                        if item_dict:
+                            new_items.append(item_dict)
+
+                            # Extract final_output from message type if available
+                            if item_dict.get('type') == 'message' and not final_output:
+                                content = item_dict.get('content', [])
+                                if content and isinstance(content, list):
+                                    for content_part in content:
+                                        if isinstance(content_part, dict) and 'text' in content_part:
+                                            final_output = content_part['text']
+                                            break
+                    except Exception as e:
+                        logger.warning(f"Failed to serialize item in temporal_streaming_model: {e}")
+                        continue
+
+                # Extract tool calls and outputs from input
+                try:
+                    if isinstance(input, list):
+                        for item in input:
+                            try:
+                                item_dict = _serialize_item(item) if not isinstance(item, dict) else item
+                                if item_dict:
+                                    # Capture function calls
+                                    if item_dict.get('type') == 'function_call':
+                                        tool_calls.append(item_dict)
+                                    # Capture function outputs
+                                    elif item_dict.get('type') == 'function_call_output':
+                                        tool_outputs.append(item_dict)
+                            except Exception:
+                                pass
+                except Exception as e:
+                    logger.warning(f"Failed to extract tool calls and outputs: {e}")
+
+                # Set span output with structured data
+                if span:
+                    output_data = {
+                        "new_items": new_items,
+                        "final_output": final_output,
+                        "usage": {
+                            "input_tokens": usage.input_tokens,
+                            "output_tokens": usage.output_tokens,
+                            "total_tokens": usage.total_tokens,
+                            "cached_input_tokens": usage.input_tokens_details.cached_tokens,
+                            "reasoning_tokens": usage.output_tokens_details.reasoning_tokens,
+                        },
+                    }
+                    # Include tool calls if any were in the input
+                    if tool_calls:
+                        output_data["tool_calls"] = tool_calls
+                    # Include tool outputs if any were processed
+                    if tool_outputs:
+                        output_data["tool_outputs"] = tool_outputs
+
+                    span.output = output_data
+                    lineage_refs = resolve_refs_from_items(new_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
+
+                # Streaming-only metrics. Token counters and the success request
+                # counter are emitted by LLMMetricsHooks.on_llm_end so they fire
+                # consistently across streaming and non-streaming paths.
+                m = get_llm_metrics()
+                metric_attrs = {"model": self.model_name}
+                if first_token_at is not None:
+                    m.ttft_ms.record((first_token_at - stream_start_perf) * 1000, metric_attrs)
+                if first_answer_at is not None:
+                    m.ttat_ms.record((first_answer_at - stream_start_perf) * 1000, metric_attrs)
+                # Single-token responses collapse the generation window to 0; tps
+                # is undefined and skipped.
+                if (
+                    first_token_at is not None
+                    and last_token_at is not None
+                    and last_token_at > first_token_at
+                    and (usage.output_tokens or 0) > 0
+                ):
+                    m.tps.record(usage.output_tokens / (last_token_at - first_token_at), metric_attrs)
+
+                # Return the response. response_id is the server-issued id from
+                # ResponseCompletedEvent.response.id, or None when the stream ended
+                # without a completed event (error path) — matching the documented
+                # `str | None` contract on `ModelResponse.response_id`. Returning
+                # None lets callers use it safely as `previous_response_id` for
+                # multi-turn chaining; a fabricated UUID would 400 against any real
+                # server.
+                return ModelResponse(
+                    output=response_output,
+                    usage=usage,
+                    response_id=captured_response_id,
+                )
+
+            except Exception as e:
+                logger.error(f"Error using Responses API: {e}")
+                # LLMMetricsHooks.on_llm_end doesn't fire on error, so emit the
+                # failure counter here. Best-effort so the typed LLM exception
+                # always propagates intact for retry / circuit-breaker logic.
+                record_llm_failure(self.model_name, e)
+                raise
+
+    # The _get_response_with_responses_api method has been merged into get_response above
+    # All Responses API logic is now integrated directly in get_response() method
+
+    @override
+    def stream_response(self, *args, **kwargs):
+        """Streaming is not implemented as we use the async get_response method.
+        This method is included for compatibility with the Model interface but should not be used.
+        All streaming is handled through the async get_response method with the Responses API."""
+        raise NotImplementedError("stream_response is not used in Temporal activities - use get_response instead")
+
+
+class TemporalStreamingModelProvider(ModelProvider):
+    """Custom model provider that returns a streaming-capable model."""
+
+    def __init__(
+        self,
+        openai_client: Optional[AsyncOpenAI] = None,
+        streaming_mode: StreamingMode = "coalesced",
+    ):
+        """Initialize the provider.
+
+        Args:
+            openai_client: Optional custom AsyncOpenAI client to use for all models.
+                          If not provided, each model will create its own default client.
+            streaming_mode: Default streaming mode applied to every model returned by
+                          this provider. See ``StreamingMode`` for the meaning of
+                          each value. Defaults to "coalesced" — fast but still streamy.
+        """
+        super().__init__()
+        self.openai_client = openai_client
+        self.streaming_mode: StreamingMode = streaming_mode
+        logger.info(f"[TemporalStreamingModelProvider] Initialized, custom_client={openai_client is not None}, streaming_mode={self.streaming_mode}")
+
+    @override
+    def get_model(self, model_name: Union[str, None]) -> Model:
+        """Get a model instance with streaming capabilities.
+
+        Args:
+            model_name: The name of the model to retrieve
+
+        Returns:
+            A Model instance with streaming support.
+        """
+        # Use the provided model_name or default to gpt-4o
+        actual_model = model_name if model_name else "gpt-4o"
+        logger.info(f"[TemporalStreamingModelProvider] Creating TemporalStreamingModel for model_name: {actual_model}")
+        model = TemporalStreamingModel(
+            model_name=actual_model,
+            openai_client=self.openai_client,
+            streaming_mode=self.streaming_mode,
+        )
+        return model

@@ -1,0 +1,73 @@
+# {{ agent_name }} — AgentEx Temporal + Claude Code
+
+This template builds a **Temporal-durable** agent that drives the **Claude Code
+CLI** through the unified harness surface on AgentEx:
+- A Temporal workflow holds conversation state (the Claude Code `session_id`)
+  durably across worker crashes
+- Each turn delegates to the `run_claude_code_turn` activity, which spawns the
+  CLI (subprocess I/O is not permitted on the workflow event loop)
+- The activity wraps the CLI's stdout stream in a `ClaudeCodeTurn` and delivers
+  canonical `StreamTaskMessage*` events via `UnifiedEmitter.auto_send_turn`
+- Tracing integration to SGP / AgentEx
+
+## Prerequisites
+
+- The `claude` CLI installed and on your `PATH`
+- An `ANTHROPIC_API_KEY` (or equivalent credential) in your environment
+- A running Temporal service (provided automatically by the local dev stack)
+
+## Running the Agent
+
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+This starts both the ACP HTTP server and the Temporal worker.
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/
+│   ├── __init__.py
+│   ├── acp.py            # Thin ACP server; FastACP auto-wires to the workflow
+│   ├── workflow.py       # Temporal workflow (durable conversation state)
+│   ├── activities.py     # run_claude_code_turn activity (CLI subprocess)
+│   └── run_worker.py     # Temporal worker entrypoint
+├── Dockerfile
+├── manifest.yaml
+├── dev.ipynb
+{% if use_uv %}
+└── pyproject.toml
+{% else %}
+└── requirements.txt
+{% endif %}
+```
+
+## Key Concepts
+
+### Subprocess must run in an activity
+Temporal runs workflow + signal-handler bodies on a deterministic sandbox event
+loop that does not implement `subprocess_exec`. The workflow therefore delegates
+each turn to the `run_claude_code_turn` activity, which also gains Temporal's
+retry + timeout guarantees.
+
+### The unified harness surface
+`ClaudeCodeTurn` + `UnifiedEmitter` are the unified harness surface. The turn
+normalizes CLI output into canonical AgentEx events; the emitter traces and
+delivers them.
+
+## Development
+
+### 1. Customize the subprocess
+Edit `_spawn_claude` in `project/activities.py` to change the CLI flags, working
+directory, or how the prompt is delivered.
+
+### 2. Configure Credentials
+Set your credentials via `manifest.yaml`, an exported environment variable, or a
+`.env` file in the project directory.
+
+### 3. Run Locally
+```bash
+export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
+```

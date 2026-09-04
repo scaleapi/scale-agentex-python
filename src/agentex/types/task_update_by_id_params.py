@@ -1,0 +1,14 @@
+# File generated from our OpenAPI spec by Stainless. See CONTRIBUTING.md for details.
+
+from __future__ import annotations
+
+from typing import Dict, Optional
+from typing_extensions import TypedDict
+
+__all__ = ["TaskUpdateByIDParams"]
+
+
+class TaskUpdateByIDParams(TypedDict, total=False):
+    merge_params: Optional[Dict[str, object]]
+
+    task_metadata: Optional[Dict[str, object]]

@@ -1,0 +1,77 @@
+"""
+Custom Temporal Activities Template
+====================================
+This file is for defining custom Temporal activities that can be executed
+by your workflow. Activities are used for:
+- External API calls
+- Database operations  
+- File I/O operations
+- Heavy computations
+- Any non-deterministic operations
+
+IMPORTANT: All activities should have appropriate timeouts!
+Default recommendation: start_to_close_timeout=timedelta(minutes=10)
+"""
+
+from datetime import timedelta
+from typing import Any, Dict
+
+from pydantic import BaseModel
+from temporalio import activity
+from temporalio.common import RetryPolicy
+
+from agentex.lib.utils.logging import make_logger
+
+logger = make_logger(__name__)
+
+
+# Example activity parameter models
+class ExampleActivityParams(BaseModel):
+    """Parameters for the example activity"""
+    data: Dict[str, Any]
+    task_id: str
+
+
+# Example custom activity
+@activity.defn(name="example_custom_activity")
+async def example_custom_activity(params: ExampleActivityParams) -> Dict[str, Any]:
+    """
+    Example custom activity that demonstrates best practices.
+    
+    When calling this activity from your workflow, use:
+    ```python
+    result = await workflow.execute_activity(
+        "example_custom_activity",
+        ExampleActivityParams(data={"key": "value"}, task_id=task_id),
+        start_to_close_timeout=timedelta(minutes=10),  # Recommended: 10 minute timeout
+        heartbeat_timeout=timedelta(minutes=1),         # Optional: heartbeat every minute
+        retry_policy=RetryPolicy(maximum_attempts=3)    # Optional: retry up to 3 times
+    )
+    ```
+    """
+    logger.info(f"Processing activity for task {params.task_id} with data: {params.data}")
+    
+    # Your activity logic here
+    # This could be:
+    # - API calls
+    # - Database operations
+    # - File processing
+    # - ML model inference
+    # - etc.
+    
+    result = {
+        "status": "success",
+        "processed_data": params.data,
+        "task_id": params.task_id
+    }
+    
+    return result
+
+
+# Add more custom activities below as needed
+# Remember to:
+# 1. Use appropriate timeouts (default: 10 minutes)
+# 2. Define clear parameter models with Pydantic
+# 3. Handle errors appropriately
+# 4. Use logging for debugging
+# 5. Keep activities focused on a single responsibility

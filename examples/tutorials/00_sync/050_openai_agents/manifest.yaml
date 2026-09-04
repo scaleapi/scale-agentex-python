@@ -1,0 +1,58 @@
+build:
+  context:
+    root: ../../
+    include_paths:
+      - 00_sync/050_openai_agents
+      - test_utils
+    dockerfile: 00_sync/050_openai_agents/Dockerfile
+    dockerignore: 00_sync/050_openai_agents/.dockerignore
+
+local_development:
+  agent:
+    port: 8000
+    host_address: host.docker.internal
+  paths:
+    acp: project/acp.py
+
+agent:
+  acp_type: sync
+  name: s050-openai-agents
+  description: A sync OpenAI Agents SDK agent on the unified harness surface
+
+  temporal:
+    enabled: false
+
+  credentials:
+    - env_var_name: OPENAI_API_KEY
+      secret_name: openai-api-key
+      secret_key: api-key
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+    - env_var_name: SGP_API_KEY
+      secret_name: sgp-api-key
+      secret_key: api-key
+    - env_var_name: SGP_ACCOUNT_ID
+      secret_name: sgp-account-id
+      secret_key: account-id
+    - env_var_name: SGP_CLIENT_BASE_URL
+      secret_name: sgp-client-base-url
+      secret_key: url
+
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+
+  global:
+    agent:
+      name: "s050-openai-agents"
+      description: "A sync OpenAI Agents SDK agent on the unified harness surface"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

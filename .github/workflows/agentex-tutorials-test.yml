@@ -1,0 +1,363 @@
+name: Test Tutorial Agents
+
+on:
+  pull_request:
+    branches: [main, next]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  find-tutorials:
+    runs-on: ubuntu-latest
+    outputs:
+      tutorials: ${{ steps.get-tutorials.outputs.tutorials }}
+    steps:
+      - name: Checkout agentex-python repo
+        uses: actions/checkout@v4
+
+      - name: Find all tutorials
+        id: get-tutorials
+        run: |
+          cd examples/tutorials
+          # Find all tutorials with a manifest.yaml
+          all_tutorials=$(find . -name "manifest.yaml" -exec dirname {} \; | sort | sed 's|^\./||')
+
+          # Convert to JSON array
+          tutorials=$(echo "$all_tutorials" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "tutorials=$tutorials" >> $GITHUB_OUTPUT
+          echo "All tutorials found: $(echo "$all_tutorials" | wc -l)"
+          echo "Final tutorial list: $tutorials"
+
+  test-tutorial:
+    needs: find-tutorials
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        tutorial: ${{ fromJson(needs.find-tutorials.outputs.tutorials) }}
+      fail-fast: false
+    name: test-${{ matrix.tutorial }}
+
+    steps:
+      - name: Checkout agentex-python repo
+        uses: actions/checkout@v4
+
+      - name: Install UV
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      # Subprocess-CLI harnesses: install the relevant CLI only for the
+      # claude-code / codex tutorials (no-op for every other tutorial). npm is
+      # preinstalled on ubuntu runners. Versions mirror the golden agent's
+      # sandbox image (teams/sgp/agents/golden_agent/sandbox/Dockerfile): claude-code
+      # is pinned to the same CLAUDE_CODE_VERSION; codex is left unpinned there,
+      # so it is left unpinned here too. Bump CLAUDE_CODE_VERSION in lockstep
+      # with the sandbox Dockerfile.
+      - name: Install harness CLI (claude-code / codex only)
+        if: ${{ contains(matrix.tutorial, 'claude_code') || contains(matrix.tutorial, 'codex') }}
+        env:
+          CLAUDE_CODE_VERSION: "2.1.142"
+        run: |
+          if [[ "${{ matrix.tutorial }}" == *claude_code* ]]; then
+            echo "📦 Installing Claude Code CLI (v${CLAUDE_CODE_VERSION})..."
+            npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+            claude --version || true
+          fi
+          if [[ "${{ matrix.tutorial }}" == *codex* ]]; then
+            echo "📦 Installing Codex CLI..."
+            npm install -g @openai/codex
+            codex --version || true
+          fi
+
+      - name: Pull latest AgentEx image
+        run: |
+          echo "🐳 Pulling latest Scale AgentEx Docker image..."
+          max_attempts=3
+          attempt=1
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts..."
+            if docker pull ghcr.io/scaleapi/scale-agentex/agentex:latest; then
+              echo "✅ Successfully pulled AgentEx Docker image"
+              exit 0
+            fi
+            echo "❌ Pull failed, waiting before retry..."
+            sleep $((attempt * 10))
+            attempt=$((attempt + 1))
+          done
+          echo "❌ Failed to pull image after $max_attempts attempts"
+          exit 1
+
+      - name: Checkout scale-agentex repo
+        uses: actions/checkout@v4
+        with:
+          repository: scaleapi/scale-agentex
+          path: scale-agentex
+
+      - name: Configure Docker Compose for pulled image and host networking
+        run: |
+          cd scale-agentex/agentex
+          echo "🔧 Configuring AgentEx container to use pulled image and host networking..."
+
+          # Install yq for YAML manipulation
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+          # Override to use pulled image instead of building
+          yq eval '.services.agentex.image = "ghcr.io/scaleapi/scale-agentex/agentex:latest"' -i docker-compose.yml
+          yq eval 'del(.services.agentex.build)' -i docker-compose.yml
+
+          # Add extra_hosts to agentex service to make host.docker.internal work
+          yq eval '.services.agentex.extra_hosts = ["host.docker.internal:host-gateway"]' -i docker-compose.yml
+
+          echo "✅ Configured docker-compose to use pulled image with host access"
+
+      - name: Start AgentEx Server
+        run: |
+          cd scale-agentex/agentex
+          echo "🚀 Starting AgentEx server and dependencies..."
+
+          # Start all services
+          docker compose up -d
+
+          echo "⏳ Waiting for dependencies to be healthy..."
+
+          # Wait for services to be healthy
+          for i in {1..30}; do
+            if docker compose ps | grep -q "healthy"; then
+              echo "✅ Dependencies are healthy"
+              break
+            fi
+            echo "  Attempt $i/30: Waiting for services..."
+            sleep 5
+          done
+
+          # Wait specifically for AgentEx server to be ready
+          echo "⏳ Waiting for AgentEx server to be ready..."
+          for i in {1..30}; do
+            if curl -s --max-time 5 http://localhost:5003/health >/dev/null 2>&1; then
+              echo "✅ AgentEx server is ready"
+              break
+            fi
+            echo "  Attempt $i/30: Waiting for AgentEx server..."
+            sleep 5
+          done
+
+      - name: Build AgentEx SDK
+        run: |
+          echo "🔨 Building both SDK wheels (slim client + heavy ADK overlay)..."
+          # uv workspace builds both members into the root dist/. --wheel: the
+          # heavy's cross-dir force-include can't build via the sdist default.
+          uv build --all-packages --wheel
+          echo "✅ Both SDK wheels built successfully"
+          ls -la dist/
+
+      - name: Test Tutorial
+        id: run-test
+        working-directory: ./examples/tutorials
+        env:
+          OPENAI_API_KEY: ${{ secrets.TUTORIAL_OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.TUTORIAL_ANTHROPIC_API_KEY }}
+          # Enable the gated live tests only for the matching subprocess-CLI
+          # harness tutorial (the CLI is installed for it in the step above).
+          CLAUDE_LIVE_TESTS: ${{ contains(matrix.tutorial, 'claude_code') && '1' || '' }}
+          CODEX_LIVE_TESTS: ${{ contains(matrix.tutorial, 'codex') && '1' || '' }}
+          HEALTH_CHECK_PORT: 8080 # Use non-privileged port for temporal worker health checks
+        run: |
+          echo "Testing tutorial: ${{ matrix.tutorial }}"
+          AGENTEX_API_BASE_URL="http://localhost:5003" \
+            ./run_agent_test.sh --build-cli "${{ matrix.tutorial }}"
+
+      - name: Print agent logs on failure
+        if: failure()
+        working-directory: ./examples/tutorials
+        run: |
+          echo "🚨 Test failed for tutorial: ${{ matrix.tutorial }}"
+
+          # Print agent logs from /tmp (where run_agent_test.sh writes them)
+          tutorial_name=$(basename "${{ matrix.tutorial }}")
+          agent_log="/tmp/agentex-${tutorial_name}.log"
+          if [[ -f "$agent_log" ]]; then
+            echo "📋 Agent logs ($agent_log):"
+            echo "----------------------------------------"
+            tail -100 "$agent_log"
+            echo "----------------------------------------"
+          else
+            echo "⚠️ No agent log at $agent_log"
+            echo "Available /tmp/agentex-*.log files:"
+            ls -la /tmp/agentex-*.log 2>/dev/null || echo "  (none)"
+          fi
+
+          # Print Docker server logs
+          echo ""
+          echo "📋 AgentEx Server (Docker) logs:"
+          echo "----------------------------------------"
+          cd ../../scale-agentex/agentex && docker compose logs --tail=100 agentex 2>/dev/null || echo "Could not retrieve Docker logs"
+          echo "----------------------------------------"
+
+          echo ""
+          echo "🔍 Running python processes:"
+          ps aux | grep python || echo "No python processes found"
+
+      - name: Record test result
+        id: test-result
+        if: always()
+        run: |
+          # Create results directory
+          mkdir -p test-results
+
+          # Determine result
+          if [ "${{ steps.run-test.outcome }}" == "success" ]; then
+            result="passed"
+            echo "result=passed" >> $GITHUB_OUTPUT
+            echo "tutorial=${{ matrix.tutorial }}" >> $GITHUB_OUTPUT
+          else
+            result="failed"
+            echo "result=failed" >> $GITHUB_OUTPUT
+            echo "tutorial=${{ matrix.tutorial }}" >> $GITHUB_OUTPUT
+          fi
+
+          # Save result to file for artifact upload
+          # Create a safe filename from tutorial path
+          safe_name=$(echo "${{ matrix.tutorial }}" | tr '/' '_' | tr -d ' ')
+          echo "$result" > "test-results/result-${safe_name}.txt"
+          echo "${{ matrix.tutorial }}" > "test-results/tutorial-${safe_name}.txt"
+          echo "safe_name=${safe_name}" >> $GITHUB_OUTPUT
+
+      - name: Upload test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-result-${{ steps.test-result.outputs.safe_name }}
+          path: test-results/
+          retention-days: 1
+
+  test-summary:
+    if: always()
+    needs: [find-tutorials, test-tutorial]
+    runs-on: ubuntu-latest
+    name: Test Summary
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-result-*
+          path: all-results/
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Generate Test Summary
+        run: |
+          echo "# 🧪 Tutorial Tests Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Initialize counters
+          passed_count=0
+          failed_count=0
+          skipped_count=0
+          total_count=0
+
+          # Get all tutorials that were supposed to run
+          tutorials='${{ needs.find-tutorials.outputs.tutorials }}'
+
+          if [ -d "all-results" ] && [ "$(ls -A all-results 2>/dev/null)" ]; then
+            echo "📊 Processing individual test results from artifacts..."
+
+            echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Tutorial | Status | Result |" >> $GITHUB_STEP_SUMMARY
+            echo "|----------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+            # Process each result file
+            for result_file in all-results/result-*.txt; do
+              if [ -f "$result_file" ]; then
+                # Extract the safe name from filename
+                safe_name=$(basename "$result_file" .txt | sed 's/result-//')
+
+                # Get corresponding tutorial name file
+                tutorial_file="all-results/tutorial-${safe_name}.txt"
+
+                if [ -f "$tutorial_file" ]; then
+                  tutorial_name=$(cat "$tutorial_file")
+                  result=$(cat "$result_file")
+
+                  total_count=$((total_count + 1))
+
+                  if [ "$result" = "passed" ]; then
+                    echo "| \`$tutorial_name\` | ✅ | Passed |" >> $GITHUB_STEP_SUMMARY
+                    passed_count=$((passed_count + 1))
+                  else
+                    echo "| \`$tutorial_name\` | ❌ | Failed |" >> $GITHUB_STEP_SUMMARY
+                    failed_count=$((failed_count + 1))
+                  fi
+                fi
+              fi
+            done
+
+            # Check for any tutorials that didn't have results (skipped/cancelled)
+            echo "$tutorials" | jq -r '.[]' | while read expected_tutorial; do
+              safe_expected=$(echo "$expected_tutorial" | tr '/' '_' | tr -d ' ')
+              if [ ! -f "all-results/result-${safe_expected}.txt" ]; then
+                echo "| \`$expected_tutorial\` | ⏭️ | Skipped/Cancelled |" >> $GITHUB_STEP_SUMMARY
+                skipped_count=$((skipped_count + 1))
+                total_count=$((total_count + 1))
+              fi
+            done
+
+          else
+            echo "⚠️ No individual test results found. This could mean:"
+            echo "- Test jobs were cancelled before completion"
+            echo "- Artifacts failed to upload"
+            echo "- No tutorials were found to test"
+            echo ""
+
+            overall_result="${{ needs.test-tutorial.result }}"
+            echo "Overall job status: **$overall_result**"
+
+            if [[ "$overall_result" == "success" ]]; then
+              echo "✅ All tests appear to have passed based on job status."
+            elif [[ "$overall_result" == "failure" ]]; then
+              echo "❌ Some tests appear to have failed based on job status."
+              echo ""
+              echo "💡 **Tip:** Check individual job logs for specific failure details."
+            elif [[ "$overall_result" == "cancelled" ]]; then
+              echo "⏭️ Tests were cancelled."
+            else
+              echo "❓ Test status is unclear: $overall_result"
+            fi
+
+            # Don't show detailed breakdown when we don't have individual results
+            tutorial_count=$(echo "$tutorials" | jq -r '. | length')
+            echo ""
+            echo "Expected tutorial count: $tutorial_count"
+          fi
+
+          # Only show detailed statistics if we have individual results
+          if [ -d "all-results" ] && [ "$(ls -A all-results 2>/dev/null)" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Summary Statistics" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Total Tests:** $total_count" >> $GITHUB_STEP_SUMMARY
+            echo "- **Passed:** $passed_count ✅" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed:** $failed_count ❌" >> $GITHUB_STEP_SUMMARY
+            echo "- **Skipped:** $skipped_count ⏭️" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            if [ $failed_count -eq 0 ] && [ $passed_count -gt 0 ]; then
+              echo "🎉 **All tests passed!**" >> $GITHUB_STEP_SUMMARY
+            elif [ $failed_count -gt 0 ]; then
+              echo "⚠️ **Some tests failed.** Check individual job logs for details." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "💡 **Tip:** Look for the 'Print agent logs on failure' step in failed jobs for debugging information." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "ℹ️ **Tests were cancelled or skipped.**" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+      - name: Fail if tests failed
+        if: ${{ needs.test-tutorial.result != 'success' }}
+        run: |
+          echo "❌ Test jobs did not succeed. Result: ${{ needs.test-tutorial.result }}"
+          exit 1

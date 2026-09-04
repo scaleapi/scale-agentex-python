@@ -1,0 +1,934 @@
+# Standard library imports
+from __future__ import annotations
+
+from typing import Any, Literal
+from datetime import datetime
+from contextlib import AsyncExitStack, asynccontextmanager
+from collections.abc import Callable
+
+from mcp import StdioServerParameters
+from agents import Agent, Runner, RunResult, RunResultStreaming
+from pydantic import BaseModel
+from agents.mcp import MCPServerStdio
+from agents.agent import StopAtTools, ToolsToFinalOutputFunction
+from agents.guardrail import InputGuardrail, OutputGuardrail
+from agents.exceptions import InputGuardrailTripwireTriggered, OutputGuardrailTripwireTriggered
+from openai.types.responses import (
+    ResponseFunctionWebSearch,
+    ResponseCodeInterpreterToolCall,
+)
+
+# Local imports
+from agentex import AsyncAgentex
+from agentex.lib.utils import logging
+from agentex.lib.utils.mcp import redact_mcp_server_params
+from agentex.lib.utils.temporal import heartbeat_if_in_workflow
+from agentex.lib.core.tracing.tracer import AsyncTracer
+from agentex.lib.core.harness.emitter import UnifiedEmitter
+from agentex.lib.core.tracing.lineage import merge_refs_into_data, resolve_refs_from_items
+from agentex.types.task_message_update import StreamTaskMessageFull
+from agentex.types.task_message_content import (
+    TextContent,
+    ToolRequestContent,
+    ToolResponseContent,
+)
+from agentex.lib.core.services.adk.streaming import StreamingService
+
+logger = logging.make_logger(__name__)
+
+
+@asynccontextmanager
+async def mcp_server_context(
+    mcp_server_params: list[StdioServerParameters],
+    mcp_timeout_seconds: int | None = None,
+):
+    """Context manager for MCP servers."""
+    servers = []
+    for params in mcp_server_params:
+        server = MCPServerStdio(
+            name=f"Server: {params.command}",
+            params=params.model_dump(),
+            cache_tools_list=True,
+            client_session_timeout_seconds=mcp_timeout_seconds,
+        )
+        servers.append(server)
+
+    async with AsyncExitStack() as stack:
+        for server in servers:
+            await stack.enter_async_context(server)
+        yield servers
+
+
+def _make_created_at_dispenser(initial: datetime | None) -> Callable[[], datetime | None]:
+    # Returns a closure that yields the workflow-supplied created_at exactly
+    # once (on the first call), then None forever after. Used to stamp the
+    # first agent message of a turn with workflow.now() while letting
+    # subsequent messages fall back to server wall-clock — see the call sites
+    # in run_agent_auto_send / run_agent_streamed_auto_send for context.
+    pending: list[datetime | None] = [initial]
+
+    def take() -> datetime | None:
+        value = pending[0]
+        pending[0] = None
+        return value
+
+    return take
+
+
+class OpenAIService:
+    """Service for OpenAI agent operations using the agents library."""
+
+    def __init__(
+        self,
+        agentex_client: AsyncAgentex | None = None,
+        streaming_service: StreamingService | None = None,
+        tracer: AsyncTracer | None = None,
+    ):
+        self.agentex_client = agentex_client
+        self.streaming_service = streaming_service
+        self.tracer = tracer
+
+    def _extract_tool_call_info(self, tool_call_item: Any) -> tuple[str, str, dict[str, Any]]:
+        """
+        Extract call_id, tool_name, and tool_arguments from a tool call item.
+
+        Args:
+            tool_call_item: The tool call item to process
+
+        Returns:
+            A tuple of (call_id, tool_name, tool_arguments)
+        """
+        # Generic handling for different tool call types
+        # Try 'call_id' first, then 'id', then generate placeholder
+        if hasattr(tool_call_item, "call_id"):
+            call_id = tool_call_item.call_id
+        elif hasattr(tool_call_item, "id"):
+            call_id = tool_call_item.id
+        else:
+            call_id = f"unknown_call_{id(tool_call_item)}"
+            logger.warning(
+                f"Warning: Tool call item {type(tool_call_item)} has "
+                f"neither 'call_id' nor 'id' attribute, using placeholder: "
+                f"{call_id}"
+            )
+
+        if isinstance(tool_call_item, ResponseFunctionWebSearch):
+            tool_name = "web_search"
+            tool_arguments = {"action": tool_call_item.action.model_dump(), "status": tool_call_item.status}
+        elif isinstance(tool_call_item, ResponseCodeInterpreterToolCall):
+            tool_name = "code_interpreter"
+            tool_arguments = {"code": tool_call_item.code, "status": tool_call_item.status}
+        else:
+            # Generic handling for any tool call type
+            tool_name = getattr(tool_call_item, "name", type(tool_call_item).__name__)
+            tool_arguments = tool_call_item.model_dump()
+
+        return call_id, tool_name, tool_arguments
+
+    def _extract_tool_response_info(self, tool_call_map: dict[str, Any], tool_output_item: Any) -> tuple[str, str, str]:
+        """
+        Extract call_id, tool_name, and content from a tool output item.
+
+        Args:
+            tool_call_map: Map of call_ids to tool_call items
+            tool_output_item: The tool output item to process
+
+        Returns:
+            A tuple of (call_id, tool_name, content)
+        """
+        # Extract call_id and content from the tool_output_item
+        # Handle both dictionary access and attribute access
+        if hasattr(tool_output_item, "get") and callable(tool_output_item.get):
+            # Dictionary-like access
+            call_id = tool_output_item["call_id"]
+            content = tool_output_item["output"]
+        else:
+            # Attribute access for structured objects
+            call_id = getattr(tool_output_item, "call_id", "")
+            content = getattr(tool_output_item, "output", "")
+
+        # Get the name from the tool call map using generic approach
+        tool_call = tool_call_map[call_id]
+        if hasattr(tool_call, "name"):
+            tool_name = tool_call.name
+        elif hasattr(tool_call, "type"):
+            tool_name = tool_call.type
+        else:
+            tool_name = type(tool_call).__name__
+
+        return call_id, tool_name, content
+
+    async def run_agent(
+        self,
+        input_list: list[dict[str, Any]],
+        mcp_server_params: list[StdioServerParameters],
+        agent_name: str,
+        agent_instructions: str,
+        trace_id: str | None = None,
+        parent_span_id: str | None = None,
+        handoff_description: str | None = None,
+        handoffs: list[BaseModel] | None = None,
+        model: str | None = None,
+        model_settings: BaseModel | None = None,
+        tools: list[BaseModel] | None = None,
+        output_type: type[Any] | None = None,
+        tool_use_behavior: (
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
+        ) = "run_llm_again",
+        mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
+        max_turns: int | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
+    ) -> RunResult:
+        """
+        Run an agent without streaming or TaskMessage creation.
+
+        Args:
+            input_list: List of input data for the agent.
+            mcp_server_params: MCP server parameters for the agent.
+            agent_name: The name of the agent to run.
+            agent_instructions: Instructions for the agent.
+            trace_id: Optional trace ID for tracing.
+            parent_span_id: Optional parent span ID for tracing.
+            handoff_description: Optional description of the handoff.
+            handoffs: Optional list of handoffs.
+            model: Optional model to use.
+            model_settings: Optional model settings.
+            tools: Optional list of tools.
+            output_type: Optional output type.
+            tool_use_behavior: Optional tool use behavior.
+            mcp_timeout_seconds: Optional param to set the timeout threshold
+                for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on
+                initial user input.
+            output_guardrails: Optional list of output guardrails to run on
+                final agent output.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
+        Returns:
+            SerializableRunResult: The result of the agent run.
+        """
+        redacted_params = redact_mcp_server_params(mcp_server_params)
+
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
+        trace = self.tracer.trace(trace_id)
+        async with trace.span(
+            parent_id=parent_span_id,
+            name="run_agent",
+            input={
+                "input_list": input_list,
+                "mcp_server_params": redacted_params,
+                "agent_name": agent_name,
+                "agent_instructions": agent_instructions,
+                "handoff_description": handoff_description,
+                "handoffs": handoffs,
+                "model": model,
+                "model_settings": model_settings,
+                "tools": tools,
+                "output_type": output_type,
+                "tool_use_behavior": tool_use_behavior,
+                "max_turns": max_turns,
+            },
+        ) as span:
+            heartbeat_if_in_workflow("run agent")
+
+            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
+                tools = (
+                    [
+                        tool.to_oai_function_tool() if hasattr(tool, "to_oai_function_tool") else tool  # type: ignore[attr-defined]
+                        for tool in tools
+                    ]
+                    if tools
+                    else []
+                )
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
+
+                agent_kwargs = {
+                    "name": agent_name,
+                    "instructions": agent_instructions,
+                    "mcp_servers": servers,
+                    "handoff_description": handoff_description,
+                    "handoffs": handoffs,
+                    "model": model,
+                    "tools": tools,
+                    "output_type": output_type,
+                    "tool_use_behavior": tool_use_behavior,
+                }
+                if model_settings is not None:
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings()  # type: ignore[attr-defined]
+                        if hasattr(model_settings, "to_oai_model_settings")
+                        else model_settings
+                    )
+                if input_guardrails is not None:
+                    agent_kwargs["input_guardrails"] = input_guardrails
+                if output_guardrails is not None:
+                    agent_kwargs["output_guardrails"] = output_guardrails
+
+                agent = Agent(**agent_kwargs)
+
+                # Run without streaming
+                if max_turns is not None and previous_response_id is not None:
+                    result = await Runner.run(
+                        starting_agent=agent,
+                        input=input_list,
+                        max_turns=max_turns,
+                        previous_response_id=previous_response_id,
+                    )
+                elif max_turns is not None:
+                    result = await Runner.run(starting_agent=agent, input=input_list, max_turns=max_turns)
+                elif previous_response_id is not None:
+                    result = await Runner.run(
+                        starting_agent=agent, input=input_list, previous_response_id=previous_response_id
+                    )
+                else:
+                    result = await Runner.run(starting_agent=agent, input=input_list)
+
+                if span:
+                    serialized_items = [
+                        item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                        for item in result.new_items
+                    ]
+                    span.output = {
+                        "new_items": serialized_items,
+                        "final_output": result.final_output,
+                    }
+                    lineage_refs = resolve_refs_from_items(serialized_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
+
+        return result
+
+    async def run_agent_auto_send(
+        self,
+        task_id: str,
+        input_list: list[dict[str, Any]],
+        mcp_server_params: list[StdioServerParameters],
+        agent_name: str,
+        agent_instructions: str,
+        trace_id: str | None = None,
+        parent_span_id: str | None = None,
+        handoff_description: str | None = None,
+        handoffs: list[BaseModel] | None = None,
+        model: str | None = None,
+        model_settings: BaseModel | None = None,
+        tools: list[BaseModel] | None = None,
+        output_type: type[Any] | None = None,
+        tool_use_behavior: (
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
+        ) = "run_llm_again",
+        mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
+        max_turns: int | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
+        created_at: datetime | None = None,
+    ) -> RunResult:
+        """
+        Run an agent with automatic TaskMessage creation.
+
+        Args:
+            task_id: The ID of the task to run the agent for.
+            input_list: List of input data for the agent.
+            mcp_server_params: MCP server parameters for the agent.
+            agent_name: The name of the agent to run.
+            agent_instructions: Instructions for the agent.
+            trace_id: Optional trace ID for tracing.
+            parent_span_id: Optional parent span ID for tracing.
+            handoff_description: Optional description of the handoff.
+            handoffs: Optional list of handoffs.
+            model: Optional model to use.
+            model_settings: Optional model settings.
+            tools: Optional list of tools.
+            output_type: Optional output type.
+            tool_use_behavior: Optional tool use behavior.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on initial user input.
+            output_guardrails: Optional list of output guardrails to run on final agent output.
+            max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
+        Returns:
+            SerializableRunResult: The result of the agent run.
+        """
+        if self.streaming_service is None:
+            raise ValueError("StreamingService must be available for auto_send methods")
+        if self.agentex_client is None:
+            raise ValueError("Agentex client must be provided for auto_send methods")
+
+        redacted_params = redact_mcp_server_params(mcp_server_params)
+
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
+        trace = self.tracer.trace(trace_id)
+        async with trace.span(
+            parent_id=parent_span_id,
+            name="run_agent_auto_send",
+            input={
+                "task_id": task_id,
+                "input_list": input_list,
+                "mcp_server_params": redacted_params,
+                "agent_name": agent_name,
+                "agent_instructions": agent_instructions,
+                "handoff_description": handoff_description,
+                "handoffs": handoffs,
+                "model": model,
+                "model_settings": model_settings,
+                "tools": tools,
+                "output_type": output_type,
+                "tool_use_behavior": tool_use_behavior,
+                "max_turns": max_turns,
+            },
+        ) as span:
+            heartbeat_if_in_workflow("run agent auto send")
+
+            _take_created_at = _make_created_at_dispenser(created_at)
+
+            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
+                tools = (
+                    [
+                        tool.to_oai_function_tool() if hasattr(tool, "to_oai_function_tool") else tool  # type: ignore[attr-defined]
+                        for tool in tools
+                    ]
+                    if tools
+                    else []
+                )
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
+                agent_kwargs = {
+                    "name": agent_name,
+                    "instructions": agent_instructions,
+                    "mcp_servers": servers,
+                    "handoff_description": handoff_description,
+                    "handoffs": handoffs,
+                    "model": model,
+                    "tools": tools,
+                    "output_type": output_type,
+                    "tool_use_behavior": tool_use_behavior,
+                }
+                if model_settings is not None:
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings()  # type: ignore[attr-defined]
+                        if hasattr(model_settings, "to_oai_model_settings")
+                        else model_settings
+                    )
+                if input_guardrails is not None:
+                    agent_kwargs["input_guardrails"] = input_guardrails
+                if output_guardrails is not None:
+                    agent_kwargs["output_guardrails"] = output_guardrails
+
+                agent = Agent(**agent_kwargs)
+
+                # Run without streaming
+                if max_turns is not None and previous_response_id is not None:
+                    result = await Runner.run(
+                        starting_agent=agent,
+                        input=input_list,
+                        max_turns=max_turns,
+                        previous_response_id=previous_response_id,
+                    )
+                elif max_turns is not None:
+                    result = await Runner.run(starting_agent=agent, input=input_list, max_turns=max_turns)
+                elif previous_response_id is not None:
+                    result = await Runner.run(
+                        starting_agent=agent, input=input_list, previous_response_id=previous_response_id
+                    )
+                else:
+                    result = await Runner.run(starting_agent=agent, input=input_list)
+
+                if span:
+                    serialized_items = [
+                        item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                        for item in result.new_items
+                    ]
+                    span.output = {
+                        "new_items": serialized_items,
+                        "final_output": result.final_output,
+                    }
+                    lineage_refs = resolve_refs_from_items(serialized_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
+
+                tool_call_map: dict[str, Any] = {}
+
+                for item in result.new_items:
+                    if item.type == "message_output_item":
+                        text_content = TextContent(
+                            author="agent",
+                            content=item.raw_item.content[0].text,  # type: ignore[union-attr]
+                        )
+                        # Create message for the final result using streaming context
+                        async with self.streaming_service.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=text_content,
+                            created_at=_take_created_at(),
+                        ) as streaming_context:
+                            await streaming_context.stream_update(
+                                update=StreamTaskMessageFull(
+                                    parent_task_message=streaming_context.task_message,
+                                    content=text_content,
+                                    type="full",
+                                ),
+                            )
+
+                    elif item.type == "tool_call_item":
+                        tool_call_item = item.raw_item
+
+                        # Extract tool call information using the helper method
+                        call_id, tool_name, tool_arguments = self._extract_tool_call_info(tool_call_item)
+                        tool_call_map[call_id] = tool_call_item
+
+                        tool_request_content = ToolRequestContent(
+                            author="agent",
+                            tool_call_id=call_id,
+                            name=tool_name,
+                            arguments=tool_arguments,
+                        )
+
+                        # Create tool request using streaming context
+                        async with self.streaming_service.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=tool_request_content,
+                            created_at=_take_created_at(),
+                        ) as streaming_context:
+                            await streaming_context.stream_update(
+                                update=StreamTaskMessageFull(
+                                    parent_task_message=streaming_context.task_message,
+                                    content=tool_request_content,
+                                    type="full",
+                                ),
+                            )
+
+                    elif item.type == "tool_call_output_item":
+                        tool_output_item = item.raw_item
+
+                        # Extract tool response information using the helper method
+                        call_id, tool_name, content = self._extract_tool_response_info(tool_call_map, tool_output_item)
+
+                        tool_response_content = ToolResponseContent(
+                            author="agent",
+                            tool_call_id=call_id,
+                            name=tool_name,
+                            content=content,
+                        )
+                        # Create tool response using streaming context
+                        async with self.streaming_service.streaming_task_message_context(
+                            task_id=task_id,
+                            initial_content=tool_response_content,
+                            created_at=_take_created_at(),
+                        ) as streaming_context:
+                            await streaming_context.stream_update(
+                                update=StreamTaskMessageFull(
+                                    parent_task_message=streaming_context.task_message,
+                                    content=tool_response_content,
+                                    type="full",
+                                ),
+                            )
+
+                # Convert to serializable result
+        return result
+
+    async def run_agent_streamed(
+        self,
+        input_list: list[dict[str, Any]],
+        mcp_server_params: list[StdioServerParameters],
+        agent_name: str,
+        agent_instructions: str,
+        trace_id: str | None = None,
+        parent_span_id: str | None = None,
+        handoff_description: str | None = None,
+        handoffs: list[BaseModel] | None = None,
+        model: str | None = None,
+        model_settings: BaseModel | None = None,
+        tools: list[BaseModel] | None = None,
+        output_type: type[Any] | None = None,
+        tool_use_behavior: (
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
+        ) = "run_llm_again",
+        mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
+        max_turns: int | None = None,
+        previous_response_id: str | None = None,  # noqa: ARG002
+    ) -> RunResultStreaming:
+        """
+        Run an agent with streaming enabled but no TaskMessage creation.
+
+        Args:
+            input_list: List of input data for the agent.
+            mcp_server_params: MCP server parameters for the agent.
+            agent_name: The name of the agent to run.
+            agent_instructions: Instructions for the agent.
+            trace_id: Optional trace ID for tracing.
+            parent_span_id: Optional parent span ID for tracing.
+            handoff_description: Optional description of the handoff.
+            handoffs: Optional list of handoffs.
+            model: Optional model to use.
+            model_settings: Optional model settings.
+            tools: Optional list of tools.
+            output_type: Optional output type.
+            tool_use_behavior: Optional tool use behavior.
+            mcp_timeout_seconds: Optional param to set the timeout threshold
+                for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on
+                initial user input.
+            output_guardrails: Optional list of output guardrails to run on
+                final agent output.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
+        Returns:
+            RunResultStreaming: The result of the agent run with streaming.
+        """
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
+        trace = self.tracer.trace(trace_id)
+        redacted_params = redact_mcp_server_params(mcp_server_params)
+
+        async with trace.span(
+            parent_id=parent_span_id,
+            name="run_agent_streamed",
+            input={
+                "input_list": input_list,
+                "mcp_server_params": redacted_params,
+                "agent_name": agent_name,
+                "agent_instructions": agent_instructions,
+                "handoff_description": handoff_description,
+                "handoffs": handoffs,
+                "model": model,
+                "model_settings": model_settings,
+                "tools": tools,
+                "output_type": output_type,
+                "tool_use_behavior": tool_use_behavior,
+                "max_turns": max_turns,
+            },
+        ) as span:
+            heartbeat_if_in_workflow("run agent streamed")
+
+            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
+                tools = (
+                    [
+                        tool.to_oai_function_tool() if hasattr(tool, "to_oai_function_tool") else tool  # type: ignore[attr-defined]
+                        for tool in tools
+                    ]
+                    if tools
+                    else []
+                )
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
+                agent_kwargs = {
+                    "name": agent_name,
+                    "instructions": agent_instructions,
+                    "mcp_servers": servers,
+                    "handoff_description": handoff_description,
+                    "handoffs": handoffs,
+                    "model": model,
+                    "tools": tools,
+                    "output_type": output_type,
+                    "tool_use_behavior": tool_use_behavior,
+                }
+                if model_settings is not None:
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings()  # type: ignore[attr-defined]
+                        if hasattr(model_settings, "to_oai_model_settings")
+                        else model_settings
+                    )
+                if input_guardrails is not None:
+                    agent_kwargs["input_guardrails"] = input_guardrails
+                if output_guardrails is not None:
+                    agent_kwargs["output_guardrails"] = output_guardrails
+
+                agent = Agent(**agent_kwargs)
+
+                # Run with streaming (but no TaskMessage creation)
+                if max_turns is not None and previous_response_id is not None:
+                    result = Runner.run_streamed(
+                        starting_agent=agent,
+                        input=input_list,
+                        max_turns=max_turns,
+                        previous_response_id=previous_response_id,
+                    )
+                elif max_turns is not None:
+                    result = Runner.run_streamed(starting_agent=agent, input=input_list, max_turns=max_turns)
+                elif previous_response_id is not None:
+                    result = Runner.run_streamed(
+                        starting_agent=agent, input=input_list, previous_response_id=previous_response_id
+                    )
+                else:
+                    result = Runner.run_streamed(starting_agent=agent, input=input_list)
+
+                if span:
+                    serialized_items = [
+                        item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                        for item in result.new_items
+                    ]
+                    span.output = {
+                        "new_items": serialized_items,
+                        "final_output": result.final_output,
+                    }
+                    lineage_refs = resolve_refs_from_items(serialized_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
+
+        return result
+
+    async def run_agent_streamed_auto_send(
+        self,
+        task_id: str,
+        input_list: list[dict[str, Any]],
+        mcp_server_params: list[StdioServerParameters],
+        agent_name: str,
+        agent_instructions: str,
+        trace_id: str | None = None,
+        parent_span_id: str | None = None,
+        handoff_description: str | None = None,
+        handoffs: list[BaseModel] | None = None,
+        model: str | None = None,
+        model_settings: BaseModel | None = None,
+        tools: list[BaseModel] | None = None,
+        output_type: type[Any] | None = None,
+        tool_use_behavior: (
+            Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
+        ) = "run_llm_again",
+        mcp_timeout_seconds: int | None = None,
+        input_guardrails: list[InputGuardrail] | None = None,
+        output_guardrails: list[OutputGuardrail] | None = None,
+        max_turns: int | None = None,
+        previous_response_id: str | None = None,
+        created_at: datetime | None = None,
+    ) -> RunResultStreaming:
+        """
+        Run an agent with streaming enabled and automatic TaskMessage creation.
+
+        Args:
+            task_id: The ID of the task to run the agent for.
+            input_list: List of input data for the agent.
+            mcp_server_params: MCP server parameters for the agent.
+            agent_name: The name of the agent to run.
+            agent_instructions: Instructions for the agent.
+            trace_id: Optional trace ID for tracing.
+            parent_span_id: Optional parent span ID for tracing.
+            handoff_description: Optional description of the handoff.
+            handoffs: Optional list of handoffs.
+            model: Optional model to use.
+            model_settings: Optional model settings.
+            tools: Optional list of tools.
+            output_type: Optional output type.
+            tool_use_behavior: Optional tool use behavior.
+            mcp_timeout_seconds: Optional param to set the timeout threshold
+                for the MCP servers. Defaults to 5 seconds.
+            input_guardrails: Optional list of input guardrails to run on
+                initial user input.
+            output_guardrails: Optional list of output guardrails to run on
+                final agent output.
+            mcp_timeout_seconds: Optional param to set the timeout threshold for the MCP servers. Defaults to 5 seconds.
+            max_turns: Maximum number of turns the agent can take. Uses Runner's default if None.
+
+        Returns:
+            RunResultStreaming: The result of the agent run with streaming.
+        """
+        if self.streaming_service is None:
+            raise ValueError("StreamingService must be available for auto_send methods")
+        if self.agentex_client is None:
+            raise ValueError("Agentex client must be provided for auto_send methods")
+
+        if self.tracer is None:
+            raise RuntimeError("Tracer not initialized - ensure tracer is provided to OpenAIService")
+        trace = self.tracer.trace(trace_id)
+        redacted_params = redact_mcp_server_params(mcp_server_params)
+
+        async with trace.span(
+            parent_id=parent_span_id,
+            name="run_agent_streamed_auto_send",
+            input={
+                "task_id": task_id,
+                "input_list": input_list,
+                "mcp_server_params": redacted_params,
+                "agent_name": agent_name,
+                "agent_instructions": agent_instructions,
+                "handoff_description": handoff_description,
+                "handoffs": handoffs,
+                "model": model,
+                "model_settings": model_settings,
+                "tools": tools,
+                "output_type": output_type,
+                "tool_use_behavior": tool_use_behavior,
+                "max_turns": max_turns,
+            },
+        ) as span:
+            heartbeat_if_in_workflow("run agent streamed auto send")
+
+            # created_at is threaded through UnifiedEmitter.auto_send_turn ->
+            # auto_send -> every streaming_task_message_context call, so the
+            # first agent message of the turn is stamped with the
+            # workflow-supplied timestamp (e.g. workflow.now()).
+            # The dispenser is still used below for guardrail-rejection messages,
+            # which open their own streaming contexts directly.
+            _take_created_at = _make_created_at_dispenser(created_at)
+
+            async with mcp_server_context(mcp_server_params, mcp_timeout_seconds) as servers:
+                tools = (
+                    [
+                        tool.to_oai_function_tool() if hasattr(tool, "to_oai_function_tool") else tool  # type: ignore[attr-defined]
+                        for tool in tools
+                    ]
+                    if tools
+                    else []
+                )
+                handoffs = [Agent(**handoff.model_dump()) for handoff in handoffs] if handoffs else []  # type: ignore[misc]
+                agent_kwargs = {
+                    "name": agent_name,
+                    "instructions": agent_instructions,
+                    "mcp_servers": servers,
+                    "handoff_description": handoff_description,
+                    "handoffs": handoffs,
+                    "model": model,
+                    "tools": tools,
+                    "output_type": output_type,
+                    "tool_use_behavior": tool_use_behavior,
+                }
+                if model_settings is not None:
+                    agent_kwargs["model_settings"] = (
+                        model_settings.to_oai_model_settings()  # type: ignore[attr-defined]
+                        if hasattr(model_settings, "to_oai_model_settings")
+                        else model_settings
+                    )
+                if input_guardrails is not None:
+                    agent_kwargs["input_guardrails"] = input_guardrails
+                if output_guardrails is not None:
+                    agent_kwargs["output_guardrails"] = output_guardrails
+
+                agent = Agent(**agent_kwargs)
+
+                # Run with streaming. Forward previous_response_id so callers that
+                # continue a Responses-API conversation resume the prior response
+                # instead of silently starting a fresh one (mirrors the non-auto-send
+                # run_agent_streamed path).
+                if max_turns is not None and previous_response_id is not None:
+                    result = Runner.run_streamed(
+                        starting_agent=agent,
+                        input=input_list,
+                        max_turns=max_turns,
+                        previous_response_id=previous_response_id,
+                    )
+                elif max_turns is not None:
+                    result = Runner.run_streamed(starting_agent=agent, input=input_list, max_turns=max_turns)
+                elif previous_response_id is not None:
+                    result = Runner.run_streamed(
+                        starting_agent=agent, input=input_list, previous_response_id=previous_response_id
+                    )
+                else:
+                    result = Runner.run_streamed(starting_agent=agent, input=input_list)
+
+                # Migrate onto the unified harness surface: wrap the streamed run
+                # as an OpenAITurn (provider -> canonical StreamTaskMessage*
+                # adapter) and let UnifiedEmitter.auto_send_turn drive delivery +
+                # tracing + usage. The previous ~270-line inline loop that hand-
+                # rolled per-item streaming contexts, reasoning handling, and
+                # span derivation now lives in the shared harness modules.
+                # Imported lazily: openai_turn pulls in agentex.lib.adk, which
+                # imports this service module, so an eager import would create a
+                # circular import at package init.
+                from agentex.lib.adk.providers._modules.openai_turn import OpenAITurn
+
+                turn = OpenAITurn(result=result, model=model)
+                emitter = UnifiedEmitter(
+                    task_id=task_id,
+                    trace_id=trace_id,
+                    parent_span_id=parent_span_id,
+                    tracer=self.tracer,
+                    streaming=self.streaming_service,
+                )
+
+                try:
+                    await emitter.auto_send_turn(turn, created_at=created_at)
+
+                except InputGuardrailTripwireTriggered as e:
+                    # Handle guardrail trigger by sending a rejection message
+                    rejection_message = "I'm sorry, but I cannot process this request due to a guardrail. Please try a different question."
+
+                    # Try to extract rejection message from the guardrail result
+                    if hasattr(e, "guardrail_result") and hasattr(e.guardrail_result, "output"):
+                        output_info = getattr(e.guardrail_result.output, "output_info", {})
+                        if isinstance(output_info, dict) and "rejection_message" in output_info:
+                            rejection_message = output_info["rejection_message"]
+                        elif hasattr(e.guardrail_result, "guardrail"):
+                            # Fall back to using guardrail name if no custom message
+                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, "name", None)
+                            if triggered_guardrail_name:
+                                rejection_message = f"I'm sorry, but I cannot process this request. The '{triggered_guardrail_name}' guardrail was triggered."
+
+                    # Create and send the rejection message as a TaskMessage
+                    async with self.streaming_service.streaming_task_message_context(
+                        task_id=task_id,
+                        initial_content=TextContent(
+                            author="agent",
+                            content=rejection_message,
+                        ),
+                        created_at=_take_created_at(),
+                    ) as streaming_context:
+                        # Send the full message
+                        await streaming_context.stream_update(
+                            update=StreamTaskMessageFull(
+                                parent_task_message=streaming_context.task_message,
+                                content=TextContent(
+                                    author="agent",
+                                    content=rejection_message,
+                                ),
+                                type="full",
+                            ),
+                        )
+
+                    # Re-raise to let the activity handle it
+                    raise
+
+                except OutputGuardrailTripwireTriggered as e:
+                    # Handle output guardrail trigger by sending a rejection message
+                    rejection_message = "I'm sorry, but I cannot provide this response due to a guardrail. Please try a different question."
+
+                    # Try to extract rejection message from the guardrail result
+                    if hasattr(e, "guardrail_result") and hasattr(e.guardrail_result, "output"):
+                        output_info = getattr(e.guardrail_result.output, "output_info", {})
+                        if isinstance(output_info, dict) and "rejection_message" in output_info:
+                            rejection_message = output_info["rejection_message"]
+                        elif hasattr(e.guardrail_result, "guardrail"):
+                            # Fall back to using guardrail name if no custom message
+                            triggered_guardrail_name = getattr(e.guardrail_result.guardrail, "name", None)
+                            if triggered_guardrail_name:
+                                rejection_message = f"I'm sorry, but I cannot provide this response. The '{triggered_guardrail_name}' guardrail was triggered."
+
+                    # Create and send the rejection message as a TaskMessage
+                    async with self.streaming_service.streaming_task_message_context(
+                        task_id=task_id,
+                        initial_content=TextContent(
+                            author="agent",
+                            content=rejection_message,
+                        ),
+                        created_at=_take_created_at(),
+                    ) as streaming_context:
+                        # Send the full message
+                        await streaming_context.stream_update(
+                            update=StreamTaskMessageFull(
+                                parent_task_message=streaming_context.task_message,
+                                content=TextContent(
+                                    author="agent",
+                                    content=rejection_message,
+                                ),
+                                type="full",
+                            ),
+                        )
+
+                    # Re-raise to let the activity handle it
+                    raise
+
+                if span:
+                    serialized_items = [
+                        item.raw_item.model_dump() if isinstance(item.raw_item, BaseModel) else item.raw_item
+                        for item in result.new_items
+                    ]
+                    span.output = {
+                        "new_items": serialized_items,
+                        "final_output": result.final_output,
+                    }
+                    lineage_refs = resolve_refs_from_items(serialized_items)
+                    if lineage_refs:
+                        span.data = merge_refs_into_data(span.data, lineage_refs)
+
+        return result
