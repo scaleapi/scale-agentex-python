@@ -68,11 +68,8 @@ class EnvironmentVariables(BaseModel):
     AGENT_ID: str | None = None
     # Build/version discriminator (image tag or git sha), set by the deployment
     AGENT_VERSION: str | None = None
-    # The agent's source commit, baked into the image or set by the deployment.
-    # Unlike AGENT_VERSION this is expected to be a git SHA and nothing else, and
-    # it is OPT-IN: nothing is stamped unless the agent calls
-    # `adk.code_revision.enable()`, which also refuses a value that is not a git
-    # object name. See agentex.lib.core.tracing.code_revision.
+    # The agent's source commit, set by the deployment or baked into the image; a git
+    # SHA and nothing else. Stamped as __commit_sha__ when set (see tracing.code_revision).
     AGENT_COMMIT_SHA: str | None = None
     AGENT_API_KEY: str | None = None
     ACP_TYPE: str | None = "async"
