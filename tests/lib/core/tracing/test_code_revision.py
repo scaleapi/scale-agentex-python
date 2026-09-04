@@ -1,7 +1,8 @@
-"""Opt-in commit-SHA stamping.
+"""Commit-SHA stamping.
 
-The contract that matters: an agent that does not call ``enable()`` gets nothing,
-so upgrading the SDK never starts emitting this field on its own.
+The contract that matters: with ``AGENT_COMMIT_SHA`` absent and no ``enable()``
+call, nothing is stamped, so upgrading the SDK never starts emitting this field
+on its own. A deployment that sets the env var turns it on without agent code.
 """
 
 from __future__ import annotations
@@ -21,13 +22,32 @@ def _reset():
     code_revision.disable()
 
 
-class TestOptIn:
-    def test_disabled_by_default(self, monkeypatch):
-        """Even with the env fully populated, nothing resolves until enable()."""
-        monkeypatch.setenv("AGENT_COMMIT_SHA", SHA)
+class TestEnablement:
+    def test_off_when_env_absent(self, monkeypatch):
+        """The import-time hook ignores AGENT_VERSION; that fallback needs enable()."""
+        monkeypatch.delenv("AGENT_COMMIT_SHA", raising=False)
         monkeypatch.setenv("AGENT_VERSION", SHA)
+        code_revision._enable_from_environment()
         assert code_revision.commit_sha() is None
         assert code_revision.is_enabled() is False
+
+    def test_env_set_at_startup_enables_without_a_call(self, monkeypatch):
+        """The cloud deploy sets AGENT_COMMIT_SHA from the build record; the agent
+        should not need to know."""
+        monkeypatch.setenv("AGENT_COMMIT_SHA", SHA)
+        code_revision._enable_from_environment()
+        assert code_revision.commit_sha() == SHA
+
+    def test_env_set_after_import_needs_enable(self, monkeypatch):
+        monkeypatch.setenv("AGENT_COMMIT_SHA", SHA)
+        assert code_revision.commit_sha() is None
+        code_revision.enable()
+        assert code_revision.commit_sha() == SHA
+
+    def test_bad_env_at_startup_leaves_it_off(self, monkeypatch):
+        monkeypatch.setenv("AGENT_COMMIT_SHA", "latest")
+        code_revision._enable_from_environment()
+        assert code_revision.commit_sha() is None
 
     def test_enable_reads_agent_commit_sha(self, monkeypatch):
         monkeypatch.setenv("AGENT_COMMIT_SHA", SHA)
