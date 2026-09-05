@@ -23,6 +23,11 @@ from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows, s
 logger = make_logger(__name__)
 console = Console()
 
+# asyncio's StreamReader defaults to 64 KiB, and a single log line above that makes
+# readline() raise. Agents legitimately emit large lines (serialized charts, payloads
+# echoed by validation errors), so give the reader room before it has to drop one.
+SUBPROCESS_STREAM_LIMIT = 8 * 1024 * 1024
+
 
 class RunError(Exception):
     """An error occurred during agent run"""
@@ -215,6 +220,7 @@ async def start_acp_server(
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        limit=SUBPROCESS_STREAM_LIMIT,
     )
 
 
@@ -234,23 +240,53 @@ async def start_temporal_worker(
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        limit=SUBPROCESS_STREAM_LIMIT,
     )
 
 
 async def stream_process_output(process: asyncio.subprocess.Process, prefix: str):
-    """Stream process output with prefix"""
+    """Stream process output with prefix.
+
+    This loop is the only reader of the child's stdout pipe. If it ever stops
+    reading, the pipe fills and the child blocks forever inside ``write()``,
+    which presents as a silent freeze: 0% CPU, no further logs, no traceback.
+    So a single unreadable line must never end the loop.
+    """
     try:
         if process.stdout is None:
             return
         while True:
-            line = await process.stdout.readline()
+            try:
+                line = await process.stdout.readline()
+            except ValueError as e:
+                # Line longer than the stream limit. readline() has already
+                # dropped it (or cleared the buffer) and resumed the transport,
+                # so continuing is safe and always makes progress.
+                logger.warning(
+                    f"Dropped an oversized log line from {prefix} ({e}); "
+                    f"raise limit= on this process's create_subprocess_exec if it recurs."
+                )
+                continue
+
             if not line:
                 break
-            decoded_line = line.decode("utf-8").rstrip()
+
+            try:
+                decoded_line = line.decode("utf-8").rstrip()
+            except UnicodeDecodeError as e:
+                logger.warning(f"Dropped an undecodable log line from {prefix} ({e}).")
+                continue
+
             if decoded_line:  # Only print non-empty lines
                 console.print(f"[dim]{prefix}:[/dim] {decoded_line}")
     except Exception as e:
-        logger.debug(f"Output streaming ended for {prefix}: {e}")
+        # Anything reaching here ends the loop, so the child is now at risk of
+        # blocking on a full pipe. make_logger pins loggers to INFO, so the
+        # previous debug() here could never be emitted.
+        logger.warning(
+            f"Output streaming for {prefix} stopped on {e!r}. "
+            f"Nothing is draining its stdout now, so {prefix} will hang once the pipe fills."
+        )
 
 
 async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
