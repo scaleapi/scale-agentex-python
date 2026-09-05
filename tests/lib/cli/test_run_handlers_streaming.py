@@ -10,19 +10,26 @@ from __future__ import annotations
 
 import sys
 import asyncio
+from typing import Any
 
+import pytest
+
+from agentex.lib.cli.handlers import run_handlers
 from agentex.lib.cli.handlers.run_handlers import (
     SUBPROCESS_STREAM_LIMIT,
+    start_acp_server,
+    start_temporal_worker,
     stream_process_output,
 )
 
-# Emits a line over the reader's limit, then enough further output to more than
-# fill a 64 KiB pipe. If the reader stops draining, the child cannot finish its
-# writes and never exits.
+# Emits a line of MARKER over the reader's limit, then enough further output to
+# more than fill a 64 KiB pipe. If the reader stops draining, the child cannot
+# finish its writes and never exits.
+MARKER = "X"
+
 CHILD_SCRIPT = """
-import sys
 print("before")
-print("X" * {oversized})
+print("{marker}" * {oversized})
 for i in range(2000):
     print("after", i, "y" * 60)
 print("done")
@@ -30,10 +37,11 @@ print("done")
 
 
 async def _drain(limit: int, oversized: int) -> int | None:
+    """Run the child under stream_process_output. None means it never exited."""
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-c",
-        CHILD_SCRIPT.format(oversized=oversized),
+        CHILD_SCRIPT.format(marker=MARKER, oversized=oversized),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
         limit=limit,
@@ -48,25 +56,57 @@ async def _drain(limit: int, oversized: int) -> int | None:
     return process.returncode
 
 
-async def test_oversized_line_is_skipped_without_stalling_the_child() -> None:
-    """A line past the reader's limit is dropped and streaming continues.
+async def test_oversized_line_is_skipped_without_stalling_the_child(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A line past the reader's limit is dropped, and streaming continues.
 
     Before this was handled per line, readline() raised, the loop exited, and the
     child deadlocked on a full pipe. The child reaching exit is the assertion.
     """
     limit = 64 * 1024
-    returncode = await _drain(limit=limit, oversized=limit + 16_000)
+    oversized = limit + 16_000
+
+    returncode = await _drain(limit=limit, oversized=oversized)
+    out = capsys.readouterr().out
 
     assert returncode == 0, "child did not exit: the reader stopped draining its pipe"
+    # The offending line is gone, but everything after it still streamed.
+    assert out.count(MARKER) == 0
+    assert "done" in out
 
 
-async def test_large_line_within_limit_is_streamed() -> None:
-    """A line larger than asyncio's 64 KiB default still streams under our limit."""
-    returncode = await _drain(limit=SUBPROCESS_STREAM_LIMIT, oversized=82_000)
+async def test_large_line_within_the_limit_is_streamed_in_full(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A line over asyncio's 64 KiB default still reaches the console under our limit.
+
+    Counts marker characters rather than matching the line, because rich wraps
+    long output across terminal-width lines.
+    """
+    oversized = 82_000
+
+    returncode = await _drain(limit=SUBPROCESS_STREAM_LIMIT, oversized=oversized)
+    out = capsys.readouterr().out
 
     assert returncode == 0
+    assert out.count(MARKER) == oversized, "the large line was dropped rather than streamed"
 
 
-async def test_subprocess_stream_limit_exceeds_asyncio_default() -> None:
-    """The whole point of the constant: asyncio's default is what breaks readline()."""
-    assert SUBPROCESS_STREAM_LIMIT > 64 * 1024
+async def test_agent_subprocesses_are_spawned_with_the_larger_limit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """The helpers must pass limit=, or large lines are dropped in production."""
+    seen: list[int | None] = []
+
+    async def fake_exec(*_args: Any, **kwargs: Any) -> None:
+        seen.append(kwargs.get("limit"))
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(run_handlers, "calculate_uvicorn_target_for_local", lambda *_: "project.acp")
+
+    await start_acp_server(tmp_path / "acp.py", 8000, {}, tmp_path)
+    await start_temporal_worker(tmp_path / "run_worker.py", {}, tmp_path)
+
+    assert seen == [SUBPROCESS_STREAM_LIMIT, SUBPROCESS_STREAM_LIMIT]
+    assert SUBPROCESS_STREAM_LIMIT > 64 * 1024, "asyncio's default is what breaks readline()"
