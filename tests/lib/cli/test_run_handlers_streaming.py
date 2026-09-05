@@ -93,6 +93,57 @@ async def test_large_line_within_the_limit_is_streamed_in_full(
     assert out.count(MARKER) == oversized, "the large line was dropped rather than streamed"
 
 
+class _AlwaysFailingReader:
+    """A reader whose readline() raises without consuming anything.
+
+    The dangerous shape: skipping it makes no progress, so an unbounded retry
+    would spin at 100% CPU while still not draining the pipe.
+    """
+
+    def __init__(self) -> None:
+        self.attempts = 0
+
+    async def readline(self) -> bytes:
+        self.attempts += 1
+        raise ValueError("unreadable, and nothing was consumed")
+
+
+class _FakeProcess:
+    def __init__(self, stdout: Any) -> None:
+        self.stdout = stdout
+
+
+async def test_repeated_unreadable_lines_give_up_instead_of_spinning() -> None:
+    """A ValueError that consumes nothing must not loop forever."""
+    reader = _AlwaysFailingReader()
+
+    await asyncio.wait_for(
+        stream_process_output(_FakeProcess(reader), "TEST"), timeout=30
+    )
+
+    assert reader.attempts == run_handlers.MAX_CONSECUTIVE_READ_ERRORS + 1
+
+
+async def test_cancellation_is_not_swallowed() -> None:
+    """The auto-reload path cancels these tasks, so cancel must propagate.
+
+    CancelledError derives from BaseException, so the outer `except Exception`
+    does not catch it. This pins that, since swallowing it would hang restarts.
+    """
+
+    class _NeverReturns:
+        async def readline(self) -> bytes:
+            await asyncio.sleep(3600)
+            return b""
+
+    task = asyncio.create_task(stream_process_output(_FakeProcess(_NeverReturns()), "TEST"))
+    await asyncio.sleep(0)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
 async def test_agent_subprocesses_are_spawned_with_the_larger_limit(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Any
 ) -> None:

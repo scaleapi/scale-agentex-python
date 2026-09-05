@@ -297,9 +297,12 @@ async def stream_process_output(process: asyncio.subprocess.Process, prefix: str
             if decoded_line:  # Only print non-empty lines
                 console.print(f"[dim]{prefix}:[/dim] {decoded_line}")
     except Exception as e:
-        # Anything reaching here ends the loop, so the child is now at risk of
-        # blocking on a full pipe. make_logger pins loggers to INFO, so the
-        # previous debug() here could never be emitted.
+        # The escalation path, including for the re-raise above. Anything reaching
+        # here ends the loop, so the child is now at risk of blocking on a full pipe.
+        # Warning rather than debug: this used to be a debug() that make_logger could
+        # never emit, which is why three freezes produced no clue.
+        # CancelledError derives from BaseException, so the auto-reload path that
+        # cancels these tasks passes straight through and is unaffected.
         logger.warning(
             f"Output streaming for {prefix} stopped on {e!r}. "
             f"Nothing is draining its stdout now, so {prefix} will hang once the pipe fills."
