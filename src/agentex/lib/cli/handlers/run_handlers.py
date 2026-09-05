@@ -28,6 +28,11 @@ console = Console()
 # echoed by validation errors), so give the reader room before it has to drop one.
 SUBPROCESS_STREAM_LIMIT = 8 * 1024 * 1024
 
+# How many consecutive unreadable lines to skip before giving up on the stream.
+# Skipping is only known-safe for the limit-overrun case; this bounds the damage
+# if some other error repeats without consuming anything.
+MAX_CONSECUTIVE_READ_ERRORS = 100
+
 
 class RunError(Exception):
     """An error occurred during agent run"""
@@ -255,18 +260,30 @@ async def stream_process_output(process: asyncio.subprocess.Process, prefix: str
     try:
         if process.stdout is None:
             return
+        consecutive_read_errors = 0
         while True:
             try:
                 line = await process.stdout.readline()
             except ValueError as e:
-                # Line longer than the stream limit. readline() has already
-                # dropped it (or cleared the buffer) and resumed the transport,
-                # so continuing is safe and always makes progress.
+                # readline() raises ValueError when a line exceeds the stream limit.
+                # In *that* case it has already discarded the line and resumed the
+                # transport, so skipping it makes guaranteed progress. Any other
+                # ValueError carries no such guarantee, and retrying it forever would
+                # spin without draining. We cannot tell the two apart (readline
+                # flattens LimitOverrunError into a bare ValueError), so bound the
+                # retries and let the outer handler report the hang risk.
+                consecutive_read_errors += 1
+                if consecutive_read_errors > MAX_CONSECUTIVE_READ_ERRORS:
+                    raise
                 logger.warning(
-                    f"Dropped an oversized log line from {prefix} ({e}); "
-                    f"raise limit= on this process's create_subprocess_exec if it recurs."
+                    f"Skipping an unreadable line from {prefix}: {e!r} "
+                    f"(consecutive failure {consecutive_read_errors}/{MAX_CONSECUTIVE_READ_ERRORS}). "
+                    f"If this says the chunk exceeded the limit, raise limit= on this "
+                    f"process's create_subprocess_exec."
                 )
                 continue
+
+            consecutive_read_errors = 0
 
             if not line:
                 break
