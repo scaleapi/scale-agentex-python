@@ -12,6 +12,7 @@ from rich.console import Console
 from agentex.lib.cli.debug import DebugConfig, start_acp_server_debug, start_temporal_worker_debug
 from agentex.lib.utils.logging import make_logger
 from agentex.config.agent_manifest import AgentManifest
+from agentex.lib.cli.utils.cli_utils import SUBPROCESS_STREAM_LIMIT
 from agentex.lib.cli.utils.path_utils import (
     get_file_paths,
     calculate_uvicorn_target_for_local,
@@ -22,11 +23,6 @@ from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows, s
 
 logger = make_logger(__name__)
 console = Console()
-
-# asyncio's StreamReader defaults to 64 KiB, and a single log line above that makes
-# readline() raise. Agents legitimately emit large lines (serialized charts, payloads
-# echoed by validation errors), so give the reader room before it has to drop one.
-SUBPROCESS_STREAM_LIMIT = 8 * 1024 * 1024
 
 # How many consecutive unreadable lines to skip before giving up on the stream.
 # Skipping is only known-safe for the limit-overrun case; this bounds the damage

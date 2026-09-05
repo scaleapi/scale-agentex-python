@@ -14,7 +14,12 @@ from typing import Any
 
 import pytest
 
+from agentex.lib.cli.debug import DebugMode, DebugConfig
 from agentex.lib.cli.handlers import run_handlers
+from agentex.lib.cli.debug.debug_handlers import (
+    start_acp_server_debug,
+    start_temporal_worker_debug,
+)
 from agentex.lib.cli.handlers.run_handlers import (
     SUBPROCESS_STREAM_LIMIT,
     start_acp_server,
@@ -144,10 +149,15 @@ async def test_cancellation_is_not_swallowed() -> None:
         await task
 
 
-async def test_agent_subprocesses_are_spawned_with_the_larger_limit(
+async def test_every_spawn_uses_the_larger_limit(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Any
 ) -> None:
-    """The helpers must pass limit=, or large lines are dropped in production."""
+    """Every spawn must pass limit=, including the debug ones.
+
+    A subprocess left on asyncio's default overruns far more easily, and enough
+    consecutive overruns exhaust MAX_CONSECUTIVE_READ_ERRORS and stop the reader
+    draining, which is the deadlock the bound exists to avoid.
+    """
     seen: list[int | None] = []
 
     async def fake_exec(*_args: Any, **kwargs: Any) -> None:
@@ -159,5 +169,12 @@ async def test_agent_subprocesses_are_spawned_with_the_larger_limit(
     await start_acp_server(tmp_path / "acp.py", 8000, {}, tmp_path)
     await start_temporal_worker(tmp_path / "run_worker.py", {}, tmp_path)
 
-    assert seen == [SUBPROCESS_STREAM_LIMIT, SUBPROCESS_STREAM_LIMIT]
+    # BOTH, since each helper refuses unless its own mode is enabled.
+    debug_config = DebugConfig(
+        enabled=True, mode=DebugMode.BOTH, port=5678, wait_for_attach=False, auto_port=False
+    )
+    await start_acp_server_debug(tmp_path / "acp.py", 8000, {}, debug_config)
+    await start_temporal_worker_debug(tmp_path / "run_worker.py", {}, debug_config)
+
+    assert seen == [SUBPROCESS_STREAM_LIMIT] * 4, f"a spawn is missing limit=: {seen}"
     assert SUBPROCESS_STREAM_LIMIT > 64 * 1024, "asyncio's default is what breaks readline()"
