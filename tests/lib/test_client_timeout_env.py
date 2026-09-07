@@ -60,6 +60,8 @@ def test_an_empty_value_falls_back_to_the_default():
 def test_client_picks_up_the_env_timeout(monkeypatch):
     monkeypatch.setenv("AGENTEX_CLIENT_CONNECT_TIMEOUT_SECONDS", "30")
     client = create_async_agentex_client(api_key="test", base_url="http://localhost:5003")
+    # client.timeout is float | Timeout | None; narrow before reading a component.
+    assert isinstance(client.timeout, httpx.Timeout)
     assert client.timeout.connect == 30.0
 
 
@@ -70,6 +72,7 @@ def test_explicit_timeout_wins_over_the_environment(monkeypatch):
         base_url="http://localhost:5003",
         timeout=httpx.Timeout(connect=7.0, read=8.0, write=9.0, pool=10.0),
     )
+    assert isinstance(client.timeout, httpx.Timeout)
     assert client.timeout.connect == 7.0
 
 
