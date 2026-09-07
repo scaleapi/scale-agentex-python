@@ -18,7 +18,6 @@ from agentex.lib.adk.utils._modules.client import (
     _timeout_from_env,
     create_async_agentex_client,
 )
-from agentex.lib.environment_variables import EnvironmentVariables
 
 
 @pytest.fixture(autouse=True)
