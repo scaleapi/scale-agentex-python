@@ -20,7 +20,7 @@ from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_proce
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.protocol.acp import SendEventParams, CancelTaskParams, CreateTaskParams
 from agentex.lib.types.fastacp import AsyncACPConfig
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import SGPTracingProcessorConfig, AgentexTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.adk import LangGraphTurn
@@ -28,6 +28,9 @@ from agentex.lib.adk import LangGraphTurn
 from project.graph import create_graph
 
 logger = make_logger(__name__)
+
+# Local Agentex backend: spans appear in the developer UI's traces tab.
+add_tracing_processor_config(AgentexTracingProcessorConfig())
 
 add_tracing_processor_config(
     SGPTracingProcessorConfig(
