@@ -50,6 +50,7 @@ def _write(root: Path, rel: str, content: str = "x") -> None:
         ("https://github.com/scaleapi/Repo.git", "github.com/scaleapi/Repo"),
         ("https://x-token:secret@GitHub.com/scaleapi/Repo", "github.com/scaleapi/Repo"),
         ("ssh://git@gitlab.com/group/sub/proj.git", "gitlab.com/group/sub/proj"),
+        ("https://github.com/scaleapi/Repo.git?access_token=SECRET#frag", "github.com/scaleapi/Repo"),
         ("", None),
         (None, None),
     ],

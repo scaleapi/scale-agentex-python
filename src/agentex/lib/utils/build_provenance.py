@@ -82,7 +82,8 @@ def normalize_remote(url: Optional[str]) -> Optional[str]:
     """Strip credentials and scheme from a remote, returning ``host/path``."""
     if not url:
         return None
-    candidate = url.strip()
+    # Query strings and fragments never name a repo, but they do carry tokens.
+    candidate = url.strip().split("?", 1)[0].split("#", 1)[0]
     # scp-like syntax: git@host:org/repo(.git) — no scheme, host/path split on ':'
     if "://" not in candidate and ":" in candidate and "/" not in candidate.split(":", 1)[0]:
         candidate = candidate.split("@", 1)[-1].replace(":", "/", 1)
