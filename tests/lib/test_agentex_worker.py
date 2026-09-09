@@ -117,6 +117,167 @@ class TestAgentexWorker:
         assert worker.metrics_temporality_delta is False
 
 
+class TestAgentexWorkerAgentCard:
+    """Tests that AgentexWorker publishes an optional AgentCard through the
+    existing automatic registration lifecycle."""
+
+    @pytest.fixture(autouse=True)
+    def cleanup_env(self):
+        yield
+        for key in ("AGENT_ID", "AGENT_NAME", "AGENT_API_KEY"):
+            os.environ.pop(key, None)
+
+    @staticmethod
+    def _env_vars_mock():
+        env = MagicMock()
+        env.AGENTEX_BASE_URL = "http://agentex.test"
+        env.ACP_URL = "http://agent.test"
+        env.ACP_PORT = 8000
+        env.AGENT_DESCRIPTION = "test description"
+        env.AGENT_NAME = "test-agent"
+        env.ACP_TYPE = "agentic"
+        env.AUTH_PRINCIPAL_B64 = None
+        env.AGENTEX_DEPLOYMENT_ID = None
+        env.AGENT_ID = None
+        env.AGENT_INPUT_TYPE = None
+        return env
+
+    @staticmethod
+    def _httpx_client_mock(captured_payloads):
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            "id": "agent-id",
+            "name": "test-agent",
+            "agent_api_key": "api-key",
+        }
+
+        async def post(url, json=None, timeout=None):  # noqa: ARG001
+            captured_payloads.append(json)
+            return response
+
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=MagicMock(post=AsyncMock(side_effect=post)))
+        client.__aexit__ = AsyncMock(return_value=False)
+        return MagicMock(return_value=client)
+
+    def test_worker_agent_card_defaults_to_none(self):
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        worker = AgentexWorker(task_queue="test-queue", health_check_port=8080)
+
+        assert worker.agent_card is None
+
+    async def test_default_registration_calls_register_agent_without_card(self):
+        """The default worker still registers automatically and passes no card,
+        preserving existing callers and wire behavior."""
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        worker = AgentexWorker(task_queue="test-queue", health_check_port=8080)
+
+        with patch(
+            "agentex.lib.core.temporal.workers.worker.register_agent", new=AsyncMock()
+        ) as mock_register, patch(
+            "agentex.lib.core.temporal.workers.worker.assert_backend_compatible",
+            new=AsyncMock(),
+        ), patch(
+            "agentex.lib.core.temporal.workers.worker.EnvironmentVariables"
+        ) as mock_env_cls:
+            env = self._env_vars_mock()
+            mock_env_cls.refresh.return_value = env
+
+            await worker._register_agent()
+
+        mock_register.assert_awaited_once_with(env, agent_card=None)
+
+    async def test_supplied_card_forwarded_exactly_once_by_run_lifecycle(self):
+        """A card passed to the constructor reaches register_agent exactly once
+        through the existing automatic registration in run(); no second
+        registration call is introduced."""
+        from agentex.lib.types.agent_card import AgentCard
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        card = AgentCard(metadata={"permits_capable": True})
+        worker = AgentexWorker(
+            task_queue="test-queue", health_check_port=8080, agent_card=card
+        )
+
+        with patch.object(
+            worker, "start_health_check_server", new=AsyncMock()
+        ), patch(
+            "agentex.lib.core.temporal.workers.worker.register_agent", new=AsyncMock()
+        ) as mock_register, patch(
+            "agentex.lib.core.temporal.workers.worker.assert_backend_compatible",
+            new=AsyncMock(),
+        ), patch(
+            "agentex.lib.core.temporal.workers.worker.EnvironmentVariables"
+        ) as mock_env_cls, patch(
+            "agentex.lib.core.temporal.workers.worker.get_temporal_client",
+            new=AsyncMock(return_value=MagicMock()),
+        ), patch(
+            "agentex.lib.core.temporal.workers.worker.Worker"
+        ) as mock_worker_cls:
+            env = self._env_vars_mock()
+            mock_env_cls.refresh.return_value = env
+            mock_worker_cls.return_value.run = AsyncMock()
+
+            await worker.run(activities=[], workflows=[MagicMock()])
+
+        mock_register.assert_awaited_once_with(env, agent_card=card)
+
+    async def test_worker_and_fastacp_paths_serialize_the_same_card_shape(self):
+        """The worker path and the FastACP/BaseACPServer lifespan path hand the
+        same card to register_agent, so the registration payload's
+        registration_metadata.agent_card is identical."""
+        from agentex.lib.types.agent_card import AgentCard
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+        from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+
+        card = AgentCard(metadata={"permits_capable": True, "region": "us"})
+
+        worker_payloads = []
+        worker = AgentexWorker(
+            task_queue="test-queue", health_check_port=8080, agent_card=card
+        )
+        with patch(
+            "agentex.lib.core.temporal.workers.worker.assert_backend_compatible",
+            new=AsyncMock(),
+        ), patch(
+            "agentex.lib.core.temporal.workers.worker.EnvironmentVariables"
+        ) as mock_env_cls, patch(
+            "agentex.lib.utils.registration.httpx.AsyncClient",
+            new=self._httpx_client_mock(worker_payloads),
+        ):
+            mock_env_cls.refresh.return_value = self._env_vars_mock()
+            await worker._register_agent()
+
+        acp_payloads = []
+        server = BaseACPServer.create()
+        server._agent_card = card
+        lifespan = server.get_lifespan_function()
+        with patch(
+            "agentex.lib.sdk.fastacp.base.base_acp_server.assert_backend_compatible",
+            new=AsyncMock(),
+        ), patch(
+            "agentex.lib.sdk.fastacp.base.base_acp_server.EnvironmentVariables"
+        ) as mock_env_cls, patch(
+            "agentex.lib.sdk.fastacp.base.base_acp_server.shutdown_default_span_queue",
+            new=AsyncMock(),
+        ), patch(
+            "agentex.lib.utils.registration.httpx.AsyncClient",
+            new=self._httpx_client_mock(acp_payloads),
+        ):
+            mock_env_cls.refresh.return_value = self._env_vars_mock()
+            async with lifespan(MagicMock()):
+                pass
+
+        assert len(worker_payloads) == 1
+        assert len(acp_payloads) == 1
+        worker_card = worker_payloads[0]["registration_metadata"]["agent_card"]
+        acp_card = acp_payloads[0]["registration_metadata"]["agent_card"]
+        assert worker_card == acp_card == card.model_dump()
+
+
 class TestGetTemporalClientMetricsConfig:
     """Tests that metrics params reach OpenTelemetryConfig correctly."""
 
