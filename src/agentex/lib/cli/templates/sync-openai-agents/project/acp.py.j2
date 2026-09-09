@@ -6,7 +6,7 @@ from agentex.lib.adk.providers._modules.sync_provider import SyncStreamingProvid
 from agentex.lib.sdk.fastacp.fastacp import FastACP
 from agentex.protocol.acp import SendMessageParams
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import SGPTracingProcessorConfig, AgentexTracingProcessorConfig
 from agentex.lib.utils.model_utils import BaseModel
 
 from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
@@ -31,6 +31,9 @@ if _litellm_key:
 SGP_API_KEY = os.environ.get("SGP_API_KEY", "")
 SGP_ACCOUNT_ID = os.environ.get("SGP_ACCOUNT_ID", "")
 SGP_CLIENT_BASE_URL = os.environ.get("SGP_CLIENT_BASE_URL", "")
+
+# Local Agentex backend: spans appear in the developer UI's traces tab.
+add_tracing_processor_config(AgentexTracingProcessorConfig())
 
 if SGP_API_KEY and SGP_ACCOUNT_ID:
     add_tracing_processor_config(
