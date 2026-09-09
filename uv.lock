@@ -15,7 +15,7 @@ members = [
 
 [[package]]
 name = "agentex-client"
-version = "0.21.0"
+version = "0.25.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
@@ -91,7 +91,7 @@ dev = [
 
 [[package]]
 name = "agentex-sdk"
-version = "0.21.0"
+version = "0.25.0"
 source = { editable = "adk" }
 dependencies = [
     { name = "agentex-client" },
@@ -160,7 +160,7 @@ requires-dist = [
     { name = "temporalio", specifier = ">=1.26.0,<2" },
     { name = "typer", specifier = ">=0.16,<0.17" },
     { name = "uvicorn", specifier = ">=0.31.1" },
-    { name = "watchfiles", specifier = ">=0.24.0,<1.0" },
+    { name = "watchfiles", specifier = ">=0.24.0,<2.0" },
     { name = "yaspin", specifier = ">=3.1.0" },
 ]
 
