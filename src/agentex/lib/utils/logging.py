@@ -11,6 +11,25 @@ _is_datadog_configured = bool(os.environ.get("DD_AGENT_HOST"))
 
 ctx_var_request_id = contextvars.ContextVar[str]("request_id")
 
+DEFAULT_LOG_LEVEL = logging.INFO
+
+
+def resolve_log_level() -> int:
+    """Read the log level from ``LOG_LEVEL``, falling back to INFO.
+
+    Read straight from the environment rather than through ``EnvVarKeys``, since
+    ``environment_variables`` imports this module and the reverse would be a cycle.
+
+    ``getLevelName`` returns the string ``"Level FOO"`` for anything it does not
+    recognise, so the isinstance check is what stops a typo in ``LOG_LEVEL`` from
+    silently turning logging off.
+    """
+    configured = os.getenv("LOG_LEVEL")
+    if not configured:
+        return DEFAULT_LOG_LEVEL
+    level = logging.getLevelName(configured.strip().upper())
+    return level if isinstance(level, int) else DEFAULT_LOG_LEVEL
+
 
 class CustomJSONFormatter(json_log_formatter.JSONFormatter):
     def json_record(self, message: str, extra: dict, record: logging.LogRecord) -> dict:  # type: ignore[override]
@@ -51,7 +70,7 @@ def make_logger(name: str) -> logging.Logger:
     """
     # Create a console object to print colored text
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(resolve_log_level())
 
     environment = os.getenv("ENVIRONMENT")
     if environment == "local":
