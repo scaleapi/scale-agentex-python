@@ -413,16 +413,6 @@ def create_agent_environment(manifest: AgentManifest, manifest_dir: Path | None 
     # Start with current environment
     env = dict(os.environ)
 
-    # Local development: load the .env next to manifest.yaml into BOTH the ACP and
-    # worker processes (the docs promise this). Variables already set in the shell
-    # win, matching python-dotenv's default. Without this, a value in .env only
-    # reaches a process if some import happens to call load_dotenv() first.
-    if manifest_dir is not None:
-        env_file = Path(manifest_dir) / ".env"
-        if env_file.is_file():
-            for key, value in dotenv_values(env_file).items():
-                if value is not None and key not in env:
-                    env[key] = value
 
     agent_config = manifest.agent
 
@@ -469,6 +459,23 @@ def create_agent_environment(manifest: AgentManifest, manifest_dir: Path | None 
 
     env.update(env_vars)
 
+    # Local development: load the .env next to manifest.yaml into BOTH the ACP and
+    # worker processes (the docs promise this). Precedence, highest first: the
+    # manifest's env block, variables already set in the shell, then .env, then
+    # the built-in local defaults above (so .env can point at a custom Redis or
+    # Temporal). ENVIRONMENT stays "development": that is what makes this a
+    # local run. Without this block a value in .env only reaches a process if
+    # some import happens to call load_dotenv() first.
+    if manifest_dir is not None:
+        env_file = Path(manifest_dir) / ".env"
+        if env_file.is_file():
+            manifest_env = agent_config.env or {}
+            for key, value in dotenv_values(env_file).items():
+                if value is None or key == "ENVIRONMENT":
+                    continue
+                if key in os.environ or key in manifest_env:
+                    continue
+                env[key] = value
     return env
 
 
