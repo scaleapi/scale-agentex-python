@@ -65,3 +65,17 @@ def test_missing_dotenv_and_no_manifest_dir_are_fine(project_dir: Path, monkeypa
 
     assert "FROM_DOTENV" not in create_agent_environment(manifest, manifest_dir=project_dir)
     assert "FROM_DOTENV" not in create_agent_environment(manifest)
+
+
+def test_dotenv_overrides_builtin_local_defaults_but_not_environment(project_dir: Path, monkeypatch: pytest.MonkeyPatch):
+    """.env may point local runs at a custom Redis/Temporal; ENVIRONMENT stays development."""
+    (project_dir / ".env").write_text("REDIS_URL=redis://custom:6380\nTEMPORAL_ADDRESS=temporal.internal:7233\nENVIRONMENT=production\n")
+    for key in ("REDIS_URL", "TEMPORAL_ADDRESS", "ENVIRONMENT"):
+        monkeypatch.delenv(key, raising=False)
+    manifest = load_agent_manifest(file_path=str(project_dir / "manifest.yaml"))
+
+    env = create_agent_environment(manifest, manifest_dir=project_dir)
+
+    assert env["REDIS_URL"] == "redis://custom:6380"
+    assert env["TEMPORAL_ADDRESS"] == "temporal.internal:7233"
+    assert env["ENVIRONMENT"] == "development"
