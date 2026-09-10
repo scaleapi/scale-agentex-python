@@ -137,3 +137,19 @@ class TestTemporalLangGraphTemplate:
         requirements = (project_dir / "requirements.txt").read_text()
         assert "temporalio[langgraph]>=1.27.0" in requirements
         assert "langchain-openai" in requirements
+
+
+@pytest.mark.parametrize("template_type", [TemplateType.TEMPORAL_OPENAI_AGENTS, TemplateType.TEMPORAL_PYDANTIC_AI])
+def test_temporal_worker_maps_litellm_key(tmp_path: Path, template_type: TemplateType):
+    """Temporal workers that call OpenAI-compatible models must see OPENAI_API_KEY.
+
+    These templates' .env.example only set LITELLM_API_KEY. The model call runs
+    in the worker process, started separately from the ACP process, so the
+    worker entrypoint needs the LITELLM_API_KEY -> OPENAI_API_KEY mapping or it
+    fails with "Missing credentials".
+    """
+    project_dir = _render_project(tmp_path, template_type)
+    src = (project_dir / "project" / "run_worker.py").read_text()
+    assert 'os.environ["OPENAI_API_KEY"] = _litellm_key' in src, f"{template_type.value} run_worker.py lacks the LITELLM_API_KEY mapping"
+    assert "load_dotenv()" in src, f"{template_type.value} run_worker.py does not load the project .env"
+    assert src.index("load_dotenv()") < src.index('_litellm_key = os.environ.get("LITELLM_API_KEY")'), "mapping must run after load_dotenv()"
