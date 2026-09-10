@@ -8,6 +8,17 @@ class and registers every model/tool activity the TemporalAgent needs —
 so we don't have to enumerate activities by hand here.
 """
 
+import os
+
+# LiteLLM proxy auth: the worker process runs the model calls, so copy
+# LITELLM_API_KEY to OPENAI_API_KEY before importing project code (some
+# frameworks build their OpenAI client at import time). Without this the
+# worker raises "Missing credentials".
+_litellm_key = os.environ.get("LITELLM_API_KEY")
+if _litellm_key and not os.environ.get("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = _litellm_key
+
+
 import asyncio
 
 from project.workflow import {{ workflow_class }}
@@ -18,6 +29,7 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.activities import get_all_activities
 from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
 
 environment_variables = EnvironmentVariables.refresh()
 logger = make_logger(__name__)
