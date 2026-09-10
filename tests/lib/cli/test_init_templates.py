@@ -151,3 +151,5 @@ def test_temporal_worker_maps_litellm_key(tmp_path: Path, template_type: Templat
     project_dir = _render_project(tmp_path, template_type)
     src = (project_dir / "project" / "run_worker.py").read_text()
     assert 'os.environ["OPENAI_API_KEY"] = _litellm_key' in src, f"{template_type.value} run_worker.py lacks the LITELLM_API_KEY mapping"
+    assert "load_dotenv()" in src, f"{template_type.value} run_worker.py does not load the project .env"
+    assert src.index("load_dotenv()") < src.index('_litellm_key = os.environ.get("LITELLM_API_KEY")'), "mapping must run after load_dotenv()"

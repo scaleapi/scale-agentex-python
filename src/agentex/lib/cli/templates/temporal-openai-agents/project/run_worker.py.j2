@@ -1,9 +1,14 @@
 import os
 
-# LiteLLM proxy auth: the worker process runs the model calls, so copy
+# Load the project .env first (the ACP process does the same), then map the
+# LiteLLM proxy key: the worker process runs the model calls, so copy
 # LITELLM_API_KEY to OPENAI_API_KEY before importing project code (some
 # frameworks build their OpenAI client at import time). Without this the
 # worker raises "Missing credentials".
+from dotenv import load_dotenv
+
+load_dotenv()  # the project .env, before any project code runs
+
 _litellm_key = os.environ.get("LITELLM_API_KEY")
 if _litellm_key and not os.environ.get("OPENAI_API_KEY"):
     os.environ["OPENAI_API_KEY"] = _litellm_key
