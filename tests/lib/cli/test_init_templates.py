@@ -137,3 +137,14 @@ class TestTemporalLangGraphTemplate:
         requirements = (project_dir / "requirements.txt").read_text()
         assert "temporalio[langgraph]>=1.27.0" in requirements
         assert "langchain-openai" in requirements
+
+
+@pytest.mark.parametrize("template_type", list(TemplateType))
+def test_all_templates_ship_a_gitignore_that_excludes_env(tmp_path: Path, template_type: TemplateType):
+    """Every scaffold ships a .gitignore so .env (API keys) and .venv are never committed."""
+    project_dir = _render_project(tmp_path, template_type)
+    gitignore = project_dir / ".gitignore"
+    assert gitignore.is_file(), f"{template_type.value} did not render .gitignore"
+    lines = gitignore.read_text().splitlines()
+    assert ".env" in lines and ".venv/" in lines
+    assert "!.env.example" in lines, "the example env file should stay committable"
