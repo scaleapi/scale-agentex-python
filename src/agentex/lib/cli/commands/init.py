@@ -28,12 +28,14 @@ class TemplateType(str, Enum):
     TEMPORAL_LANGGRAPH = "temporal-langgraph"
     TEMPORAL_CLAUDE_CODE = "temporal-claude-code"
     TEMPORAL_CODEX = "temporal-codex"
+    TEMPORAL_GEMINI_CLI = "temporal-gemini-cli"
     DEFAULT = "default"
     DEFAULT_LANGGRAPH = "default-langgraph"
     DEFAULT_PYDANTIC_AI = "default-pydantic-ai"
     DEFAULT_OPENAI_AGENTS = "default-openai-agents"
     DEFAULT_CLAUDE_CODE = "default-claude-code"
     DEFAULT_CODEX = "default-codex"
+    DEFAULT_GEMINI_CLI = "default-gemini-cli"
     SYNC = "sync"
     SYNC_OPENAI_AGENTS = "sync-openai-agents"
     SYNC_OPENAI_AGENTS_LOCAL_SANDBOX = "sync-openai-agents-local-sandbox"
@@ -41,6 +43,7 @@ class TemplateType(str, Enum):
     SYNC_PYDANTIC_AI = "sync-pydantic-ai"
     SYNC_CLAUDE_CODE = "sync-claude-code"
     SYNC_CODEX = "sync-codex"
+    SYNC_GEMINI_CLI = "sync-gemini-cli"
 
 
 def render_template(
@@ -75,12 +78,14 @@ def create_project_structure(
         TemplateType.TEMPORAL_LANGGRAPH: ["acp.py", "workflow.py", "run_worker.py", "graph.py", "tools.py"],
         TemplateType.TEMPORAL_CLAUDE_CODE: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
         TemplateType.TEMPORAL_CODEX: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
+        TemplateType.TEMPORAL_GEMINI_CLI: ["acp.py", "workflow.py", "run_worker.py", "activities.py"],
         TemplateType.DEFAULT: ["acp.py"],
         TemplateType.DEFAULT_LANGGRAPH: ["acp.py", "graph.py", "tools.py"],
         TemplateType.DEFAULT_PYDANTIC_AI: ["acp.py", "agent.py", "tools.py"],
         TemplateType.DEFAULT_OPENAI_AGENTS: ["acp.py"],
         TemplateType.DEFAULT_CLAUDE_CODE: ["acp.py"],
         TemplateType.DEFAULT_CODEX: ["acp.py"],
+        TemplateType.DEFAULT_GEMINI_CLI: ["acp.py"],
         TemplateType.SYNC: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS: ["acp.py"],
         TemplateType.SYNC_OPENAI_AGENTS_LOCAL_SANDBOX: ["acp.py", "agent.py", "tools.py"],
@@ -88,6 +93,7 @@ def create_project_structure(
         TemplateType.SYNC_PYDANTIC_AI: ["acp.py", "agent.py", "tools.py"],
         TemplateType.SYNC_CLAUDE_CODE: ["acp.py"],
         TemplateType.SYNC_CODEX: ["acp.py"],
+        TemplateType.SYNC_GEMINI_CLI: ["acp.py"],
     }[template_type]
 
     # Create project/code files
@@ -203,6 +209,7 @@ def init():
                 {"name": "Async ACP + Pydantic AI", "value": TemplateType.DEFAULT_PYDANTIC_AI},
                 {"name": "Async ACP + Claude Code", "value": TemplateType.DEFAULT_CLAUDE_CODE},
                 {"name": "Async ACP + Codex", "value": TemplateType.DEFAULT_CODEX},
+                {"name": "Async ACP + Gemini CLI", "value": TemplateType.DEFAULT_GEMINI_CLI},
             ],
         ).ask()
         if not template_type:
@@ -217,6 +224,7 @@ def init():
                 {"name": "Temporal + LangGraph", "value": TemplateType.TEMPORAL_LANGGRAPH},
                 {"name": "Temporal + Claude Code", "value": TemplateType.TEMPORAL_CLAUDE_CODE},
                 {"name": "Temporal + Codex", "value": TemplateType.TEMPORAL_CODEX},
+                {"name": "Temporal + Gemini CLI", "value": TemplateType.TEMPORAL_GEMINI_CLI},
             ],
         ).ask()
         if not template_type:
@@ -232,6 +240,7 @@ def init():
                 {"name": "Sync ACP + Pydantic AI", "value": TemplateType.SYNC_PYDANTIC_AI},
                 {"name": "Sync ACP + Claude Code", "value": TemplateType.SYNC_CLAUDE_CODE},
                 {"name": "Sync ACP + Codex", "value": TemplateType.SYNC_CODEX},
+                {"name": "Sync ACP + Gemini CLI", "value": TemplateType.SYNC_GEMINI_CLI},
             ],
         ).ask()
         if not template_type:
