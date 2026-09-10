@@ -119,7 +119,17 @@ def create_project_structure(
 
     for template, output in root_templates.items():
         output_path = project_dir / output
-        output_path.write_text(render_template(template, context, template_type))
+        rendered = render_template(template, context, template_type)
+        if output == ".gitignore" and output_path.exists():
+            # Re-running init on an existing project: keep the user's rules and
+            # append only the scaffold entries that are missing.
+            existing = output_path.read_text()
+            existing_lines = {line.strip() for line in existing.splitlines()}
+            missing = [line for line in rendered.splitlines() if line.strip() and not line.startswith("#") and line.strip() not in existing_lines]
+            if missing:
+                output_path.write_text(existing.rstrip("\n") + "\n\n# Added by agentex init\n" + "\n".join(missing) + "\n")
+            continue
+        output_path.write_text(rendered)
 
     console.print(f"\n[green]✓[/green] Created project structure at: {project_dir}")
 
