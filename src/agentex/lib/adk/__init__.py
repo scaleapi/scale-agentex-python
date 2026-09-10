@@ -22,6 +22,8 @@ from agentex.lib.adk._modules._claude_code_turn import (
 )
 from agentex.lib.adk._modules._codex_sync import convert_codex_to_agentex_events
 from agentex.lib.adk._modules._codex_turn import CodexTurn, codex_usage_to_turn_usage
+from agentex.lib.adk._modules._gemini_cli_sync import convert_gemini_cli_to_agentex_events
+from agentex.lib.adk._modules._gemini_cli_turn import GeminiCliTurn, gemini_cli_usage_to_turn_usage
 from agentex.lib.adk._modules.events import EventsModule
 from agentex.lib.adk._modules.messages import MessagesModule
 from agentex.lib.adk._modules.state import StateModule
@@ -101,6 +103,10 @@ __all__ = [
     "convert_codex_to_agentex_events",
     "CodexTurn",
     "codex_usage_to_turn_usage",
+    # Gemini CLI
+    "convert_gemini_cli_to_agentex_events",
+    "GeminiCliTurn",
+    "gemini_cli_usage_to_turn_usage",
     # Unified harness surface (AGX1-375)
     "UnifiedEmitter",
     "SpanTracer",
