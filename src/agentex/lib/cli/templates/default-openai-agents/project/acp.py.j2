@@ -25,7 +25,7 @@ from agents import Agent, Runner, function_tool, set_tracing_disabled
 from agentex.lib import adk
 from agentex.lib.types.acp import SendEventParams, CancelTaskParams, CreateTaskParams
 from agentex.lib.types.fastacp import AsyncACPConfig
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import SGPTracingProcessorConfig, AgentexTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.utils.model_utils import BaseModel
@@ -48,6 +48,12 @@ if _litellm_key and not os.environ.get("OPENAI_API_KEY"):
 
 _sgp_api_key = os.environ.get("SGP_API_KEY", "")
 _sgp_account_id = os.environ.get("SGP_ACCOUNT_ID", "")
+# Local Agentex backend: spans appear in the developer UI's traces tab. Skipped
+# when AGENTEX_BASE_URL is explicitly empty (the runtime then treats the backend
+# as disabled and skips agent registration too).
+if os.environ.get("AGENTEX_BASE_URL", "http://localhost:5003"):
+    add_tracing_processor_config(AgentexTracingProcessorConfig())
+
 if _sgp_api_key and _sgp_account_id:
     add_tracing_processor_config(
         SGPTracingProcessorConfig(

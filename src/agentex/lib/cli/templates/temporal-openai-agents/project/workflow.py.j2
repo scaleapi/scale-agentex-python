@@ -25,7 +25,7 @@ from project.activities import get_weather
 from agentex.lib.core.tracing.tracing_processor_manager import (
     add_tracing_processor_config,
 )
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import SGPTracingProcessorConfig, AgentexTracingProcessorConfig
 from datetime import timedelta
 
 
@@ -38,6 +38,12 @@ if environment_variables.AGENT_NAME is None:
     raise ValueError("Environment variable AGENT_NAME is not set")
 
 logger = make_logger(__name__)
+
+# Local Agentex backend: spans appear in the developer UI's traces tab. Skipped
+# when AGENTEX_BASE_URL is explicitly empty (the runtime then treats the backend
+# as disabled and skips agent registration too).
+if os.environ.get("AGENTEX_BASE_URL", "http://localhost:5003"):
+    add_tracing_processor_config(AgentexTracingProcessorConfig())
 
 # Setup tracing for SGP (Scale GenAI Platform)
 # This enables visibility into your agent's execution in the SGP dashboard
