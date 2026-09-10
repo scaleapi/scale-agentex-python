@@ -5,6 +5,7 @@ import sys
 import asyncio
 from pathlib import Path
 
+from dotenv import dotenv_values
 from rich.panel import Panel
 from rich.console import Console
 
@@ -332,7 +333,7 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
             raise RunError("Temporal agent requires a worker file path to be configured")
 
     # Create environment for subprocesses
-    agent_env = create_agent_environment(manifest)
+    agent_env = create_agent_environment(manifest, manifest_dir=manifest_file.parent)
 
     # Setup process manager
     process_manager = ProcessManager()
@@ -407,10 +408,21 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
 
 
 
-def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
+def create_agent_environment(manifest: AgentManifest, manifest_dir: Path | None = None) -> dict[str, str]:
     """Create environment variables for agent processes without modifying os.environ"""
     # Start with current environment
     env = dict(os.environ)
+
+    # Local development: load the .env next to manifest.yaml into BOTH the ACP and
+    # worker processes (the docs promise this). Variables already set in the shell
+    # win, matching python-dotenv's default. Without this, a value in .env only
+    # reaches a process if some import happens to call load_dotenv() first.
+    if manifest_dir is not None:
+        env_file = Path(manifest_dir) / ".env"
+        if env_file.is_file():
+            for key, value in dotenv_values(env_file).items():
+                if value is not None and key not in env:
+                    env[key] = value
 
     agent_config = manifest.agent
 
