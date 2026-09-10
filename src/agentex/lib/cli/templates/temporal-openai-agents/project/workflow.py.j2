@@ -39,8 +39,11 @@ if environment_variables.AGENT_NAME is None:
 
 logger = make_logger(__name__)
 
-# Local Agentex backend: spans appear in the developer UI's traces tab.
-add_tracing_processor_config(AgentexTracingProcessorConfig())
+# Local Agentex backend: spans appear in the developer UI's traces tab. Skipped
+# when AGENTEX_BASE_URL is explicitly empty (the runtime then treats the backend
+# as disabled and skips agent registration too).
+if os.environ.get("AGENTEX_BASE_URL", "http://localhost:5003"):
+    add_tracing_processor_config(AgentexTracingProcessorConfig())
 
 # Setup tracing for SGP (Scale GenAI Platform)
 # This enables visibility into your agent's execution in the SGP dashboard
