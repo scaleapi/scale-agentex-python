@@ -141,11 +141,52 @@ def init_sgp_obs(app: Any = None) -> str:
         return _status
 
     if "traces" in handles:
+        _install_openai_agents_bridge()
         _warn_if_correlation_backend_mismatched()
 
     _status = "wired:" + ",".join(sorted(handles))
     logger.info("sgp-obs wired (%s)", _status)
     return _status
+
+
+def _install_openai_agents_bridge() -> bool:
+    """Register sgp-obs' openai-agents trace processor, so a ``Runner`` turn produces
+    logical model-operation spans.
+
+    This is the one piece of traces wiring ``sgp_obs.init()`` does NOT do for itself.
+    Measured on 0.16.0 after a plain ``init()`` with the traces signal on:
+
+        GenAI attempt span processor  installed
+        litellm logical adapter       installed
+        httpx / aiohttp egress        instrumented
+        openai-agents bridge          NOT installed
+
+    which is why the obs-test agents each carry a hand-written bootstrap that calls it.
+    It matters more than the others here: roughly 83% of model-calling agents reach the
+    model through the openai-agents ``Runner``, so without this the dominant path
+    contributes no logical spans and "traces on" looks like it does nothing.
+
+    Unconditional because ``openai-agents`` is a hard dependency of this SDK, so the
+    ``agents`` package is importable in every agent. The call is idempotent and returns
+    False rather than raising when the SDK is somehow absent.
+    """
+    try:
+        from sgp_obs.traces import install_openai_agents_bridge  # type: ignore[import-not-found]
+
+        installed = bool(install_openai_agents_bridge())
+        if installed:
+            logger.debug("sgp-obs openai-agents bridge installed")
+        else:
+            # Only reachable if `agents` is not importable, which should not happen
+            # while openai-agents is a hard dependency — so say so rather than shrug.
+            logger.warning(
+                "sgp-obs openai-agents bridge did not install; Runner turns will "
+                "produce no logical model-operation spans."
+            )
+        return installed
+    except Exception:  # pragma: no cover - telemetry must never break startup
+        logger.debug("sgp-obs openai-agents bridge unavailable", exc_info=True)
+        return False
 
 
 def _warn_if_correlation_backend_mismatched() -> None:

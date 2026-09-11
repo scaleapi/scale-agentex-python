@@ -52,13 +52,21 @@ def caplog_at(monkeypatch):
     yield records
 
 
-def _fake_sgp_obs(monkeypatch, init=None, shutdown=None):
-    """Install a stand-in ``sgp_obs`` module whose entry points we control."""
+def _fake_sgp_obs(monkeypatch, init=None, shutdown=None, bridge=None):
+    """Install a stand-in ``sgp_obs`` module whose entry points we control.
+
+    ``bridge`` stands in for ``sgp_obs.traces.install_openai_agents_bridge``; it lives
+    on a fake ``sgp_obs.traces`` submodule because that is how the SDK imports it.
+    """
     module = type(sys)("sgp_obs")
     module.init = init if init is not None else (lambda **_kwargs: {"metrics": object()})
     if shutdown is not None:
         module.shutdown = shutdown
     monkeypatch.setitem(sys.modules, "sgp_obs", module)
+
+    traces = type(sys)("sgp_obs.traces")
+    traces.install_openai_agents_bridge = bridge if bridge is not None else (lambda: True)
+    monkeypatch.setitem(sys.modules, "sgp_obs.traces", traces)
     return module
 
 
@@ -339,3 +347,56 @@ class TestAnAgentStillServesWithoutSgpObs:
         _block_sgp_obs_import(monkeypatch)
         routes = {getattr(r, "path", None) for r in BaseACPServer().routes}
         assert {"/healthz", "/api"} <= routes
+
+
+class TestOpenAIAgentsBridge:
+    """sgp_obs.init() installs the GenAI attempt processor, the litellm adapter and the
+    egress instrumentors by itself, but NOT the openai-agents bridge (measured on
+    0.16.0). That is the path ~83% of model-calling agents take, so the SDK installs it
+    — otherwise "traces on" produces no logical model-operation spans for most agents.
+    """
+
+    def test_installed_when_traces_are_wired(self, monkeypatch):
+        calls = []
+        _fake_sgp_obs(
+            monkeypatch,
+            init=lambda **_kwargs: {"traces": object()},
+            bridge=lambda: calls.append(True) or True,
+        )
+        monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
+        assert init_sgp_obs() == "wired:traces"
+        assert calls == [True]
+
+    def test_not_installed_without_the_traces_signal(self, monkeypatch):
+        """A metrics-only agent has no span pipeline to feed, so installing an
+        openai-agents trace processor would be pointless work at startup."""
+        calls = []
+        _fake_sgp_obs(
+            monkeypatch,
+            init=lambda **_kwargs: {"metrics": object()},
+            bridge=lambda: calls.append(True) or True,
+        )
+        assert init_sgp_obs() == "wired:metrics"
+        assert calls == []
+
+    def test_a_bridge_that_declines_is_reported(self, monkeypatch, caplog):
+        """False means the `agents` SDK was not importable. openai-agents is a hard
+        dependency of this package, so that should be impossible — say so rather than
+        swallow it."""
+        monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
+        _fake_sgp_obs(
+            monkeypatch, init=lambda **_kwargs: {"traces": object()}, bridge=lambda: False
+        )
+        with caplog.at_level("WARNING"):
+            assert init_sgp_obs() == "wired:traces"
+        assert "openai-agents bridge" in caplog.text
+
+    def test_a_raising_bridge_does_not_stop_startup(self, monkeypatch):
+        def boom():
+            raise RuntimeError("sgp-obs internals moved")
+
+        monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
+        _fake_sgp_obs(
+            monkeypatch, init=lambda **_kwargs: {"traces": object()}, bridge=boom
+        )
+        assert init_sgp_obs() == "wired:traces"
