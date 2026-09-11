@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import sys
 import builtins
+from contextlib import contextmanager
 
 import pytest
 
@@ -38,6 +39,17 @@ def _reset(monkeypatch):
     sgp_obs_setup._reset_for_tests()
     yield
     sgp_obs_setup._reset_for_tests()
+
+
+@contextmanager
+def caplog_at(monkeypatch):
+    """Collect sgp_obs_setup's WARNING messages regardless of root config."""
+    records: list[str] = []
+    monkeypatch.setattr(
+        sgp_obs_setup.logger, "warning",
+        lambda msg, *a, **_k: records.append(msg % a if a else msg),
+    )
+    yield records
 
 
 def _fake_sgp_obs(monkeypatch, init=None, shutdown=None):
@@ -132,6 +144,36 @@ class TestGateTwoEnvironmentSwitches:
         with caplog.at_level("WARNING"):
             init_sgp_obs()
         assert len(caplog.records) == 1
+
+    def test_traces_without_lgtm_mode_warns_that_correlation_is_dead(
+        self, monkeypatch
+    ):
+        """SGP_OBS_MODE defaults to dd_only, where the SDK's business-span wrapper
+        only opens if a ddtrace trace is already active — never true on a
+        bare-uvicorn agent. So both correlation edges vanish while the traces
+        signal still reports itself wired. Measured: mode unset -> zero exported
+        spans and no ids either way; lgtm -> both edges, round trip closes."""
+        monkeypatch.delenv("SGP_OBS_MODE", raising=False)
+        _fake_sgp_obs(monkeypatch, lambda **_kwargs: {"traces": object()})
+        with caplog_at(monkeypatch) as records:
+            assert init_sgp_obs() == "wired:traces"
+        assert any("SGP_OBS_MODE" in r for r in records)
+
+    def test_traces_with_lgtm_mode_is_quiet(self, monkeypatch, caplog):
+        monkeypatch.setenv("SGP_OBS_MODE", "lgtm")
+        _fake_sgp_obs(monkeypatch, lambda **_kwargs: {"traces": object()})
+        with caplog.at_level("WARNING"):
+            assert init_sgp_obs() == "wired:traces"
+        assert caplog.records == []
+
+    def test_metrics_only_does_not_warn_about_the_mode(self, monkeypatch, caplog):
+        """The correlation edges are a traces concern. A metrics-only agent has no
+        business-span linking to lose, so the warning would be noise."""
+        monkeypatch.delenv("SGP_OBS_MODE", raising=False)
+        _fake_sgp_obs(monkeypatch, lambda **_kwargs: {"metrics": object()})
+        with caplog.at_level("WARNING"):
+            assert init_sgp_obs() == "wired:metrics"
+        assert caplog.records == []
 
     def test_all_three_signals_are_named_in_the_status(self, monkeypatch):
         _fake_sgp_obs(

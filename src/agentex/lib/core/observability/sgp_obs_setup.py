@@ -140,9 +140,57 @@ def init_sgp_obs(app: Any = None) -> str:
         _status = "disabled"
         return _status
 
+    if "traces" in handles:
+        _warn_if_correlation_backend_mismatched()
+
     _status = "wired:" + ",".join(sorted(handles))
     logger.info("sgp-obs wired (%s)", _status)
     return _status
+
+
+def _warn_if_correlation_backend_mismatched() -> None:
+    """Warn when sgp-obs is exporting OTel traces but the SDK's business-span
+    correlation is still reading ddtrace.
+
+    The SDK has had its own correlation for a while (core/tracing/obs_span.py). It
+    writes BOTH directions of the link between a business span and an obs span:
+
+      forward  — obs_trace_id / obs_span_id onto the business span's data, so the
+                 SGP tracing UI can pivot to Tempo
+      backward — agentex.business_span_id / agentex.business_trace_id onto the OTel
+                 span, so Tempo can pivot back
+
+    Which backend it opens that span in is chosen by SGP_OBS_MODE, which defaults to
+    ``dd_only``. In that mode it opens a ddtrace span, and only if a ddtrace trace is
+    already active — which on a bare-uvicorn agent it never is. So the wrapper is
+    never opened, the correlation dict comes back empty, and BOTH edges vanish
+    silently while the traces signal still reports itself as wired.
+
+    Measured on sgp-obs 0.16.0 with a real business span: mode unset gives zero
+    exported spans and no ids in either direction; SGP_OBS_MODE=lgtm gives the
+    span, both tags, and a round trip that closes (the business span's obs_span_id
+    equals the exported span's span id, and the span's agentex.business_span_id
+    equals the business span's id).
+
+    Warn rather than set it: SGP_OBS_MODE also steers correlation reads elsewhere,
+    and an agent genuinely running ddtrace (the Centipede family) would be misread
+    if this flipped underneath it. The operator picks; this only makes the silent
+    case audible.
+    """
+    try:
+        from agentex.lib.core.tracing.obs_ids import LGTM, get_obs_mode
+
+        if get_obs_mode() != LGTM:
+            logger.warning(
+                "sgp-obs wired the traces signal (OpenTelemetry), but SGP_OBS_MODE is "
+                "%r, so this SDK's business-span correlation still targets ddtrace and "
+                "will not link anything. Set SGP_OBS_MODE=lgtm to get both edges: "
+                "obs_trace_id/obs_span_id on the business span, and "
+                "agentex.business_span_id/agentex.business_trace_id on the OTel span.",
+                get_obs_mode(),
+            )
+    except Exception:  # pragma: no cover - a diagnostic must never break startup
+        logger.debug("could not check SGP_OBS_MODE", exc_info=True)
 
 
 async def shutdown_sgp_obs() -> None:
