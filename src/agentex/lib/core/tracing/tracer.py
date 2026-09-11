@@ -15,12 +15,12 @@ class Tracer:
     It manages the client connection and creates traces.
     """
 
-    def __init__(self, client: Agentex):
+    def __init__(self, client: Agentex | None = None):
         """
-        Initialize a new sync tracer with the provided client.
+        Initialize a new sync tracer.
 
         Args:
-            client: Agentex client instance used for API communication.
+            client: Kept for backward compatibility, no longer used.
         """
         self.client = client
 
@@ -47,12 +47,12 @@ class AsyncTracer:
     It manages the async client connection and creates async traces.
     """
 
-    def __init__(self, client: AsyncAgentex):
+    def __init__(self, client: AsyncAgentex | None = None):
         """
-        Initialize a new async tracer with the provided client.
+        Initialize a new async tracer.
 
         Args:
-            client: AsyncAgentex client instance used for API communication.
+            client: Kept for backward compatibility, no longer used.
         """
         self.client = client
 

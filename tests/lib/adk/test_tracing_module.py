@@ -7,7 +7,7 @@ import pytest
 from temporalio.exceptions import ActivityError
 
 import agentex.lib.adk._modules.tracing as _tracing_mod
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.core.harness.types import TurnUsage
 from agentex.lib.adk._modules.tracing import TurnSpan, TracingModule
 from agentex.lib.core.tracing.span_error import get_span_error

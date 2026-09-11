@@ -9,15 +9,12 @@ from scale_gp_beta.lib.tracing import (
 )
 from scale_gp_beta.lib.tracing.types import ErrorCategory
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 
 # Reserved key under ``Span.data`` carrying failure info for a span whose
-# context-manager body raised. Mirrors the existing ``__span_type__`` /
-# ``__source__`` reserved-key convention already read/written by the SGP
-# processor. Stored in ``data`` because the Span model is generated from the
-# OpenAPI spec and has no first-class status/error field; ``data`` is a real
-# field, so it survives ``model_copy(deep=True)`` and round-trips to both the
-# SGP and agentex-native span stores.
+# context-manager body raised, alongside the ``__span_type__`` / ``__source__``
+# keys the SGP processor already reads. Kept in ``data`` so it survives
+# ``model_copy(deep=True)`` and reaches the processors with the span.
 SPAN_ERROR_KEY = "__error__"
 
 ERROR_CATEGORY_UNKNOWN: ErrorCategory = "unknown"

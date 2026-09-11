@@ -7,7 +7,7 @@ from typing import cast
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.core.tracing.span_queue import (
     _DEFAULT_BATCH_SIZE,
     SpanEventType,

@@ -6,7 +6,7 @@ import asyncio
 from enum import Enum
 from dataclasses import dataclass
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.observability import tracing_metrics_recording as _metrics
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (

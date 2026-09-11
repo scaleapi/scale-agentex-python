@@ -3,8 +3,7 @@ from __future__ import annotations
 import asyncio
 from abc import ABC, abstractmethod
 
-from agentex.types.span import Span
-from agentex.lib.types.tracing import TracingProcessorConfig
+from agentex.lib.types.tracing import Span, TracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 
 logger = make_logger(__name__)

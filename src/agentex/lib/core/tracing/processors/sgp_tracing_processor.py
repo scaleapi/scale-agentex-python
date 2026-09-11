@@ -10,9 +10,8 @@ from scale_gp_beta import SGPClient, AsyncSGPClient
 from scale_gp_beta.lib.tracing import create_span, flush_queue
 from scale_gp_beta.lib.tracing.span import Span as SGPSpan
 
-from agentex.types.span import Span
 from agentex.lib.core.tracing import code_revision
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import Span, SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.observability import tracing_metrics_recording as _metrics
 from agentex.lib.environment_variables import EnvironmentVariables
@@ -75,8 +74,8 @@ def _sgp_metadata(span: Span) -> Any:
 
     Returns a COPY rather than mutating ``span``. ``trace.py`` hands the same
     Span instance to every registered processor, so anything written onto
-    ``span.data`` here would also be serialized by the Agentex processor and
-    show up in caller-visible span data. ``__commit_sha__`` is opt-in and
+    ``span.data`` here would also reach every other processor and show up in
+    caller-visible span data. ``__commit_sha__`` is opt-in and
     SGP-scoped, so it must not leak that way.
 
     (The ``__source__`` / ``__agent_*`` keys set by ``_add_source_to_span`` do

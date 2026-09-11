@@ -25,7 +25,7 @@ from opentelemetry.trace import (
 )
 
 import agentex.lib.core.tracing.trace as trace_mod
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.core.tracing.trace import _OBS_HANDLES, _OBS_HANDLES_MAX, Trace
 from agentex.lib.core.tracing.obs_span import ObsSpanHandle
 

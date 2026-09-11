@@ -11,7 +11,6 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, TimeoutError as TemporalTimeoutError, is_cancelled_exception
 
 from agentex import AsyncAgentex  # noqa: F401
-from agentex.lib.adk.utils._modules.client import create_async_agentex_client
 from agentex.lib.core.services.adk.tracing import TracingService
 from agentex.lib.core.temporal.activities.activity_helpers import ActivityHelpers
 from agentex.lib.core.temporal.activities.adk.tracing_activities import (
@@ -22,7 +21,7 @@ from agentex.lib.core.temporal.activities.adk.tracing_activities import (
 from agentex.lib.core.tracing.span_error import set_span_error
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.core.harness.types import TurnUsage
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.temporal import in_temporal_workflow
@@ -145,46 +144,17 @@ class TracingModule:
 
         Args:
             tracing_service (Optional[TracingService]): Optional pre-configured tracing service.
-                If None, will be lazily created on first use so the httpx client is
-                bound to the correct running event loop.
+                If None, one is created on first use.
         """
         self._tracing_service_explicit = tracing_service
         self._tracing_service_lazy: TracingService | None = None
-        self._bound_loop_id: int | None = None
 
     @property
     def _tracing_service(self) -> TracingService:
         if self._tracing_service_explicit is not None:
             return self._tracing_service_explicit
-
-        import asyncio
-
-        # Determine the current event loop (if any).
-        try:
-            loop = asyncio.get_running_loop()
-            loop_id = id(loop)
-        except RuntimeError:
-            loop_id = None
-
-        # Re-create the underlying httpx client when the event loop changes
-        # (e.g. between HTTP requests in a sync ASGI server) to avoid
-        # "Event loop is closed" / "bound to a different event loop" errors.
-        if self._tracing_service_lazy is None or (loop_id is not None and loop_id != self._bound_loop_id):
-            import httpx
-
-            # Keepalive ON: connections are reused within a single event
-            # loop, eliminating the TLS-handshake-per-span penalty under
-            # load.  Cross-loop safety is preserved by rebuilding the
-            # client whenever loop_id changes (the conditional above).
-            agentex_client = create_async_agentex_client(
-                http_client=httpx.AsyncClient(
-                    limits=httpx.Limits(max_keepalive_connections=20),
-                ),
-            )
-            tracer = AsyncTracer(agentex_client)
-            self._tracing_service_lazy = TracingService(tracer=tracer)
-            self._bound_loop_id = loop_id
-
+        if self._tracing_service_lazy is None:
+            self._tracing_service_lazy = TracingService(tracer=AsyncTracer())
         return self._tracing_service_lazy
 
     @asynccontextmanager

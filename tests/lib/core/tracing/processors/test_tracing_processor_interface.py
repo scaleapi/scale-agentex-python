@@ -5,8 +5,7 @@ import logging
 from typing import override
 from datetime import UTC, datetime
 
-from agentex.types.span import Span
-from agentex.lib.types.tracing import TracingProcessorConfig
+from agentex.lib.types.tracing import Span, TracingProcessorConfig
 from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     AsyncTracingProcessor,
 )
