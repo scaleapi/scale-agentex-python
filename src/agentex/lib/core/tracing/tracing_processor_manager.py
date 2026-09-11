@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 from threading import Lock
 
 from agentex.lib.types.tracing import TracingProcessorConfig
@@ -13,17 +12,9 @@ from agentex.lib.core.tracing.processors.tracing_processor_interface import (
     AsyncTracingProcessor,
 )
 
-if TYPE_CHECKING:
-    from agentex.lib.core.tracing.processors.agentex_tracing_processor import (  # noqa: F401
-        AgentexSyncTracingProcessor,
-        AgentexAsyncTracingProcessor,
-    )
-
 
 class TracingProcessorManager:
     def __init__(self):
-        # Mapping of processor config type to processor class
-        # Use lazy loading for agentex processors to avoid circular imports
         self.sync_config_registry: dict[str, type[SyncTracingProcessor]] = {
             "sgp": SGPSyncTracingProcessor,
         }
@@ -34,22 +25,15 @@ class TracingProcessorManager:
         self.sync_processors: list[SyncTracingProcessor] = []
         self.async_processors: list[AsyncTracingProcessor] = []
         self.lock = Lock()
-        self._agentex_registered = False
-
-    def _ensure_agentex_registered(self):
-        """Lazily register agentex processors to avoid circular imports."""
-        if not self._agentex_registered:
-            from agentex.lib.core.tracing.processors.agentex_tracing_processor import (
-                AgentexSyncTracingProcessor,
-                AgentexAsyncTracingProcessor,
-            )
-            self.sync_config_registry["agentex"] = AgentexSyncTracingProcessor
-            self.async_config_registry["agentex"] = AgentexAsyncTracingProcessor
-            self._agentex_registered = True
 
     def add_processor_config(self, processor_config: TracingProcessorConfig) -> None:
         with self.lock:
-            self._ensure_agentex_registered()
+            if processor_config.type not in self.sync_config_registry:
+                raise ValueError(
+                    f"Unknown tracing processor type {processor_config.type!r}. "
+                    f"Supported: {sorted(self.sync_config_registry)}. The Agentex span store "
+                    "was removed, configure SGPTracingProcessorConfig instead."
+                )
             sync_processor = self.sync_config_registry[processor_config.type]
             async_processor = self.async_config_registry[processor_config.type]
             self.sync_processors.append(sync_processor(processor_config))
@@ -73,8 +57,10 @@ GLOBAL_TRACING_PROCESSOR_MANAGER = TracingProcessorManager()
 add_tracing_processor_config = GLOBAL_TRACING_PROCESSOR_MANAGER.add_processor_config
 set_tracing_processor_configs = GLOBAL_TRACING_PROCESSOR_MANAGER.set_processor_configs
 
+
 def get_sync_tracing_processors():
     return GLOBAL_TRACING_PROCESSOR_MANAGER.get_sync_processors()
+
 
 def get_async_tracing_processors():
     return GLOBAL_TRACING_PROCESSOR_MANAGER.get_async_processors()

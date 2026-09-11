@@ -9,7 +9,7 @@ from collections import OrderedDict
 from pydantic import BaseModel
 
 from agentex import Agentex, AsyncAgentex
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
 from agentex.lib.core.tracing.obs_ids import obs_correlation, warn_on_backend_drift
@@ -220,7 +220,6 @@ class Trace:
     """
     Trace is a wrapper around the Agentex API for tracing.
     It provides a context manager for spans and a way to start and end spans.
-    It also provides a way to get spans by ID and list all spans in a trace.
     """
 
     def __init__(
@@ -268,7 +267,6 @@ class Trace:
         if not self.trace_id:
             raise ValueError("Trace ID is required to start a span")
 
-        # Create a span using the client's spans resource
         start_time = datetime.now(UTC)
 
         serialized_input = recursive_model_dump(input) if input else None
@@ -327,30 +325,7 @@ class Trace:
 
         return span
 
-    def get_span(self, span_id: str) -> Span:
-        """
-        Get a span by ID.
 
-        Args:
-            span_id: The ID of the span to get.
-
-        Returns:
-            The requested span.
-        """
-        # Query from Agentex API
-        span = self.client.spans.retrieve(span_id)
-        return span
-
-    def list_spans(self) -> list[Span]:
-        """
-        List all spans in this trace.
-
-        Returns:
-            List of spans in this trace.
-        """
-        # Query from Agentex API
-        spans = self.client.spans.list(trace_id=self.trace_id)
-        return spans
 
     @contextmanager
     def span(
@@ -382,7 +357,6 @@ class AsyncTrace:
     """
     AsyncTrace is a wrapper around the Agentex API for tracing.
     It provides a context manager for spans and a way to start and end spans.
-    It also provides a way to get spans by ID and list all spans in a trace.
     """
 
     def __init__(
@@ -432,7 +406,6 @@ class AsyncTrace:
         if not self.trace_id:
             raise ValueError("Trace ID is required to start a span")
 
-        # Create a span using the client's spans resource
         start_time = datetime.now(UTC)
 
         serialized_input = recursive_model_dump(input) if input else None
@@ -507,30 +480,7 @@ class AsyncTrace:
 
         return span
 
-    async def get_span(self, span_id: str) -> Span:
-        """
-        Get a span by ID.
 
-        Args:
-            span_id: The ID of the span to get.
-
-        Returns:
-            The requested span.
-        """
-        # Query from Agentex API
-        span = await self.client.spans.retrieve(span_id)
-        return span
-
-    async def list_spans(self) -> list[Span]:
-        """
-        List all spans in this trace.
-
-        Returns:
-            List of spans in this trace.
-        """
-        # Query from Agentex API
-        spans = await self.client.spans.list(trace_id=self.trace_id)
-        return spans
 
     @asynccontextmanager
     async def span(

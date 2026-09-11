@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 from temporalio.testing import ActivityEnvironment
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 
 
 def _make_span(**overrides) -> Span:

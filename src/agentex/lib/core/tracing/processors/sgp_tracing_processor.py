@@ -10,9 +10,8 @@ from scale_gp_beta import SGPClient, AsyncSGPClient
 from scale_gp_beta.lib.tracing import create_span, flush_queue
 from scale_gp_beta.lib.tracing.span import Span as SGPSpan
 
-from agentex.types.span import Span
 from agentex.lib.core.tracing import code_revision
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import Span, SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.observability import tracing_metrics_recording as _metrics
 from agentex.lib.environment_variables import EnvironmentVariables

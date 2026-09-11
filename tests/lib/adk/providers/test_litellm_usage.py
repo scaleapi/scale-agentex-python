@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.types.task_message import TaskMessage
 from agentex.lib.types.llm_messages import (
     Delta,

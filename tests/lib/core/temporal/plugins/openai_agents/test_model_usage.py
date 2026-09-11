@@ -22,7 +22,7 @@ from openai.types.responses.response_usage import (
 )
 
 import agentex.lib.core.temporal.plugins.openai_agents.models.temporal_streaming_model as tsm
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.core.temporal.plugins.openai_agents.interceptors.context_interceptor import (
     streaming_task_id,
     streaming_trace_id,

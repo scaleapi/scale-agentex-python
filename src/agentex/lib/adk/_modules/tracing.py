@@ -22,7 +22,7 @@ from agentex.lib.core.temporal.activities.adk.tracing_activities import (
 from agentex.lib.core.tracing.span_error import set_span_error
 from agentex.lib.core.tracing.tracer import AsyncTracer
 from agentex.lib.core.harness.types import TurnUsage
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.utils.temporal import in_temporal_workflow

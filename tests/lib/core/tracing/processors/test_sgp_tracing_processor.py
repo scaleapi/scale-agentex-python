@@ -7,8 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agentex.types.span import Span
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import Span, SGPTracingProcessorConfig
 
 MODULE = "agentex.lib.core.tracing.processors.sgp_tracing_processor"
 
@@ -84,11 +83,10 @@ class TestSourceStamps:
 
     def test_commit_sha_does_not_leak_onto_the_shared_span(self, monkeypatch):
         """trace.py hands ONE Span to every processor. If the commit SHA were
-        written onto span.data, a co-registered Agentex processor would
-        serialize it too, and it would surface in caller-visible span data."""
+        written onto span.data, any co-registered processor would serialize it
+        too, and it would surface in caller-visible span data."""
         from agentex.lib.core.tracing import code_revision
         from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
-        from agentex.lib.core.tracing.processors.agentex_tracing_processor import _create_kwargs
 
         monkeypatch.setenv("AGENT_COMMIT_SHA", self.SHA)
         code_revision.enable()
@@ -96,7 +94,6 @@ class TestSourceStamps:
             span = _make_span(); span.data = {}
             assert _sgp_metadata(span)["__commit_sha__"] == self.SHA   # SGP sees it
             assert "__commit_sha__" not in span.data                   # the span does not
-            assert "__commit_sha__" not in (_create_kwargs(span)["data"] or {})
         finally:
             code_revision.disable()
 

@@ -41,7 +41,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.core.tracing.trace import AsyncTrace
 from agentex.lib.core.tracing.span_queue import AsyncSpanQueue
 

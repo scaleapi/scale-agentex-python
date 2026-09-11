@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, override
 
 from pydantic import BaseModel
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.sdk.state_machine import StateMachine
 
 

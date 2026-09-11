@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.adk._modules.tracing import TracingModule
 from agentex.lib.core.tracing.span_error import get_span_error
 

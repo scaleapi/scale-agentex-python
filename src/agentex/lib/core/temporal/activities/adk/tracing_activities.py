@@ -5,7 +5,7 @@ from typing import Any
 
 from temporalio import activity
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 from agentex.lib.core.services.adk.tracing import TracingService

@@ -9,7 +9,7 @@ from scale_gp_beta.lib.tracing import (
 )
 from scale_gp_beta.lib.tracing.types import ErrorCategory
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 
 # Reserved key under ``Span.data`` carrying failure info for a span whose
 # context-manager body raised. Mirrors the existing ``__span_type__`` /

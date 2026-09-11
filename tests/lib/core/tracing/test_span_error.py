@@ -12,7 +12,7 @@ from scale_gp_beta.lib.tracing import (
     CategorizedError as SGPCategorizedError,
 )
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.lib.core.tracing.span_error import (
     SPAN_ERROR_KEY,

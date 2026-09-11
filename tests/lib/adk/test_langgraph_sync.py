@@ -251,7 +251,7 @@ class _FakeTracingBackend:
     spans_ended: list[str] = field(default_factory=list)
 
     async def start_span(self, **kw) -> Any:
-        from agentex.types.span import Span
+        from agentex.lib.types.tracing import Span
 
         sp = Span(
             id=f"span-{len(self.spans_started) + 1}",

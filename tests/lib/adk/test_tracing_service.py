@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-from agentex.types.span import Span
+from agentex.lib.types.tracing import Span
 from agentex.lib.core.services.adk.tracing import TracingService
 
 
