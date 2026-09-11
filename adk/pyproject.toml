@@ -65,6 +65,7 @@ dependencies = [
 # agentex/lib/* uses `from typing import override` (3.12+) in 19 files.
 # The slim agentex-client keeps 3.11 support.
 requires-python = ">= 3.12,<4"
+
 classifiers = [
   "Typing :: Typed",
   "Intended Audience :: Developers",
@@ -75,6 +76,23 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "License :: OSI Approved :: Apache Software License",
 ]
+
+# No `obs` extra, deliberately — do not add one for sgp-obs.
+#
+# sgp-obs is not on public PyPI (it is served from Scale's curated CodeArtifact
+# mirror), and declaring it in [project.optional-dependencies] makes THIS repo's uv
+# workspace unresolvable: `uv sync` re-locks, locking must resolve every declared
+# optional dependency of every workspace member, and there is no way to exempt one.
+# Measured: `uv lock --check`, `uv sync --all-extras`, plain `uv sync` with no extras,
+# and `uv sync --all-extras --no-extra obs` all fail (`--no-extra` filters what is
+# installed, not what is resolved); `uv lock` has no `--no-extra`; and
+# `[tool.uv] override-dependencies` does not exempt it either. Only `--frozen` works,
+# which would leave nobody able to re-lock this repo again.
+#
+# So the dependency is the AGENT's to declare — `sgp-obs[genai-auto,http,otlp]`
+# against the mirror — and the SDK wires it when it is importable. See
+# agentex/lib/core/observability/sgp_obs_setup.py; nothing imports sgp_obs outside a
+# try, so a plain `pip install agentex-sdk` is unaffected either way.
 
 [project.urls]
 Homepage = "https://github.com/scaleapi/scale-agentex-python"

@@ -39,6 +39,7 @@ from agentex.lib.sdk.fastacp.base.constants import (
     FASTACP_HEADER_SKIP_EXACT,
     FASTACP_HEADER_SKIP_PREFIXES,
 )
+from agentex.lib.core.observability.sgp_obs_setup import init_sgp_obs, shutdown_sgp_obs
 
 logger = make_logger(__name__)
 
@@ -139,6 +140,20 @@ class BaseACPServer(FastAPI):
         # Method handlers
         # this just adds a request ID to the request and response headers
         self.add_middleware(RequestIDMiddleware)
+
+        # Optional observability (traces, metrics, logs), off unless sgp-obs is
+        # installed AND the SGP_OBS_* environment switches ask for it — see
+        # observability/sgp_obs_setup.py for the two gates. sgp-obs is deliberately
+        # not a dependency of this package; the agent declares it. Returns a status
+        # instead of raising: a telemetry problem must never stop an agent starting.
+        #
+        # Here rather than in the lifespan, deliberately: sgp-obs installs ASGI
+        # instrumentation via add_middleware, and Starlette raises "Cannot add middleware
+        # after an application has started" once the lifespan is running. Wiring it there
+        # loses http.server.* for the agent's own entry point — and loses it QUIETLY,
+        # because sgp-obs fails open.
+        init_sgp_obs(app=self)
+
         self._handlers: dict[RPCMethod, Callable] = {}
 
         # Agent info to return in healthz
@@ -176,6 +191,11 @@ class BaseACPServer(FastAPI):
                 yield
             finally:
                 await shutdown_default_span_queue()
+                # Flush whatever sgp-obs still holds. A periodic exporter's buffer
+                # is otherwise dropped when the pod stops, which for a short-lived
+                # or scaled-to-zero agent can be most of what it recorded. No-op
+                # when sgp-obs is absent or was never wired.
+                await shutdown_sgp_obs()
 
         return lifespan_context
 
