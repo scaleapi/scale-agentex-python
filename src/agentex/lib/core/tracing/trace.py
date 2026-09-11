@@ -218,22 +218,24 @@ def _begin_obs(
 
 class Trace:
     """
-    Trace is a wrapper around the Agentex API for tracing.
-    It provides a context manager for spans and a way to start and end spans.
+    Trace groups the spans of one trace id and hands each span to the
+    registered processors. It provides a context manager for spans and a way
+    to start and end spans.
     """
 
     def __init__(
         self,
         processors: list[SyncTracingProcessor],
-        client: Agentex,
+        client: Agentex | None = None,
         trace_id: str | None = None,
     ):
         """
         Initialize a new trace with the specified trace ID.
 
         Args:
-            trace_id: Required trace ID to use for this trace.
-            processors: Optional list of tracing processors to use for this trace.
+            processors: Tracing processors every span is handed to.
+            client: Kept for backward compatibility, no longer used.
+            trace_id: Trace ID to use for this trace.
         """
         self.processors = processors
         self.client = client
@@ -251,7 +253,7 @@ class Trace:
         task_id: str | None = None,
     ) -> Span:
         """
-        Start a new span and register it with the API.
+        Start a new span and hand it to the registered processors.
 
         Args:
             name: Name of the span.
@@ -325,8 +327,6 @@ class Trace:
 
         return span
 
-
-
     @contextmanager
     def span(
         self,
@@ -355,14 +355,14 @@ class Trace:
 
 class AsyncTrace:
     """
-    AsyncTrace is a wrapper around the Agentex API for tracing.
-    It provides a context manager for spans and a way to start and end spans.
+    AsyncTrace is the async version of Trace. It provides a context manager
+    for spans and a way to start and end spans.
     """
 
     def __init__(
         self,
         processors: list[AsyncTracingProcessor],
-        client: AsyncAgentex,
+        client: AsyncAgentex | None = None,
         trace_id: str | None = None,
         span_queue: AsyncSpanQueue | None = None,
     ):
@@ -391,7 +391,7 @@ class AsyncTrace:
         task_id: str | None = None,
     ) -> Span:
         """
-        Start a new span and register it with the API.
+        Start a new span and hand it to the registered processors.
 
         Args:
             name: Name of the span.
@@ -479,8 +479,6 @@ class AsyncTrace:
                 )
 
         return span
-
-
 
     @asynccontextmanager
     async def span(

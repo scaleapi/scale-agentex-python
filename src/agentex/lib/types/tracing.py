@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any, Literal
 from datetime import datetime
 
+from pydantic import ConfigDict
+
 from agentex.lib.utils.model_utils import BaseModel
 
 
@@ -21,6 +23,9 @@ class BaseModelWithTraceParams(BaseModel):
 
 class Span(BaseModel):
     """In-memory span handed to tracing processors. Owned here, not by the generated client."""
+
+    # The generated model kept unknown keys, and custom processors may stash their own.
+    model_config = ConfigDict(extra="allow")
 
     id: str
     name: str

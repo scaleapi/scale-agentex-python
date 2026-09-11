@@ -74,8 +74,8 @@ def _sgp_metadata(span: Span) -> Any:
 
     Returns a COPY rather than mutating ``span``. ``trace.py`` hands the same
     Span instance to every registered processor, so anything written onto
-    ``span.data`` here would also be serialized by the Agentex processor and
-    show up in caller-visible span data. ``__commit_sha__`` is opt-in and
+    ``span.data`` here would also reach every other processor and show up in
+    caller-visible span data. ``__commit_sha__`` is opt-in and
     SGP-scoped, so it must not leak that way.
 
     (The ``__source__`` / ``__agent_*`` keys set by ``_add_source_to_span`` do

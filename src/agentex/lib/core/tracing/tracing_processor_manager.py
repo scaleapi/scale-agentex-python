@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from threading import Lock
+from threading import RLock
 
 from agentex.lib.types.tracing import TracingProcessorConfig
 from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
@@ -24,7 +24,8 @@ class TracingProcessorManager:
         # Cache for processors
         self.sync_processors: list[SyncTracingProcessor] = []
         self.async_processors: list[AsyncTracingProcessor] = []
-        self.lock = Lock()
+        # Reentrant: set_processor_configs holds it while calling add_processor_config.
+        self.lock = RLock()
 
     def add_processor_config(self, processor_config: TracingProcessorConfig) -> None:
         with self.lock:
