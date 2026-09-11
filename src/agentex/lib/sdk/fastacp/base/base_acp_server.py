@@ -119,6 +119,40 @@ class RequestIDMiddleware:
             _detach_otel_context(otel_token)
 
 
+def _shutdown_sync_tracing_processors() -> None:
+    """Drain the sync tracing processors' queues at shutdown. Never raises.
+
+    ``shutdown_default_span_queue`` covers the async path only. The sync processors
+    keep their own queue and nothing in the SDK ever shut them down, so a sync ACP
+    agent dropped whatever business spans were still queued when the pod stopped.
+    That matters beyond the lost spans: the business span is what an obs span's
+    ``agentex.business_trace_id`` resolves to, so losing it breaks the pivot from
+    Tempo back to the SGP store.
+
+    Each processor is isolated: one that hangs or raises must not stop the others,
+    and none of them may stop the pod from shutting down.
+    """
+    try:
+        from agentex.lib.core.tracing.tracing_processor_manager import (
+            get_sync_tracing_processors,
+        )
+
+        processors = get_sync_tracing_processors()
+    except Exception:  # pragma: no cover - nothing to drain if this can't import
+        logger.debug("sync tracing processors unavailable at shutdown", exc_info=True)
+        return
+
+    for processor in processors:
+        try:
+            processor.shutdown()
+        except Exception:  # noqa: PERF203 - one bad processor must not block the rest
+            logger.warning(
+                "a sync tracing processor failed to flush on shutdown; "
+                "some business spans may be lost",
+                exc_info=True,
+            )
+
+
 class BaseACPServer(FastAPI):
     """
     AsyncAgentACP provides RPC-style hooks for agent events and commands asynchronously.
@@ -191,6 +225,11 @@ class BaseACPServer(FastAPI):
                 yield
             finally:
                 await shutdown_default_span_queue()
+                # The queue above is the ASYNC path only. Sync tracing processors
+                # hold their own queue and nothing ever drained it, so a sync ACP
+                # agent lost whatever business spans were still queued when the pod
+                # stopped — including the ones the obs correlation points at.
+                _shutdown_sync_tracing_processors()
                 # Flush whatever sgp-obs still holds. A periodic exporter's buffer
                 # is otherwise dropped when the pod stops, which for a short-lived
                 # or scaled-to-zero agent can be most of what it recorded. No-op
@@ -198,6 +237,7 @@ class BaseACPServer(FastAPI):
                 await shutdown_sgp_obs()
 
         return lifespan_context
+
 
     async def _healthz(self):
         """Health check endpoint"""
