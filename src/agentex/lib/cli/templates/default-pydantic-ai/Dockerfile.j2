@@ -29,8 +29,22 @@ COPY {{ project_path_from_build_root }}/requirements.txt /app/{{ project_path_fr
 
 WORKDIR /app/{{ project_path_from_build_root }}
 
+# Optional private index for `agentex-sdk[obs]` and other Scale-internal packages
+# (TEAM-RUNBOOK / SGPINF-1568). Inert unless the control-plane broker injects the
+# secret, so local builds, CI builds, and agents that never opt in are unaffected.
+#
+# This template installs from requirements.txt, so no pyproject.toml is present for
+# uv to read a named index out of — unlike Dockerfile-uv.j2, which uses the named
+# `scale-pypi` index. The credentialed URL is taken straight from the injected pip
+# config instead. That is also why nothing is percent-decoded here: the token stays
+# inside the URL, already encoded for exactly that use.
+#
 # Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+RUN --mount=type=secret,id=codeartifact-pip-conf,required=false \
+    if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_DEFAULT_INDEX="$(sed -n 's#^[[:space:]]*index-url[[:space:]]*=[[:space:]]*##p' /run/secrets/codeartifact-pip-conf | head -1)"; \
+    fi; \
+    uv pip install --system -r requirements.txt
 
 # Copy the project code
 COPY {{ project_path_from_build_root }}/project /app/{{ project_path_from_build_root }}/project

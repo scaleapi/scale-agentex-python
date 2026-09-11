@@ -30,7 +30,29 @@ WORKDIR /app/{{ project_path_from_build_root }}
 COPY {{ project_path_from_build_root }}/pyproject.toml ./
 
 # Install dependencies (without project itself, for layer caching)
+# Optional private index for `agentex-sdk[obs]` and other Scale-internal packages
+# (TEAM-RUNBOOK / SGPINF-1568). Inert unless the control-plane broker injects the
+# secret, so local builds, CI builds, and agents that never opt in are unaffected.
+#
+# To opt in, add this to the agent's pyproject.toml. The index name must be exactly
+# `scale-pypi`, because that is what binds the credentials exported below; rename it
+# and they silently stop applying. Exporting UV_INDEX_URL instead does not
+# authenticate a named index at all, and the resolve 401s.
+#
+#   [[tool.uv.index]]
+#   name = "scale-pypi"
+#   url = "<scale-customer-pypi URL from TEAM-RUNBOOK>"
+#   default = true
+#
+# The token is percent-decoded on the way out: the buildspec URL-encodes it into the
+# pip config's URL userinfo, so a token containing + / = arrives as %2B %2F %3D.
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=secret,id=codeartifact-pip-conf,required=false \
+    if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_INDEX_SCALE_PYPI_USERNAME=aws; \
+      export UV_INDEX_SCALE_PYPI_PASSWORD="$(sed -n 's#.*index-url = https://aws:\([^@]*\)@.*#\1#p' /run/secrets/codeartifact-pip-conf \
+        | python3 -c 'import sys,urllib.parse;print(urllib.parse.unquote(sys.stdin.read().strip()))')"; \
+    fi; \
     uv sync --no-install-project --no-dev
 
 # Copy the project code
@@ -38,6 +60,12 @@ COPY {{ project_path_from_build_root }}/project ./project
 
 # Install the project
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=secret,id=codeartifact-pip-conf,required=false \
+    if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_INDEX_SCALE_PYPI_USERNAME=aws; \
+      export UV_INDEX_SCALE_PYPI_PASSWORD="$(sed -n 's#.*index-url = https://aws:\([^@]*\)@.*#\1#p' /run/secrets/codeartifact-pip-conf \
+        | python3 -c 'import sys,urllib.parse;print(urllib.parse.unquote(sys.stdin.read().strip()))')"; \
+    fi; \
     uv sync --no-dev
 
 ENV PATH="/app/{{ project_path_from_build_root }}/.venv/bin:$PATH"
