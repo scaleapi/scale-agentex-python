@@ -30,31 +30,12 @@ WORKDIR /app/{{ project_path_from_build_root }}
 COPY {{ project_path_from_build_root }}/pyproject.toml ./
 
 # Install dependencies (without project itself, for layer caching)
-# Optional private index for `agentex-sdk[obs]` and other Scale-internal packages
-# (TEAM-RUNBOOK / SGPINF-1568). Inert unless the control-plane broker injects the
-# secret, so local builds, CI builds, and agents that never opt in are unaffected.
+# Optional private index for Scale-internal packages such as sgp-obs, injected by the
+# control-plane broker (SGPINF-1568). Inert unless the secret is present, so local
+# builds, CI builds, and agents that never opt in are unaffected.
 #
-# To opt in, add this to the agent's pyproject.toml. The index name must be exactly
-# `scale-pypi`, because that is what binds the credentials exported below; rename it
-# and they silently stop applying. Exporting UV_INDEX_URL instead does not
-# authenticate a named index at all, and the resolve 401s.
-#
-#   [[tool.uv.index]]
-#   name = "scale-pypi"
-#   url = "<scale-customer-pypi URL from TEAM-RUNBOOK>"
-#   default = true
-#
-# UV_INDEX re-binds that name to the URL the BROKER supplied, overriding whatever URL
-# the project declared for it. Without this the credential follows the name wherever
-# pyproject.toml points it: uv sends the token to any host declared under the name
-# `scale-pypi`, so a one-line edit to a project file — far less conspicuous in review
-# than a change to this Dockerfile — would exfiltrate it. Verified both ways against a
-# local server: without UV_INDEX the rogue host receives `Basic aws:<token>`; with it
-# the rogue host is never contacted. The URL carries no userinfo; the token travels
-# only in UV_INDEX_SCALE_PYPI_PASSWORD.
-#
-# The token is percent-decoded on the way out: the buildspec URL-encodes it into the
-# pip config's URL userinfo, so a token containing + / = arrives as %2B %2F %3D.
+# To opt in, and for why UV_INDEX is pinned to the broker's URL rather than trusting
+# the project's, see PRIVATE_INDEX.md in the agentex-sdk CLI templates directory.
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=secret,id=codeartifact-pip-conf,required=false \
     if [ -s /run/secrets/codeartifact-pip-conf ]; then \
