@@ -36,7 +36,20 @@ WORKDIR /app/{{ project_path_from_build_root }}
 COPY {{ project_path_from_build_root }}/pyproject.toml ./
 
 # Install dependencies (without project itself, for layer caching)
+# Optional private index for Scale-internal packages such as sgp-obs, injected by the
+# control-plane broker (SGPINF-1568). Inert unless the secret is present, so local
+# builds, CI builds, and agents that never opt in are unaffected.
+#
+# To opt in, and for why UV_INDEX is pinned to the broker's URL rather than trusting
+# the project's, see PRIVATE_INDEX.md in the agentex-sdk CLI templates directory.
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=secret,id=codeartifact-pip-conf,required=false \
+    if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_INDEX="scale-pypi=$(sed -n 's#.*index-url = https://aws:[^@]*@\(.*\)#https://\1#p' /run/secrets/codeartifact-pip-conf | head -1)"; \
+      export UV_INDEX_SCALE_PYPI_USERNAME=aws; \
+      export UV_INDEX_SCALE_PYPI_PASSWORD="$(sed -n 's#.*index-url = https://aws:\([^@]*\)@.*#\1#p' /run/secrets/codeartifact-pip-conf \
+        | python3 -c 'import sys,urllib.parse;print(urllib.parse.unquote(sys.stdin.read().strip()))')"; \
+    fi; \
     uv sync --no-install-project --no-dev
 
 # Copy the project code
@@ -44,6 +57,13 @@ COPY {{ project_path_from_build_root }}/project ./project
 
 # Install the project
 RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=secret,id=codeartifact-pip-conf,required=false \
+    if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_INDEX="scale-pypi=$(sed -n 's#.*index-url = https://aws:[^@]*@\(.*\)#https://\1#p' /run/secrets/codeartifact-pip-conf | head -1)"; \
+      export UV_INDEX_SCALE_PYPI_USERNAME=aws; \
+      export UV_INDEX_SCALE_PYPI_PASSWORD="$(sed -n 's#.*index-url = https://aws:\([^@]*\)@.*#\1#p' /run/secrets/codeartifact-pip-conf \
+        | python3 -c 'import sys,urllib.parse;print(urllib.parse.unquote(sys.stdin.read().strip()))')"; \
+    fi; \
     uv sync --no-dev
 
 ENV PATH="/app/{{ project_path_from_build_root }}/.venv/bin:$PATH"
