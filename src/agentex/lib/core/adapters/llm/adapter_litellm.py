@@ -40,7 +40,7 @@ class LiteLLMGateway(LLMGateway):
         # `async with`, not try/except: asyncio.CancelledError is a BaseException, so a
         # caller that disappears mid-flight would skip an `except Exception` handler and
         # the record would be silently dropped.
-        async with inference_call(kwargs) as call:
+        async with inference_call(kwargs, args) as call:
             # Return a single completion for non-streaming
             response = call.observe(await llm.acompletion(*args, **kwargs))
             return Completion.model_validate(response)
@@ -52,7 +52,7 @@ class LiteLLMGateway(LLMGateway):
         if not kwargs.get("stream"):
             raise ValueError("To use streaming, please set stream=True in the kwargs")
 
-        async with inference_call(kwargs) as call:
+        async with inference_call(kwargs, args) as call:
             # observe() takes ownership of the stream and yields the same chunks, so it
             # can read time-to-first-chunk and the token totals off the last chunk.
             # Wrapping only the `await` would return before the first chunk arrived and

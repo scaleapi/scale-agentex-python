@@ -17,7 +17,7 @@ patch cannot help in two situations, and this gateway hits both:
 the OpenAI client, we name that, and ``call()`` stands down if the client instrumentor
 is already recording. When litellm routes natively there is no such overlap, so we
 record. That decision is made per call, from the model string, in
-:func:`_transport_for`.
+:func:`_split_model`.
 
 Everything here is fail-open: sgp-obs is an optional dependency and a telemetry problem
 must never fail a model call. If the import fails, :func:`inference_call` returns an
@@ -59,7 +59,28 @@ def _split_model(model: str) -> tuple[str, bool]:
     return (vendor or _DEFAULT_VENDOR), proxied or vendor == _DEFAULT_VENDOR
 
 
-def inference_call(kwargs: dict[str, Any]) -> Any:
+def resolve_model(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
+    """The model for a litellm call, whether it arrived by keyword or positionally.
+
+    ``litellm.acompletion`` takes ``model`` as its FIRST positional argument, and the
+    gateway forwards ``*args`` untouched, so ``gateway.acompletion("anthropic/claude-
+    sonnet-4", messages)`` is a legal call that puts the model in ``args[0]``.
+
+    Reading only ``kwargs`` there does not merely mislabel the vendor, it loses the
+    measurement: an empty model resolves to the default vendor "openai", which sets
+    ``transport=OPENAI``, which makes ``call()`` stand down for the OpenAI client
+    instrumentor — while litellm routes natively to Anthropic and never touches that
+    client. Nothing records it and nothing says so.
+    """
+    model = kwargs.get("model")
+    if not model and args:
+        model = args[0]
+    # Positional args are forwarded verbatim, so args[0] is whatever the caller passed;
+    # only a string can be a litellm model name.
+    return model if isinstance(model, str) else ""
+
+
+def inference_call(kwargs: dict[str, Any], args: tuple[Any, ...] = ()) -> Any:
     """Begin recording one litellm call. Never raises, never returns None."""
     try:
         # See sgp_obs_setup.py: optional, not publicly installable, absent in CI.
@@ -74,12 +95,12 @@ def inference_call(kwargs: dict[str, Any]) -> Any:
         return _NULL_CALL
 
     try:
-        model = kwargs.get("model") or ""
-        vendor, over_openai_client = _split_model(str(model))
+        model = resolve_model(args, kwargs)
+        vendor, over_openai_client = _split_model(model)
         return genai.call(
             provider=vendor,
             operation=genai.CHAT,
-            model=str(model),
+            model=model,
             # litellm normalises every vendor's response onto the OpenAI shape, so one
             # parser reads them all — which is exactly what `spec` separates from the
             # `provider` label.

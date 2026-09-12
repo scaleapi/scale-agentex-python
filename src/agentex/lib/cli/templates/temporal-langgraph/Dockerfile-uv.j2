@@ -50,11 +50,21 @@ COPY {{ project_path_from_build_root }}/pyproject.toml ./
 #   url = "<scale-customer-pypi URL from TEAM-RUNBOOK>"
 #   default = true
 #
+# UV_INDEX re-binds that name to the URL the BROKER supplied, overriding whatever URL
+# the project declared for it. Without this the credential follows the name wherever
+# pyproject.toml points it: uv sends the token to any host declared under the name
+# `scale-pypi`, so a one-line edit to a project file — far less conspicuous in review
+# than a change to this Dockerfile — would exfiltrate it. Verified both ways against a
+# local server: without UV_INDEX the rogue host receives `Basic aws:<token>`; with it
+# the rogue host is never contacted. The URL carries no userinfo; the token travels
+# only in UV_INDEX_SCALE_PYPI_PASSWORD.
+#
 # The token is percent-decoded on the way out: the buildspec URL-encodes it into the
 # pip config's URL userinfo, so a token containing + / = arrives as %2B %2F %3D.
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=secret,id=codeartifact-pip-conf,required=false \
     if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_INDEX="scale-pypi=$(sed -n 's#.*index-url = https://aws:[^@]*@\(.*\)#https://\1#p' /run/secrets/codeartifact-pip-conf | head -1)"; \
       export UV_INDEX_SCALE_PYPI_USERNAME=aws; \
       export UV_INDEX_SCALE_PYPI_PASSWORD="$(sed -n 's#.*index-url = https://aws:\([^@]*\)@.*#\1#p' /run/secrets/codeartifact-pip-conf \
         | python3 -c 'import sys,urllib.parse;print(urllib.parse.unquote(sys.stdin.read().strip()))')"; \
@@ -68,6 +78,7 @@ COPY {{ project_path_from_build_root }}/project ./project
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=secret,id=codeartifact-pip-conf,required=false \
     if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_INDEX="scale-pypi=$(sed -n 's#.*index-url = https://aws:[^@]*@\(.*\)#https://\1#p' /run/secrets/codeartifact-pip-conf | head -1)"; \
       export UV_INDEX_SCALE_PYPI_USERNAME=aws; \
       export UV_INDEX_SCALE_PYPI_PASSWORD="$(sed -n 's#.*index-url = https://aws:\([^@]*\)@.*#\1#p' /run/secrets/codeartifact-pip-conf \
         | python3 -c 'import sys,urllib.parse;print(urllib.parse.unquote(sys.stdin.read().strip()))')"; \
