@@ -16,7 +16,11 @@ import builtins
 import pytest
 
 from agentex.lib.core.adapters.llm import _genai_metrics
-from agentex.lib.core.adapters.llm._genai_metrics import _split_model, inference_call
+from agentex.lib.core.adapters.llm._genai_metrics import (
+    _split_model,
+    resolve_model,
+    inference_call,
+)
 
 
 class TestSplitModel:
@@ -113,3 +117,58 @@ class TestFailsOpenWithoutSgpObs:
         monkeypatch.setitem(sys.modules, "sgp_obs", type(sys)("sgp_obs"))
         monkeypatch.setitem(sys.modules, "sgp_obs.metrics", module)
         assert inference_call({"model": "gpt-4o"}) is _genai_metrics._NULL_CALL
+
+
+class TestResolveModel:
+    """litellm takes `model` as its FIRST positional argument and the gateway forwards
+    *args untouched, so a positional call is legal and must still be measured.
+
+    Reading only kwargs does not merely mislabel the vendor: an empty model resolves to
+    the default vendor "openai", which sets transport=OPENAI, which makes call() stand
+    down for the OpenAI client instrumentor — while litellm routes natively to Anthropic
+    and never touches that client. Nothing records it and nothing says so.
+    """
+
+    def test_keyword_model(self):
+        assert resolve_model((), {"model": "gpt-4o"}) == "gpt-4o"
+
+    def test_positional_model(self):
+        assert resolve_model(("anthropic/claude-sonnet-4",), {}) == "anthropic/claude-sonnet-4"
+
+    def test_keyword_wins_over_positional(self):
+        """litellm itself would reject both, but if it ever resolved one, the keyword is
+        the explicit intent."""
+        assert resolve_model(("a/b",), {"model": "c/d"}) == "c/d"
+
+    def test_no_model_at_all(self):
+        assert resolve_model((), {}) == ""
+
+    def test_a_non_string_first_arg_is_not_a_model(self):
+        """*args is forwarded verbatim, so args[0] is whatever the caller passed."""
+        assert resolve_model(([{"role": "user"}],), {}) == ""
+
+    def test_positional_native_vendor_does_not_stand_down(self, monkeypatch):
+        """The regression this guards: a positional Anthropic model must be recorded by
+        the gateway, because nothing else will."""
+        seen = {}
+
+        class _Genai:
+            CHAT = "chat"
+            OPENAI_SPEC = "openai"
+            OPENAI = "openai"
+
+            @staticmethod
+            def call(**kwargs):
+                seen.update(kwargs)
+                return _genai_metrics._NULL_CALL
+
+        module = type(sys)("sgp_obs.metrics")
+        module.genai = _Genai
+        monkeypatch.setitem(sys.modules, "sgp_obs", type(sys)("sgp_obs"))
+        monkeypatch.setitem(sys.modules, "sgp_obs.metrics", module)
+
+        inference_call({}, ("anthropic/claude-sonnet-4",))
+        assert seen["model"] == "anthropic/claude-sonnet-4"
+        assert seen["provider"] == "anthropic"
+        # Empty transport == "no OpenAI-client overlap, so record it here".
+        assert seen["transport"] == ""
