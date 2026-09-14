@@ -20,7 +20,7 @@ from project.agent import MODEL_NAME, create_agent
 import agentex.lib.adk as adk
 from agentex.protocol.acp import SendMessageParams
 from agentex.lib.core.harness import UnifiedEmitter
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import SGPTracingProcessorConfig, AgentexTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.sdk.fastacp.fastacp import FastACP
@@ -36,6 +36,12 @@ logger = make_logger(__name__)
 # processor that's lazy-initialised on first span.
 SGP_API_KEY = os.environ.get("SGP_API_KEY", "")
 SGP_ACCOUNT_ID = os.environ.get("SGP_ACCOUNT_ID", "")
+# Local Agentex backend: spans appear in the developer UI's traces tab. Skipped
+# when AGENTEX_BASE_URL is explicitly empty (the runtime then treats the backend
+# as disabled and skips agent registration too).
+if os.environ.get("AGENTEX_BASE_URL", "http://localhost:5003"):
+    add_tracing_processor_config(AgentexTracingProcessorConfig())
+
 if SGP_API_KEY and SGP_ACCOUNT_ID:
     add_tracing_processor_config(
         SGPTracingProcessorConfig(
