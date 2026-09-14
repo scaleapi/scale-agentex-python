@@ -127,8 +127,22 @@ class InterruptTaskParams(BaseModel):
     )
 
 
+# Methods whose handler must finish before the RPC responds.
+#
+# TASK_CREATE and EVENT_SEND are here because dispatching them in the background
+# loses work silently. The handlers run against Temporal: TASK_CREATE starts the
+# workflow, EVENT_SEND signals it. Backgrounding both means a caller that does
+# task/create followed by event/send can have its signal reach Temporal before
+# the workflow exists, and the signal is dropped with `workflow not found`. The
+# caller cannot tell, because the background path already answered
+# {"status": "processing"} and the handler's exception is only logged.
+#
+# Both handlers are short Temporal RPCs, and the caller applies its own timeout,
+# so awaiting them costs little and makes failures visible and retryable.
 RPC_SYNC_METHODS = [
     RPCMethod.MESSAGE_SEND,
+    RPCMethod.TASK_CREATE,
+    RPCMethod.EVENT_SEND,
 ]
 
 PARAMS_MODEL_BY_METHOD: dict[RPCMethod, type[BaseModel]] = {
