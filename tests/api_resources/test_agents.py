@@ -74,6 +74,7 @@ class TestAgents:
     @parametrize
     def test_method_list_with_all_params(self, client: Agentex) -> None:
         agent = client.agents.list(
+            agent_card_metadata="agent_card_metadata",
             limit=1,
             order_by="order_by",
             order_direction="order_direction",
@@ -468,6 +469,7 @@ class TestAsyncAgents:
     @parametrize
     async def test_method_list_with_all_params(self, async_client: AsyncAgentex) -> None:
         agent = await async_client.agents.list(
+            agent_card_metadata="agent_card_metadata",
             limit=1,
             order_by="order_by",
             order_direction="order_direction",
