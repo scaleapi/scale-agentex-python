@@ -14,6 +14,7 @@ test covers every template so a broken `.j2` anywhere is caught early.
 from __future__ import annotations
 
 import ast
+import importlib
 from pathlib import Path
 
 import pytest
@@ -45,6 +46,32 @@ def _render_project(tmp_path: Path, template_type: TemplateType, use_uv: bool = 
     context = _context(template_type, use_uv=use_uv)
     create_project_structure(tmp_path, context, template_type, use_uv=use_uv)
     return tmp_path / context["project_name"]
+
+
+def _agentex_imports(source: str, filename: str) -> list[tuple[str, str]]:
+    """(module, name) for every `from agentex... import name` in the source."""
+    found: list[tuple[str, str]] = []
+    for node in ast.walk(ast.parse(source, filename=filename)):
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("agentex"):
+            found.extend((node.module, alias.name) for alias in node.names)
+    return found
+
+
+@pytest.mark.parametrize("template_type", list(TemplateType))
+def test_all_templates_import_existing_agentex_symbols(tmp_path: Path, template_type: TemplateType):
+    """Every `from agentex... import X` a template renders resolves at import time.
+
+    Parsing alone lets a template keep naming a symbol the SDK removed, so every scaffolded
+    agent fails on its first start instead of here.
+    """
+    project_dir = _render_project(tmp_path, template_type)
+
+    missing: list[str] = []
+    for py_file in project_dir.rglob("*.py"):
+        for module, name in _agentex_imports(py_file.read_text(), str(py_file)):
+            if not hasattr(importlib.import_module(module), name):
+                missing.append(f"{py_file.relative_to(project_dir)}: from {module} import {name}")
+    assert not missing, "\n".join(missing)
 
 
 @pytest.mark.parametrize("template_type", list(TemplateType))
