@@ -52,18 +52,19 @@ class TestSyncProcessorDrain:
         _patch_processors(monkeypatch, [])
         await shutdown_sync_tracing_processors()  # must not raise
 
-    async def test_an_unimportable_manager_does_not_fail_shutdown(self, monkeypatch):
-        """Nothing here may stop the pod from shutting down."""
-        import builtins
+    async def test_an_unreadable_processor_list_does_not_fail_shutdown(self, monkeypatch):
+        """Nothing here may stop the pod from shutting down.
 
-        real_import = builtins.__import__
+        This used to block the import of ``tracing_processor_manager``, which tested
+        nothing once the drain moved INTO that module: it reads
+        ``get_sync_tracing_processors`` as a module global, so the import never runs and
+        the ``except`` branch was never reached. Make the lookup itself raise instead."""
+        import agentex.lib.core.tracing.tracing_processor_manager as mgr
 
-        def blocked(name, *args, **kwargs):
-            if "tracing_processor_manager" in name:
-                raise ImportError("boom")
-            return real_import(name, *args, **kwargs)
+        def boom():
+            raise RuntimeError("processor registry unavailable")
 
-        monkeypatch.setattr(builtins, "__import__", blocked)
+        monkeypatch.setattr(mgr, "get_sync_tracing_processors", boom)
         await shutdown_sync_tracing_processors()  # must not raise
 
     def test_the_lifespan_calls_it(self):
@@ -163,3 +164,86 @@ class TestTheTemporalWorkerIsWiredToo:
 
         source = inspect.getsource(AgentexWorker.run)
         assert "init_sgp_obs(app=" not in source
+
+
+class TestConcurrencyAndProcessExit:
+    """Two properties the budget only really has if these hold."""
+
+    async def test_a_fast_processor_finishes_even_when_another_stalls(self, monkeypatch):
+        """Flushes start concurrently under ONE shared deadline. Draining them in
+        sequence let the first stalled processor spend the whole budget, so every
+        processor after it was skipped even when it would have returned instantly."""
+        import time
+
+        class Stalled:
+            def shutdown(self):
+                time.sleep(2)
+
+        class Fast:
+            def __init__(self):
+                self.flushed = False
+
+            def shutdown(self):
+                self.flushed = True
+
+        fast = Fast()
+        # Stalled FIRST: in a sequential drain it would eat the budget and `fast`
+        # would never be asked.
+        _patch_processors(monkeypatch, [Stalled(), fast])
+        await shutdown_sync_tracing_processors(budget_s=0.5)
+        assert fast.flushed, "a fast processor was starved by a stalled one"
+
+    def test_a_stalled_flush_does_not_delay_process_exit(self):
+        """The property the deadline actually promises, and the one it did NOT have.
+
+        `asyncio.wait_for` stops awaiting a thread; it cannot stop the thread. And
+        `asyncio.run` joins the default executor on the way out (as does a private
+        ThreadPoolExecutor, via its atexit hook), so a timed-out `asyncio.to_thread`
+        flush left the process blocked on the very export the budget was meant to
+        escape — measured at 10.0s against a 0.25s budget. Daemon threads are abandoned
+        at interpreter exit, which is what the budget promises.
+
+        A subprocess, because this is about interpreter shutdown: it cannot be observed
+        from inside the test process.
+        """
+        import os
+        import sys
+        import time
+        import textwrap
+        import subprocess
+        from pathlib import Path
+
+        # tests/base/fastacp/sdk/lib/agentex/src -> parents[6] is the src root.
+        src = Path(__file__).resolve().parents[6]
+        program = textwrap.dedent(
+            """
+            import asyncio, sys, time
+            from agentex.lib.core.tracing.tracing_processor_manager import (
+                shutdown_sync_tracing_processors,
+            )
+            import agentex.lib.core.tracing.tracing_processor_manager as mgr
+
+            class Stalled:
+                def shutdown(self):
+                    time.sleep(30)
+
+            mgr.get_sync_tracing_processors = lambda: [Stalled()]
+            asyncio.run(shutdown_sync_tracing_processors(budget_s=0.25))
+            """
+        )
+        started = time.monotonic()
+        proc = subprocess.run(
+            [sys.executable, "-c", program],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            # Inherit the environment: replacing it wholesale breaks the
+            # interpreter's own bootstrap before the test can run.
+            env={**os.environ, "PYTHONPATH": str(src)},
+        )
+        elapsed = time.monotonic() - started
+        assert proc.returncode == 0, proc.stderr[-2000:]
+        assert elapsed < 10, (
+            f"process took {elapsed:.1f}s to exit with a 30s stalled flush and a "
+            "0.25s budget; the flush thread is blocking interpreter shutdown"
+        )

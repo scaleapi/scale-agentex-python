@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from typing import TYPE_CHECKING
 from threading import Lock
 
@@ -101,19 +102,26 @@ async def shutdown_sync_tracing_processors(
     span is what an obs span's ``agentex.business_trace_id`` resolves to, so losing it
     breaks the pivot from Tempo back to the SGP store.
 
-    Off the event loop and on a deadline, both deliberately.
     ``SGPSyncTracingProcessor.shutdown`` calls ``flush_queue()``, a BLOCKING HTTP flush
-    with retries. Calling it inline would stall the caller's loop, so a slow or
-    unreachable collector could burn the whole termination grace period and stop the
-    OTel flush that runs after it — trading a few business spans for all of the OTel
-    ones. Each processor runs in a worker thread, and the budget is shared across all
-    of them so one stalled export cannot starve the rest.
+    with retries, so three properties have to hold at once:
 
-    A timed-out flush leaks its thread until the process exits. Accepted: this runs
-    only during shutdown, and the alternative is blocking on it.
+    **Off the calling loop.** Awaiting it inline stalls the lifespan, so a slow
+    collector could burn the pod's whole termination grace period and stop the OTel
+    flush that runs after this — trading a few business spans for all of the OTel ones.
 
-    Lives here rather than in the ACP server because both entry points need it — the
-    ACP server AND the Temporal worker, which runs in its own process.
+    **Concurrent.** Every processor is started at once and they share one deadline. A
+    sequential loop would let the first stalled processor spend the entire budget, so
+    later processors were skipped even when they would have finished instantly.
+
+    **On DAEMON threads, not the default executor.** This is the subtle one.
+    ``asyncio.wait_for`` stops *awaiting* a thread; it cannot stop the thread. And
+    ``asyncio.run`` calls ``loop.shutdown_default_executor()``, which JOINS the default
+    executor — as does a private ``ThreadPoolExecutor``, via its atexit hook. So a
+    timed-out ``asyncio.to_thread`` flush leaves the process blocked on the very export
+    the deadline was meant to escape. Measured: a 10s stalled flush under a 0.25s budget
+    returns in 0.25s but the process exits at 10.0s with ``to_thread``, and at 0.25s on
+    a daemon thread. A daemon thread is abandoned at interpreter exit, which is what the
+    budget promises.
     """
     try:
         processors = get_sync_tracing_processors()
@@ -121,31 +129,56 @@ async def shutdown_sync_tracing_processors(
         _logger.debug("sync tracing processors unavailable at shutdown", exc_info=True)
         return
 
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + budget_s
+    if not processors:
+        return
 
-    for processor in processors:
-        remaining = deadline - loop.time()
-        if remaining <= 0:
-            _logger.warning(
-                "sync tracing shutdown budget of %.1fs exhausted; %s and any after it "
-                "were not flushed and their business spans are lost",
-                budget_s,
-                type(processor).__name__,
-            )
-            break
+    loop = asyncio.get_running_loop()
+    finished: list[threading.Event] = []
+    all_done = asyncio.Event()
+
+    def _note_finished() -> None:
+        if all(event.is_set() for event in finished):
+            all_done.set()
+
+    def _flush(processor: SyncTracingProcessor, event: threading.Event) -> None:
         try:
-            await asyncio.wait_for(asyncio.to_thread(processor.shutdown), remaining)
-        except (TimeoutError, asyncio.TimeoutError):
+            processor.shutdown()
+        except Exception:
             _logger.warning(
-                "%s did not flush within the remaining %.1fs; its business spans are "
-                "lost, but shutdown continues",
+                "%s raised while flushing on shutdown; some business spans may be lost",
                 type(processor).__name__,
-                remaining,
-            )
-        except Exception:  # noqa: PERF203 - one bad processor must not block the rest
-            _logger.warning(
-                "a sync tracing processor failed to flush on shutdown; "
-                "some business spans may be lost",
                 exc_info=True,
             )
+        finally:
+            event.set()
+            # The loop may already be closed if we timed out and shutdown raced ahead;
+            # abandoning the notification is fine, nobody is waiting on it any more.
+            try:
+                loop.call_soon_threadsafe(_note_finished)
+            except RuntimeError:  # pragma: no cover - loop already closed
+                pass
+
+    for index, processor in enumerate(processors):
+        event = threading.Event()
+        finished.append(event)
+        threading.Thread(
+            target=_flush,
+            args=(processor, event),
+            daemon=True,
+            name=f"agentex-span-flush-{index}",
+        ).start()
+
+    try:
+        await asyncio.wait_for(all_done.wait(), budget_s)
+    except (TimeoutError, asyncio.TimeoutError):
+        stalled = [
+            type(processor).__name__
+            for processor, event in zip(processors, finished)
+            if not event.is_set()
+        ]
+        _logger.warning(
+            "sync tracing shutdown budget of %.1fs expired with %s still flushing; "
+            "their business spans are lost, but shutdown continues",
+            budget_s,
+            ", ".join(stalled) or "unknown processors",
+        )
