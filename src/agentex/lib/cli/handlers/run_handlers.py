@@ -5,6 +5,7 @@ import sys
 import asyncio
 from pathlib import Path
 
+from dotenv import dotenv_values
 from rich.panel import Panel
 from rich.console import Console
 
@@ -332,7 +333,7 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
             raise RunError("Temporal agent requires a worker file path to be configured")
 
     # Create environment for subprocesses
-    agent_env = create_agent_environment(manifest)
+    agent_env = create_agent_environment(manifest, manifest_dir=manifest_file.parent)
 
     # Setup process manager
     process_manager = ProcessManager()
@@ -407,10 +408,11 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
 
 
 
-def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
+def create_agent_environment(manifest: AgentManifest, manifest_dir: Path | None = None) -> dict[str, str]:
     """Create environment variables for agent processes without modifying os.environ"""
     # Start with current environment
     env = dict(os.environ)
+
 
     agent_config = manifest.agent
 
@@ -457,6 +459,23 @@ def create_agent_environment(manifest: AgentManifest) -> dict[str, str]:
 
     env.update(env_vars)
 
+    # Local development: load the .env next to manifest.yaml into BOTH the ACP and
+    # worker processes (the docs promise this). Precedence, highest first: the
+    # manifest's env block, variables already set in the shell, then .env, then
+    # the built-in local defaults above (so .env can point at a custom Redis or
+    # Temporal). ENVIRONMENT stays "development": that is what makes this a
+    # local run. Without this block a value in .env only reaches a process if
+    # some import happens to call load_dotenv() first.
+    if manifest_dir is not None:
+        env_file = Path(manifest_dir) / ".env"
+        if env_file.is_file():
+            manifest_env = agent_config.env or {}
+            for key, value in dotenv_values(env_file).items():
+                if value is None or key == "ENVIRONMENT":
+                    continue
+                if key in os.environ or key in manifest_env:
+                    continue
+                env[key] = value
     return env
 
 
