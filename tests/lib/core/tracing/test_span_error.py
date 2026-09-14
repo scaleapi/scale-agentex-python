@@ -16,6 +16,7 @@ from agentex.types.span import Span
 from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.lib.core.tracing.span_error import (
     SPAN_ERROR_KEY,
+    ERROR_CLASSIFIER_VERSION,
     PlatformError,
     ApplicationError,
     CategorizedError,
@@ -36,6 +37,29 @@ def _make_span(data=None) -> Span:
     )
 
 
+def _synthetic_function(module_name: str, filename: str, body: str, **values: Any) -> Any:
+    namespace = {"__name__": module_name, **values}
+    exec(compile(f"def run():\n    {body}\n", filename, "exec"), namespace)
+    return namespace["run"]
+
+
+def _record_synthetic(function: Any, *, innermost_only: bool = False) -> dict[str, Any]:
+    span = _make_span()
+    try:
+        function()
+    except Exception as exc:
+        if innermost_only:
+            traceback = exc.__traceback__
+            assert traceback is not None
+            while traceback.tb_next is not None:
+                traceback = traceback.tb_next
+            exc = exc.with_traceback(traceback)
+        set_span_error(span, exc)
+    error = get_span_error(span)
+    assert error is not None
+    return error
+
+
 # ---------------------------------------------------------------------------
 # Helpers: set_span_error / get_span_error
 # ---------------------------------------------------------------------------
@@ -54,13 +78,12 @@ class TestSpanErrorHelpers:
             "type": "ValueError",
             "message": "boom",
             "category": "unknown",
+            "category_source": "fallback",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "stack_no_traceback",
         }
         assert isinstance(span.data, dict)
-        assert span.data[SPAN_ERROR_KEY] == {
-            "type": "ValueError",
-            "message": "boom",
-            "category": "unknown",
-        }
+        assert span.data[SPAN_ERROR_KEY] == get_span_error(span)
 
     def test_set_uses_explicit_exception_category(self):
         span = _make_span(data=None)
@@ -69,12 +92,18 @@ class TestSpanErrorHelpers:
             "type": "PlatformError",
             "message": "unavailable",
             "category": "platform",
+            "category_source": "categorized_error",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "canonical_categorized_error",
         }
 
     def test_explicit_category_takes_precedence(self):
         span = _make_span(data=None)
         set_span_error(span, PlatformError("bad input"), error_category="application")
-        assert get_span_error(span)["category"] == "application"  # type: ignore[index]
+        error = get_span_error(span)
+        assert error is not None
+        assert error["category"] == "application"
+        assert error["category_source"] == "explicit"
 
     def test_set_uses_application_error_category(self):
         span = _make_span(data=None)
@@ -88,6 +117,103 @@ class TestSpanErrorHelpers:
         span = _make_span(data=None)
         set_span_error(span, ImplicitlyCategorizedError("boom"))
         assert get_span_error(span)["category"] == "unknown"  # type: ignore[index]
+
+    def test_generic_agentex_wrapper_around_user_failure_is_application(self):
+        application = _synthetic_function(
+            "customer_agent.tool",
+            "/synthetic/application/tool.py",
+            "raise RuntimeError('boom')",
+        )
+        wrapper = _synthetic_function(
+            "agentex.lib.core.temporal.workflows.workflow",
+            "/synthetic/agentex/workflow.py",
+            "target()",
+            target=application,
+        )
+
+        error = _record_synthetic(wrapper)
+
+        assert error["category"] == "application"
+        assert error["category_source"] == "stack_trace"
+        assert error["category_reason"] == "stack_rule:unowned_absolute_source"
+
+    def test_application_database_failure_is_application(self):
+        driver = _synthetic_function(
+            "sqlalchemy.engine",
+            "/venv/site-packages/sqlalchemy/engine.py",
+            "raise RuntimeError('db failed')",
+        )
+        application = _synthetic_function(
+            "customer_agent.main",
+            "/synthetic/application/main.py",
+            "query()",
+            query=driver,
+        )
+
+        assert _record_synthetic(application)["category"] == "application"
+
+    def test_managed_stream_database_failure_is_platform(self):
+        driver = _synthetic_function(
+            "redis.asyncio.client",
+            "/venv/site-packages/redis/client.py",
+            "raise RuntimeError('db failed')",
+        )
+        managed_store = _synthetic_function(
+            "agentex.lib.core.adapters.streams.adapter_redis",
+            "/synthetic/agentex/adapter_redis.py",
+            "query()",
+            query=driver,
+        )
+
+        assert _record_synthetic(managed_store)["category"] == "platform"
+
+    def test_application_validation_inside_platform_operation_is_application(self):
+        validation = _synthetic_function(
+            "customer_agent.query",
+            "/synthetic/application/query.py",
+            "raise ValueError('invalid configuration')",
+        )
+        managed_store = _synthetic_function(
+            "agentex.lib.core.adapters.streams.adapter_redis",
+            "/synthetic/agentex/adapter_redis.py",
+            "validate()",
+            validate=validation,
+        )
+
+        assert _record_synthetic(managed_store)["category"] == "application"
+
+    def test_driver_only_database_failure_is_unknown(self):
+        driver = _synthetic_function(
+            "pyodbc",
+            "/venv/site-packages/pyodbc.py",
+            "raise RuntimeError('db failed')",
+        )
+
+        error = _record_synthetic(driver, innermost_only=True)
+
+        assert error["category"] == "unknown"
+        assert error["category_reason"] == "stack_no_owned_frame"
+
+    def test_nested_wrapper_dependency_propagation_uses_application(self):
+        driver = _synthetic_function(
+            "sqlalchemy.engine",
+            "/venv/site-packages/sqlalchemy/engine.py",
+            "raise RuntimeError('db failed')",
+        )
+        application = _synthetic_function(
+            "customer_agent.repository",
+            "/synthetic/application/repository.py",
+            "query()",
+            query=driver,
+        )
+        wrapper = _synthetic_function(
+            "agentex.lib.core.temporal.activities.activity_helpers",
+            "/synthetic/agentex/activity_helpers.py",
+            "target()",
+            target=application,
+        )
+
+        assert _record_synthetic(wrapper)["category"] == "application"
 
     def test_set_preserves_existing_dict_keys(self):
         span = _make_span(data={"__span_type__": "LLM"})
@@ -127,7 +253,10 @@ class TestContextManagerCapture:
         assert err == {
             "type": "ValueError",
             "message": "boom",
-            "category": "unknown",
+            "category": "application",
+            "category_source": "stack_trace",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "stack_rule:unowned_absolute_source",
         }
 
     def test_sync_span_success_has_no_error(self):
@@ -148,7 +277,10 @@ class TestContextManagerCapture:
         assert err == {
             "type": "RuntimeError",
             "message": "kaboom",
-            "category": "unknown",
+            "category": "application",
+            "category_source": "stack_trace",
+            "classifier_version": ERROR_CLASSIFIER_VERSION,
+            "category_reason": "stack_rule:unowned_absolute_source",
         }
 
 
@@ -193,6 +325,9 @@ class TestBuildSGPSpanMapping:
                     "type": "ValueError",
                     "message": "boom",
                     "category": "application",
+                    "category_source": "stack_trace",
+                    "classifier_version": ERROR_CLASSIFIER_VERSION,
+                    "category_reason": "stack_rule:application_module",
                 }
             }
         )
@@ -204,6 +339,9 @@ class TestBuildSGPSpanMapping:
         assert sgp_span.metadata["error_type"] == "ValueError"
         assert sgp_span.metadata["error_message"] == "boom"
         assert sgp_span.metadata["error_category"] == "application"
+        assert sgp_span.metadata["error_category_source"] == "stack_trace"
+        assert sgp_span.metadata["error_classifier_version"] == ERROR_CLASSIFIER_VERSION
+        assert sgp_span.metadata["error_category_reason"] == "stack_rule:application_module"
 
     def test_no_error_leaves_status_success(self):
         from agentex.lib.core.tracing.processors.sgp_tracing_processor import _build_sgp_span
