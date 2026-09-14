@@ -189,12 +189,41 @@ class TestAgentCardDirect:
         assert card.data_events == []
         assert card.input_types == []
         assert card.output_schema is None
+        assert card.metadata == {}
 
     def test_serialization_roundtrip(self):
         card = AgentCard(input_types=["text"], data_events=["result"])
         dumped = card.model_dump()
         restored = AgentCard.model_validate(dumped)
         assert restored == card
+
+    def test_metadata_accepts_arbitrary_json_object(self):
+        card = AgentCard(
+            metadata={
+                "permits_capable": True,
+                "supported_workflows": ["submit", "review"],
+                "limits": {"max_batch": 5},
+            }
+        )
+        assert card.metadata == {
+            "permits_capable": True,
+            "supported_workflows": ["submit", "review"],
+            "limits": {"max_batch": 5},
+        }
+
+    def test_metadata_serialization_roundtrip(self):
+        card = AgentCard(metadata={"permits_capable": True})
+        dumped = card.model_dump()
+        assert dumped["metadata"] == {"permits_capable": True}
+        restored = AgentCard.model_validate(dumped)
+        assert restored == card
+
+    def test_metadata_default_instances_are_independent(self):
+        """Each default metadata is its own dict, not a shared class-level object."""
+        card_a = AgentCard()
+        card_b = AgentCard()
+        card_a.metadata["mutated"] = True
+        assert card_b.metadata == {}
 
 
 # --- AgentCard.from_states ---
@@ -246,6 +275,14 @@ class TestAgentCardFromStates:
         assert waiting.waits_for_input is True
         assert waiting.accepts == ["text", "doc_upload"]
         assert waiting.transitions == ["processing"]
+
+    def test_metadata_forwarded(self, sample_states):
+        card = AgentCard.from_states(
+            initial_state=SampleState.WAITING,
+            states=sample_states,
+            metadata={"permits_capable": True},
+        )
+        assert card.metadata == {"permits_capable": True}
 
     def test_matches_from_state_machine(self, sample_states, sample_sm):
         """from_states and from_state_machine should produce identical cards."""
@@ -315,6 +352,13 @@ class TestAgentCardFromStateMachine:
         assert card.data_events == []
         assert card.output_schema is None
 
+    def test_metadata_forwarded(self, sample_sm):
+        card = AgentCard.from_state_machine(
+            state_machine=sample_sm,
+            metadata={"permits_capable": True},
+        )
+        assert card.metadata == {"permits_capable": True}
+
 
 # --- register_agent agent_card merging ---
 
@@ -369,6 +413,20 @@ class TestRegisterAgentCardMerge:
             assert "agent_card" in metadata
             assert metadata["agent_card"]["input_types"] == ["text"]
             assert metadata["agent_card"]["data_events"] == ["result"]
+
+    async def test_agent_card_metadata_propagates_through_registration(self, mock_env_vars):
+        card = AgentCard(metadata={"permits_capable": True})
+        mock_client = self._make_mock_client()
+
+        with patch("agentex.lib.utils.registration.httpx.AsyncClient", return_value=mock_client):
+            from agentex.lib.utils.registration import register_agent
+
+            await register_agent(mock_env_vars, agent_card=card)
+
+            sent_data = mock_client.post.call_args.kwargs["json"]
+            metadata = sent_data["registration_metadata"]
+
+            assert metadata["agent_card"]["metadata"] == {"permits_capable": True}
 
     async def test_none_preserved_when_no_card(self, mock_env_vars):
         mock_client = self._make_mock_client()

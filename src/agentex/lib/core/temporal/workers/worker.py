@@ -178,6 +178,7 @@ class AgentexWorker:
         metrics_headers: dict[str, str] | None = None,
         metrics_use_http: bool = False,
         metrics_temporality_delta: bool = False,
+        agent_card: Any | None = None,
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -196,6 +197,7 @@ class AgentexWorker:
         self.metrics_temporality_delta = metrics_temporality_delta
         self.payload_codec = payload_codec
         self.data_converter = data_converter
+        self.agent_card = agent_card
 
     @overload
     async def run(
@@ -312,6 +314,6 @@ class AgentexWorker:
             # the worker process never goes through the ACP server lifespan, so it needs its
             # own guard (mirrors base_acp_server.lifespan_context).
             await assert_backend_compatible(env_vars.AGENTEX_BASE_URL)
-            await register_agent(env_vars)
+            await register_agent(env_vars, agent_card=self.agent_card)
         else:
             logger.warning("AGENTEX_BASE_URL not set, skipping worker registration")
