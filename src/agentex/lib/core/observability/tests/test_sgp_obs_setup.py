@@ -400,3 +400,48 @@ class TestOpenAIAgentsBridge:
             monkeypatch, init=lambda **_kwargs: {"traces": object()}, bridge=boom
         )
         assert init_sgp_obs() == "wired:traces"
+
+
+class TestLoggingHandover:
+    """agentex's make_logger attaches a handler to each module's own logger; sgp-obs'
+    logs pipeline owns the ROOT logger and deliberately leaves named loggers alone. Both
+    then print, so every record appears twice — and the agentex copy is emitted before
+    the pipeline's filters, so it carries no agent_id/task_id, is not governed by the
+    allowlist, and is not truncated.
+    """
+
+    @staticmethod
+    def _spy(monkeypatch):
+        calls = []
+        monkeypatch.setattr(
+            sgp_obs_setup, "route_agentex_loggers_to_root", lambda: calls.append(True) or 1
+        )
+        return calls
+
+    def test_handover_runs_when_the_logs_signal_is_wired(self, monkeypatch):
+        calls = self._spy(monkeypatch)
+        _fake_sgp_obs(monkeypatch, lambda **_kwargs: {"logs": object()})
+        assert init_sgp_obs() == "wired:logs"
+        assert calls == [True]
+
+    def test_no_handover_when_logs_are_not_wired(self, monkeypatch):
+        """Nothing owns the root logger in that case, so stripping the leaf handlers
+        would send agentex's records nowhere at all."""
+        calls = self._spy(monkeypatch)
+        _fake_sgp_obs(monkeypatch, lambda **_kwargs: {"metrics": object()})
+        assert init_sgp_obs() == "wired:metrics"
+        assert calls == []
+
+    def test_no_handover_when_sgp_obs_is_absent(self, monkeypatch):
+        calls = self._spy(monkeypatch)
+        _block_sgp_obs_import(monkeypatch)
+        assert init_sgp_obs() == "not_installed"
+        assert calls == []
+
+    def test_a_failing_handover_does_not_stop_startup(self, monkeypatch):
+        def boom():
+            raise RuntimeError("logging registry is in a strange state")
+
+        monkeypatch.setattr(sgp_obs_setup, "route_agentex_loggers_to_root", boom)
+        _fake_sgp_obs(monkeypatch, lambda **_kwargs: {"logs": object()})
+        assert init_sgp_obs() == "wired:logs"

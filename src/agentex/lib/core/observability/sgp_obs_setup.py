@@ -50,7 +50,11 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.utils.logging import (
+    make_logger,
+    _reset_for_tests as _logging_reset_for_tests,
+    route_agentex_loggers_to_root,
+)
 
 logger = make_logger(__name__)
 
@@ -140,6 +144,9 @@ def init_sgp_obs(app: Any = None) -> str:
         _status = "disabled"
         return _status
 
+    if "logs" in handles:
+        _hand_agentex_logging_to_the_pipeline()
+
     if "traces" in handles:
         _install_openai_agents_bridge()
         _warn_if_correlation_backend_mismatched()
@@ -147,6 +154,44 @@ def init_sgp_obs(app: Any = None) -> str:
     _status = "wired:" + ",".join(sorted(handles))
     logger.info("sgp-obs wired (%s)", _status)
     return _status
+
+
+def _hand_agentex_logging_to_the_pipeline() -> None:
+    """Stop agentex's own loggers printing a second, ungoverned copy of every record.
+
+    ``agentex.lib.utils.logging.make_logger`` attaches a handler to each module's own
+    (leaf) logger. sgp-obs' logs pipeline replaces the handlers on the ROOT logger and
+    deliberately leaves named loggers alone, because a named logger's handler may be
+    there on purpose. The two are individually correct and together print everything
+    twice: once in agentex's plain-text format from the leaf, once as pipeline JSON
+    from root. Measured on sgp-obs 0.16.0, one ``logger.info()`` gave two stdout lines,
+    and sgp-obs' boot warning named 63 loggers.
+
+    The duplicate is not merely redundant: it is emitted before the pipeline's filters,
+    so it carries no ``agent_id``/``task_id``, is not governed by the allowlist, and is
+    not truncated.
+
+    Only agentex's loggers are handed over — see
+    :func:`~agentex.lib.utils.logging.route_agentex_loggers_to_root` for why by prefix,
+    why ``capture_loggers=`` is not the mechanism, and why a third party's handler is
+    left where it is.
+    """
+    try:
+        cleared = route_agentex_loggers_to_root()
+    except Exception:  # pragma: no cover - telemetry must never break startup
+        logger.debug("could not hand agentex logging to the sgp-obs pipeline", exc_info=True)
+        return
+
+    if cleared:
+        # sgp-obs has already logged its "bypass log governance" warning by this point,
+        # naming loggers this call has just fixed. Say so, or the two lines read as a
+        # contradiction to whoever is looking at the pod's first second of output.
+        logger.info(
+            "routed %d agentex logger(s) through the sgp-obs logs pipeline; any "
+            "'bypass log governance' warning above that names agentex.* loggers was "
+            "emitted before this ran and no longer applies to them",
+            cleared,
+        )
 
 
 def _install_openai_agents_bridge() -> bool:
@@ -299,3 +344,7 @@ async def shutdown_sgp_obs() -> None:
 def _reset_for_tests() -> None:
     global _status
     _status = None
+    # The logging hand-over is a process-wide latch too, and a test that wired the
+    # logs signal would otherwise leave make_logger attaching nothing for the rest
+    # of the session.
+    _logging_reset_for_tests()
