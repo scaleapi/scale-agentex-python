@@ -13,6 +13,11 @@ SDK regeneration.
     client.agents.list(
         agent_card_metadata=encode_metadata_filter({"permits_capable": True}),
     )
+
+The ``agent_card_metadata`` filter requires an Agentex server that includes
+scaleapi/scale-agentex#411. Older servers ignore the unknown query parameter
+and return the full unfiltered agent list rather than erroring, and the SDK's
+startup backend-contract check does not guard against this.
 """
 
 from __future__ import annotations
