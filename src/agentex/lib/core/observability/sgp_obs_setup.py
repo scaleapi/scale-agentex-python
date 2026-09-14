@@ -176,6 +176,7 @@ def _install_openai_agents_bridge() -> bool:
         installed = bool(install_openai_agents_bridge())
         if installed:
             logger.debug("sgp-obs openai-agents bridge installed")
+            _warn_if_openai_agents_tracing_disabled()
         else:
             # Only reachable if `agents` is not importable, which should not happen
             # while openai-agents is a hard dependency — so say so rather than shrug.
@@ -187,6 +188,37 @@ def _install_openai_agents_bridge() -> bool:
     except Exception:  # pragma: no cover - telemetry must never break startup
         logger.debug("sgp-obs openai-agents bridge unavailable", exc_info=True)
         return False
+
+
+def _warn_if_openai_agents_tracing_disabled() -> None:
+    """Warn when the bridge is installed but openai-agents tracing is switched off.
+
+    ``install_openai_agents_bridge()`` returns True as soon as it registers itself as a
+    trace processor — it cannot tell whether the provider will ever feed it. If the
+    agent called ``set_tracing_disabled(True)``, no spans are produced at all, so the
+    bridge is registered and permanently idle, and nothing says so.
+
+    That is not hypothetical: it is what the openai-agents scaffolds used to do, so
+    agents generated before this change carry it. Those scaffolds now clear the
+    processor list instead, which removes the OpenAI exporter (the thing they were
+    actually trying to avoid) while leaving spans flowing to the bridge.
+
+    Reads a private attribute, so it is fully guarded: a diagnostic must never be the
+    reason startup fails, and if upstream renames it we simply stop warning.
+    """
+    try:
+        from agents.tracing import get_trace_provider
+
+        if getattr(get_trace_provider(), "_disabled", False):
+            logger.warning(
+                "The sgp-obs openai-agents bridge is installed but openai-agents "
+                "tracing is disabled, so Runner turns will produce no model spans. "
+                "Replace set_tracing_disabled(True) with set_trace_processors([]): "
+                "that still stops traces reaching api.openai.com, but keeps spans "
+                "flowing to the bridge."
+            )
+    except Exception:  # pragma: no cover - a diagnostic must never break startup
+        logger.debug("could not determine openai-agents tracing state", exc_info=True)
 
 
 def _warn_if_correlation_backend_mismatched() -> None:

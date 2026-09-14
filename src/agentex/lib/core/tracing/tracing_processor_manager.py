@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import TYPE_CHECKING
 from threading import Lock
 
@@ -78,3 +80,72 @@ def get_sync_tracing_processors():
 
 def get_async_tracing_processors():
     return GLOBAL_TRACING_PROCESSOR_MANAGER.get_async_processors()
+
+
+_logger = logging.getLogger(__name__)
+
+# Total wall-clock budget for draining every sync tracing processor. A pod's
+# terminationGracePeriodSeconds (30s by default) is shared with the OTel flush that
+# follows this, so the drain takes a small slice of it.
+SYNC_TRACING_SHUTDOWN_BUDGET_S = 5.0
+
+
+async def shutdown_sync_tracing_processors(
+    budget_s: float = SYNC_TRACING_SHUTDOWN_BUDGET_S,
+) -> None:
+    """Drain the sync tracing processors' queues at shutdown. Never raises.
+
+    Nothing used to call this. The ACP lifespan drained ``shutdown_default_span_queue``,
+    which is the ASYNC path only, so a sync agent dropped whatever business spans were
+    still queued when the pod stopped. That matters beyond the lost spans: the business
+    span is what an obs span's ``agentex.business_trace_id`` resolves to, so losing it
+    breaks the pivot from Tempo back to the SGP store.
+
+    Off the event loop and on a deadline, both deliberately.
+    ``SGPSyncTracingProcessor.shutdown`` calls ``flush_queue()``, a BLOCKING HTTP flush
+    with retries. Calling it inline would stall the caller's loop, so a slow or
+    unreachable collector could burn the whole termination grace period and stop the
+    OTel flush that runs after it — trading a few business spans for all of the OTel
+    ones. Each processor runs in a worker thread, and the budget is shared across all
+    of them so one stalled export cannot starve the rest.
+
+    A timed-out flush leaks its thread until the process exits. Accepted: this runs
+    only during shutdown, and the alternative is blocking on it.
+
+    Lives here rather than in the ACP server because both entry points need it — the
+    ACP server AND the Temporal worker, which runs in its own process.
+    """
+    try:
+        processors = get_sync_tracing_processors()
+    except Exception:  # pragma: no cover - nothing to drain
+        _logger.debug("sync tracing processors unavailable at shutdown", exc_info=True)
+        return
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + budget_s
+
+    for processor in processors:
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            _logger.warning(
+                "sync tracing shutdown budget of %.1fs exhausted; %s and any after it "
+                "were not flushed and their business spans are lost",
+                budget_s,
+                type(processor).__name__,
+            )
+            break
+        try:
+            await asyncio.wait_for(asyncio.to_thread(processor.shutdown), remaining)
+        except (TimeoutError, asyncio.TimeoutError):
+            _logger.warning(
+                "%s did not flush within the remaining %.1fs; its business spans are "
+                "lost, but shutdown continues",
+                type(processor).__name__,
+                remaining,
+            )
+        except Exception:  # noqa: PERF203 - one bad processor must not block the rest
+            _logger.warning(
+                "a sync tracing processor failed to flush on shutdown; "
+                "some business spans may be lost",
+                exc_info=True,
+            )
