@@ -21,7 +21,7 @@ import re
 
 from agentex.lib.utils.logging import make_logger
 
-__all__ = ("COMMIT_SHA_KEY", "enable", "disable", "is_enabled", "commit_sha")
+__all__ = ("COMMIT_SHA_KEY", "enable", "disable", "is_enabled", "commit_sha", "is_git_object_name")
 
 logger = make_logger(__name__)
 
@@ -30,6 +30,12 @@ COMMIT_SHA_KEY = "__commit_sha__"
 # A git object name: 40 hex for SHA-1, 64 for SHA-256, or an abbreviation down to
 # git's own 7-character minimum.
 _GIT_SHA_RE = re.compile(r"[0-9a-fA-F]{7,64}")
+
+
+def is_git_object_name(value: str) -> bool:
+    """Whether ``value`` is a full or abbreviated git SHA-1/SHA-256 object name."""
+    return _GIT_SHA_RE.fullmatch(value.strip()) is not None
+
 
 _COMMIT_SHA_ENV = "AGENT_COMMIT_SHA"
 # Fallback only: automatic, and only usable when it happens to be SHA-shaped.
