@@ -16,6 +16,22 @@ from agentex.lib.core.tracing.tracing_processor_manager import (
 )
 
 
+def _block_sgp_obs_import(monkeypatch):
+    """Make `import sgp_obs` fail, i.e. the image a tokenless build produces."""
+    import sys
+    import builtins
+
+    monkeypatch.delitem(sys.modules, "sgp_obs", raising=False)
+    real_import = builtins.__import__
+
+    def blocked(name, *args, **kwargs):
+        if name == "sgp_obs" or name.startswith("sgp_obs."):
+            raise ImportError("No module named 'sgp_obs'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocked)
+
+
 class _Processor:
     def __init__(self, explode: bool = False) -> None:
         self.calls = 0
@@ -247,3 +263,40 @@ class TestConcurrencyAndProcessExit:
             f"process took {elapsed:.1f}s to exit with a 30s stalled flush and a "
             "0.25s budget; the flush thread is blocking interpreter shutdown"
         )
+
+
+class TestTheWorkerObsPathRunsWithoutSgpObs:
+    """The image a build with NO broker token produces has no sgp-obs in it, and a
+    Temporal agent's model calls happen in this process.
+
+    The two tests above pin that ``run()`` *calls* these, by reading its source. That
+    cannot catch a call that is written correctly and then raises, so this exercises the
+    sequence for real. Together: one proves the wiring exists, the other proves it is
+    harmless.
+    """
+
+    def test_the_worker_module_imports_and_constructs(self):
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        # port 0 so nothing binds a real health port during the test
+        assert AgentexWorker(task_queue="probe", health_check_port=0) is not None
+
+    async def test_init_and_both_drains_are_inert(self, monkeypatch):
+        """Exactly what ``run()`` does: init at entry, both drains in its finally —
+        with nothing wired, which is every agent that has not adopted."""
+        from agentex.lib.core.observability import sgp_obs_setup
+        from agentex.lib.core.observability.sgp_obs_setup import (
+            init_sgp_obs,
+            shutdown_sgp_obs,
+        )
+
+        monkeypatch.delenv("SGP_OBS_ENABLED", raising=False)
+        sgp_obs_setup._reset_for_tests()
+        try:
+            _block_sgp_obs_import(monkeypatch)
+            assert init_sgp_obs() == "not_installed"
+            # Neither drain may raise just because nothing was ever wired.
+            await shutdown_sync_tracing_processors()
+            await shutdown_sgp_obs()
+        finally:
+            sgp_obs_setup._reset_for_tests()
