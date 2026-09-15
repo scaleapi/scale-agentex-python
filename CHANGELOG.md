@@ -12,6 +12,20 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.26.0 (2026-09-14)
+
+Full Changelog: [agentex-client-v0.25.0...agentex-client-v0.26.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.25.0...agentex-client-v0.26.0)
+
+### Features
+
+* **agent-card:** add metadata field and expose list filter ([#502](https://github.com/scaleapi/scale-agentex-python/issues/502)) ([55a0178](https://github.com/scaleapi/scale-agentex-python/commit/55a0178c2d210325770b56dbb58eac2f644cc14b))
+* **api:** add agent_card_metadata parameter to agents list method ([ebb632a](https://github.com/scaleapi/scale-agentex-python/commit/ebb632a4b22287e157bcf086dd98b27f26188fc5))
+* **tracing:** add opt-in commit SHA stamping for SGP spans ([#505](https://github.com/scaleapi/scale-agentex-python/issues/505)) ([76252a9](https://github.com/scaleapi/scale-agentex-python/commit/76252a98f28663e8c95777456d07e42171592c62))
+
+### Bug Fixes
+
+* keep agent output streaming alive on an unreadable line, and honor LOG_LEVEL ([#509](https://github.com/scaleapi/scale-agentex-python/issues/509)) ([0db6037](https://github.com/scaleapi/scale-agentex-python/commit/0db6037e63ca1b24b80ae0d38883f7687ae5b9e5))
+
 ## 0.25.0 (2026-08-26)
 
 Full Changelog: [agentex-client-v0.24.0...agentex-client-v0.25.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.24.0...agentex-client-v0.25.0)
