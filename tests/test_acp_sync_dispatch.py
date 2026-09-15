@@ -121,7 +121,9 @@ class TestHandlerCompletesBeforeResponse:
             await asyncio.sleep(0)
             order.append("handler")
 
-        response = await _dispatch(acp, RPCMethod.TASK_CREATE, CreateTaskParams(agent=_agent(), task=_task()))
+        response = await _dispatch(
+            acp, RPCMethod.TASK_CREATE, CreateTaskParams(agent=_agent(), task=_task(), params=None)
+        )
         order.append("response")
 
         assert order == ["handler", "response"]
@@ -160,7 +162,9 @@ class TestHandlerFailureReachesCaller:
         async def handler(params: CreateTaskParams) -> None:
             raise RuntimeError("workflow not found for ID: test-task-123")
 
-        response = await _dispatch(acp, RPCMethod.TASK_CREATE, CreateTaskParams(agent=_agent(), task=_task()))
+        response = await _dispatch(
+            acp, RPCMethod.TASK_CREATE, CreateTaskParams(agent=_agent(), task=_task(), params=None)
+        )
 
         assert response.error is not None
         assert "workflow not found" in response.error.message
