@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from agents import Runner, set_tracing_disabled
+from agents import Runner, set_trace_processors
 from agents.sandbox import SandboxAgent, SandboxRunConfig
 from agents.run_config import RunConfig
 from agents.sandbox.sandboxes.unix_local import (
@@ -25,10 +25,17 @@ from agents.sandbox.sandboxes.unix_local import (
 
 from project.tools import get_capabilities
 
-# Disable the openai-agents SDK's native tracer so it doesn't ship traces to
-# api.openai.com using OPENAI_API_KEY (which may be a gateway/proxy key and would
-# 401). Agentex tracing still runs via the tracing manager configured in acp.py.
-set_tracing_disabled(True)
+# Drop the openai-agents SDK's own exporter, so it can't ship traces to
+# api.openai.com using OPENAI_API_KEY (which may be a gateway/proxy key and would 401).
+#
+# Clearing the processor list rather than disabling tracing outright: disabling stops
+# spans being produced AT ALL, which silently starves any processor added later —
+# including the sgp-obs bridge the SDK installs when observability is on, so a Runner
+# turn would contribute no model spans. Clearing instead removes the OpenAI exporter
+# (which otherwise stays registered and is merely never fed) while leaving the
+# machinery alive for the bridge to attach to.
+# Agentex/SGP tracing still runs via the tracing manager.
+set_trace_processors([])
 
 MODEL_NAME = "gpt-4o-mini"
 INSTRUCTIONS = """You are a local sandbox assistant.
