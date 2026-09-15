@@ -35,6 +35,7 @@ from agentex.protocol.acp import (
     SendEventParams,
     CreateTaskParams,
 )
+from agentex.protocol.json_rpc import JSONRPCResponse
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
 
 
@@ -71,6 +72,13 @@ class _FakeRequest:
 
     async def json(self) -> dict[str, Any]:
         return self._payload
+
+
+async def _dispatch(acp: SyncACP, method: RPCMethod, params: Any) -> JSONRPCResponse:
+    """Call the JSON-RPC entry point and narrow its untyped return."""
+    response = await acp._handle_jsonrpc(_FakeRequest(_rpc(method, params)))  # pyright: ignore[reportArgumentType]
+    assert isinstance(response, JSONRPCResponse)
+    return response
 
 
 def _rpc(method: RPCMethod, params: Any) -> dict[str, Any]:
@@ -113,9 +121,7 @@ class TestHandlerCompletesBeforeResponse:
             await asyncio.sleep(0)
             order.append("handler")
 
-        response = await acp._handle_jsonrpc(
-            _FakeRequest(_rpc(RPCMethod.TASK_CREATE, CreateTaskParams(agent=_agent(), task=_task())))
-        )
+        response = await _dispatch(acp, RPCMethod.TASK_CREATE, CreateTaskParams(agent=_agent(), task=_task()))
         order.append("response")
 
         assert order == ["handler", "response"]
@@ -131,13 +137,8 @@ class TestHandlerCompletesBeforeResponse:
             await asyncio.sleep(0)
             order.append("handler")
 
-        response = await acp._handle_jsonrpc(
-            _FakeRequest(
-                _rpc(
-                    RPCMethod.EVENT_SEND,
-                    SendEventParams(agent=_agent(), task=_task(), event=_event()),
-                )
-            )
+        response = await _dispatch(
+            acp, RPCMethod.EVENT_SEND, SendEventParams(agent=_agent(), task=_task(), event=_event())
         )
         order.append("response")
 
@@ -159,12 +160,10 @@ class TestHandlerFailureReachesCaller:
         async def handler(params: CreateTaskParams) -> None:
             raise RuntimeError("workflow not found for ID: test-task-123")
 
-        response = await acp._handle_jsonrpc(
-            _FakeRequest(_rpc(RPCMethod.TASK_CREATE, CreateTaskParams(agent=_agent(), task=_task())))
-        )
+        response = await _dispatch(acp, RPCMethod.TASK_CREATE, CreateTaskParams(agent=_agent(), task=_task()))
 
         assert response.error is not None
-        assert "workflow not found" in response.error["message"]
+        assert "workflow not found" in response.error.message
 
     async def test_event_send_failure_returns_error(self) -> None:
         acp = SyncACP()
@@ -173,14 +172,9 @@ class TestHandlerFailureReachesCaller:
         async def handler(params: SendEventParams) -> None:
             raise RuntimeError("workflow not found for ID: test-task-123")
 
-        response = await acp._handle_jsonrpc(
-            _FakeRequest(
-                _rpc(
-                    RPCMethod.EVENT_SEND,
-                    SendEventParams(agent=_agent(), task=_task(), event=_event()),
-                )
-            )
+        response = await _dispatch(
+            acp, RPCMethod.EVENT_SEND, SendEventParams(agent=_agent(), task=_task(), event=_event())
         )
 
         assert response.error is not None
-        assert "workflow not found" in response.error["message"]
+        assert "workflow not found" in response.error.message
