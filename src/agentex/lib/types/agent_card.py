@@ -5,7 +5,7 @@ import typing
 from enum import Enum
 from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import Field, BaseModel
 
 if TYPE_CHECKING:
     from agentex.lib.sdk.state_machine.state import State
@@ -31,6 +31,11 @@ class AgentCard(BaseModel):
     data_events: list[str] = []
     input_types: list[str] = []
     output_schema: dict | None = None
+    # Free-form JSON object for opt-in self-description (e.g. protocol-specific
+    # capability flags). Not interpreted by the platform, but callers can filter
+    # agents on it with ``agents.list(agent_card_metadata=...)`` -- see
+    # ``agentex.lib.utils.metadata_filters.encode_metadata_filter``.
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @classmethod
     def from_states(
@@ -40,6 +45,7 @@ class AgentCard(BaseModel):
         output_event_model: type[BaseModel] | None = None,
         extra_input_types: list[str] | None = None,
         queries: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> AgentCard:
         """Build an AgentCard directly from a list[State] + initial_state.
 
@@ -81,6 +87,7 @@ class AgentCard(BaseModel):
             data_events=data_events,
             input_types=sorted(derived_input_types | set(extra_input_types or [])),
             output_schema=output_schema,
+            metadata=metadata or {},
         )
 
     @classmethod
@@ -90,6 +97,7 @@ class AgentCard(BaseModel):
         output_event_model: type[BaseModel] | None = None,
         extra_input_types: list[str] | None = None,
         queries: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> AgentCard:
         """Build an AgentCard from a StateMachine instance. Delegates to from_states()."""
         lifecycle = state_machine.get_lifecycle()
@@ -125,6 +133,7 @@ class AgentCard(BaseModel):
             data_events=data_events,
             input_types=sorted(derived_input_types | set(extra_input_types or [])),
             output_schema=output_schema,
+            metadata=metadata or {},
         )
 
 
