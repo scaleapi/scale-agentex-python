@@ -7,6 +7,8 @@ import httpx
 
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.utils.build_provenance import normalize_remote
+from agentex.lib.core.tracing.code_revision import is_git_object_name
 
 logger = make_logger(__name__)
 
@@ -19,6 +21,29 @@ def get_auth_principal(env_vars: EnvironmentVariables):
         return json.loads(decoded_str)
     except Exception:
         return None
+
+
+def build_registration_metadata(env_vars: EnvironmentVariables, agent_card=None) -> dict:
+    """Deployment id, source provenance, and agent card; keys appear only when known."""
+    metadata: dict = {}
+    if env_vars.AGENTEX_DEPLOYMENT_ID:
+        metadata["deployment_id"] = env_vars.AGENTEX_DEPLOYMENT_ID
+    commit = (env_vars.AGENT_COMMIT_SHA or "").strip()
+    if commit:
+        if is_git_object_name(commit):
+            metadata["commit_sha"] = commit
+        else:
+            logger.warning(
+                "AGENT_COMMIT_SHA=%r is not a git commit SHA; commit_sha omitted from registration.",
+                commit,
+            )
+    repo = normalize_remote(env_vars.AGENT_SOURCE_REPO)
+    if repo:
+        metadata["source_repo"] = repo
+    if agent_card is not None:
+        metadata["agent_card"] = agent_card.model_dump() if hasattr(agent_card, "model_dump") else agent_card
+    return metadata
+
 
 async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
     """Register this agent with the Agentex server"""
@@ -33,13 +58,7 @@ async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
         or f"Generic description for agent: {env_vars.AGENT_NAME}"
     )
 
-    # Registration metadata carries the deployment id and agent card.
-    registration_metadata: dict = {}
-    if env_vars.AGENTEX_DEPLOYMENT_ID:
-        registration_metadata["deployment_id"] = env_vars.AGENTEX_DEPLOYMENT_ID
-    if agent_card is not None:
-        card_data = agent_card.model_dump() if hasattr(agent_card, "model_dump") else agent_card
-        registration_metadata["agent_card"] = card_data
+    registration_metadata = build_registration_metadata(env_vars, agent_card)
 
     # Prepare registration data
     registration_data = {

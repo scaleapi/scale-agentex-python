@@ -140,6 +140,8 @@ class TestAgentexWorkerAgentCard:
         env.AGENTEX_DEPLOYMENT_ID = None
         env.AGENT_ID = None
         env.AGENT_INPUT_TYPE = None
+        env.AGENT_COMMIT_SHA = None
+        env.AGENT_SOURCE_REPO = None
         return env
 
     @staticmethod
