@@ -279,6 +279,9 @@ def merge_deployment_configs(
                 "name": manifest.agent.name,
                 "description": manifest.agent.description,
                 "acp_type": manifest.agent.acp_type,
+                # Rendered as the pod's AGENT_VERSION (chart >=0.6.0), stamped
+                # onto every span as __agent_version__ by the SGP processor.
+                "version": image_tag,
             },
         },
         "replicaCount": manifest.deployment.global_config.replicaCount,
