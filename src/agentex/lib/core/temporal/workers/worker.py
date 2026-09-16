@@ -32,8 +32,6 @@ from agentex.lib.utils.registration import register_agent
 from agentex.lib.core.tracing.temporal import temporal_tracing_interceptors
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.compat.version_guard import assert_backend_compatible
-from agentex.lib.core.observability.sgp_obs_setup import init_sgp_obs, shutdown_sgp_obs
-from agentex.lib.core.tracing.tracing_processor_manager import shutdown_sync_tracing_processors
 
 logger = make_logger(__name__)
 
@@ -224,18 +222,6 @@ class AgentexWorker:
         workflow: type | None = None,
         workflows: list[type] | None = None,
     ):
-        # A Temporal agent runs its model calls HERE, in a separate process from the
-        # ACP server, and this process never constructs a BaseACPServer — so without
-        # this call an agent that installed sgp-obs and set the documented environment
-        # would still get no metrics, traces or structured logs from its worker, which
-        # is where the interesting work happens.
-        #
-        # No `app=`: there is no ASGI application in this process. The health-check
-        # server is aiohttp, which sgp-obs' ASGI middleware does not apply to, so the
-        # worker contributes model and egress telemetry but no http.server.* — correct,
-        # since nothing here serves agent traffic.
-        init_sgp_obs()
-
         await self.start_health_check_server()
         await self._register_agent()
 
@@ -281,14 +267,7 @@ class AgentexWorker:
         # Eagerly set the worker status to healthy
         self.healthy = True
         logger.info(f"Running workers for task queue: {self.task_queue}")
-        try:
-            await worker.run()
-        finally:
-            # Same drains as the ACP lifespan, for the same reason: whatever is still
-            # queued when the pod stops is otherwise dropped. Both are bounded and
-            # fail-open, so neither can stop the worker exiting.
-            await shutdown_sync_tracing_processors()
-            await shutdown_sgp_obs()
+        await worker.run()
 
     async def _health_check(self):
         return web.json_response(self.healthy)
