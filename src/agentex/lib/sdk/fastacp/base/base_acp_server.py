@@ -86,6 +86,71 @@ def _attach_incoming_otel_context(scope_headers: list[tuple[bytes, bytes]]) -> o
         return None
 
 
+# sgp-obs is an optional install (see ``sgp_obs_setup``), and Python does not cache a
+# FAILED import, so attempting one per request would re-walk sys.path for the majority
+# of agents that do not have it. Resolved once, to the module or to None.
+_OBS_CONTEXT_UNRESOLVED = object()
+_obs_context_module: Any = _OBS_CONTEXT_UNRESOLVED
+
+
+def _sgp_obs_context() -> Any | None:
+    global _obs_context_module
+    if _obs_context_module is _OBS_CONTEXT_UNRESOLVED:
+        try:
+            from sgp_obs import context as obs_context  # type: ignore[import-not-found]
+
+            _obs_context_module = obs_context
+        except Exception:  # pragma: no cover - the normal case: sgp-obs is not installed
+            _obs_context_module = None
+    return _obs_context_module
+
+
+def _bind_request_id_for_telemetry(request_id: str) -> object | None:
+    """Put the request id where a logs pipeline reads it from.
+
+    Until the logging hand-over, ``request_id`` reached the logs through exactly one
+    writer: ``CustomJSONFormatter``, on the handler ``make_logger`` attaches to each
+    module's own logger. That handler is taken off once a pipeline owns the root logger,
+    because it was printing a second, ungoverned copy of every record -- and it was the
+    field's only writer, so without this the request id would not move to the governed
+    copy, it would disappear. Measured on dbt-assistant: ``request_id`` appeared on 5.2%
+    of log lines, which were exactly the ungoverned copies.
+
+    sgp-obs reads the id from its shared correlation context -- the one place all three
+    signals take correlation ids from -- and stamps it onto each record in a stage that
+    runs on a COPY of the record at handler time. That is why the id is handed over
+    rather than written onto the record here: ``extra={"request_id": ...}`` from a
+    caller and an attribute set before the call would collide, and the stdlib raises
+    ``KeyError`` for that collision at the ``logger.info()`` call site.
+
+    sgp-obs can also fill this context from its own ``RequestIdMiddleware``. Binding the
+    SDK's id here instead keeps ONE generator for the value, so the id in the logs is
+    the same one ``ctx_var_request_id`` gives application code and the same one
+    ``x-request-id`` carried in.
+
+    Returns a reset token (or None); fail-open.
+    """
+    obs_context = _sgp_obs_context()
+    if obs_context is None:
+        return None
+    try:
+        return obs_context.bind(request_id=request_id)
+    except Exception:  # pragma: no cover - obs must never break a request
+        return None
+
+
+def _unbind_request_id_for_telemetry(token: object | None) -> None:
+    if token is None:
+        return
+    obs_context = _sgp_obs_context()
+    if obs_context is None:
+        return
+    try:
+        obs_context.reset(token)
+    except Exception:  # pragma: no cover - best-effort
+        pass
+
+
 def _detach_otel_context(token: object | None) -> None:
     if token is None:
         return
@@ -105,12 +170,16 @@ class RequestIDMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         otel_token: object | None = None
+        obs_request_token: object | None = None
         if scope["type"] == "http":
             scope_headers = scope.get("headers", [])
             headers = dict(scope_headers)
             raw_request_id = headers.get(b"x-request-id", b"")
             request_id = raw_request_id.decode() if raw_request_id else uuid.uuid4().hex
             ctx_var_request_id.set(request_id)
+            # Keep the id in the logs once the leaf handler that used to write it is
+            # gone; see _bind_request_id_for_telemetry.
+            obs_request_token = _bind_request_id_for_telemetry(request_id)
             # Continue the ingress trace for this request (and its background
             # Temporal dispatch); see _attach_incoming_otel_context.
             otel_token = _attach_incoming_otel_context(scope_headers)
@@ -118,6 +187,7 @@ class RequestIDMiddleware:
             await self.app(scope, receive, send)
         finally:
             _detach_otel_context(otel_token)
+            _unbind_request_id_for_telemetry(obs_request_token)
 
 
 class BaseACPServer(FastAPI):
