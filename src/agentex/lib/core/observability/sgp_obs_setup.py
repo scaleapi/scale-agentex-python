@@ -53,7 +53,7 @@ from typing import Any
 from agentex.lib.utils.logging import (
     make_logger,
     _reset_for_tests as _logging_reset_for_tests,
-    route_agentex_loggers_to_root,
+    route_loggers_to_root,
 )
 
 logger = make_logger(__name__)
@@ -145,7 +145,7 @@ def init_sgp_obs(app: Any = None) -> str:
         return _status
 
     if "logs" in handles:
-        _hand_agentex_logging_to_the_pipeline()
+        _hand_logging_to_the_pipeline()
 
     if "traces" in handles:
         _install_openai_agents_bridge()
@@ -156,8 +156,8 @@ def init_sgp_obs(app: Any = None) -> str:
     return _status
 
 
-def _hand_agentex_logging_to_the_pipeline() -> None:
-    """Stop agentex's own loggers printing a second, ungoverned copy of every record.
+def _hand_logging_to_the_pipeline() -> None:
+    """Stop a second, ungoverned copy of every log record being printed.
 
     ``agentex.lib.utils.logging.make_logger`` attaches a handler to each module's own
     (leaf) logger. sgp-obs' logs pipeline replaces the handlers on the ROOT logger and
@@ -169,17 +169,21 @@ def _hand_agentex_logging_to_the_pipeline() -> None:
 
     The duplicate is not merely redundant: it is emitted before the pipeline's filters,
     so it carries no ``agent_id``/``task_id``, is not governed by the allowlist, and is
-    not truncated.
+    not truncated. Measured on dbt-assistant running 0.27.0b1: 123 of 3361 log lines
+    were the second copy, each one 80 microseconds after its governed twin.
 
-    Only agentex's loggers are handed over — see
-    :func:`~agentex.lib.utils.logging.route_agentex_loggers_to_root` for why by prefix,
-    why ``capture_loggers=`` is not the mechanism, and why a third party's handler is
-    left where it is.
+    An agent's OWN modules are covered, not just the SDK's. They call
+    ``make_logger(__name__)`` too, under the agent's package name, and that is where
+    the dbt-assistant duplicate came from. See
+    :func:`~agentex.lib.utils.logging.route_loggers_to_root` for how a handler is
+    recognised as the SDK's on a logger whose name the SDK cannot predict, why
+    ``capture_loggers=`` is not the mechanism, and why a third party's handler is left
+    where it is.
     """
     try:
-        cleared = route_agentex_loggers_to_root()
+        cleared = route_loggers_to_root()
     except Exception:  # pragma: no cover - telemetry must never break startup
-        logger.debug("could not hand agentex logging to the sgp-obs pipeline", exc_info=True)
+        logger.debug("could not hand agentex logging to the sgp-obs logs pipeline", exc_info=True)
         return
 
     if cleared:
@@ -187,9 +191,9 @@ def _hand_agentex_logging_to_the_pipeline() -> None:
         # naming loggers this call has just fixed. Say so, or the two lines read as a
         # contradiction to whoever is looking at the pod's first second of output.
         logger.info(
-            "routed %d agentex logger(s) through the sgp-obs logs pipeline; any "
-            "'bypass log governance' warning above that names agentex.* loggers was "
-            "emitted before this ran and no longer applies to them",
+            "routed %d logger(s) through the sgp-obs logs pipeline; any 'bypass log "
+            "governance' warning above that names an agentex.* logger, or one of this "
+            "agent's own, was emitted before this ran and no longer applies to it",
             cleared,
         )
 
