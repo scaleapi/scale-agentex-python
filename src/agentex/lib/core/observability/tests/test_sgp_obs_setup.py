@@ -403,18 +403,18 @@ class TestOpenAIAgentsBridge:
 
 
 class TestLoggingHandover:
-    """agentex's make_logger attaches a handler to each module's own logger; sgp-obs'
-    logs pipeline owns the ROOT logger and deliberately leaves named loggers alone. Both
-    then print, so every record appears twice — and the agentex copy is emitted before
-    the pipeline's filters, so it carries no agent_id/task_id, is not governed by the
-    allowlist, and is not truncated.
+    """agentex's make_logger attaches a handler to each module's own logger — the
+    agent's modules as well as the SDK's; sgp-obs' logs pipeline owns the ROOT logger and
+    deliberately leaves named loggers alone. Both then print, so every record appears
+    twice — and the leaf copy is emitted before the pipeline's filters, so it carries no
+    agent_id/task_id, is not governed by the allowlist, and is not truncated.
     """
 
     @staticmethod
     def _spy(monkeypatch):
         calls = []
         monkeypatch.setattr(
-            sgp_obs_setup, "route_agentex_loggers_to_root", lambda: calls.append(True) or 1
+            sgp_obs_setup, "route_loggers_to_root", lambda: calls.append(True) or 1
         )
         return calls
 
@@ -442,6 +442,6 @@ class TestLoggingHandover:
         def boom():
             raise RuntimeError("logging registry is in a strange state")
 
-        monkeypatch.setattr(sgp_obs_setup, "route_agentex_loggers_to_root", boom)
+        monkeypatch.setattr(sgp_obs_setup, "route_loggers_to_root", boom)
         _fake_sgp_obs(monkeypatch, lambda **_kwargs: {"logs": object()})
         assert init_sgp_obs() == "wired:logs"
