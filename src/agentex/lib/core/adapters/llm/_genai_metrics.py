@@ -21,7 +21,8 @@ record. That decision is made per call, from the model string, in
 
 Everything here is fail-open: sgp-obs is an optional dependency and a telemetry problem
 must never fail a model call. If the import fails, :func:`inference_call` returns an
-object that records nothing and costs nothing.
+object that records nothing, and the failure is remembered so that later calls cost an
+identity check rather than another walk of sys.path.
 """
 
 from __future__ import annotations
@@ -39,7 +40,39 @@ _PROXY_PREFIX = "litellm_proxy/"
 # A bare model name with no "<vendor>/" prefix is OpenAI, per litellm's own default.
 _DEFAULT_VENDOR = "openai"
 
-_warned = False
+# sgp-obs is an optional install (see ``sgp_obs_setup``), and Python does NOT cache a
+# FAILED import, so importing inside ``inference_call`` re-walked sys.path on every
+# single model call for the majority of agents that do not have it. Measured on
+# 0.27.0b2 in a venv with five sys.path entries (a container image has more): 62us per
+# attempt, which took the gateway's own per-call overhead from 12us to 84us. Resolved
+# once, to the module or to None -- the shape ``base_acp_server`` already uses for
+# ``sgp_obs.context``, for the same reason.
+_GENAI_UNRESOLVED = object()
+_genai_module: Any = _GENAI_UNRESOLVED
+
+
+def _genai() -> Any | None:
+    """The sgp-obs GenAI metrics module, or None when it is not installed.
+
+    Resolved on first use rather than at import time, so that importing the litellm
+    adapter does not pay for it and the answer is read after startup has run.
+
+    The debug line is here rather than at the call site because this body runs exactly
+    once, which is the only place a "said it once" latch is not needed.
+    """
+    global _genai_module
+    if _genai_module is _GENAI_UNRESOLVED:
+        try:
+            # See sgp_obs_setup.py: optional, not publicly installable, absent in CI.
+            from sgp_obs.metrics import genai  # type: ignore[import-not-found]
+
+            _genai_module = genai
+        except Exception:
+            _genai_module = None
+            logger.debug(
+                "sgp-obs is not available; GenAI metrics are off for litellm calls"
+            )
+    return _genai_module
 
 
 def _split_model(model: str) -> tuple[str, bool]:
@@ -82,16 +115,8 @@ def resolve_model(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
 
 def inference_call(kwargs: dict[str, Any], args: tuple[Any, ...] = ()) -> Any:
     """Begin recording one litellm call. Never raises, never returns None."""
-    try:
-        # See sgp_obs_setup.py: optional, not publicly installable, absent in CI.
-        from sgp_obs.metrics import genai  # type: ignore[import-not-found]
-    except Exception:
-        global _warned
-        if not _warned:
-            _warned = True
-            logger.debug(
-                "sgp-obs is not available; GenAI metrics are off for litellm calls"
-            )
+    genai = _genai()
+    if genai is None:
         return _NULL_CALL
 
     try:
@@ -131,3 +156,14 @@ class _NullCall:
 
 
 _NULL_CALL = _NullCall()
+
+
+def _reset_for_tests() -> None:
+    """Forget the resolved module, so a test can present a different sgp-obs.
+
+    The handle is a process-wide latch: without this, the first test to run with
+    sgp-obs absent would cache None for the rest of the session and every later test
+    that injects a fake ``sgp_obs.metrics`` would silently exercise the null path.
+    """
+    global _genai_module
+    _genai_module = _GENAI_UNRESOLVED
