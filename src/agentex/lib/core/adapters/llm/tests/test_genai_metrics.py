@@ -23,6 +23,20 @@ from agentex.lib.core.adapters.llm._genai_metrics import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _forget_resolved_sgp_obs():
+    """Clear the resolved-once module handle around every test.
+
+    It is process-wide state, so without this the first test to run with sgp-obs
+    absent would cache None for the rest of the session and every later test that
+    injects a fake ``sgp_obs.metrics`` would silently exercise the null path instead
+    of the one it means to.
+    """
+    _genai_metrics._reset_for_tests()
+    yield
+    _genai_metrics._reset_for_tests()
+
+
 class TestSplitModel:
     """``(vendor, goes_out_over_the_openai_client)``. The boolean decides whether
     ``call()`` stands down for the OpenAI client instrumentor or records itself, so
@@ -67,8 +81,9 @@ class TestFailsOpenWithoutSgpObs:
             return real_import(name, *args, **kwargs)
 
         monkeypatch.setattr(builtins, "__import__", no_sgp_obs)
-        # The "already warned" latch is module state; reset so the path is exercised.
-        monkeypatch.setattr(_genai_metrics, "_warned", False)
+        # Resolution is cached, so drop anything a previous call resolved -- otherwise
+        # hiding the module here would have no effect.
+        _genai_metrics._reset_for_tests()
 
     def test_returns_a_usable_recorder_not_none(self, monkeypatch):
         self._hide_sgp_obs(monkeypatch)
@@ -117,6 +132,89 @@ class TestFailsOpenWithoutSgpObs:
         monkeypatch.setitem(sys.modules, "sgp_obs", type(sys)("sgp_obs"))
         monkeypatch.setitem(sys.modules, "sgp_obs.metrics", module)
         assert inference_call({"model": "gpt-4o"}) is _genai_metrics._NULL_CALL
+
+
+class TestTheImportIsResolvedOnce:
+    """Python does not cache a FAILED import, so importing inside ``inference_call``
+    re-walked sys.path on every model call. Measured at 62us per attempt with five
+    sys.path entries, which was most of the gateway's per-call overhead for the
+    majority of agents -- the ones with no sgp-obs installed."""
+
+    def test_a_missing_sgp_obs_is_looked_up_once_not_per_call(self, monkeypatch):
+        attempts = []
+        real_import = builtins.__import__
+
+        def counting_import(name, *args, **kwargs):
+            if name == "sgp_obs" or name.startswith("sgp_obs."):
+                attempts.append(name)
+                raise ImportError("No module named 'sgp_obs'")
+            return real_import(name, *args, **kwargs)
+
+        for name in [m for m in sys.modules if m.startswith("sgp_obs")]:
+            monkeypatch.delitem(sys.modules, name, raising=False)
+        monkeypatch.setattr(builtins, "__import__", counting_import)
+
+        for _ in range(50):
+            assert inference_call({"model": "gpt-4o"}) is _genai_metrics._NULL_CALL
+
+        assert len(attempts) == 1, f"expected one import attempt, got {len(attempts)}"
+
+    def test_a_present_sgp_obs_is_looked_up_once_too(self, monkeypatch):
+        """The handle must cache the module as well as the failure, or an agent that
+        DOES have sgp-obs keeps paying for a lookup it already did."""
+        attempts = []
+
+        class _Genai:
+            CHAT = "chat"
+            OPENAI_SPEC = "openai"
+            OPENAI = "openai"
+
+            @staticmethod
+            def call(**_kwargs):
+                return _genai_metrics._NULL_CALL
+
+        module = type(sys)("sgp_obs.metrics")
+        module.genai = _Genai
+        monkeypatch.setitem(sys.modules, "sgp_obs", type(sys)("sgp_obs"))
+        monkeypatch.setitem(sys.modules, "sgp_obs.metrics", module)
+
+        real_import = builtins.__import__
+
+        def counting_import(name, *args, **kwargs):
+            if name == "sgp_obs" or name.startswith("sgp_obs."):
+                attempts.append(name)
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", counting_import)
+
+        for _ in range(50):
+            inference_call({"model": "gpt-4o"})
+
+        assert len(attempts) == 1, f"expected one import attempt, got {len(attempts)}"
+
+    def test_the_recorder_is_still_the_real_one_after_caching(self, monkeypatch):
+        """Caching must not turn a working sgp-obs into the null path on call two."""
+        seen = []
+
+        class _Genai:
+            CHAT = "chat"
+            OPENAI_SPEC = "openai"
+            OPENAI = "openai"
+
+            @staticmethod
+            def call(**kwargs):
+                seen.append(kwargs["model"])
+                return _genai_metrics._NULL_CALL
+
+        module = type(sys)("sgp_obs.metrics")
+        module.genai = _Genai
+        monkeypatch.setitem(sys.modules, "sgp_obs", type(sys)("sgp_obs"))
+        monkeypatch.setitem(sys.modules, "sgp_obs.metrics", module)
+
+        for index in range(3):
+            inference_call({"model": f"anthropic/claude-{index}"})
+
+        assert seen == ["anthropic/claude-0", "anthropic/claude-1", "anthropic/claude-2"]
 
 
 class TestResolveModel:
