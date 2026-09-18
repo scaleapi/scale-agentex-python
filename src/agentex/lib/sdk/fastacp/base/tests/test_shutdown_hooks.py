@@ -169,6 +169,48 @@ class TestTheTemporalWorkerIsWiredToo:
         assert "init_sgp_obs()" in source
         assert "shutdown_sgp_obs()" in source
         assert "shutdown_sync_tracing_processors()" in source
+        assert "shutdown_default_span_queue()" in source
+
+    def test_the_worker_drains_the_async_queue_too(self):
+        """The one a Temporal worker most needs. Standard activities trace through
+        AsyncTracer (core/temporal/activities/__init__.py), and AsyncTrace takes
+        get_default_span_queue() when no queue is passed — so a worker's business spans
+        sit in the ASYNC queue, which this finally originally did not drain at all.
+
+        Order matters as well as presence: the async queue is drained first, as the ACP
+        lifespan does, so the bounded drains that follow cannot eat its budget.
+        """
+        import inspect
+
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+
+        source = inspect.getsource(AgentexWorker.run)
+        async_at = source.index("shutdown_default_span_queue()")
+        sync_at = source.index("shutdown_sync_tracing_processors()")
+        obs_at = source.index("shutdown_sgp_obs()")
+        assert async_at < sync_at < obs_at, (
+            "the worker's finally must drain async queue -> sync processors -> sgp-obs, "
+            "matching the ACP lifespan"
+        )
+
+    def test_the_worker_matches_the_acp_lifespan(self):
+        """The two shutdown paths drifting apart is how the async queue came to be
+        missing here in the first place."""
+        import inspect
+
+        from agentex.lib.core.temporal.workers.worker import AgentexWorker
+        from agentex.lib.sdk.fastacp.base.base_acp_server import BaseACPServer
+
+        drains = (
+            "shutdown_default_span_queue()",
+            "shutdown_sync_tracing_processors()",
+            "shutdown_sgp_obs()",
+        )
+        worker = inspect.getsource(AgentexWorker.run)
+        lifespan = inspect.getsource(BaseACPServer.get_lifespan_function)
+        for drain in drains:
+            assert drain in worker, f"worker is missing {drain}"
+            assert drain in lifespan, f"ACP lifespan is missing {drain}"
 
     def test_the_worker_does_not_pass_an_app(self):
         """There is no ASGI application in the worker process. The health-check server

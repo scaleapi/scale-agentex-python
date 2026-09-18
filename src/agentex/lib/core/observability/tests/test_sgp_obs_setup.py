@@ -270,6 +270,172 @@ class TestFailOpen:
         assert len(calls) == 1
 
 
+class TestTheFlushIsBounded:
+    """``sgp_obs.shutdown()`` is a blocking network export whose own timeout may be
+    longer than whatever is left of the pod's grace period. Both callers (the ACP
+    lifespan and the worker's finally) await it, so an unbounded flush held the
+    process open until the export finished or the pod was killed."""
+
+    async def test_a_stalled_flush_returns_within_the_budget(self, monkeypatch):
+        import time as _time
+
+        _fake_sgp_obs(monkeypatch, shutdown=lambda: _time.sleep(30))
+        assert init_sgp_obs() == "wired:metrics"
+
+        started = _time.monotonic()
+        await shutdown_sgp_obs(budget_s=0.25)
+        elapsed = _time.monotonic() - started
+        assert elapsed < 5, f"waited {elapsed:.1f}s on a 0.25s budget"
+
+    async def test_the_overrun_is_reported(self, monkeypatch):
+        """Silence here would look exactly like a clean flush, while the telemetry
+        the flush existed to save is gone."""
+        import time as _time
+
+        _fake_sgp_obs(monkeypatch, shutdown=lambda: _time.sleep(30))
+        assert init_sgp_obs() == "wired:metrics"
+        with caplog_at(monkeypatch) as records:
+            await shutdown_sgp_obs(budget_s=0.05)
+        assert any("did not finish flushing" in r for r in records), records
+
+    async def test_a_prompt_flush_is_not_delayed_by_the_budget(self, monkeypatch):
+        """The deadline is a ceiling, not a wait."""
+        import time as _time
+
+        called = []
+        _fake_sgp_obs(monkeypatch, shutdown=lambda: called.append(True))
+        assert init_sgp_obs() == "wired:metrics"
+        started = _time.monotonic()
+        await shutdown_sgp_obs(budget_s=30)
+        assert _time.monotonic() - started < 5
+        assert called == [True]
+
+    async def test_it_does_not_block_the_event_loop(self, monkeypatch):
+        """The flush runs off the loop, so the lifespan can still make progress."""
+        import time as _time
+        import asyncio as _asyncio
+
+        _fake_sgp_obs(monkeypatch, shutdown=lambda: _time.sleep(1.0))
+        assert init_sgp_obs() == "wired:metrics"
+
+        ticks = 0
+
+        async def tick():
+            nonlocal ticks
+            while True:
+                await _asyncio.sleep(0.01)
+                ticks += 1
+
+        ticker = _asyncio.create_task(tick())
+        await shutdown_sgp_obs(budget_s=0.3)
+        ticker.cancel()
+        assert ticks > 3, f"loop only advanced {ticks} times; the flush blocked it"
+
+
+    def test_a_stalled_flush_does_not_delay_process_exit(self):
+        """The property the deadline actually promises, and the one it did NOT have.
+
+        ``asyncio.wait_for`` stops awaiting a thread; it cannot stop the thread. And
+        ``asyncio.run`` calls ``loop.shutdown_default_executor()``, which JOINS the
+        default executor — so the previous ``asyncio.to_thread(shutdown)`` returned at
+        the deadline but left the process blocked on the very export the deadline was
+        meant to escape. A daemon thread is abandoned at interpreter exit.
+
+        A subprocess, because this is about interpreter shutdown: it cannot be observed
+        from inside the test process.
+        """
+        import os
+        import sys
+        import time
+        import shutil
+        import tempfile
+        import textwrap
+        import subprocess
+        from pathlib import Path
+
+        # tests/observability/core/lib/agentex/src -> parents[5] is the src root.
+        src = Path(__file__).resolve().parents[5]
+        stub_dir = tempfile.mkdtemp()
+        try:
+            # A real importable sgp_obs, so the subprocess takes the wired path.
+            Path(stub_dir, "sgp_obs.py").write_text(
+                "import time\n"
+                "def init(**kwargs):\n"
+                "    return {'metrics': object()}\n"
+                "def shutdown():\n"
+                "    time.sleep(30)\n"
+            )
+            program = textwrap.dedent(
+                """
+                import asyncio
+                from agentex.lib.core.observability.sgp_obs_setup import (
+                    init_sgp_obs, shutdown_sgp_obs,
+                )
+
+                assert init_sgp_obs().startswith("wired"), "stub did not wire"
+                asyncio.run(shutdown_sgp_obs(budget_s=0.25))
+                """
+            )
+            started = time.monotonic()
+            proc = subprocess.run(
+                [sys.executable, "-c", program],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env={**os.environ, "PYTHONPATH": os.pathsep.join([stub_dir, str(src)])},
+            )
+            elapsed = time.monotonic() - started
+        finally:
+            shutil.rmtree(stub_dir, ignore_errors=True)
+
+        assert proc.returncode == 0, proc.stderr[-2000:]
+        assert elapsed < 10, (
+            f"process took {elapsed:.1f}s to exit with a 30s stalled flush and a "
+            "0.25s budget; the flush thread is blocking interpreter shutdown"
+        )
+
+
+class TestASecondAppIsNotSilentlyUninstrumented:
+    """``init()`` is process-wide and must not run twice, but the ASGI instrumentation
+    it installs is per-APP. A second application therefore gets none of it — and that
+    is the half nothing else would report."""
+
+    async def test_a_second_app_is_warned_about(self, monkeypatch):
+        _fake_sgp_obs(monkeypatch)
+        first, second = object(), object()
+        assert init_sgp_obs(app=first) == "wired:metrics"
+        with caplog_at(monkeypatch) as records:
+            assert init_sgp_obs(app=second) == "wired:metrics"
+        assert any("does not get the ASGI instrumentation" in r for r in records), records
+
+    async def test_the_worker_then_acp_ordering_is_named(self, monkeypatch):
+        """The realistic case: AgentexWorker.run() calls init_sgp_obs() with no app, so
+        an ACP server built later in the same process would lose http.server.*."""
+        _fake_sgp_obs(monkeypatch)
+        assert init_sgp_obs() == "wired:metrics"
+        with caplog_at(monkeypatch) as records:
+            init_sgp_obs(app=object())
+        assert any("without an application" in r for r in records), records
+
+    async def test_the_same_app_twice_is_quiet(self, monkeypatch):
+        """Re-entry with the same app is just the idempotence guard doing its job."""
+        _fake_sgp_obs(monkeypatch)
+        app = object()
+        assert init_sgp_obs(app=app) == "wired:metrics"
+        with caplog_at(monkeypatch) as records:
+            assert init_sgp_obs(app=app) == "wired:metrics"
+        assert records == []
+
+    async def test_nothing_is_warned_when_nothing_was_wired(self, monkeypatch):
+        """With sgp-obs absent there is no instrumentation for a second app to miss,
+        so this must not add noise to the overwhelmingly common case."""
+        _block_sgp_obs_import(monkeypatch)
+        assert init_sgp_obs() == "not_installed"
+        with caplog_at(monkeypatch) as records:
+            assert init_sgp_obs(app=object()) == "not_installed"
+        assert records == []
+
+
 class TestShutdown:
     async def test_flushes_when_wired(self, monkeypatch):
         """Without this the periodic exporter's buffer is dropped when the pod

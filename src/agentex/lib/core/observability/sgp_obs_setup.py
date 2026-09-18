@@ -48,6 +48,8 @@ starting or serving. Every path returns a status string instead of raising.
 from __future__ import annotations
 
 import os
+import asyncio
+import threading
 from typing import Any
 
 from agentex.lib.utils.logging import (
@@ -60,6 +62,12 @@ logger = make_logger(__name__)
 
 _status: str | None = None
 
+# Which app, if any, was handed to ``sgp_obs.init()``. ``init()`` is process-wide and is
+# not meant to run twice, but the ASGI instrumentation it installs is per-APP — so a
+# second application arriving later silently gets none of it. Remembered so that case can
+# at least be named; see the warning in :func:`init_sgp_obs`.
+_wired_app: Any = None
+
 # sgp-obs' own truthy set (sgp_obs.env._TRUTHY), so "is the master switch on?" is
 # answered the same way here as in the library deciding whether to wire.
 _TRUTHY = {"1", "true", "yes", "on"}
@@ -68,6 +76,12 @@ _TRUTHY = {"1", "true", "yes", "on"}
 # would have to know to pass it. It stamps agent_id (from AGENT_ID) and task_id (from
 # the SDK's streaming contextvar) onto every log record.
 _SOURCE = "agentex"
+
+# Wall-clock budget for the flush below. Deliberately the same 5s as
+# SYNC_TRACING_SHUTDOWN_BUDGET_S: the two run back to back out of one pod
+# terminationGracePeriodSeconds (30s by default), so together they take a third of it
+# at worst and leave the rest for the process to actually exit.
+SGP_OBS_SHUTDOWN_BUDGET_S = 5.0
 
 
 def _master_switch_on() -> bool:
@@ -85,10 +99,24 @@ def init_sgp_obs(app: Any = None) -> str:
     It is also what installs the trace-context ingress middleware, so an incoming
     ``traceparent`` continues into the agent's spans rather than starting a new trace.
     """
-    global _status
+    global _status, _wired_app
     if _status is not None:
         # init() is not meant to run twice, and a Temporal worker plus an ACP
         # server can both reach this in one process.
+        if _status.startswith("wired") and app is not None and app is not _wired_app:
+            # Everything init() set up process-wide (providers, exporters, the egress
+            # instrumentation) still applies to this app. What does NOT is the per-app
+            # ASGI layer, and that is the half nothing else would report.
+            logger.warning(
+                "sgp-obs was already initialized %s, so this application does not get "
+                "the ASGI instrumentation: no http.server.* for its own entry point, "
+                "and an incoming traceparent starts a new trace instead of continuing "
+                "one. Everything process-wide (model, egress, logs) is unaffected. "
+                "init() cannot safely run twice, so construct whichever application "
+                "serves agent traffic before anything else calls init_sgp_obs() — note "
+                "AgentexWorker.run() initializes without an app.",
+                "without an application" if _wired_app is None else "for a different application",
+            )
         return _status
 
     try:
@@ -151,6 +179,7 @@ def init_sgp_obs(app: Any = None) -> str:
         _install_openai_agents_bridge()
         _warn_if_correlation_backend_mismatched()
 
+    _wired_app = app
     _status = "wired:" + ",".join(sorted(handles))
     logger.info("sgp-obs wired (%s)", _status)
     return _status
@@ -315,23 +344,31 @@ def _warn_if_correlation_backend_mismatched() -> None:
         logger.debug("could not check SGP_OBS_MODE", exc_info=True)
 
 
-async def shutdown_sgp_obs() -> None:
-    """Flush the providers ``init()`` built. Never raises.
+async def shutdown_sgp_obs(budget_s: float = SGP_OBS_SHUTDOWN_BUDGET_S) -> None:
+    """Flush the providers ``init()`` built, within a deadline. Never raises.
 
     Without this, whatever is sitting in a periodic exporter's buffer when the pod
     stops is dropped — which for a short-lived or scaled-to-zero agent can be most
     of what it recorded. sgp-obs only flushes providers it OWNS; one adopted from
     the runtime is left to its owner, so this is safe under operator injection.
 
-    Run in a thread: the flush blocks up to the SDK export timeout per owned signal,
-    and this is called from an async lifespan.
+    Bounded, on a DAEMON thread, for the reason spelled out at length in
+    ``tracing_processor_manager.shutdown_sync_tracing_processors``: the flush is a
+    blocking network export whose own timeout may exceed whatever is left of the pod's
+    grace period, ``asyncio.wait_for`` can stop *awaiting* a thread but cannot stop the
+    thread, and ``asyncio.run`` joins the default executor on the way out — so an
+    ``asyncio.to_thread`` flush that timed out would still hold the process open until
+    the export finished or the pod was killed. A daemon thread is abandoned at
+    interpreter exit, which is what the budget promises.
+
+    This is the LAST drain in both the ACP lifespan and the worker, so an overrun here
+    delays nothing else — but it can still burn the grace period the runtime needs to
+    exit cleanly, which is what the deadline is for.
     """
     if _status is None or not _status.startswith("wired"):
         return
 
     try:
-        import asyncio
-
         import sgp_obs  # type: ignore[import-not-found]
 
         # Added in sgp-obs 0.16.0. Feature-detected rather than version-pinned,
@@ -340,14 +377,43 @@ async def shutdown_sgp_obs() -> None:
         if shutdown is None:
             logger.debug("sgp-obs has no shutdown(); needs 0.16.0+ to flush on exit")
             return
-        await asyncio.to_thread(shutdown)
+
+        loop = asyncio.get_running_loop()
+        finished = asyncio.Event()
+
+        def _flush() -> None:
+            try:
+                shutdown()
+            except Exception:
+                logger.debug("sgp-obs shutdown raised", exc_info=True)
+            finally:
+                # The loop may already be closed if we timed out and shutdown raced
+                # ahead; abandoning the notification is fine, nobody is waiting on it.
+                try:
+                    loop.call_soon_threadsafe(finished.set)
+                except RuntimeError:  # pragma: no cover - loop already closed
+                    pass
+
+        threading.Thread(
+            target=_flush, daemon=True, name="agentex-sgp-obs-flush"
+        ).start()
+
+        try:
+            await asyncio.wait_for(finished.wait(), budget_s)
+        except (TimeoutError, asyncio.TimeoutError):
+            logger.warning(
+                "sgp-obs did not finish flushing within %.1fs; whatever it still held "
+                "is lost, but shutdown continues",
+                budget_s,
+            )
     except Exception:  # pragma: no cover - a failed flush must not fail shutdown
         logger.debug("sgp-obs shutdown failed", exc_info=True)
 
 
 def _reset_for_tests() -> None:
-    global _status
+    global _status, _wired_app
     _status = None
+    _wired_app = None
     # The logging hand-over is a process-wide latch too, and a test that wired the
     # logs signal would otherwise leave make_logger attaching nothing for the rest
     # of the session.

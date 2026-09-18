@@ -31,6 +31,7 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.registration import register_agent
 from agentex.lib.core.tracing.temporal import temporal_tracing_interceptors
 from agentex.lib.environment_variables import EnvironmentVariables
+from agentex.lib.core.tracing.span_queue import shutdown_default_span_queue
 from agentex.lib.core.compat.version_guard import assert_backend_compatible
 from agentex.lib.core.observability.sgp_obs_setup import init_sgp_obs, shutdown_sgp_obs
 from agentex.lib.core.tracing.tracing_processor_manager import shutdown_sync_tracing_processors
@@ -284,9 +285,16 @@ class AgentexWorker:
         try:
             await worker.run()
         finally:
-            # Same drains as the ACP lifespan, for the same reason: whatever is still
-            # queued when the pod stops is otherwise dropped. Both are bounded and
-            # fail-open, so neither can stop the worker exiting.
+            # The same three drains as the ACP lifespan, in the same order and for the
+            # same reason: whatever is still queued when the pod stops is otherwise
+            # dropped. All three are bounded and fail-open, so none can stop the worker
+            # exiting.
+            #
+            # The async queue matters here specifically: standard Temporal activities
+            # trace through AsyncTracer (core/temporal/activities/__init__.py), and
+            # AsyncTrace takes get_default_span_queue() when no queue is passed, so a
+            # worker's business spans sit in exactly this queue.
+            await shutdown_default_span_queue()
             await shutdown_sync_tracing_processors()
             await shutdown_sgp_obs()
 
