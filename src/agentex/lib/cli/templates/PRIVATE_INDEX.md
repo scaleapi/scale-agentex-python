@@ -22,8 +22,20 @@ Add the index to the agent's `pyproject.toml`:
 [[tool.uv.index]]
 name = "scale-pypi"
 url = "<the scale-customer-pypi URL>"
-default = true
 ```
+
+**No `default = true`, deliberately.** An earlier revision of this snippet had it, which was
+misleading in both directions. It would not survive the build — the Dockerfiles export
+`UV_INDEX`, which binds the mirror as a *named* index ahead of public PyPI rather than
+replacing it as the default, and a name rebound that way does not carry the project entry's
+default flag. And it is not the behaviour we want anyway: the mirror exists to supply the
+Scale-internal packages that are not on public PyPI, not to become the sole source for every
+dependency.
+
+So resolution is **mirror first, public PyPI as fallback**. `sgp-obs` can only come from the
+mirror, because it exists nowhere else. An ordinary dependency the mirror happens not to carry
+still resolves from PyPI instead of failing the build, which is what keeps a scaffolded agent
+building when the mirror is incomplete or unreachable.
 
 The name must be exactly `scale-pypi`. uv applies `UV_INDEX_SCALE_PYPI_USERNAME` /
 `UV_INDEX_SCALE_PYPI_PASSWORD` to the index of that name, so renaming it makes the credentials
