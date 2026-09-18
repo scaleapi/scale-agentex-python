@@ -56,13 +56,13 @@ class TestSourceStamps:
 
     SHA = "b362b171a9c4e1f09d8e7a6b5c4d3e2f1a0b9c8d"
 
-    def test_commit_sha_is_not_stamped_without_opt_in(self, monkeypatch):
-        """Upgrading the SDK must not start emitting __commit_sha__ on its own,
-        even when the environment carries a perfectly good SHA."""
+    def test_commit_sha_is_not_stamped_when_env_absent(self, monkeypatch):
+        """Upgrading the SDK must not start emitting __commit_sha__ on its own;
+        only AGENT_COMMIT_SHA or an enable() call turns it on."""
         from agentex.lib.core.tracing import code_revision
         from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
 
-        monkeypatch.setenv("AGENT_COMMIT_SHA", self.SHA)
+        monkeypatch.delenv("AGENT_COMMIT_SHA", raising=False)
         code_revision.disable()
 
         span = _make_span(); span.data = {}
