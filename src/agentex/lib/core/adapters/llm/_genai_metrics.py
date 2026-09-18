@@ -40,6 +40,39 @@ _PROXY_PREFIX = "litellm_proxy/"
 # A bare model name with no "<vendor>/" prefix is OpenAI, per litellm's own default.
 _DEFAULT_VENDOR = "openai"
 
+# Providers litellm dispatches through the `openai` Python client, and which the OpenAI
+# client instrumentor therefore already records, but which litellm does NOT carry in
+# `openai_compatible_providers`. Azure is the one that matters: it is served by
+# openai.AzureOpenAI (litellm/main.py, `if custom_llm_provider == "azure"`), so reading
+# the prefix alone and calling it a native vendor double-counted every Azure call.
+_EXTRA_OPENAI_CLIENT_PROVIDERS = frozenset(
+    {"openai", "azure", "azure_text", "text-completion-openai", "custom_openai"}
+)
+
+_OPENAI_CLIENT_PROVIDERS_UNRESOLVED = object()
+_openai_client_providers: Any = _OPENAI_CLIENT_PROVIDERS_UNRESOLVED
+
+
+def _over_openai_client(provider: str) -> bool:
+    """Would the OpenAI client instrumentor already have recorded this call?
+
+    Answered from litellm's own ``openai_compatible_providers`` rather than a list of
+    our own, because that list is what litellm actually routes on and it grows every
+    release (54 entries as of 1.87.0: groq, deepseek, xai, fireworks_ai, ...).
+    """
+    global _openai_client_providers
+    if _openai_client_providers is _OPENAI_CLIENT_PROVIDERS_UNRESOLVED:
+        try:
+            import litellm
+
+            _openai_client_providers = (
+                frozenset(litellm.openai_compatible_providers)
+                | _EXTRA_OPENAI_CLIENT_PROVIDERS
+            )
+        except Exception:  # pragma: no cover - litellm is a hard dependency
+            _openai_client_providers = _EXTRA_OPENAI_CLIENT_PROVIDERS
+    return provider in _openai_client_providers
+
 # sgp-obs is an optional install (see ``sgp_obs_setup``), and Python does NOT cache a
 # FAILED import, so importing inside ``inference_call`` re-walked sys.path on every
 # single model call for the majority of agents that do not have it. Measured on
@@ -76,20 +109,93 @@ def _genai() -> Any | None:
 
 
 def _split_model(model: str) -> tuple[str, bool]:
-    """``(vendor, goes_out_over_the_openai_client)`` for a litellm model string.
+    """``(provider, goes_out_over_the_openai_client)`` for a litellm model string.
 
     ``"litellm_proxy/anthropic/claude-sonnet-4"`` -> ``("anthropic", True)``
     ``"anthropic/claude-sonnet-4"``              -> ``("anthropic", False)``
+    ``"claude-sonnet-4-20250514"``               -> ``("anthropic", False)``
+    ``"azure/gpt-4o"``                           -> ``("azure", True)``
     ``"gpt-4o"``                                 -> ``("openai", True)``
 
-    A bare name is OpenAI, and litellm reaches OpenAI through the ``openai``
-    client, so the client instrumentor already sees it and we stand down.
+    The provider comes from ``litellm.get_llm_provider`` — the same resolution litellm
+    uses to route the call — rather than from reading the prefix. Reading the prefix got
+    two whole classes of call wrong, in opposite directions:
+
+    * **Prefixed but still over the OpenAI client.** ``azure/gpt-4o`` looks like a
+      native vendor, but litellm serves it with ``openai.AzureOpenAI``, so the client
+      instrumentor recorded it too and this recorded it a second time. The same held
+      for every openai-compatible provider litellm supports — groq, deepseek, xai,
+      fireworks_ai and ~50 others — all of which look "native" to a prefix reader.
+    * **Unprefixed but NOT OpenAI.** ``claude-sonnet-4-20250514`` is a legal litellm
+      model string that routes to Anthropic, but a bare name was assumed to be OpenAI,
+      so this stood down for an instrumentor that never saw the call. Nothing recorded
+      it and nothing said so.
+
+    The proxy prefix is stripped before resolving, deliberately: ``litellm_proxy/`` is a
+    routing instruction, so the vendor underneath it is the interesting label — and the
+    one thing the OpenAI client instrumentor cannot report, since from inside that
+    client the call is simply "openai".
     """
     proxied = model.startswith(_PROXY_PREFIX)
     rest = model[len(_PROXY_PREFIX):] if proxied else model
-    vendor = rest.split("/", 1)[0] if "/" in rest else _DEFAULT_VENDOR
-    # Proxy mode always leaves over the OpenAI client. So does a native openai/* call.
-    return (vendor or _DEFAULT_VENDOR), proxied or vendor == _DEFAULT_VENDOR
+
+    provider = _resolve_provider(rest)
+    if provider is None:
+        # litellm could not resolve it, which means it would not route the call either.
+        # Fall back to the prefix so an exotic string still gets a sensible label.
+        provider = rest.split("/", 1)[0] if "/" in rest else _DEFAULT_VENDOR
+        provider = provider or _DEFAULT_VENDOR
+
+    # Proxy mode always leaves over the OpenAI client, whatever the vendor underneath.
+    return provider, proxied or _over_openai_client(provider)
+
+
+# Resolved providers, keyed by model string. A plain dict rather than lru_cache:
+# `functools.lru_cache` is banned in this repo (TID251) and the sanctioned replacement
+# lives in `agentex._utils`, which is the generated client half that `agentex/lib` does
+# not otherwise import from. This module already keeps two other resolve-once caches,
+# so a third is the least surprising option.
+#
+# Bounded because the key is a model string, and a fine-tune id or a caller building
+# names dynamically would otherwise grow it without limit. An agent talks to a handful
+# of models, so the cap is never reached in practice; clearing wholesale when it is
+# keeps the bookkeeping to nothing.
+_PROVIDER_CACHE_MAX = 256
+_provider_cache: dict[str, str | None] = {}
+
+
+def _resolve_provider(model: str) -> str | None:
+    """litellm's own provider for ``model``, or None when it cannot resolve one.
+
+    ``get_llm_provider`` raises ``BadRequestError`` for a model it does not know
+    (measured: ``claude-3-5-sonnet-latest`` raises, ``claude-sonnet-4-20250514`` does
+    not), and a telemetry lookup must never be the reason a model call fails.
+
+    Cached for two reasons beyond speed. litellm prints a red "Provider List: ..."
+    banner to STDOUT when resolution fails — not through logging, so it cannot be
+    filtered — and uncached, an agent on a model string litellm cannot place would
+    print it on every single call. Redirecting stdout around the lookup was the
+    alternative and is worse: it swaps a process-global for the duration, so under
+    concurrency it would swallow output belonging to other coroutines.
+    """
+    if not model:
+        return None
+    if model in _provider_cache:
+        return _provider_cache[model]
+
+    provider: str | None = None
+    try:
+        from litellm import get_llm_provider
+
+        _model, resolved, _key, _base = get_llm_provider(model=model)
+        provider = resolved or None
+    except Exception:
+        provider = None
+
+    if len(_provider_cache) >= _PROVIDER_CACHE_MAX:
+        _provider_cache.clear()
+    _provider_cache[model] = provider
+    return provider
 
 
 def resolve_model(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
@@ -165,5 +271,7 @@ def _reset_for_tests() -> None:
     sgp-obs absent would cache None for the rest of the session and every later test
     that injects a fake ``sgp_obs.metrics`` would silently exercise the null path.
     """
-    global _genai_module
+    global _genai_module, _openai_client_providers
     _genai_module = _GENAI_UNRESOLVED
+    _openai_client_providers = _OPENAI_CLIENT_PROVIDERS_UNRESOLVED
+    _provider_cache.clear()
