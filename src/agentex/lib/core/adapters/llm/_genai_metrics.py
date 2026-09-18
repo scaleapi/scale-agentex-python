@@ -62,14 +62,32 @@ def _over_openai_client(provider: str) -> bool:
     """
     global _openai_client_providers
     if _openai_client_providers is _OPENAI_CLIENT_PROVIDERS_UNRESOLVED:
+        compatible: Any = None
         try:
             import litellm
 
-            _openai_client_providers = (
-                frozenset(litellm.openai_compatible_providers)
-                | _EXTRA_OPENAI_CLIENT_PROVIDERS
-            )
+            # Read via getattr: the attribute is not in litellm's __all__, so it is
+            # not a promised export and a future release may rename or drop it.
+            compatible = getattr(litellm, "openai_compatible_providers", None)
         except Exception:  # pragma: no cover - litellm is a hard dependency
+            compatible = None
+
+        if compatible:
+            _openai_client_providers = (
+                frozenset(compatible) | _EXTRA_OPENAI_CLIENT_PROVIDERS
+            )
+        else:
+            # Degrading quietly here would re-introduce the double counting this
+            # function exists to prevent: every openai-compatible provider would look
+            # native again and be recorded twice. Say so rather than drift.
+            logger.warning(
+                "litellm no longer exposes openai_compatible_providers, so GenAI "
+                "metrics can only recognise %d providers as reaching the model over "
+                "the OpenAI client. Calls to openai-compatible providers such as "
+                "groq or deepseek may now be counted twice, once here and once by "
+                "the OpenAI client instrumentor.",
+                len(_EXTRA_OPENAI_CLIENT_PROVIDERS),
+            )
             _openai_client_providers = _EXTRA_OPENAI_CLIENT_PROVIDERS
     return provider in _openai_client_providers
 

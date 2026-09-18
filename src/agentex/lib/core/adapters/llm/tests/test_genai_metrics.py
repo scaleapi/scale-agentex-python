@@ -123,10 +123,27 @@ class TestTheRoutingDecisionComesFromLitellm:
 
         from agentex.lib.core.adapters.llm._genai_metrics import _over_openai_client
 
-        for provider in list(litellm.openai_compatible_providers)[:20]:
+        for provider in list(getattr(litellm, "openai_compatible_providers", []))[:20]:
             assert _over_openai_client(provider), provider
         for provider in ("anthropic", "bedrock", "vertex_ai", "gemini"):
             assert not _over_openai_client(provider), provider
+
+    def test_losing_litellms_list_is_not_silent(self, monkeypatch, caplog):
+        """`openai_compatible_providers` is not in litellm's __all__, so it is read
+        defensively. But degrading quietly would re-introduce the double counting this
+        whole function exists to prevent, so the fallback has to be audible."""
+        import litellm
+
+        monkeypatch.delattr(litellm, "openai_compatible_providers", raising=False)
+        _genai_metrics._reset_for_tests()
+
+        with caplog.at_level("WARNING", logger=_genai_metrics.logger.name):
+            # The five explicit ones still work; the ~50 from litellm no longer do.
+            assert _genai_metrics._over_openai_client("azure") is True
+            assert _genai_metrics._over_openai_client("groq") is False
+        assert any("openai_compatible_providers" in r.message for r in caplog.records), [
+            r.message for r in caplog.records
+        ]
 
     def test_an_unresolvable_model_does_not_spam_stdout(self):
         """litellm prints a red "Provider List" banner to STDOUT (not logging, so it
