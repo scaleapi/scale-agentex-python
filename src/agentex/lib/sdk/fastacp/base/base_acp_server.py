@@ -39,6 +39,8 @@ from agentex.lib.sdk.fastacp.base.constants import (
     FASTACP_HEADER_SKIP_EXACT,
     FASTACP_HEADER_SKIP_PREFIXES,
 )
+from agentex.lib.core.observability.sgp_obs_setup import init_sgp_obs, shutdown_sgp_obs
+from agentex.lib.core.tracing.tracing_processor_manager import shutdown_sync_tracing_processors
 
 logger = make_logger(__name__)
 
@@ -84,6 +86,71 @@ def _attach_incoming_otel_context(scope_headers: list[tuple[bytes, bytes]]) -> o
         return None
 
 
+# sgp-obs is an optional install (see ``sgp_obs_setup``), and Python does not cache a
+# FAILED import, so attempting one per request would re-walk sys.path for the majority
+# of agents that do not have it. Resolved once, to the module or to None.
+_OBS_CONTEXT_UNRESOLVED = object()
+_obs_context_module: Any = _OBS_CONTEXT_UNRESOLVED
+
+
+def _sgp_obs_context() -> Any | None:
+    global _obs_context_module
+    if _obs_context_module is _OBS_CONTEXT_UNRESOLVED:
+        try:
+            from sgp_obs import context as obs_context  # type: ignore[import-not-found]
+
+            _obs_context_module = obs_context
+        except Exception:  # pragma: no cover - the normal case: sgp-obs is not installed
+            _obs_context_module = None
+    return _obs_context_module
+
+
+def _bind_request_id_for_telemetry(request_id: str) -> object | None:
+    """Put the request id where a logs pipeline reads it from.
+
+    Until the logging hand-over, ``request_id`` reached the logs through exactly one
+    writer: ``CustomJSONFormatter``, on the handler ``make_logger`` attaches to each
+    module's own logger. That handler is taken off once a pipeline owns the root logger,
+    because it was printing a second, ungoverned copy of every record -- and it was the
+    field's only writer, so without this the request id would not move to the governed
+    copy, it would disappear. Measured on dbt-assistant: ``request_id`` appeared on 5.2%
+    of log lines, which were exactly the ungoverned copies.
+
+    sgp-obs reads the id from its shared correlation context -- the one place all three
+    signals take correlation ids from -- and stamps it onto each record in a stage that
+    runs on a COPY of the record at handler time. That is why the id is handed over
+    rather than written onto the record here: ``extra={"request_id": ...}`` from a
+    caller and an attribute set before the call would collide, and the stdlib raises
+    ``KeyError`` for that collision at the ``logger.info()`` call site.
+
+    sgp-obs can also fill this context from its own ``RequestIdMiddleware``. Binding the
+    SDK's id here instead keeps ONE generator for the value, so the id in the logs is
+    the same one ``ctx_var_request_id`` gives application code and the same one
+    ``x-request-id`` carried in.
+
+    Returns a reset token (or None); fail-open.
+    """
+    obs_context = _sgp_obs_context()
+    if obs_context is None:
+        return None
+    try:
+        return obs_context.bind(request_id=request_id)
+    except Exception:  # pragma: no cover - obs must never break a request
+        return None
+
+
+def _unbind_request_id_for_telemetry(token: object | None) -> None:
+    if token is None:
+        return
+    obs_context = _sgp_obs_context()
+    if obs_context is None:
+        return
+    try:
+        obs_context.reset(token)
+    except Exception:  # pragma: no cover - best-effort
+        pass
+
+
 def _detach_otel_context(token: object | None) -> None:
     if token is None:
         return
@@ -103,12 +170,16 @@ class RequestIDMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         otel_token: object | None = None
+        obs_request_token: object | None = None
         if scope["type"] == "http":
             scope_headers = scope.get("headers", [])
             headers = dict(scope_headers)
             raw_request_id = headers.get(b"x-request-id", b"")
             request_id = raw_request_id.decode() if raw_request_id else uuid.uuid4().hex
             ctx_var_request_id.set(request_id)
+            # Keep the id in the logs once the leaf handler that used to write it is
+            # gone; see _bind_request_id_for_telemetry.
+            obs_request_token = _bind_request_id_for_telemetry(request_id)
             # Continue the ingress trace for this request (and its background
             # Temporal dispatch); see _attach_incoming_otel_context.
             otel_token = _attach_incoming_otel_context(scope_headers)
@@ -116,6 +187,7 @@ class RequestIDMiddleware:
             await self.app(scope, receive, send)
         finally:
             _detach_otel_context(otel_token)
+            _unbind_request_id_for_telemetry(obs_request_token)
 
 
 class BaseACPServer(FastAPI):
@@ -139,6 +211,20 @@ class BaseACPServer(FastAPI):
         # Method handlers
         # this just adds a request ID to the request and response headers
         self.add_middleware(RequestIDMiddleware)
+
+        # Optional observability (traces, metrics, logs), off unless sgp-obs is
+        # installed AND the SGP_OBS_* environment switches ask for it — see
+        # observability/sgp_obs_setup.py for the two gates. sgp-obs is deliberately
+        # not a dependency of this package; the agent declares it. Returns a status
+        # instead of raising: a telemetry problem must never stop an agent starting.
+        #
+        # Here rather than in the lifespan, deliberately: sgp-obs installs ASGI
+        # instrumentation via add_middleware, and Starlette raises "Cannot add middleware
+        # after an application has started" once the lifespan is running. Wiring it there
+        # loses http.server.* for the agent's own entry point — and loses it QUIETLY,
+        # because sgp-obs fails open.
+        init_sgp_obs(app=self)
+
         self._handlers: dict[RPCMethod, Callable] = {}
 
         # Agent info to return in healthz
@@ -176,8 +262,19 @@ class BaseACPServer(FastAPI):
                 yield
             finally:
                 await shutdown_default_span_queue()
+                # The queue above is the ASYNC path only. Sync tracing processors
+                # hold their own queue and nothing ever drained it, so a sync ACP
+                # agent lost whatever business spans were still queued when the pod
+                # stopped — including the ones the obs correlation points at.
+                await shutdown_sync_tracing_processors()
+                # Flush whatever sgp-obs still holds. A periodic exporter's buffer
+                # is otherwise dropped when the pod stops, which for a short-lived
+                # or scaled-to-zero agent can be most of what it recorded. No-op
+                # when sgp-obs is absent or was never wired.
+                await shutdown_sgp_obs()
 
         return lifespan_context
+
 
     async def _healthz(self):
         """Health check endpoint"""
