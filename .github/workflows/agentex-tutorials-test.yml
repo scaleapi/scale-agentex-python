@@ -9,6 +9,10 @@ on:
 
 jobs:
   find-tutorials:
+    # Repo guard: this workflow is specific to the production repo. Staging carries the
+    # same file (the trunks are kept SHA-identical) but has none of its secrets, so
+    # without this it runs and fails red on every codegen push.
+    if: github.repository == 'scaleapi/scale-agentex-python'
     runs-on: ubuntu-latest
     outputs:
       tutorials: ${{ steps.get-tutorials.outputs.tutorials }}
@@ -235,7 +239,7 @@ jobs:
           retention-days: 1
 
   test-summary:
-    if: always()
+    if: always() && github.repository == 'scaleapi/scale-agentex-python'
     needs: [find-tutorials, test-tutorial]
     runs-on: ubuntu-latest
     name: Test Summary

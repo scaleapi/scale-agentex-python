@@ -25,6 +25,10 @@ permissions:
 
 jobs:
   check-permissions:
+    # Repo guard: this workflow is specific to the production repo. Staging carries the
+    # same file (the trunks are kept SHA-identical) but has none of its secrets, so
+    # without this it runs and fails red on every codegen push.
+    if: github.repository == 'scaleapi/scale-agentex-python'
     runs-on: ubuntu-latest
     steps:
       - name: Check event type and permissions
