@@ -42,6 +42,38 @@ The name must be exactly `scale-pypi`. uv applies `UV_INDEX_SCALE_PYPI_USERNAME`
 silently stop applying. Setting `UV_INDEX_URL` instead does not authenticate a *named* index at
 all, and the resolve fails with a 401.
 
+## The secret is scoped to the dependency step only
+
+`Dockerfile-uv.j2` installs in two steps, and only the first one mounts the broker secret:
+
+| Step | What it does | Secret |
+| --- | --- | --- |
+| `uv sync --no-install-project` | resolves and installs dependencies, private ones included | mounted |
+| `uv sync` (after `COPY project`) | builds and installs the agent's own project | **not mounted** |
+
+The second step runs the agent's own PEP 517 build backend, and that is project-controlled
+code — an in-tree `backend-path` module, or whatever `[build-system] requires` names. With the
+secret mounted there it can read `/run/secrets/codeartifact-pip-conf` and the decoded
+`UV_INDEX_SCALE_PYPI_PASSWORD`, and the build has network, so the CodeArtifact token can go
+anywhere. That is the same threat this file already describes below — a contributed change to a
+*project* file, far less conspicuous in review than a `curl` in the Dockerfile — and it needs
+only files the templates already copy: `pyproject.toml` and something under `project/`.
+
+Reproduced against the previous layout, then re-run against this one:
+
+| | secret on both steps | secret on step 1 only |
+| --- | --- | --- |
+| build succeeds | yes | yes |
+| package from the private index installs | yes | **yes** |
+| build backend reads the secret file | **yes** | `<absent>` |
+| build backend reads the decoded token | **yes** | `<unset>` |
+
+Nothing is lost by dropping it: dependencies are already installed by the first step, so the
+second has nothing left to fetch from the mirror.
+
+`Dockerfile.j2` (the `requirements.txt` variant) never had this problem — it installs and only
+then copies the project, so no project-controlled code runs while the secret is mounted.
+
 ## Three things that are easy to get wrong
 
 **The token arrives percent-encoded.** The buildspec URL-encodes it to embed it in the pip config's

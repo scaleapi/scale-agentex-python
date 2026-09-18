@@ -55,15 +55,17 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Copy the project code
 COPY {{ project_path_from_build_root }}/project ./project
 
-# Install the project
+# Install the project.
+#
+# No broker secret on this step, deliberately. Unlike the step above, this one runs the
+# agent's OWN build backend — and a PEP 517 backend is project-controlled code (an
+# in-tree `backend-path` module, or whatever `[build-system] requires` names). With the
+# secret mounted here it could read /run/secrets/codeartifact-pip-conf and the decoded
+# UV_INDEX_SCALE_PYPI_PASSWORD and send the CodeArtifact token anywhere; the build has
+# network. Reproduced before this change. Dependencies — including the private ones —
+# are already installed by the step above, so nothing is lost by dropping it here.
+# See PRIVATE_INDEX.md.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=secret,id=codeartifact-pip-conf,required=false \
-    if [ -s /run/secrets/codeartifact-pip-conf ]; then \
-      export UV_INDEX="scale-pypi=$(sed -n 's#.*index-url = https://aws:[^@]*@\(.*\)#https://\1#p' /run/secrets/codeartifact-pip-conf | head -1)"; \
-      export UV_INDEX_SCALE_PYPI_USERNAME=aws; \
-      export UV_INDEX_SCALE_PYPI_PASSWORD="$(sed -n 's#.*index-url = https://aws:\([^@]*\)@.*#\1#p' /run/secrets/codeartifact-pip-conf \
-        | python3 -c 'import sys,urllib.parse;print(urllib.parse.unquote(sys.stdin.read().strip()))')"; \
-    fi; \
     uv sync --no-dev
 
 ENV PATH="/app/{{ project_path_from_build_root }}/.venv/bin:$PATH"
