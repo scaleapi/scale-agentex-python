@@ -53,51 +53,46 @@ _OPENAI_CLIENT_PROVIDERS_UNRESOLVED = object()
 _openai_client_providers: Any = _OPENAI_CLIENT_PROVIDERS_UNRESOLVED
 
 
-def _over_openai_client(provider: str) -> bool:
-    """Would the OpenAI client instrumentor already have recorded this call?
+def _openai_client_provider_set() -> frozenset[str] | None:
+    """Providers litellm dispatches over the ``openai`` client, or None if unknowable.
 
-    Answered from litellm's own ``openai_compatible_providers`` rather than a list of
-    our own, because that list is what litellm actually routes on and it grows every
-    release (54 entries as of 1.87.0: groq, deepseek, xai, fireworks_ai, ...).
+    Imported from ``litellm.constants``, which is where the list is defined, rather
+    than from the ``litellm`` top level, which is an incidental re-export: litellm
+    declares no ``__all__``, so a type checker treats the top-level name as private
+    and it carries no stability promise even informally.
     """
     global _openai_client_providers
     if _openai_client_providers is _OPENAI_CLIENT_PROVIDERS_UNRESOLVED:
-        compatible: Any = None
         try:
-            import litellm
+            from litellm.constants import openai_compatible_providers
 
-            # Read via getattr: the attribute is not in litellm's __all__, so it is
-            # not a promised export and a future release may rename or drop it.
-            compatible = getattr(litellm, "openai_compatible_providers", None)
-        except Exception:  # pragma: no cover - litellm is a hard dependency
-            compatible = None
-
-        if compatible:
             _openai_client_providers = (
-                frozenset(compatible) | _EXTRA_OPENAI_CLIENT_PROVIDERS
+                frozenset(openai_compatible_providers) | _EXTRA_OPENAI_CLIENT_PROVIDERS
             )
-        else:
-            # Degrading quietly here would re-introduce the double counting this
-            # function exists to prevent: every openai-compatible provider would look
-            # native again and be recorded twice. Say so rather than drift.
+        except Exception:  # pragma: no cover - litellm is a hard dependency
             logger.warning(
-                "litellm no longer exposes openai_compatible_providers, so GenAI "
-                "metrics can only recognise %d providers as reaching the model over "
-                "the OpenAI client. Calls to openai-compatible providers such as "
-                "groq or deepseek may now be counted twice, once here and once by "
-                "the OpenAI client instrumentor.",
-                len(_EXTRA_OPENAI_CLIENT_PROVIDERS),
+                "litellm.constants.openai_compatible_providers is unavailable, so "
+                "GenAI metrics cannot tell which calls the OpenAI client instrumentor "
+                "already records. Recording anyway would double-count every "
+                "openai-compatible provider, so litellm gateway metrics are off for "
+                "this process."
             )
-            _openai_client_providers = _EXTRA_OPENAI_CLIENT_PROVIDERS
-    return provider in _openai_client_providers
+            _openai_client_providers = None
+    return _openai_client_providers
 
-# sgp-obs is an optional install (see ``sgp_obs_setup``), and Python does NOT cache a
-# FAILED import, so importing inside ``inference_call`` re-walked sys.path on every
-# single model call for the majority of agents that do not have it. Measured on
-# 0.27.0b2 in a venv with five sys.path entries (a container image has more): 62us per
-# attempt, which took the gateway's own per-call overhead from 12us to 84us. Resolved
-# once, to the module or to None -- the shape ``base_acp_server`` already uses for
-# ``sgp_obs.context``, for the same reason.
+
+def _over_openai_client(provider: str) -> bool | None:
+    """Would the OpenAI client instrumentor already have recorded this call?
+
+    None means "cannot tell", which is NOT the same as False and must not collapse
+    into it: treating an unknown provider as native is what double-counts it.
+    """
+    known = _openai_client_provider_set()
+    if known is None:
+        return None
+    return provider in known
+
+
 _GENAI_UNRESOLVED = object()
 _genai_module: Any = _GENAI_UNRESOLVED
 
@@ -126,7 +121,7 @@ def _genai() -> Any | None:
     return _genai_module
 
 
-def _split_model(model: str) -> tuple[str, bool]:
+def _split_model(model: str) -> tuple[str, bool | None]:
     """``(provider, goes_out_over_the_openai_client)`` for a litellm model string.
 
     ``"litellm_proxy/anthropic/claude-sonnet-4"`` -> ``("anthropic", True)``
@@ -153,6 +148,10 @@ def _split_model(model: str) -> tuple[str, bool]:
     routing instruction, so the vendor underneath it is the interesting label — and the
     one thing the OpenAI client instrumentor cannot report, since from inside that
     client the call is simply "openai".
+
+    A second element of None means the routing table itself could not be read, so
+    whether this call is already recorded elsewhere is unknown. Callers must stand down
+    rather than guess; see :func:`inference_call`.
     """
     proxied = model.startswith(_PROXY_PREFIX)
     rest = model[len(_PROXY_PREFIX):] if proxied else model
@@ -246,6 +245,13 @@ def inference_call(kwargs: dict[str, Any], args: tuple[Any, ...] = ()) -> Any:
     try:
         model = resolve_model(args, kwargs)
         vendor, over_openai_client = _split_model(model)
+        if over_openai_client is None:
+            # The routing table could not be read, so we cannot tell whether the
+            # OpenAI client instrumentor is already recording this call. Recording
+            # would double-count every openai-compatible provider, and a doubled
+            # token or cost figure is worse than a missing one: the gap is visible
+            # and warned about, the doubling is silent and gets believed.
+            return _NULL_CALL
         return genai.call(
             provider=vendor,
             operation=genai.CHAT,

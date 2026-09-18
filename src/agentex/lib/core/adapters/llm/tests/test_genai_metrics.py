@@ -119,31 +119,80 @@ class TestTheRoutingDecisionComesFromLitellm:
     def test_the_provider_list_agrees_with_litellm(self):
         """Pinned to litellm's own list rather than a copy of it, because the copy
         would go stale every release."""
-        import litellm
+        import litellm.constants
 
         from agentex.lib.core.adapters.llm._genai_metrics import _over_openai_client
 
-        for provider in list(getattr(litellm, "openai_compatible_providers", []))[:20]:
+        for provider in list(litellm.constants.openai_compatible_providers)[:20]:
             assert _over_openai_client(provider), provider
         for provider in ("anthropic", "bedrock", "vertex_ai", "gemini"):
             assert not _over_openai_client(provider), provider
 
-    def test_losing_litellms_list_is_not_silent(self, monkeypatch, caplog):
-        """`openai_compatible_providers` is not in litellm's __all__, so it is read
-        defensively. But degrading quietly would re-introduce the double counting this
-        whole function exists to prevent, so the fallback has to be audible."""
-        import litellm
+    def test_an_unknown_routing_table_stands_down_rather_than_guessing(
+        self, monkeypatch, caplog
+    ):
+        """If the routing table cannot be read we do not know whether the OpenAI client
+        instrumentor is already recording a call. Recording anyway would double-count
+        every openai-compatible provider, and a doubled token or cost figure is worse
+        than a missing one: the gap is visible and warned about, the doubling is silent
+        and gets believed. So the recorder stands down entirely."""
+        import builtins
 
-        monkeypatch.delattr(litellm, "openai_compatible_providers", raising=False)
+        real_import = builtins.__import__
+
+        def no_constants(name, *args, **kwargs):
+            if name == "litellm.constants":
+                raise ImportError("litellm.constants is gone")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", no_constants)
         _genai_metrics._reset_for_tests()
 
         with caplog.at_level("WARNING", logger=_genai_metrics.logger.name):
-            # The five explicit ones still work; the ~50 from litellm no longer do.
-            assert _genai_metrics._over_openai_client("azure") is True
-            assert _genai_metrics._over_openai_client("groq") is False
-        assert any("openai_compatible_providers" in r.message for r in caplog.records), [
-            r.message for r in caplog.records
-        ]
+            assert _genai_metrics._over_openai_client("groq") is None
+            assert _genai_metrics._over_openai_client("anthropic") is None
+            assert _split_model("groq/llama3-8b-8192") == ("groq", None)
+
+        assert any(
+            "openai_compatible_providers is unavailable" in r.message
+            for r in caplog.records
+        ), [r.message for r in caplog.records]
+
+    def test_a_real_sgp_obs_is_not_started_when_routing_is_unknown(self, monkeypatch):
+        """The property that actually protects the data: no record is started at all,
+        rather than one started with a guessed transport."""
+        import sys
+        import builtins
+
+        started = []
+
+        class _Genai:
+            CHAT = "chat"
+            OPENAI_SPEC = "openai"
+            OPENAI = "openai"
+
+            @staticmethod
+            def call(**kwargs):
+                started.append(kwargs)
+                return object()
+
+        module = type(sys)("sgp_obs.metrics")
+        module.genai = _Genai
+        monkeypatch.setitem(sys.modules, "sgp_obs", type(sys)("sgp_obs"))
+        monkeypatch.setitem(sys.modules, "sgp_obs.metrics", module)
+
+        real_import = builtins.__import__
+
+        def no_constants(name, *args, **kwargs):
+            if name == "litellm.constants":
+                raise ImportError("litellm.constants is gone")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", no_constants)
+        _genai_metrics._reset_for_tests()
+
+        assert inference_call({"model": "groq/llama3-8b-8192"}) is _genai_metrics._NULL_CALL
+        assert started == [], "a record was started with an unknown routing table"
 
     def test_an_unresolvable_model_does_not_spam_stdout(self):
         """litellm prints a red "Provider List" banner to STDOUT (not logging, so it
