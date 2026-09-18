@@ -29,7 +29,7 @@ from temporalio import workflow
 from agentex.lib import adk
 from agentex.lib.types.acp import SendEventParams, CreateTaskParams
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.temporal.logging import make_workflow_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.types.workflow import SignalName
@@ -54,7 +54,7 @@ if environment_variables.WORKFLOW_NAME is None:
 if environment_variables.AGENT_NAME is None:
     raise ValueError("Environment variable AGENT_NAME is not set")
 
-logger = make_logger(__name__)
+logger = make_workflow_logger(__name__)
 
 MODEL = os.environ.get("CODEX_MODEL", "o4-mini")
 

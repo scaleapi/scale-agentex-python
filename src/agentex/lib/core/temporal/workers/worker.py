@@ -258,9 +258,8 @@ class AgentexWorker:
             max_concurrent_activities=self.max_concurrent_activities,
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
-            # Tracing interceptor OUTERMOST so business interceptors (and the spans
-            # they create) nest under the propagated workflow/activity span.
-            interceptors=[*temporal_tracing_interceptors(), *self.interceptors],
+            # Temporal inherits client tracing before these business interceptors.
+            interceptors=self.interceptors,
         )
 
         logger.info(f"Starting workers for task queue: {self.task_queue}")
