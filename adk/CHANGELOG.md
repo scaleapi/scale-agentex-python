@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.27.0 (2026-09-18)
+
+Full Changelog: [agentex-sdk-v0.26.0...agentex-sdk-v0.27.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.26.0...agentex-sdk-v0.27.0)
+
+### Features
+
+* **obs:** wire sgp-obs from the SDK for traces, metrics and logs ([#518](https://github.com/scaleapi/scale-agentex-python/issues/518)) ([d88fac6](https://github.com/scaleapi/scale-agentex-python/commit/d88fac6a0b3e572a6346106a615265b2354d1f79))
+
+
+### Reverts
+
+* **obs:** remove sgp-obs beta changes ([#522](https://github.com/scaleapi/scale-agentex-python/issues/522)) ([687ebfb](https://github.com/scaleapi/scale-agentex-python/commit/687ebfbf874e1feb01e102c7130cebb7f26e387a))
+
 ## 0.26.0 (2026-09-14)
 
 Full Changelog: [agentex-sdk-v0.25.0...agentex-sdk-v0.26.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.25.0...agentex-sdk-v0.26.0)
