@@ -7,15 +7,22 @@ from agentex.lib import adk
 from agentex.protocol.acp import CreateTaskParams, SendEventParams
 from agentex.lib.core.temporal.workflows.workflow import BaseWorkflow
 from agentex.lib.core.temporal.types.workflow import SignalName
-from agentex.lib.utils.logging import make_logger
+from agentex.lib.core.temporal.logging import make_workflow_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.environment_variables import EnvironmentVariables
-from agents import Agent, Runner, set_tracing_disabled
+from agents import Agent, Runner, set_trace_processors
 
-# Disable the openai-agents SDK's native tracer so it doesn't ship traces to
-# api.openai.com using OPENAI_API_KEY (which may be a LiteLLM proxy key).
-# SGP tracing below still runs via the Agentex tracing manager.
-set_tracing_disabled(True)
+# Drop the openai-agents SDK's own exporter, so it can't ship traces to
+# api.openai.com using OPENAI_API_KEY (which may be a gateway/proxy key and would 401).
+#
+# Clearing the processor list rather than disabling tracing outright: disabling stops
+# spans being produced AT ALL, which silently starves any processor added later —
+# including the sgp-obs bridge the SDK installs when observability is on, so a Runner
+# turn would contribute no model spans. Clearing instead removes the OpenAI exporter
+# (which otherwise stays registered and is merely never fed) while leaving the
+# machinery alive for the bridge to attach to.
+# Agentex/SGP tracing still runs via the tracing manager.
+set_trace_processors([])
 
 from agentex.lib.core.temporal.plugins.openai_agents.hooks.hooks import TemporalStreamingHooks
 from pydantic import BaseModel
@@ -37,7 +44,7 @@ if environment_variables.WORKFLOW_NAME is None:
 if environment_variables.AGENT_NAME is None:
     raise ValueError("Environment variable AGENT_NAME is not set")
 
-logger = make_logger(__name__)
+logger = make_workflow_logger(__name__)
 
 # Setup tracing for SGP (Scale GenAI Platform)
 # This enables visibility into your agent's execution in the SGP dashboard
