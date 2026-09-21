@@ -22,10 +22,8 @@ from temporalio.worker import (
 )
 from temporalio.converter import default
 
-from agentex.lib.core.temporal.logging import WorkflowLoggerAdapter
-
 # Set up logging
-logger = WorkflowLoggerAdapter(logging.getLogger("context.interceptor"), {})
+logger = logging.getLogger("context.interceptor")
 
 # Global context variables that models can read
 # These are thread-safe and work across async boundaries

@@ -26,7 +26,6 @@ class EnvVarKeys(str, Enum):
     AGENT_ID = "AGENT_ID"
     AGENT_VERSION = "AGENT_VERSION"
     AGENT_COMMIT_SHA = "AGENT_COMMIT_SHA"
-    AGENT_SOURCE_REPO = "AGENT_SOURCE_REPO"
     AGENT_API_KEY = "AGENT_API_KEY"
     # ACP Configuration
     ACP_URL = "ACP_URL"
@@ -69,11 +68,12 @@ class EnvironmentVariables(BaseModel):
     AGENT_ID: str | None = None
     # Build/version discriminator (image tag or git sha), set by the deployment
     AGENT_VERSION: str | None = None
-    # The agent's source commit, set by the deployment or baked into the image; a git
-    # SHA and nothing else. Stamped as __commit_sha__ when set (see tracing.code_revision).
+    # The agent's source commit, baked into the image or set by the deployment.
+    # Unlike AGENT_VERSION this is expected to be a git SHA and nothing else, and
+    # it is OPT-IN: nothing is stamped unless the agent calls
+    # `adk.code_revision.enable()`, which also refuses a value that is not a git
+    # object name. See agentex.lib.core.tracing.code_revision.
     AGENT_COMMIT_SHA: str | None = None
-    # Git remote the agent was built from (any URL form; normalized to host/path on use).
-    AGENT_SOURCE_REPO: str | None = None
     AGENT_API_KEY: str | None = None
     ACP_TYPE: str | None = "async"
     AGENT_INPUT_TYPE: str | None = None

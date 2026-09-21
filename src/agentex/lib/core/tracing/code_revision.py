@@ -1,11 +1,10 @@
-"""Stamping of the agent's source commit onto its spans.
+"""Opt-in stamping of the agent's source commit onto its spans.
 
-Stamping turns on when the process starts with ``AGENT_COMMIT_SHA`` set, which
-the SGP cloud deploy does from the build record's attested commit, or when the
-agent calls :func:`enable` itself. Nothing is stamped otherwise: upgrading the
-SDK alone never starts emitting the field. When on, the resolved commit lands in
-span data under ``__commit_sha__`` and is searchable in the SGP Traces UI as
-``__commit_sha__:<sha>``.
+Nothing is stamped until the agent calls :func:`enable`, mirroring the
+``lineage`` registry next door: a process-wide switch the agent sets once at
+import, rather than automatic behaviour every agent inherits. When enabled the
+resolved commit lands in span data under ``__commit_sha__`` and is searchable in
+the SGP Traces UI as ``__commit_sha__:<sha>``.
 
 This is deliberately separate from ``__agent_version__``, which is automatic and
 carries the deployed image tag verbatim ("image tag or git sha"). That tag is a
@@ -22,7 +21,7 @@ import re
 
 from agentex.lib.utils.logging import make_logger
 
-__all__ = ("COMMIT_SHA_KEY", "enable", "disable", "is_enabled", "commit_sha", "is_git_object_name")
+__all__ = ("COMMIT_SHA_KEY", "enable", "disable", "is_enabled", "commit_sha")
 
 logger = make_logger(__name__)
 
@@ -31,12 +30,6 @@ COMMIT_SHA_KEY = "__commit_sha__"
 # A git object name: 40 hex for SHA-1, 64 for SHA-256, or an abbreviation down to
 # git's own 7-character minimum.
 _GIT_SHA_RE = re.compile(r"[0-9a-fA-F]{7,64}")
-
-
-def is_git_object_name(value: str) -> bool:
-    """Whether ``value`` is a full or abbreviated git SHA-1/SHA-256 object name."""
-    return _GIT_SHA_RE.fullmatch(value.strip()) is not None
-
 
 _COMMIT_SHA_ENV = "AGENT_COMMIT_SHA"
 # Fallback only: automatic, and only usable when it happens to be SHA-shaped.
@@ -49,16 +42,13 @@ _commit_sha: str | None = None
 
 
 def enable(commit_sha: str | None = None) -> None:
-    """Turn on stamping ``__commit_sha__`` onto every span from this process.
+    """Opt this process in to stamping ``__commit_sha__`` onto every span.
 
     Value precedence: the explicit ``commit_sha`` argument, else
     ``AGENT_COMMIT_SHA``, else ``AGENT_VERSION`` when the deployment happened to
     set it to a bare commit SHA. A value that is not a git object name is
     refused with a warning and leaves stamping off -- better an absent field
     than one named for a commit that holds an image tag.
-
-    Called once at import when ``AGENT_COMMIT_SHA`` is set, so a deployment that
-    supplies the commit needs no code change in the agent.
     """
     global _commit_sha
 
@@ -113,12 +103,3 @@ def is_enabled() -> bool:
 def commit_sha() -> str | None:
     """The resolved commit SHA, or ``None`` when stamping is not enabled."""
     return _commit_sha
-
-
-def _enable_from_environment() -> None:
-    """Auto-enable on ``AGENT_COMMIT_SHA`` only; ``AGENT_VERSION`` stays an explicit fallback."""
-    if os.environ.get(_COMMIT_SHA_ENV, "").strip():
-        enable()
-
-
-_enable_from_environment()

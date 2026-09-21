@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     pass
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.cli.utils.cli_utils import SUBPROCESS_STREAM_LIMIT
 
 from .debug_config import DebugConfig, resolve_debug_port
 
@@ -67,7 +66,6 @@ async def start_temporal_worker_debug(
         env=debug_env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
-        limit=SUBPROCESS_STREAM_LIMIT,
     )
 
 
@@ -121,7 +119,6 @@ async def start_acp_server_debug(
         env=debug_env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
-        limit=SUBPROCESS_STREAM_LIMIT,
     )
 
 

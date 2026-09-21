@@ -40,7 +40,7 @@ async def test_guard_runs_before_register_agent(monkeypatch):
     await _worker()._register_agent()
 
     guard.assert_awaited_once_with("http://backend")
-    register.assert_awaited_once_with(env, agent_card=None)
+    register.assert_awaited_once_with(env)
     assert order == ["guard", "register"]  # guard must precede registration
 
 

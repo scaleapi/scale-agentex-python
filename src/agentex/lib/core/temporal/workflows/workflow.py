@@ -7,10 +7,10 @@ from datetime import timedelta
 from temporalio import workflow
 
 from agentex.protocol.acp import SendEventParams, CreateTaskParams, InterruptTaskParams
-from agentex.lib.core.temporal.logging import make_workflow_logger
+from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.temporal.types.workflow import SignalName
 
-logger = make_workflow_logger(__name__)
+logger = make_logger(__name__)
 
 
 class BaseWorkflow(ABC):

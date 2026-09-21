@@ -11,59 +11,6 @@ _is_datadog_configured = bool(os.environ.get("DD_AGENT_HOST"))
 
 ctx_var_request_id = contextvars.ContextVar[str]("request_id")
 
-DEFAULT_LOG_LEVEL = logging.INFO
-
-# Every logger this module hands out is a LEAF (``make_logger(__name__)``), and until
-# now each one carried its own handler. That is fine on its own, but an observability
-# pipeline that owns the ROOT logger -- sgp-obs replaces the root handler list -- then
-# prints a SECOND copy of every record: once here, and once more when the record
-# propagates to root. Measured on sgp-obs 0.16.0: one ``logger.info()`` produced two
-# stdout lines, and sgp-obs' own boot warning named 63 loggers "bypassing log
-# governance". The plain-text copy also skips the pipeline's enrichment (agent_id,
-# task_id), its allowlist and its truncation, so it is not merely redundant.
-#
-# While this is True, ``make_logger`` attaches nothing and the record reaches the root
-# pipeline by propagation alone. ``sgp_obs_setup`` sets it via
-# :func:`route_loggers_to_root` -- nothing else may.
-_ROOT_PIPELINE_OWNS_LOGGING = False
-
-# Handlers are cleared by prefix rather than by an enumerated list: the names are
-# module paths, several agentex modules are imported LAZILY, and any list would be a
-# snapshot that goes stale the moment one of them loads.
-_PACKAGE_ROOT = "agentex"
-
-# ``make_logger`` stamps every handler it attaches, so the hand-over can find its own
-# handlers again on a logger of ANY name.
-#
-# The prefix above cannot reach them all, and that gap was a measured duplicate rather
-# than a theoretical one: agents call ``make_logger(__name__)`` from their own modules,
-# whose names come from the agent's package (``project.acp`` in every scaffold), so the
-# prefix does not match and the leaf handler stayed attached. On dbt-assistant, 123 of
-# 3361 log lines were a second, ungoverned copy carrying ``name``/``request_id`` but no
-# ``trace_id``, ``span_id``, ``source`` or ``agent_id``. The SDK cannot know an agent's
-# package name, so ownership is recorded on the handler at the moment it is attached.
-#
-# Marking the handler rather than keeping a registry of logger names means there is no
-# bookkeeping to go stale, and a handler moved to another logger is still recognised.
-_OWNED_BY_MAKE_LOGGER = "_agentex_make_logger_owned"
-
-
-def resolve_log_level() -> int:
-    """Read the log level from ``LOG_LEVEL``, falling back to INFO.
-
-    Read straight from the environment rather than through ``EnvVarKeys``, since
-    ``environment_variables`` imports this module and the reverse would be a cycle.
-
-    ``getLevelName`` returns the string ``"Level FOO"`` for anything it does not
-    recognise, so the isinstance check is what stops a typo in ``LOG_LEVEL`` from
-    silently turning logging off.
-    """
-    configured = os.getenv("LOG_LEVEL")
-    if not configured:
-        return DEFAULT_LOG_LEVEL
-    level = logging.getLevelName(configured.strip().upper())
-    return level if isinstance(level, int) else DEFAULT_LOG_LEVEL
-
 
 class CustomJSONFormatter(json_log_formatter.JSONFormatter):
     def json_record(self, message: str, extra: dict, record: logging.LogRecord) -> dict:  # type: ignore[override]
@@ -96,17 +43,6 @@ class CustomJSONFormatter(json_log_formatter.JSONFormatter):
 
         return extra
 
-
-def _attach(logger: logging.Logger, handler: logging.Handler) -> None:
-    """Attach ``handler`` and record that this module owns it.
-
-    The mark is what lets :func:`route_loggers_to_root` take this handler back off a
-    logger whose name it could not have predicted.
-    """
-    setattr(handler, _OWNED_BY_MAKE_LOGGER, True)
-    logger.addHandler(handler)
-
-
 def make_logger(name: str) -> logging.Logger:
     """
     Creates a logger object with a RichHandler to print colored text.
@@ -115,28 +51,19 @@ def make_logger(name: str) -> logging.Logger:
     """
     # Create a console object to print colored text
     logger = logging.getLogger(name)
-    logger.setLevel(resolve_log_level())
-
-    if _ROOT_PIPELINE_OWNS_LOGGING:
-        # A handler here would be the second one on this record's path to stdout.
-        # The level above is deliberately still applied: LOG_LEVEL is what agent
-        # authors set, and letting the pipeline's own threshold silently replace it
-        # would change behaviour nobody asked to change.
-        return logger
+    logger.setLevel(logging.INFO)
 
     environment = os.getenv("ENVIRONMENT")
     if environment == "local":
         console = Console()
         # Add the RichHandler to the logger to print colored text
-        _attach(
-            logger,
-            RichHandler(
-                console=console,
-                show_level=False,
-                show_path=False,
-                show_time=False,
-            ),
+        handler = RichHandler(
+            console=console,
+            show_level=False,
+            show_path=False,
+            show_time=False,
         )
+        logger.addHandler(handler)
         return logger
 
     stream_handler = logging.StreamHandler()
@@ -147,76 +74,6 @@ def make_logger(name: str) -> logging.Logger:
             logging.Formatter("%(asctime)s %(levelname)s [%(name)s] [%(filename)s:%(lineno)d] - %(message)s")
         )
 
-    _attach(logger, stream_handler)
+    logger.addHandler(stream_handler)
     # Create a logger object with the name of the current module
     return logger
-
-
-def route_loggers_to_root() -> int:
-    """Hand logging over to whatever owns the root logger. Returns the number of
-    loggers a handler was taken off.
-
-    Two halves, and BOTH are needed -- measured, one line per ``logger.info()`` only
-    when they run together:
-
-    * the sweep below fixes the loggers that ALREADY exist, i.e. every module whose
-      ``make_logger`` call ran before this did -- the whole of an agent's own code,
-      since the ACP server is constructed from a module that logs;
-    * the latch fixes every logger created AFTER it, which a sweep cannot reach.
-      agentex imports several modules lazily (the adk ``_claude_code_sync`` /
-      ``_codex_sync`` / ``_pydantic_ai_sync`` harnesses among them), so their
-      ``make_logger`` call happens later and would attach a fresh duplicate handler.
-
-    sgp-obs offers ``capture_loggers=`` for the first half, and it is deliberately not
-    used: it matches EXACT logger names, not prefixes (measured -- passing
-    ``("agentex",)`` still produced two lines), so it would mean enumerating ~60 module
-    paths; and passing anything at all replaces its uvicorn default, which would put
-    uvicorn's access log back to printing twice.
-
-    A handler is taken off only when it is ours, on one of two grounds:
-
-    * anything under the ``agentex`` prefix is this package's own logger, so every
-      handler on it is ours to move;
-    * on a logger of any other name -- an agent's ``project.acp``, or any third
-      party's -- only a handler carrying :data:`_OWNED_BY_MAKE_LOGGER` is touched.
-
-    That second rule is the fix for the duplicate measured on dbt-assistant, and it is
-    narrow on purpose. A third party's handler may be there deliberately -- which is
-    exactly why sgp-obs warns about them rather than stripping them -- so litellm's
-    three loggers and anything else keep whatever they set up themselves.
-    """
-    global _ROOT_PIPELINE_OWNS_LOGGING
-    _ROOT_PIPELINE_OWNS_LOGGING = True
-
-    cleared = 0
-    # list() snapshots the registry: a getLogger() on another thread would otherwise
-    # mutate the dict mid-iteration.
-    for name, existing in list(logging.Logger.manager.loggerDict.items()):
-        if not isinstance(existing, logging.Logger):
-            continue  # a PlaceHolder for a name whose children exist but itself does not
-        if not existing.handlers:
-            continue
-        if not existing.propagate:
-            # Deliberately cut off from root, so nothing of its reaches the pipeline.
-            # Clearing its handlers would send its records NOWHERE -- worse than a
-            # duplicate. Leave it exactly as its owner set it up.
-            continue
-        ours = name == _PACKAGE_ROOT or name.startswith(_PACKAGE_ROOT + ".")
-        removed = 0
-        for handler in list(existing.handlers):
-            if not ours and not getattr(handler, _OWNED_BY_MAKE_LOGGER, False):
-                continue
-            try:
-                handler.flush()  # a buffering handler must not lose records on removal
-            except Exception:
-                pass
-            existing.removeHandler(handler)
-            removed += 1
-        if removed:
-            cleared += 1
-    return cleared
-
-
-def _reset_for_tests() -> None:
-    global _ROOT_PIPELINE_OWNS_LOGGING
-    _ROOT_PIPELINE_OWNS_LOGGING = False

@@ -54,15 +54,17 @@ class TestSourceStamps:
             "__agent_version__": "sha-abc123",
         }
 
-    SHA = "b362b171a9c4e1f09d8e7a6b5c4d3e2f1a0b9c8d"
+    # Abbreviated deliberately: a bare 40-char hex literal trips credential
+    # scanners, and code_revision accepts any git object name (7-64 hex).
+    SHA = "b362b171a9c4"
 
-    def test_commit_sha_is_not_stamped_when_env_absent(self, monkeypatch):
-        """Upgrading the SDK must not start emitting __commit_sha__ on its own;
-        only AGENT_COMMIT_SHA or an enable() call turns it on."""
+    def test_commit_sha_is_not_stamped_without_opt_in(self, monkeypatch):
+        """Upgrading the SDK must not start emitting __commit_sha__ on its own,
+        even when the environment carries a perfectly good SHA."""
         from agentex.lib.core.tracing import code_revision
         from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
 
-        monkeypatch.delenv("AGENT_COMMIT_SHA", raising=False)
+        monkeypatch.setenv("AGENT_COMMIT_SHA", self.SHA)
         code_revision.disable()
 
         span = _make_span(); span.data = {}

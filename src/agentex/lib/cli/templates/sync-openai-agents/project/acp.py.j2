@@ -13,19 +13,12 @@ from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessa
 from agentex.types.task_message_content import TaskMessageContent
 from agentex.types.text_content import TextContent
 from agentex.lib.utils.logging import make_logger
-from agents import Agent, Runner, RunConfig, function_tool, set_trace_processors
+from agents import Agent, Runner, RunConfig, function_tool, set_tracing_disabled
 
-# Drop the openai-agents SDK's own exporter, so it can't ship traces to
-# api.openai.com using OPENAI_API_KEY (which may be a gateway/proxy key and would 401).
-#
-# Clearing the processor list rather than disabling tracing outright: disabling stops
-# spans being produced AT ALL, which silently starves any processor added later —
-# including the sgp-obs bridge the SDK installs when observability is on, so a Runner
-# turn would contribute no model spans. Clearing instead removes the OpenAI exporter
-# (which otherwise stays registered and is merely never fed) while leaving the
-# machinery alive for the bridge to attach to.
-# Agentex/SGP tracing still runs via the tracing manager.
-set_trace_processors([])
+# Disable the openai-agents SDK's native tracer so it doesn't ship traces to
+# api.openai.com using OPENAI_API_KEY (which may be a LiteLLM proxy key).
+# SGP tracing below still runs via the Agentex tracing manager.
+set_tracing_disabled(True)
 
 
 logger = make_logger(__name__)
