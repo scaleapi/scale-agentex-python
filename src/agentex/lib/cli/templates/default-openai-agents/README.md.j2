@@ -1,0 +1,69 @@
+# {{ agent_name }} - AgentEx Async OpenAI Agents SDK Agent
+
+This template builds an **asynchronous** (non-Temporal) agent built on the
+**OpenAI Agents SDK**, delivered through the unified harness surface on AgentEx:
+- Defines an OpenAI Agents SDK `Agent` (with an example weather tool) inline in
+  `acp.py`
+- Wraps the SDK run in an `OpenAITurn`
+- Delivers canonical `StreamTaskMessage*` events via `UnifiedEmitter.auto_send_turn`
+  (the async Redis push path), so the UI receives output in real time
+- Tracing integration to SGP / AgentEx
+
+## Prerequisites
+
+- An `OPENAI_API_KEY` in your environment (or a `LITELLM_API_KEY`, which is
+  copied to `OPENAI_API_KEY` for LiteLLM-proxy compatibility)
+
+## Running the Agent
+
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/
+│   ├── __init__.py
+│   └── acp.py          # ACP server, agent + tool definitions, event handlers
+├── Dockerfile
+├── manifest.yaml
+├── dev.ipynb
+{% if use_uv %}
+└── pyproject.toml
+{% else %}
+└── requirements.txt
+{% endif %}
+```
+
+## Key Concepts
+
+### Async ACP with the harness
+The async ACP model streams events over Redis instead of an HTTP response. The
+`@acp.on_task_event_send` handler runs the OpenAI Agents SDK and pushes the
+harness events to the task stream.
+
+### The unified harness surface
+`OpenAITurn` + `UnifiedEmitter` are the unified harness surface. The turn
+normalizes the SDK's streamed run into canonical AgentEx events; the emitter
+traces and delivers them.
+
+## Development
+
+### 1. Add Your Own Tools
+Define new `@function_tool` functions in `project/acp.py` and add them to the
+agent's `tools=[...]` list in `create_agent()`.
+
+### 2. Customize the Agent
+Edit `MODEL_NAME` and `INSTRUCTIONS` in `project/acp.py` to change the model or
+system prompt.
+
+### 3. Configure Credentials
+Set your credentials via `manifest.yaml`, an exported environment variable, or a
+`.env` file in the project directory.
+
+### 4. Run Locally
+```bash
+export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
+```

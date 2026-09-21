@@ -1,0 +1,30 @@
+---
+description: Repository architecture overview and code navigation hints
+globs: "src/agentex/**, examples/**, tests/**, README.md"
+alwaysApply: false
+---
+
+Code structure expectations:
+
+- `src/agentex/` contains the core SDK and generated API client code
+- `src/agentex/lib/` contains manually maintained code that should not be overwritten by the code generator
+  - `cli/` Typer-based CLI implementation
+  - `core/` Core services, adapters, and Temporal workflows
+  - `sdk/` SDK utilities and FastACP implementation
+  - `types/` Custom type definitions
+  - `utils/` Utility functions
+- `examples/` provides example implementations and tutorials
+- `tests/` contains the test suites
+
+Key components quick reference:
+
+- Client Layer: HTTP client for AgentEx API in `_client.py` and `resources/`
+- CLI Layer: Typer-based commands under `lib/cli/`
+- Core Services: Temporal workflows and services under `lib/core/`
+- FastACP: Protocol implementation in `lib/sdk/fastacp/`
+- State Machine: Workflow state management in `lib/sdk/state_machine/`
+
+Generated vs manual code:
+
+- Treat `src/agentex/lib/**` as manual code; avoid edits in generated areas unless regenerating consistently
+- Expect merge conflicts between generator outputs and manual patches; keep custom logic in `lib/`

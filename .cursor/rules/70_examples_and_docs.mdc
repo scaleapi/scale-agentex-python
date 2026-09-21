@@ -1,0 +1,11 @@
+---
+description: How to use examples and documentation for development
+globs: "examples/**, README.md"
+alwaysApply: false
+---
+
+Use the `examples/` directory as reference implementations and tutorials. When creating new features:
+
+- Mirror patterns from the closest matching example
+- Keep examples runnable with the documented commands
+- Prefer adding or updating examples alongside significant feature changes

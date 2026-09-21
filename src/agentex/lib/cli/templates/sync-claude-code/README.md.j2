@@ -1,0 +1,64 @@
+# {{ agent_name }} - AgentEx Sync Claude Code Agent
+
+This template builds a **synchronous** agent that drives the **Claude Code CLI**
+through the unified harness surface on AgentEx:
+- Spawns `claude -p --output-format stream-json --verbose` as a local subprocess
+- Wraps the CLI's stdout stream in a `ClaudeCodeTurn`
+- Delivers canonical `StreamTaskMessage*` events via `UnifiedEmitter.yield_turn`
+  (the sync HTTP yield path)
+- Tracing integration to SGP / AgentEx
+
+## Prerequisites
+
+- The `claude` CLI installed and on your `PATH`
+- An `ANTHROPIC_API_KEY` (or equivalent credential) in your environment
+
+## Running the Agent
+
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/
+│   ├── __init__.py
+│   └── acp.py          # ACP server, subprocess spawn, and message handler
+├── Dockerfile
+├── manifest.yaml
+├── dev.ipynb
+{% if use_uv %}
+└── pyproject.toml
+{% else %}
+└── requirements.txt
+{% endif %}
+```
+
+## Key Concepts
+
+### Sync ACP with the harness
+The sync ACP model uses HTTP request/response. The `@acp.on_message_send`
+handler spawns the Claude Code CLI and yields the harness events back to the
+client as they arrive.
+
+### The unified harness surface
+`ClaudeCodeTurn` + `UnifiedEmitter` are the unified harness surface. The turn
+normalizes CLI output into canonical AgentEx events; the emitter traces and
+delivers them.
+
+## Development
+
+### 1. Customize the subprocess
+Edit `_spawn_claude` in `project/acp.py` to change the CLI flags, working
+directory, or how the prompt is delivered.
+
+### 2. Configure Credentials
+Set your credentials via `manifest.yaml`, an exported environment variable, or a
+`.env` file in the project directory.
+
+### 3. Run Locally
+```bash
+export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
+```

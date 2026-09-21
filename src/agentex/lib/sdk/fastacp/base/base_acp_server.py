@@ -1,0 +1,493 @@
+from __future__ import annotations
+
+import uuid
+import asyncio
+import inspect
+from typing import Any
+from datetime import datetime
+from contextlib import asynccontextmanager
+from collections.abc import Callable, Awaitable, AsyncGenerator
+
+import uvicorn
+from fastapi import FastAPI, Request
+from pydantic import TypeAdapter, ValidationError
+from starlette.types import Send, Scope, ASGIApp, Receive
+from fastapi.responses import StreamingResponse
+
+from agentex.protocol.acp import (
+    RPC_SYNC_METHODS,
+    PARAMS_MODEL_BY_METHOD,
+    RPCMethod,
+    SendEventParams,
+    CancelTaskParams,
+    CreateTaskParams,
+    SendMessageParams,
+    InterruptTaskParams,
+)
+from agentex.lib.utils.logging import make_logger, ctx_var_request_id
+from agentex.protocol.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
+from agentex.lib.utils.model_utils import BaseModel
+from agentex.lib.utils.registration import register_agent
+
+# from agentex.lib.sdk.fastacp.types import BaseACPConfig
+from agentex.lib.environment_variables import EnvironmentVariables, refreshed_environment_variables
+from agentex.types.task_message_update import TaskMessageUpdate, StreamTaskMessageFull
+from agentex.types.task_message_content import TaskMessageContent
+from agentex.lib.core.tracing.span_queue import shutdown_default_span_queue
+from agentex.lib.core.compat.version_guard import assert_backend_compatible
+from agentex.lib.sdk.fastacp.base.constants import (
+    FASTACP_HEADER_SKIP_EXACT,
+    FASTACP_HEADER_SKIP_PREFIXES,
+)
+
+logger = make_logger(__name__)
+
+# Create a TypeAdapter for TaskMessageUpdate validation
+task_message_update_adapter = TypeAdapter(TaskMessageUpdate)
+
+
+def _attach_incoming_otel_context(scope_headers: list[tuple[bytes, bytes]]) -> object | None:
+    """Extract the inbound W3C trace context (traceparent/tracestate) from ASGI
+    headers and make it the active OpenTelemetry context for the request.
+
+    FastACP is not otherwise instrumented to *continue* an incoming trace: the
+    gateway forwards the traceparent header, but nothing on the Python side
+    extracts it, so the active context stays empty. Downstream that means the
+    Temporal ``start_workflow`` / ``signal`` (including the work dispatched via
+    ``asyncio.create_task``) fires with no active span, the interceptor injects
+    nothing, and the workflow + activities detach into fresh traces.
+
+    Attaching here (in the ASGI middleware that wraps the whole request) fixes
+    that: the request handler and the background task both run under the ingress
+    trace, so the interceptor propagates it across the Temporal boundary.
+    Returns a detach token (or None); fail-open.
+    """
+    try:
+        from opentelemetry import context as _otel_context
+        from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+        # ASGI headers are a list that can repeat a name, and a dict comprehension
+        # keeps only the last value -- which silently drops repeated `tracestate`
+        # lines (W3C/RFC7230 say they MUST be combined). Build a dict-of-lists so
+        # the propagator's getter sees every value and `TraceState.from_header`
+        # combines them; `traceparent` is single-valued so it is unaffected.
+        carrier: dict[str, list[str]] = {}
+        for k, v in scope_headers:
+            carrier.setdefault(k.decode("latin-1").lower(), []).append(v.decode("latin-1"))
+        # Use the W3C propagator explicitly rather than the ambient global one:
+        # this ingress is W3C by contract, and `OTEL_PROPAGATORS=datadog` (plausible
+        # in a DD shop, and dd_only is the default mode) would otherwise silently
+        # extract nothing. It also parses only traceparent/tracestate, so arbitrary
+        # inbound `baggage` is not pulled into the downstream context.
+        return _otel_context.attach(TraceContextTextMapPropagator().extract(carrier))
+    except Exception:  # pragma: no cover - obs must never break a request
+        return None
+
+
+def _detach_otel_context(token: object | None) -> None:
+    if token is None:
+        return
+    try:
+        from opentelemetry import context as _otel_context
+
+        _otel_context.detach(token)  # type: ignore[arg-type]
+    except Exception:  # pragma: no cover - best-effort
+        pass
+
+
+class RequestIDMiddleware:
+    """Pure ASGI middleware to set request IDs without buffering streaming responses."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        otel_token: object | None = None
+        if scope["type"] == "http":
+            scope_headers = scope.get("headers", [])
+            headers = dict(scope_headers)
+            raw_request_id = headers.get(b"x-request-id", b"")
+            request_id = raw_request_id.decode() if raw_request_id else uuid.uuid4().hex
+            ctx_var_request_id.set(request_id)
+            # Continue the ingress trace for this request (and its background
+            # Temporal dispatch); see _attach_incoming_otel_context.
+            otel_token = _attach_incoming_otel_context(scope_headers)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            _detach_otel_context(otel_token)
+
+
+class BaseACPServer(FastAPI):
+    """
+    AsyncAgentACP provides RPC-style hooks for agent events and commands asynchronously.
+    All methods follow JSON-RPC 2.0 format.
+
+    Available methods:
+    - event/send → Send a message to a task
+    - task/cancel → Cancel a task
+    - task/interrupt → Interrupt the in-flight turn (non-terminal; task stays continuable)
+    - task/approve → Approve a task
+    """
+
+    def __init__(self):
+        super().__init__(lifespan=self.get_lifespan_function())
+
+        self.get("/healthz")(self._healthz)
+        self.post("/api")(self._handle_jsonrpc)
+
+        # Method handlers
+        # this just adds a request ID to the request and response headers
+        self.add_middleware(RequestIDMiddleware)
+        self._handlers: dict[RPCMethod, Callable] = {}
+
+        # Agent info to return in healthz
+        self.agent_id: str | None = None
+
+        # Optional agent card for registration metadata
+        self._agent_card: Any | None = None
+
+    @classmethod
+    def create(cls):
+        """Create and initialize BaseACPServer instance"""
+        instance = cls()
+        instance._setup_handlers()
+        return instance
+
+    def _setup_handlers(self):
+        """Set up default handlers - override in subclasses"""
+        # Base class has no default handlers
+        pass
+
+    def get_lifespan_function(self):
+        @asynccontextmanager
+        async def lifespan_context(app: FastAPI):  # noqa: ARG001
+            env_vars = EnvironmentVariables.refresh()
+            if env_vars.AGENTEX_BASE_URL:
+                # Runtime SDK<->backend contract guard: fail fast if the backend is older
+                # than this SDK supports, instead of opaque 500s later. See compat.version_guard.
+                await assert_backend_compatible(env_vars.AGENTEX_BASE_URL)
+                await register_agent(env_vars, agent_card=self._agent_card)
+                self.agent_id = env_vars.AGENT_ID
+            else:
+                logger.warning("AGENTEX_BASE_URL not set, skipping agent registration")
+
+            try:
+                yield
+            finally:
+                await shutdown_default_span_queue()
+
+        return lifespan_context
+
+    async def _healthz(self):
+        """Health check endpoint"""
+        result = {"status": "healthy"}
+        if self.agent_id:
+            result["agent_id"] = self.agent_id
+        return result
+
+    def _wrap_handler(self, fn: Callable[..., Awaitable[Any]]):
+        """Wraps handler functions to provide JSON-RPC 2.0 response format"""
+
+        async def wrapper(*args, **kwargs) -> Any:
+            return await fn(*args, **kwargs)
+
+        return wrapper
+
+    async def _handle_jsonrpc(self, request: Request):
+        """Main JSON-RPC endpoint handler"""
+        rpc_request = None
+        logger.info(f"[base_acp_server] received request: {datetime.now()}")
+        try:
+            data = await request.json()
+            rpc_request = JSONRPCRequest(**data)
+
+            # Check if the request is authenticated
+            if refreshed_environment_variables and getattr(refreshed_environment_variables, "AGENT_API_KEY", None):
+                authorization_header = request.headers.get("x-agent-api-key")
+                if authorization_header != refreshed_environment_variables.AGENT_API_KEY:
+                    return JSONRPCResponse(
+                        id=rpc_request.id,
+                        error=JSONRPCError(code=-32601, message="Unauthorized"),
+                    )
+
+
+            # Check if method is valid first
+            try:
+                method = RPCMethod(rpc_request.method)
+            except ValueError:
+                logger.error(f"Method {rpc_request.method} was invalid")
+                return JSONRPCResponse(
+                    id=rpc_request.id,
+                    error=JSONRPCError(
+                        code=-32601, message=f"Method {rpc_request.method} not found"
+                    ),
+                )
+
+            if method not in self._handlers or self._handlers[method] is None:
+                logger.error(f"Method {method} not found on existing ACP server")
+                return JSONRPCResponse(
+                    id=rpc_request.id,
+                    error=JSONRPCError(
+                        code=-32601, message=f"Method {method} not found"
+                    ),
+                )
+
+            # Extract application headers using allowlist approach (only x-* headers)
+            # Matches gateway's security filtering rules
+            # Forward filtered headers via params.request.headers to agent handlers
+            custom_headers = {
+                key: value
+                for key, value in request.headers.items()
+                if key.lower().startswith("x-")
+                and key.lower() not in FASTACP_HEADER_SKIP_EXACT
+                and not any(key.lower().startswith(p) for p in FASTACP_HEADER_SKIP_PREFIXES)
+            }
+            
+            # Parse params into appropriate model based on method and include headers
+            params_model = PARAMS_MODEL_BY_METHOD[method]
+            params_data = dict(rpc_request.params) if rpc_request.params else {}
+            
+            # Add custom headers to the request structure if any headers were provided
+            # Gateway sends filtered headers via HTTP, SDK extracts and populates params.request
+            if custom_headers:
+                params_data["request"] = {"headers": custom_headers}
+            params = params_model.model_validate(params_data)
+
+            if method in RPC_SYNC_METHODS:
+                handler = self._handlers[method]
+                result = await handler(params)
+
+                if rpc_request.id is None:
+                    # Seems like you should return None for notifications
+                    return None
+                else:
+                    # Handle streaming vs non-streaming for MESSAGE_SEND
+                    if method == RPCMethod.MESSAGE_SEND and isinstance(
+                        result, AsyncGenerator
+                    ):
+                        return await self._handle_streaming_response(
+                            rpc_request.id, result
+                        )
+                    else:
+                        if isinstance(result, BaseModel):
+                            result = result.model_dump()
+                        return JSONRPCResponse(id=rpc_request.id, result=result)
+            else:
+                # If this is a notification (no request ID), process in background and return immediately
+                if rpc_request.id is None:
+                    asyncio.create_task(self._process_notification(method, params))
+                    return JSONRPCResponse(id=None)
+
+                # For regular requests, start processing in background but return immediately
+                asyncio.create_task(
+                    self._process_request(rpc_request.id, method, params)
+                )
+
+                # Return immediate acknowledgment
+                return JSONRPCResponse(
+                    id=rpc_request.id, result={"status": "processing"}
+                )
+
+        except Exception as e:
+            logger.error(f"Error handling JSON-RPC request: {e}", exc_info=True)
+            request_id = None
+            if rpc_request is not None:
+                request_id = rpc_request.id
+            return JSONRPCResponse(
+                id=request_id,
+                error=JSONRPCError(code=-32603, message=str(e)).model_dump(),
+            )
+
+    async def _handle_streaming_response(
+        self, request_id: int | str, async_gen: AsyncGenerator
+    ):
+        """Handle streaming response by formatting TaskMessageUpdate objects as JSON-RPC stream"""
+
+        async def generate_json_rpc_stream():
+            try:
+                async for chunk in async_gen:
+                    # Each chunk should be a TaskMessageUpdate object
+                    # Validate using Pydantic's TypeAdapter to ensure it's a proper TaskMessageUpdate
+                    try:
+                        # This will validate that chunk conforms to the TaskMessageUpdate union type
+                        validated_chunk = task_message_update_adapter.validate_python(
+                            chunk
+                        )
+                        # Use mode="json" to properly serialize datetime objects
+                        chunk_data = validated_chunk.model_dump(mode="json")
+                    except ValidationError as e:
+                        raise TypeError(
+                            f"Streaming chunks must be TaskMessageUpdate objects. Validation error: {e}"
+                        ) from e
+                    except Exception as e:
+                        raise TypeError(
+                            f"Streaming chunks must be TaskMessageUpdate objects, got {type(chunk)}: {e}"
+                        ) from e
+
+                    # Wrap in JSON-RPC response format
+                    response = JSONRPCResponse(id=request_id, result=chunk_data)
+                    # Use model_dump_json() which handles datetime serialization automatically
+                    yield f"{response.model_dump_json()}\n"
+
+            except Exception as e:
+                logger.error(f"Error in streaming response: {e}", exc_info=True)
+                error_response = JSONRPCResponse(
+                    id=request_id,
+                    error=JSONRPCError(code=-32603, message=str(e)).model_dump(),
+                )
+                yield f"{error_response.model_dump_json()}\n"
+
+        return StreamingResponse(
+            generate_json_rpc_stream(),
+            media_type="application/x-ndjson",  # Newline Delimited JSON
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Disable nginx buffering
+            },
+        )
+
+    async def _process_notification(self, method: RPCMethod, params: Any):
+        """Process a notification (request with no ID) in the background"""
+        try:
+            handler = self._handlers[method]
+            await handler(params)
+        except Exception as e:
+            logger.error(f"Error processing notification {method}: {e}", exc_info=True)
+
+    async def _process_request(
+        self, request_id: int | str, method: RPCMethod, params: Any
+    ):
+        """Process a request in the background"""
+        try:
+            handler = self._handlers[method]
+            await handler(params)
+            # Note: In a real implementation, you might want to store the result somewhere
+            # or notify the client through a different mechanism
+            logger.info(
+                f"Successfully processed request {request_id} for method {method}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Error processing request {request_id} for method {method}: {e}",
+                exc_info=True,
+            )
+
+    """
+    Define all possible decorators to be overriden and implemented by each ACP implementation
+    Then the users can override the default handlers by implementing their own handlers
+
+    ACP Type: Async
+    Decorators:
+    - on_task_create
+    - on_task_event_send
+    - on_task_cancel
+    - on_task_interrupt
+
+    ACP Type: Sync
+    Decorators:
+    - on_message_send
+    """
+
+    # Type: Async
+    def on_task_create(self, fn: Callable[[CreateTaskParams], Awaitable[Any]]):
+        """Handle task/init method"""
+        wrapped = self._wrap_handler(fn)
+        self._handlers[RPCMethod.TASK_CREATE] = wrapped
+        return fn
+
+    # Type: Async
+    def on_task_event_send(self, fn: Callable[[SendEventParams], Awaitable[Any]]):
+        """Handle event/send method"""
+
+        async def wrapped_handler(params: SendEventParams):
+            # # # Send message to client first most of the time
+            # ## But, sometimes you may want to process the message first
+            # ## and then send a message to the client
+            # await agentex.interactions.send_messages_to_client(
+            #     task_id=params.task_id,
+            #     messages=[params.message]
+            # )
+            return await fn(params)
+
+        wrapped = self._wrap_handler(wrapped_handler)
+        self._handlers[RPCMethod.EVENT_SEND] = wrapped
+        return fn
+
+    # Type: Async
+    def on_task_cancel(self, fn: Callable[[CancelTaskParams], Awaitable[Any]]):
+        """Handle task/cancel method"""
+        wrapped = self._wrap_handler(fn)
+        self._handlers[RPCMethod.TASK_CANCEL] = wrapped
+        return fn
+
+    # Type: Async
+    def on_task_interrupt(self, fn: Callable[[InterruptTaskParams], Awaitable[Any]]):
+        """Handle task/interrupt method.
+
+        Non-terminal counterpart to ``on_task_cancel``: forwards the interrupt to
+        the agent so it can stop the in-flight turn while leaving the task
+        continuable. See the interrupt-and-queue design doc, section 7.
+        """
+        wrapped = self._wrap_handler(fn)
+        self._handlers[RPCMethod.TASK_INTERRUPT] = wrapped
+        return fn
+
+    # Type: Sync
+    def on_message_send(
+        self,
+        fn: Callable[
+            [SendMessageParams],
+            Awaitable[TaskMessageContent | list[TaskMessageContent] | AsyncGenerator[TaskMessageUpdate, None]],
+        ],
+    ):
+        """Handle message/send method - supports both single and streaming responses
+
+        For non-streaming: return a single TaskMessage
+        For streaming: return an AsyncGenerator that yields TaskMessageUpdate objects
+        """
+
+        async def message_send_wrapper(params: SendMessageParams):
+            """Special wrapper for message_send that handles both regular async functions and async generators"""
+            # Check if the function is an async generator function
+
+            # Regardless of whether the Agent developer implemented an Async generator or not, we will always turn the function into an async generator and yield SSE events back tot he Agentex server so there is only one way for it to process the response. Then, based on the client's desire to stream or not, the Agentex server will either yield back the async generator objects directly (if streaming) or aggregate the content into a list of TaskMessageContents and to dispatch to the client. This basically gives the Agentex server the flexibility to handle both cases itself.
+            
+            if inspect.isasyncgenfunction(fn):
+                # The client wants streaming, an async generator already streams the content, so just return it
+                return fn(params)
+            else:
+                # The client wants streaming, but the function is not an async generator, so we turn it into one and yield each TaskMessageContent as a StreamTaskMessageFull which will be streamed to the client by the Agentex server.
+                task_message_content_response = await fn(params)
+                # Handle None returns gracefully - treat as empty list
+                if task_message_content_response is None:
+                    task_message_content_list = []
+                elif isinstance(task_message_content_response, list):
+                    # Filter out None values from lists
+                    task_message_content_list = [content for content in task_message_content_response if content is not None]
+                else:
+                    task_message_content_list = [task_message_content_response]
+
+                async def async_generator(task_message_content_list: list[TaskMessageContent]):
+                    for i, task_message_content in enumerate(task_message_content_list):
+                        yield StreamTaskMessageFull(type="full", index=i, content=task_message_content)
+
+                return async_generator(task_message_content_list)
+
+        self._handlers[RPCMethod.MESSAGE_SEND] = message_send_wrapper
+        return fn
+
+    """
+    End of Decorators
+    """
+
+    """
+    ACP Server Lifecycle Methods
+    """
+
+    def run(self, host: str = "0.0.0.0", port: int = 8000, **kwargs):
+        """Start the Uvicorn server for async handlers."""
+        uvicorn.run(self, host=host, port=port, **kwargs)
+
+    

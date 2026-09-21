@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:docs.temporal.io)",
+      "Bash(rye run pytest:*)",      
+      "Bash(rye run lint:*)",
+      "Bash(rye run typecheck:*)",
+      "Bash(rye run sync:*)",
+      "Bash(rye run build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

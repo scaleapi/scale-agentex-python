@@ -1,0 +1,16 @@
+---
+description: Formatting, linting, and type checking standards
+globs: "src/**, tests/**"
+alwaysApply: true
+---
+
+Standards:
+
+- Format code via `rye run format` or `./scripts/format`
+- Lint via `rye run lint` or `./scripts/lint`
+- Type check via `rye run typecheck` (pyright + mypy)
+
+Guidance:
+
+- Keep code readable and consistent; prefer small, focused functions
+- Avoid introducing style or type violations; fix before committing

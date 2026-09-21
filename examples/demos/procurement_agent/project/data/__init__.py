@@ -1,0 +1,1 @@
+"""Procurement agent data module."""

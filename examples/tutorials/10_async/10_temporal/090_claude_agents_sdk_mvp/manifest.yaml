@@ -1,0 +1,74 @@
+kind: Agent
+
+# Build Configuration
+build:
+  context:
+    # Root directory for the build context
+    root: ../../../  # Up to tutorials level to include test_utils
+
+    # Paths to include in the Docker build context
+    # Must include:
+    # - Your agent's directory (your custom agent code)
+    # These paths are collected and sent to the Docker daemon for building
+    include_paths:
+      - 10_async/10_temporal/090_claude_agents_sdk_mvp
+      - test_utils
+
+    # Path to your agent's Dockerfile
+    # This defines how your agent's image is built from the context
+    # Relative to the root directory
+    dockerfile: 10_async/10_temporal/090_claude_agents_sdk_mvp/Dockerfile
+
+    # Path to your agent's .dockerignore
+    # Filters unnecessary files from the build context
+    # Helps keep build context small and builds fast
+    dockerignore: 10_async/10_temporal/090_claude_agents_sdk_mvp/.dockerignore
+
+# Local Development Configuration
+local_development:
+  agent:
+    port: 8000
+    host_address: host.docker.internal
+  paths:
+    acp: project/acp.py
+    worker: project/run_worker.py
+
+# Agent Configuration
+agent:
+  acp_type: async
+  name: claude-mvp-agent
+  description: Claude Agents SDK MVP - proof of concept integration with AgentEx
+
+  temporal:
+    enabled: true
+    workflows:
+      - name: ClaudeMvpWorkflow
+        queue_name: claude-mvp-queue
+
+  credentials:
+    - env_var_name: ANTHROPIC_API_KEY
+      secret_name: anthropic-api-key
+      secret_key: api-key
+    - env_var_name: REDIS_URL
+      secret_name: redis-url-secret
+      secret_key: url
+
+# Deployment Configuration
+deployment:
+  image:
+    repository: ""
+    tag: "latest"
+  imagePullSecrets:
+    - name: my-registry-secret
+  global:
+    agent:
+      name: "claude-mvp-agent"
+      description: "Claude Agents SDK MVP"
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"

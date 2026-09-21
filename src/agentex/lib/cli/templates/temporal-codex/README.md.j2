@@ -1,0 +1,80 @@
+# {{ agent_name }} — AgentEx Temporal + Codex
+
+This template builds a **Temporal-durable** agent that drives the **Codex CLI**
+through the unified harness surface on AgentEx:
+- A Temporal workflow holds conversation state (the codex thread ID) durably
+  across worker crashes — no external state store needed
+- Each turn delegates to the `run_codex_turn` activity, which spawns the CLI
+  (subprocess I/O is not permitted on the workflow event loop)
+- The activity wraps the CLI's stdout stream in a `CodexTurn` and delivers
+  canonical `StreamTaskMessage*` events via `UnifiedEmitter.auto_send_turn`
+- Tracing integration to SGP / AgentEx
+
+## Prerequisites
+
+- The `codex` CLI installed and on your `PATH` (`npm install -g @openai/codex`)
+- An `OPENAI_API_KEY` in your environment
+- A running Temporal service (provided automatically by the local dev stack)
+
+## Running the Agent
+
+```bash
+agentex agents run --manifest manifest.yaml
+```
+
+This starts both the ACP HTTP server and the Temporal worker.
+
+## Project Structure
+
+```
+{{ project_name }}/
+├── project/
+│   ├── __init__.py
+│   ├── acp.py            # Thin ACP server; FastACP auto-wires to the workflow
+│   ├── workflow.py       # Temporal workflow (durable conversation state)
+│   ├── activities.py     # run_codex_turn activity (CLI subprocess)
+│   └── run_worker.py     # Temporal worker entrypoint
+├── Dockerfile
+├── manifest.yaml
+├── dev.ipynb
+{% if use_uv %}
+└── pyproject.toml
+{% else %}
+└── requirements.txt
+{% endif %}
+```
+
+## Key Concepts
+
+### Subprocess must run in an activity
+Temporal runs workflow + signal-handler bodies on a deterministic sandbox event
+loop that does not implement `subprocess_exec`. The workflow therefore delegates
+each turn to the `run_codex_turn` activity, which also gains Temporal's retry +
+timeout guarantees.
+
+### Durable multi-turn memory
+The codex thread ID is kept on the workflow instance; Temporal's durable replay
+reconstructs it after a crash, so the next turn resumes the same codex session.
+
+### The unified harness surface
+`CodexTurn` + `UnifiedEmitter` are the unified harness surface. The turn
+normalizes CLI output into canonical AgentEx events; the emitter traces and
+delivers them.
+
+## Development
+
+### 1. Choose a model
+Set `CODEX_MODEL` (defaults to `o4-mini`) to control which model codex uses.
+
+### 2. Customize the subprocess
+Edit `_spawn_codex` in `project/activities.py` to change the CLI flags or how
+the prompt is delivered.
+
+### 3. Configure Credentials
+Set your credentials via `manifest.yaml`, an exported environment variable, or a
+`.env` file in the project directory.
+
+### 4. Run Locally
+```bash
+export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
+```

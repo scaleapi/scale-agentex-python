@@ -1,0 +1,23 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+from pydantic import BaseModel
+
+# Import StateMachine only for type checking to avoid circular imports
+if TYPE_CHECKING:
+    from agentex.lib.sdk.state_machine import StateMachine
+
+
+class StateWorkflow(ABC):
+    description: str = ""
+    waits_for_input: bool = False
+    accepts: list[str] = []
+    transitions: list[str] = []
+
+    @abstractmethod
+    async def execute(
+        self, state_machine: "StateMachine", state_machine_data: BaseModel | None = None
+    ) -> str:
+        pass

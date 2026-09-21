@@ -52,7 +52,13 @@ jobs:
         shell: bash {0} # don't fail the job if the logging fails
         run: |
           jq '.results | map({"path": .filename, "message": .issue_text, "line": .line_number})' results.json > tmp.json
-          jq --argjson scanResults "$(<tmp.json)" '.results += $scanResults' tmp-output.json >  output.json
+          # --slurpfile, not --argjson "$(<tmp.json)": the latter passes the whole results file
+          # as a single argv entry, which Linux caps at MAX_ARG_STRLEN (128KB) regardless of the
+          # much larger total ARG_MAX. Once a scan produced more than ~128KB of findings the step
+          # died with "Argument list too long" (exit 126) and failed the job -- despite the
+          # `shell: bash {0}` above intending it to be non-fatal. --slurpfile reads the file
+          # directly, so size is irrelevant; it wraps the file's values in an array, hence [0].
+          jq --slurpfile scanResults tmp.json '.results += $scanResults[0]' tmp-output.json > output.json
       - name: Send unified results to logging cluster
         shell: bash {0} # don't fail the job if the logging fails
         run: |

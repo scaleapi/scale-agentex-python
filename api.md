@@ -1,0 +1,277 @@
+# Shared Types
+
+```python
+from agentex.types import DeleteResponse
+```
+
+# Agents
+
+Types:
+
+```python
+from agentex.types import (
+    AcpType,
+    Agent,
+    AgentRpcRequest,
+    AgentRpcResponse,
+    AgentRpcResult,
+    DataDelta,
+    ReasoningContentDelta,
+    ReasoningSummaryDelta,
+    TaskMessageContent,
+    TaskMessageDelta,
+    TaskMessageUpdate,
+    TextDelta,
+    ToolRequestDelta,
+    ToolResponseDelta,
+    AgentListResponse,
+)
+```
+
+Methods:
+
+- <code title="get /agents/{agent_id}">client.agents.<a href="./src/agentex/resources/agents/agents.py">retrieve</a>(agent_id) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="get /agents">client.agents.<a href="./src/agentex/resources/agents/agents.py">list</a>(\*\*<a href="src/agentex/types/agent_list_params.py">params</a>) -> <a href="./src/agentex/types/agent_list_response.py">AgentListResponse</a></code>
+- <code title="delete /agents/{agent_id}">client.agents.<a href="./src/agentex/resources/agents/agents.py">delete</a>(agent_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="delete /agents/name/{agent_name}">client.agents.<a href="./src/agentex/resources/agents/agents.py">delete_by_name</a>(agent_name) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /agents/register-build">client.agents.<a href="./src/agentex/resources/agents/agents.py">register_build</a>(\*\*<a href="src/agentex/types/agent_register_build_params.py">params</a>) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="get /agents/name/{agent_name}">client.agents.<a href="./src/agentex/resources/agents/agents.py">retrieve_by_name</a>(agent_name) -> <a href="./src/agentex/types/agent.py">Agent</a></code>
+- <code title="post /agents/{agent_id}/rpc">client.agents.<a href="./src/agentex/resources/agents/agents.py">rpc</a>(agent_id, \*\*<a href="src/agentex/types/agent_rpc_params.py">params</a>) -> <a href="./src/agentex/types/agent_rpc_response.py">AgentRpcResponse</a></code>
+- <code title="post /agents/name/{agent_name}/rpc">client.agents.<a href="./src/agentex/resources/agents/agents.py">rpc_by_name</a>(agent_name, \*\*<a href="src/agentex/types/agent_rpc_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agent_rpc_response.py">AgentRpcResponse</a></code>
+
+## Deployments
+
+Types:
+
+```python
+from agentex.types.agents import (
+    DeploymentCreateResponse,
+    DeploymentRetrieveResponse,
+    DeploymentListResponse,
+    DeploymentPromoteResponse,
+)
+```
+
+Methods:
+
+- <code title="post /agents/{agent_id}/deployments">client.agents.deployments.<a href="./src/agentex/resources/agents/deployments.py">create</a>(agent_id, \*\*<a href="src/agentex/types/agents/deployment_create_params.py">params</a>) -> <a href="./src/agentex/types/agents/deployment_create_response.py">DeploymentCreateResponse</a></code>
+- <code title="get /agents/{agent_id}/deployments/{deployment_id}">client.agents.deployments.<a href="./src/agentex/resources/agents/deployments.py">retrieve</a>(deployment_id, \*, agent_id) -> <a href="./src/agentex/types/agents/deployment_retrieve_response.py">DeploymentRetrieveResponse</a></code>
+- <code title="get /agents/{agent_id}/deployments">client.agents.deployments.<a href="./src/agentex/resources/agents/deployments.py">list</a>(agent_id, \*\*<a href="src/agentex/types/agents/deployment_list_params.py">params</a>) -> <a href="./src/agentex/types/agents/deployment_list_response.py">DeploymentListResponse</a></code>
+- <code title="delete /agents/{agent_id}/deployments/{deployment_id}">client.agents.deployments.<a href="./src/agentex/resources/agents/deployments.py">delete</a>(deployment_id, \*, agent_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /agents/{agent_id}/deployments/{deployment_id}/rpc">client.agents.deployments.<a href="./src/agentex/resources/agents/deployments.py">preview_rpc</a>(deployment_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/deployment_preview_rpc_params.py">params</a>) -> <a href="./src/agentex/types/agent_rpc_response.py">AgentRpcResponse</a></code>
+- <code title="post /agents/{agent_id}/deployments/{deployment_id}/promote">client.agents.deployments.<a href="./src/agentex/resources/agents/deployments.py">promote</a>(deployment_id, \*, agent_id) -> <a href="./src/agentex/types/agents/deployment_promote_response.py">DeploymentPromoteResponse</a></code>
+
+## Schedules
+
+Types:
+
+```python
+from agentex.types.agents import (
+    ScheduleCreateResponse,
+    ScheduleRetrieveResponse,
+    ScheduleUpdateResponse,
+    ScheduleListResponse,
+    SchedulePauseResponse,
+    SchedulePauseByNameResponse,
+    ScheduleResumeResponse,
+    ScheduleResumeByNameResponse,
+    ScheduleRetrieveByNameResponse,
+    ScheduleSkipResponse,
+    ScheduleTriggerResponse,
+    ScheduleTriggerByNameResponse,
+    ScheduleUnskipResponse,
+    ScheduleUpdateByNameResponse,
+)
+```
+
+Methods:
+
+- <code title="post /agents/{agent_id}/schedules">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">create</a>(agent_id, \*\*<a href="src/agentex/types/agents/schedule_create_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_create_response.py">ScheduleCreateResponse</a></code>
+- <code title="get /agents/{agent_id}/schedules/{schedule_id}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">retrieve</a>(schedule_id, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_retrieve_response.py">ScheduleRetrieveResponse</a></code>
+- <code title="patch /agents/{agent_id}/schedules/{schedule_id}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">update</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_update_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_update_response.py">ScheduleUpdateResponse</a></code>
+- <code title="get /agents/{agent_id}/schedules">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">list</a>(agent_id, \*\*<a href="src/agentex/types/agents/schedule_list_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_list_response.py">ScheduleListResponse</a></code>
+- <code title="delete /agents/{agent_id}/schedules/{schedule_id}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">delete</a>(schedule_id, \*, agent_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="delete /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">delete_by_name</a>(name, \*, agent_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/pause">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">pause</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_pause_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_pause_response.py">SchedulePauseResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/name/{name}/pause">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">pause_by_name</a>(name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_pause_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_pause_by_name_response.py">SchedulePauseByNameResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/resume">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">resume</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_resume_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_resume_response.py">ScheduleResumeResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/name/{name}/resume">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">resume_by_name</a>(name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_resume_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_resume_by_name_response.py">ScheduleResumeByNameResponse</a></code>
+- <code title="get /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">retrieve_by_name</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_retrieve_by_name_response.py">ScheduleRetrieveByNameResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/skip">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">skip</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_skip_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_skip_response.py">ScheduleSkipResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/trigger">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">trigger</a>(schedule_id, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_trigger_response.py">ScheduleTriggerResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/name/{name}/trigger">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">trigger_by_name</a>(name, \*, agent_id) -> <a href="./src/agentex/types/agents/schedule_trigger_by_name_response.py">ScheduleTriggerByNameResponse</a></code>
+- <code title="post /agents/{agent_id}/schedules/{schedule_id}/unskip">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">unskip</a>(schedule_id, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_unskip_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_unskip_response.py">ScheduleUnskipResponse</a></code>
+- <code title="patch /agents/{agent_id}/schedules/name/{name}">client.agents.schedules.<a href="./src/agentex/resources/agents/schedules.py">update_by_name</a>(path_name, \*, agent_id, \*\*<a href="src/agentex/types/agents/schedule_update_by_name_params.py">params</a>) -> <a href="./src/agentex/types/agents/schedule_update_by_name_response.py">ScheduleUpdateByNameResponse</a></code>
+
+# Tasks
+
+Types:
+
+```python
+from agentex.types import (
+    Task,
+    TaskRetrieveResponse,
+    TaskListResponse,
+    TaskQueryWorkflowResponse,
+    TaskRetrieveByNameResponse,
+)
+```
+
+Methods:
+
+- <code title="get /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve</a>(task_id, \*\*<a href="src/agentex/types/task_retrieve_params.py">params</a>) -> <a href="./src/agentex/types/task_retrieve_response.py">TaskRetrieveResponse</a></code>
+- <code title="get /tasks">client.tasks.<a href="./src/agentex/resources/tasks.py">list</a>(\*\*<a href="src/agentex/types/task_list_params.py">params</a>) -> <a href="./src/agentex/types/task_list_response.py">TaskListResponse</a></code>
+- <code title="delete /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete</a>(task_id) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /tasks/{task_id}/cancel">client.tasks.<a href="./src/agentex/resources/tasks.py">cancel</a>(task_id, \*\*<a href="src/agentex/types/task_cancel_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="post /tasks/{task_id}/complete">client.tasks.<a href="./src/agentex/resources/tasks.py">complete</a>(task_id, \*\*<a href="src/agentex/types/task_complete_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="delete /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">delete_by_name</a>(task_name) -> <a href="./src/agentex/types/shared/delete_response.py">DeleteResponse</a></code>
+- <code title="post /tasks/{task_id}/fail">client.tasks.<a href="./src/agentex/resources/tasks.py">fail</a>(task_id, \*\*<a href="src/agentex/types/task_fail_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="post /tasks/{task_id}/interrupt">client.tasks.<a href="./src/agentex/resources/tasks.py">interrupt</a>(task_id, \*\*<a href="src/agentex/types/task_interrupt_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="get /tasks/{task_id}/query/{query_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">query_workflow</a>(query_name, \*, task_id) -> <a href="./src/agentex/types/task_query_workflow_response.py">TaskQueryWorkflowResponse</a></code>
+- <code title="get /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">retrieve_by_name</a>(task_name, \*\*<a href="src/agentex/types/task_retrieve_by_name_params.py">params</a>) -> <a href="./src/agentex/types/task_retrieve_by_name_response.py">TaskRetrieveByNameResponse</a></code>
+- <code title="get /tasks/{task_id}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events</a>(task_id) -> object</code>
+- <code title="get /tasks/name/{task_name}/stream">client.tasks.<a href="./src/agentex/resources/tasks.py">stream_events_by_name</a>(task_name) -> object</code>
+- <code title="post /tasks/{task_id}/terminate">client.tasks.<a href="./src/agentex/resources/tasks.py">terminate</a>(task_id, \*\*<a href="src/agentex/types/task_terminate_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="post /tasks/{task_id}/timeout">client.tasks.<a href="./src/agentex/resources/tasks.py">timeout</a>(task_id, \*\*<a href="src/agentex/types/task_timeout_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="put /tasks/{task_id}">client.tasks.<a href="./src/agentex/resources/tasks.py">update_by_id</a>(task_id, \*\*<a href="src/agentex/types/task_update_by_id_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+- <code title="put /tasks/name/{task_name}">client.tasks.<a href="./src/agentex/resources/tasks.py">update_by_name</a>(task_name, \*\*<a href="src/agentex/types/task_update_by_name_params.py">params</a>) -> <a href="./src/agentex/types/task.py">Task</a></code>
+
+# Messages
+
+Types:
+
+```python
+from agentex.types import (
+    DataContent,
+    MessageAuthor,
+    MessageStyle,
+    ReasoningContent,
+    TaskMessage,
+    TextContent,
+    TextFormat,
+    ToolRequestContent,
+    ToolResponseContent,
+    MessageListResponse,
+    MessageListPaginatedResponse,
+)
+```
+
+Methods:
+
+- <code title="post /messages">client.messages.<a href="./src/agentex/resources/messages/messages.py">create</a>(\*\*<a href="src/agentex/types/message_create_params.py">params</a>) -> <a href="./src/agentex/types/task_message.py">TaskMessage</a></code>
+- <code title="get /messages/{message_id}">client.messages.<a href="./src/agentex/resources/messages/messages.py">retrieve</a>(message_id) -> <a href="./src/agentex/types/task_message.py">TaskMessage</a></code>
+- <code title="put /messages/{message_id}">client.messages.<a href="./src/agentex/resources/messages/messages.py">update</a>(message_id, \*\*<a href="src/agentex/types/message_update_params.py">params</a>) -> <a href="./src/agentex/types/task_message.py">TaskMessage</a></code>
+- <code title="get /messages">client.messages.<a href="./src/agentex/resources/messages/messages.py">list</a>(\*\*<a href="src/agentex/types/message_list_params.py">params</a>) -> <a href="./src/agentex/types/message_list_response.py">MessageListResponse</a></code>
+- <code title="get /messages/paginated">client.messages.<a href="./src/agentex/resources/messages/messages.py">list_paginated</a>(\*\*<a href="src/agentex/types/message_list_paginated_params.py">params</a>) -> <a href="./src/agentex/types/message_list_paginated_response.py">MessageListPaginatedResponse</a></code>
+
+## Batch
+
+Types:
+
+```python
+from agentex.types.messages import BatchCreateResponse, BatchUpdateResponse
+```
+
+Methods:
+
+- <code title="post /messages/batch">client.messages.batch.<a href="./src/agentex/resources/messages/batch.py">create</a>(\*\*<a href="src/agentex/types/messages/batch_create_params.py">params</a>) -> <a href="./src/agentex/types/messages/batch_create_response.py">BatchCreateResponse</a></code>
+- <code title="put /messages/batch">client.messages.batch.<a href="./src/agentex/resources/messages/batch.py">update</a>(\*\*<a href="src/agentex/types/messages/batch_update_params.py">params</a>) -> <a href="./src/agentex/types/messages/batch_update_response.py">BatchUpdateResponse</a></code>
+
+# Spans
+
+Types:
+
+```python
+from agentex.types import Span, SpanListResponse
+```
+
+Methods:
+
+- <code title="post /spans">client.spans.<a href="./src/agentex/resources/spans.py">create</a>(\*\*<a href="src/agentex/types/span_create_params.py">params</a>) -> <a href="./src/agentex/types/span.py">Span</a></code>
+- <code title="get /spans/{span_id}">client.spans.<a href="./src/agentex/resources/spans.py">retrieve</a>(span_id) -> <a href="./src/agentex/types/span.py">Span</a></code>
+- <code title="patch /spans/{span_id}">client.spans.<a href="./src/agentex/resources/spans.py">update</a>(span_id, \*\*<a href="src/agentex/types/span_update_params.py">params</a>) -> <a href="./src/agentex/types/span.py">Span</a></code>
+- <code title="get /spans">client.spans.<a href="./src/agentex/resources/spans.py">list</a>(\*\*<a href="src/agentex/types/span_list_params.py">params</a>) -> <a href="./src/agentex/types/span_list_response.py">SpanListResponse</a></code>
+
+# States
+
+Types:
+
+```python
+from agentex.types import State, StateListResponse
+```
+
+Methods:
+
+- <code title="post /states">client.states.<a href="./src/agentex/resources/states.py">create</a>(\*\*<a href="src/agentex/types/state_create_params.py">params</a>) -> <a href="./src/agentex/types/state.py">State</a></code>
+- <code title="get /states/{state_id}">client.states.<a href="./src/agentex/resources/states.py">retrieve</a>(state_id) -> <a href="./src/agentex/types/state.py">State</a></code>
+- <code title="put /states/{state_id}">client.states.<a href="./src/agentex/resources/states.py">update</a>(state_id, \*\*<a href="src/agentex/types/state_update_params.py">params</a>) -> <a href="./src/agentex/types/state.py">State</a></code>
+- <code title="get /states">client.states.<a href="./src/agentex/resources/states.py">list</a>(\*\*<a href="src/agentex/types/state_list_params.py">params</a>) -> <a href="./src/agentex/types/state_list_response.py">StateListResponse</a></code>
+- <code title="delete /states/{state_id}">client.states.<a href="./src/agentex/resources/states.py">delete</a>(state_id) -> <a href="./src/agentex/types/state.py">State</a></code>
+
+# Events
+
+Types:
+
+```python
+from agentex.types import Event, EventListResponse
+```
+
+Methods:
+
+- <code title="get /events/{event_id}">client.events.<a href="./src/agentex/resources/events.py">retrieve</a>(event_id) -> <a href="./src/agentex/types/event.py">Event</a></code>
+- <code title="get /events">client.events.<a href="./src/agentex/resources/events.py">list</a>(\*\*<a href="src/agentex/types/event_list_params.py">params</a>) -> <a href="./src/agentex/types/event_list_response.py">EventListResponse</a></code>
+
+# Tracker
+
+Types:
+
+```python
+from agentex.types import AgentTaskTracker, TrackerListResponse
+```
+
+Methods:
+
+- <code title="get /tracker/{tracker_id}">client.tracker.<a href="./src/agentex/resources/tracker.py">retrieve</a>(tracker_id) -> <a href="./src/agentex/types/agent_task_tracker.py">AgentTaskTracker</a></code>
+- <code title="put /tracker/{tracker_id}">client.tracker.<a href="./src/agentex/resources/tracker.py">update</a>(tracker_id, \*\*<a href="src/agentex/types/tracker_update_params.py">params</a>) -> <a href="./src/agentex/types/agent_task_tracker.py">AgentTaskTracker</a></code>
+- <code title="get /tracker">client.tracker.<a href="./src/agentex/resources/tracker.py">list</a>(\*\*<a href="src/agentex/types/tracker_list_params.py">params</a>) -> <a href="./src/agentex/types/tracker_list_response.py">TrackerListResponse</a></code>
+
+# DeploymentHistory
+
+Types:
+
+```python
+from agentex.types import DeploymentHistory, DeploymentHistoryListResponse
+```
+
+Methods:
+
+- <code title="get /deployment-history/{deployment_id}">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">retrieve</a>(deployment_id) -> <a href="./src/agentex/types/deployment_history.py">DeploymentHistory</a></code>
+- <code title="get /deployment-history">client.deployment_history.<a href="./src/agentex/resources/deployment_history.py">list</a>(\*\*<a href="src/agentex/types/deployment_history_list_params.py">params</a>) -> <a href="./src/agentex/types/deployment_history_list_response.py">DeploymentHistoryListResponse</a></code>
+
+# Checkpoints
+
+Types:
+
+```python
+from agentex.types import CheckpointListResponse, CheckpointGetTupleResponse, CheckpointPutResponse
+```
+
+Methods:
+
+- <code title="post /checkpoints/list">client.checkpoints.<a href="./src/agentex/resources/checkpoints.py">list</a>(\*\*<a href="src/agentex/types/checkpoint_list_params.py">params</a>) -> <a href="./src/agentex/types/checkpoint_list_response.py">CheckpointListResponse</a></code>
+- <code title="post /checkpoints/delete-thread">client.checkpoints.<a href="./src/agentex/resources/checkpoints.py">delete_thread</a>(\*\*<a href="src/agentex/types/checkpoint_delete_thread_params.py">params</a>) -> None</code>
+- <code title="post /checkpoints/get-tuple">client.checkpoints.<a href="./src/agentex/resources/checkpoints.py">get_tuple</a>(\*\*<a href="src/agentex/types/checkpoint_get_tuple_params.py">params</a>) -> <a href="./src/agentex/types/checkpoint_get_tuple_response.py">Optional[CheckpointGetTupleResponse]</a></code>
+- <code title="post /checkpoints/put">client.checkpoints.<a href="./src/agentex/resources/checkpoints.py">put</a>(\*\*<a href="src/agentex/types/checkpoint_put_params.py">params</a>) -> <a href="./src/agentex/types/checkpoint_put_response.py">CheckpointPutResponse</a></code>
+- <code title="post /checkpoints/put-writes">client.checkpoints.<a href="./src/agentex/resources/checkpoints.py">put_writes</a>(\*\*<a href="src/agentex/types/checkpoint_put_writes_params.py">params</a>) -> None</code>
+
+# Webhooks
+
+Types:
+
+```python
+from agentex.types import WebhookCreateWebhookTriggerResponse
+```
+
+Methods:
+
+- <code title="post /agent_api_keys/webhook-trigger">client.webhooks.<a href="./src/agentex/resources/webhooks.py">create_webhook_trigger</a>(\*\*<a href="src/agentex/types/webhook_create_webhook_trigger_params.py">params</a>) -> <a href="./src/agentex/types/webhook_create_webhook_trigger_response.py">WebhookCreateWebhookTriggerResponse</a></code>

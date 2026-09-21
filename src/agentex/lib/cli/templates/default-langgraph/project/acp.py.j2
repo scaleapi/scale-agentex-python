@@ -1,0 +1,102 @@
+"""
+ACP handler for async LangGraph agent.
+
+Uses the async ACP model with Redis streaming instead of HTTP yields.
+"""
+
+from dotenv import load_dotenv
+
+load_dotenv()
+import os
+
+# LiteLLM proxy auth: copy LITELLM_API_KEY to OPENAI_API_KEY for OpenAI client compatibility
+_litellm_key = os.environ.get("LITELLM_API_KEY")
+if _litellm_key:
+    os.environ["OPENAI_API_KEY"] = _litellm_key
+
+import agentex.lib.adk as adk
+from agentex.lib.core.harness import UnifiedEmitter
+from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
+from agentex.lib.sdk.fastacp.fastacp import FastACP
+from agentex.protocol.acp import SendEventParams, CancelTaskParams, CreateTaskParams
+from agentex.lib.types.fastacp import AsyncACPConfig
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.utils.logging import make_logger
+from agentex.types.text_content import TextContent
+from agentex.lib.adk import LangGraphTurn
+
+from project.graph import create_graph
+
+logger = make_logger(__name__)
+
+add_tracing_processor_config(
+    SGPTracingProcessorConfig(
+        sgp_api_key=os.environ.get("SGP_API_KEY", ""),
+        sgp_account_id=os.environ.get("SGP_ACCOUNT_ID", ""),
+        sgp_base_url=os.environ.get("SGP_CLIENT_BASE_URL", ""),
+    ))
+
+acp = FastACP.create(
+    acp_type="async",
+    config=AsyncACPConfig(type="base"),
+)
+
+_graph = None
+
+
+async def get_graph():
+    global _graph
+    if _graph is None:
+        _graph = await create_graph()
+    return _graph
+
+
+@acp.on_task_event_send
+async def handle_task_event_send(params: SendEventParams):
+    """Handle incoming events, streaming tokens and tool calls via Redis."""
+    graph = await get_graph()
+    task_id = params.task.id
+    content = params.event.content
+    if not isinstance(content, TextContent):
+        logger.warning("Ignoring non-text event content (type=%s)", getattr(content, "type", "?"))
+        return
+    user_message = content.content
+
+    logger.info(f"Processing message for thread {task_id}")
+
+    # Echo the user's message
+    await adk.messages.create(task_id=task_id, content=params.event.content)
+
+    async with adk.tracing.span(
+        trace_id=task_id,
+        name="message",
+        input={"message": user_message},
+        data={"__span_type__": "AGENT_WORKFLOW"},
+    ) as turn_span:
+        stream = graph.astream(
+            {"messages": [{"role": "user", "content": user_message}]},
+            config={"configurable": {"thread_id": task_id}},
+            stream_mode=["messages", "updates"],
+        )
+
+        turn = LangGraphTurn(stream, model=None)
+        emitter = UnifiedEmitter(
+            task_id=task_id,
+            trace_id=task_id,
+            parent_span_id=turn_span.id if turn_span else None,
+        )
+
+        result = await emitter.auto_send_turn(turn)
+
+        if turn_span:
+            turn_span.output = {"final_output": result.final_text}
+
+
+@acp.on_task_create
+async def handle_task_create(params: CreateTaskParams):
+    logger.info(f"Task created: {params.task.id}")
+
+
+@acp.on_task_cancel
+async def handle_task_canceled(params: CancelTaskParams):
+    logger.info(f"Task canceled: {params.task.id}")

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "at140-claude-code"
+version = "0.1.0"
+description = "A Temporal-backed Claude Code agent streaming the unified harness surface via a local CLI subprocess"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "agentex-sdk",
+    "scale-gp",
+    "temporalio>=1.18.2",
+    "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "debugpy>=1.8.15",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["project"]
