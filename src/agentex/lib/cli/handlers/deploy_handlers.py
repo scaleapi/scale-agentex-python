@@ -389,6 +389,8 @@ def merge_deployment_configs(
             _deep_merge(helm_values, agent_env_config.helm_overrides)
         logger.info(f"After-merge helm values: {helm_values}")
 
+    _stamp_agent_version(helm_values, set(all_env_vars) | {var["name"] for var in secret_env_vars})
+
     # Set final environment variables
     # Environment variable precedence: manifest -> environments.yaml -> secrets (highest)
     if all_env_vars:
@@ -428,6 +430,14 @@ def _deep_merge(base_dict: dict[str, Any], override_dict: dict[str, Any]) -> Non
             _deep_merge(base_dict[key], value)
         else:
             base_dict[key] = value
+
+
+def _stamp_agent_version(helm_values: dict[str, Any], declared_env_names: set[str]) -> None:
+    """Set global.agent.version from the merged image tag unless the deployment declares AGENT_VERSION itself."""
+    if EnvVarKeys.AGENT_VERSION.value in declared_env_names:
+        # Chart >=0.6.0 renders global.agent.version as a second AGENT_VERSION env entry.
+        return
+    helm_values["global"]["agent"].setdefault("version", helm_values["global"]["image"]["tag"])
 
 
 def create_helm_values_file(helm_values: dict[str, Any]) -> str:

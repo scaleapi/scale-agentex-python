@@ -12,6 +12,36 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## 0.28.0 (2026-09-18)
+
+Full Changelog: [agentex-client-v0.27.0...agentex-client-v0.28.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.27.0...agentex-client-v0.28.0)
+
+### Features
+
+* **obs:** wire sgp-obs from the SDK for traces, metrics and logs ([#523](https://github.com/scaleapi/scale-agentex-python/issues/523)) ([2bd031e](https://github.com/scaleapi/scale-agentex-python/commit/2bd031e7e3d8ac15a960015d9d83f8ff24921e21))
+
+
+### Bug Fixes
+
+* **temporal:** deduplicate tracing and skip replay logs ([#524](https://github.com/scaleapi/scale-agentex-python/issues/524)) ([bc51c52](https://github.com/scaleapi/scale-agentex-python/commit/bc51c52d79028764fa3f7208438f4f975be1c461))
+
+## 0.27.0 (2026-09-18)
+
+Full Changelog: [agentex-client-v0.26.0...agentex-client-v0.27.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.26.0...agentex-client-v0.27.0)
+
+### Features
+
+* **adk:** make AgentEx client HTTP timeouts configurable by env var ([#510](https://github.com/scaleapi/scale-agentex-python/issues/510)) ([066105f](https://github.com/scaleapi/scale-agentex-python/commit/066105f3be55bc3213ebf6b1a9664ca3fb1cc31f))
+* **cli:** stamp global.agent.version from the image tag on helm deploys ([#504](https://github.com/scaleapi/scale-agentex-python/issues/504)) ([a90f622](https://github.com/scaleapi/scale-agentex-python/commit/a90f62281ef262011bbdeb27d684ebac2f193ad3))
+* **obs:** wire sgp-obs from the SDK for traces, metrics and logs ([#518](https://github.com/scaleapi/scale-agentex-python/issues/518)) ([d88fac6](https://github.com/scaleapi/scale-agentex-python/commit/d88fac6a0b3e572a6346106a615265b2354d1f79))
+* **registration:** report the agent's commit and source repo at registration ([#508](https://github.com/scaleapi/scale-agentex-python/issues/508)) ([94335d7](https://github.com/scaleapi/scale-agentex-python/commit/94335d71ece7bfff3ba684fe43991e4bd2397295))
+* **tracing:** stamp __commit_sha__ automatically when AGENT_COMMIT_SHA is set ([#507](https://github.com/scaleapi/scale-agentex-python/issues/507)) ([53ab900](https://github.com/scaleapi/scale-agentex-python/commit/53ab9007ab2a78528c38fe254929b92ccce740a3))
+
+
+### Reverts
+
+* **obs:** remove sgp-obs beta changes ([#522](https://github.com/scaleapi/scale-agentex-python/issues/522)) ([687ebfb](https://github.com/scaleapi/scale-agentex-python/commit/687ebfbf874e1feb01e102c7130cebb7f26e387a))
+
 ## 0.26.0 (2026-09-14)
 
 Full Changelog: [agentex-client-v0.25.0...agentex-client-v0.26.0](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.25.0...agentex-client-v0.26.0)
