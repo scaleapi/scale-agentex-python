@@ -127,8 +127,23 @@ class InterruptTaskParams(BaseModel):
     )
 
 
+# Methods whose handler must finish before the RPC responds.
+#
+# TASK_CREATE is here because its whole contract is to hand back an id for a
+# task that now exists. Its handler starts the Temporal workflow, so answering
+# before the handler runs returns an id the server cannot yet route to: a caller
+# that follows task/create with event/send can have its signal arrive first and
+# be dropped with `workflow not found`. Nothing batches task creations, so there
+# is no benefit to trade against, and start_workflow is a short RPC.
+#
+# EVENT_SEND deliberately stays asynchronous. Callers send events in quick
+# succession and the workflow drains them as a batch; awaiting each send
+# serialises them and no batch ever holds more than one event. Once TASK_CREATE
+# is synchronous the workflow is addressable before any event is sent, which is
+# what the race needed.
 RPC_SYNC_METHODS = [
     RPCMethod.MESSAGE_SEND,
+    RPCMethod.TASK_CREATE,
 ]
 
 PARAMS_MODEL_BY_METHOD: dict[RPCMethod, type[BaseModel]] = {
