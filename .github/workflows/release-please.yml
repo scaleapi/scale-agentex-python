@@ -1,20 +1,80 @@
 name: Release Please
+
+# Hand-edited from the stlc-generated template. `.github/workflows/*.yml` is
+# scaffold-once, so this survives every later build -- upstream's own source cites
+# exactly this PAT-to-App swap as the reason that preservation exists. Do NOT run
+# `stlc build --rewrite-scaffold` without reapplying these three changes.
+#
+# What changed from the generated file, and why each is load-bearing:
+#
+#   1. App token instead of `secrets.RELEASE_PLEASE_TOKEN`, which does not exist
+#      and which we do not want to create -- eliminating PATs was the point of the
+#      App migration. It is deliberately NOT `GITHUB_TOKEN`: releases created by
+#      GITHUB_TOKEN do not trigger other workflows, so publish-*.yml would never
+#      fire and the release would stop one hop short of the registry.
+#
+#   2. The `npx release-please@16` CLI instead of googleapis/release-please-action.
+#      scale-agentex-typescript sets `allowed_actions: selected` and does not permit
+#      that action; the CLI needs only actions/-owned steps, which
+#      `github_owned_allowed: true` covers on both production repos.
+#
+#   3. `issues: write` on the minted token. release-please drives its
+#      autorelease:pending -> autorelease:tagged labels through the Issues API.
+#      Without it you get duplicate release pull requests. The generated file omits
+#      it, and the omission is silent until it bites.
+#
+# Requires AGENTEX_SDK_SYNC_PRIVATE_KEY (secret) and AGENTEX_SDK_SYNC_APP_ID
+# (variable) on the PRODUCTION repo -- a workflow only reads secrets from the repo
+# it runs in, and the guard below means that is production.
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release-please:
+    # Self-routing: this file is SHA-identical on the staging trunk, where it must
+    # stay inert. Only production cuts releases.
     if: github.repository == 'scaleapi/scale-agentex-python'
     runs-on: ubuntu-latest
-
     steps:
-      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
-        id: release
+      - name: Mint release token
+        id: release-token
+        uses: actions/create-github-app-token@v2
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          app-id: ${{ vars.AGENTEX_SDK_SYNC_APP_ID }}
+          private-key: ${{ secrets.AGENTEX_SDK_SYNC_PRIVATE_KEY }}
+          owner: scaleapi
+          repositories: scale-agentex-python
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+          permission-metadata: read
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Release PR + GitHub release
+        env:
+          RP_TOKEN: ${{ steps.release-token.outputs.token }}
+        run: |
+          # release-pr opens or updates the version-bump pull request;
+          # github-release turns an already-merged one into the tag + GitHub Release
+          # that publish-pypi.yml / publish-npm.yml trigger on. Both are idempotent,
+          # so running the pair on every push carries a release the whole way.
+          #
+          # No checkout step is needed: release-please reads the config and manifest
+          # from the repo over the API.
+          npx --yes release-please@16 release-pr \
+            --token="$RP_TOKEN" --repo-url="${{ github.repository }}" \
+            --config-file=release-please-config.json \
+            --manifest-file=.release-please-manifest.json
+          npx --yes release-please@16 github-release \
+            --token="$RP_TOKEN" --repo-url="${{ github.repository }}" \
+            --config-file=release-please-config.json \
+            --manifest-file=.release-please-manifest.json
