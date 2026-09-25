@@ -12,6 +12,7 @@ from rich.console import Console
 from agentex.lib.cli.debug import DebugConfig, start_acp_server_debug, start_temporal_worker_debug
 from agentex.lib.utils.logging import make_logger
 from agentex.config.agent_manifest import AgentManifest
+from agentex.lib.cli.utils.cli_utils import SUBPROCESS_STREAM_LIMIT
 from agentex.lib.cli.utils.path_utils import (
     get_file_paths,
     calculate_uvicorn_target_for_local,
@@ -22,6 +23,11 @@ from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows, s
 
 logger = make_logger(__name__)
 console = Console()
+
+# How many consecutive unreadable lines to skip before giving up on the stream.
+# Skipping is only known-safe for the limit-overrun case; this bounds the damage
+# if some other error repeats without consuming anything.
+MAX_CONSECUTIVE_READ_ERRORS = 100
 
 
 class RunError(Exception):
@@ -215,6 +221,7 @@ async def start_acp_server(
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        limit=SUBPROCESS_STREAM_LIMIT,
     )
 
 
@@ -234,23 +241,68 @@ async def start_temporal_worker(
         env=env,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
+        limit=SUBPROCESS_STREAM_LIMIT,
     )
 
 
 async def stream_process_output(process: asyncio.subprocess.Process, prefix: str):
-    """Stream process output with prefix"""
+    """Stream process output with prefix.
+
+    This loop is the only reader of the child's stdout pipe. If it ever stops
+    reading, the pipe fills and the child blocks forever inside ``write()``,
+    which presents as a silent freeze: 0% CPU, no further logs, no traceback.
+    So a single unreadable line must never end the loop.
+    """
     try:
         if process.stdout is None:
             return
+        consecutive_read_errors = 0
         while True:
-            line = await process.stdout.readline()
+            try:
+                line = await process.stdout.readline()
+            except ValueError as e:
+                # readline() raises ValueError when a line exceeds the stream limit.
+                # In *that* case it has already discarded the line and resumed the
+                # transport, so skipping it makes guaranteed progress. Any other
+                # ValueError carries no such guarantee, and retrying it forever would
+                # spin without draining. We cannot tell the two apart (readline
+                # flattens LimitOverrunError into a bare ValueError), so bound the
+                # retries and let the outer handler report the hang risk.
+                consecutive_read_errors += 1
+                if consecutive_read_errors > MAX_CONSECUTIVE_READ_ERRORS:
+                    raise
+                logger.warning(
+                    f"Skipping an unreadable line from {prefix}: {e!r} "
+                    f"(consecutive failure {consecutive_read_errors}/{MAX_CONSECUTIVE_READ_ERRORS}). "
+                    f"If this says the chunk exceeded the limit, raise limit= on this "
+                    f"process's create_subprocess_exec."
+                )
+                continue
+
+            consecutive_read_errors = 0
+
             if not line:
                 break
-            decoded_line = line.decode("utf-8").rstrip()
+
+            try:
+                decoded_line = line.decode("utf-8").rstrip()
+            except UnicodeDecodeError as e:
+                logger.warning(f"Dropped an undecodable log line from {prefix} ({e}).")
+                continue
+
             if decoded_line:  # Only print non-empty lines
                 console.print(f"[dim]{prefix}:[/dim] {decoded_line}")
     except Exception as e:
-        logger.debug(f"Output streaming ended for {prefix}: {e}")
+        # The escalation path, including for the re-raise above. Anything reaching
+        # here ends the loop, so the child is now at risk of blocking on a full pipe.
+        # Warning rather than debug: this used to be a debug() that make_logger could
+        # never emit, which is why three freezes produced no clue.
+        # CancelledError derives from BaseException, so the auto-reload path that
+        # cancels these tasks passes straight through and is unaffected.
+        logger.warning(
+            f"Output streaming for {prefix} stopped on {e!r}. "
+            f"Nothing is draining its stdout now, so {prefix} will hang once the pipe fills."
+        )
 
 
 async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):

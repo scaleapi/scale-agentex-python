@@ -27,6 +27,26 @@ This automatically pulls in [`agentex-client`](../) (the slim Stainless-generate
 
 The two packages contribute disjoint files to the `agentex.*` namespace — `agentex/lib/*` ships only from `agentex-sdk`.
 
+## Workflow logging
+
+Use the workflow logger in Temporal workflow code:
+
+```python
+from agentex.lib.core.temporal.logging import make_workflow_logger
+
+logger = make_workflow_logger(__name__)
+```
+
+It suppresses logs while Temporal replays recorded history and adds top-level
+`workflow_id` and `run_id` fields during workflow execution. It preserves the
+message, caller fields, and exception details. Outside workflows, including in
+activities, it behaves like the ordinary SDK logger.
+
+New Temporal templates use this helper. Existing agents must replace their own
+workflow loggers to get the same behavior. This does not create trace context or
+add trace IDs to workflows that lack it. Temporal's worker diagnostics still report
+replay failures.
+
 ## Repo layout
 
 This package is hand-authored and lives at `adk/` inside [scaleapi/scale-agentex-python](https://github.com/scaleapi/scale-agentex-python). Stainless codegen never touches `adk/**` — it's outside the generated surface. The sibling `agentex-client` package lives at the repo root and IS Stainless-generated.

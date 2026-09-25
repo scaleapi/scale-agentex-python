@@ -29,8 +29,19 @@ COPY {{ project_path_from_build_root }}/requirements.txt /app/{{ project_path_fr
 
 WORKDIR /app/{{ project_path_from_build_root }}
 
+# Optional private index for Scale-internal packages such as sgp-obs, injected by the
+# control-plane broker (SGPINF-1568). Inert unless the secret is present.
+#
+# This variant installs from requirements.txt, so there is no pyproject.toml for uv to
+# read a named index out of; the credentialed URL is used directly and is deliberately
+# NOT decoded. See PRIVATE_INDEX.md in the agentex-sdk CLI templates directory.
+#
 # Install the required Python packages
-RUN uv pip install --system -r requirements.txt
+RUN --mount=type=secret,id=codeartifact-pip-conf,required=false \
+    if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_DEFAULT_INDEX="$(sed -n 's#^[[:space:]]*index-url[[:space:]]*=[[:space:]]*##p' /run/secrets/codeartifact-pip-conf | head -1)"; \
+    fi; \
+    uv pip install --system -r requirements.txt
 
 # Copy the project code
 COPY {{ project_path_from_build_root }}/project /app/{{ project_path_from_build_root }}/project
