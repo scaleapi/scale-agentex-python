@@ -24,8 +24,17 @@ jobs:
           # These bots may not always emit Conventional-Commits-formatted titles
           # (dependabot's default "Bump foo from 1.0 to 1.1" doesn't match) and we
           # don't want their PRs blocked by this check. Mirrors validate-pr-base.
+          #
+          # agentex-sdk-sync[bot] is this repo's own SDK automation. release-please
+          # runs here as a CLI under that App rather than as the release-please[bot]
+          # GitHub App, so its release pull requests are authored by
+          # agentex-sdk-sync[bot] and the entry above never matched them. Their
+          # titles come from release-please's configured pull-request-title-pattern,
+          # "release: <version>", which is not a Conventional Commits type and cannot
+          # be changed without also changing the string release-please parses back
+          # when it cuts the release. The same App opens the promote pull requests.
           case "$PR_AUTHOR" in
-            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\])
+            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\]|agentex-sdk-sync\[bot\])
               echo "PR is from automation ($PR_AUTHOR); skipping title check."
               exit 0
               ;;
@@ -93,7 +102,7 @@ jobs:
 
           # Exempt automated PRs (must mirror validate-pr-title's list).
           case "$PR_AUTHOR" in
-            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\])
+            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\]|agentex-sdk-sync\[bot\])
               delete_comment
               echo "PR is from automation ($PR_AUTHOR); allowing PR targeting main."
               exit 0

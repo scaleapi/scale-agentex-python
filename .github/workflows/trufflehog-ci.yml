@@ -1,0 +1,13 @@
+name: TruffleHog Secret Scan
+
+on:
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  scan:
+    uses: scaleapi/required-actions/.github/workflows/trufflehog-scan.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write

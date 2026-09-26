@@ -71,7 +71,7 @@ __all__ = [
 ]
 
 ENVIRONMENTS: Dict[str, str] = {
-    "production": "http://localhost:5003",
+    "production": "https://agentex.sgp.scale.com",
     "development": "http://localhost:5003",
 }
 

@@ -1,0 +1,82 @@
+name: Bandit
+
+on:
+  # Scan changed files in PRs:
+  pull_request: {}
+
+jobs:
+  bandit-scan:
+    name: Bandit
+    runs-on: ubuntu-22.04
+    if: (github.actor != 'dependabot[bot]') && (github.actor != 'github-actions[bot]')
+    steps:
+      - name: Install PyCQA/bandit
+        shell: bash
+        run: |
+          pip install bandit
+      - name: Checkout base branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 1
+          submodules: false
+      - name: Run a baseline scan
+        shell: bash
+        run: |
+          bandit --recursive --aggregate file . -f json -o baseline.json || true
+      - name: Checkout feature branch
+        shell: bash
+        run: |
+          git fetch origin $GITHUB_HEAD_REF
+          git checkout $GITHUB_HEAD_REF
+      - name: Run Scan off of baseline
+        shell: bash
+        run: |
+          bandit --recursive --aggregate file . --baseline baseline.json -f json -o results.json || true
+      - name: Install logging prerequisites
+        shell: bash {0}
+        run: |
+          sudo apt-get -y install jq curl
+      - name: Generate logger template
+        shell: bash {0} # don't fail the job if the logging fails
+        run: |
+          jq -n --arg organization $GITHUB_REPOSITORY_OWNER \
+          -n --arg time $( date +'%Y-%m-%dT%H:%M:%SZ'  ) \
+          -n --arg action $GITHUB_WORKFLOW \
+          -n --arg repository $GITHUB_REPOSITORY \
+          -n --arg sha $GITHUB_SHA \
+          -n --arg branch $GITHUB_HEAD_REF \
+          -n --arg link "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+          -f .github/workflows/output-template.json > tmp-output.json
+      - name: Format results appropriately from results.json
+        shell: bash {0} # don't fail the job if the logging fails
+        run: |
+          jq '.results | map({"path": .filename, "message": .issue_text, "line": .line_number})' results.json > tmp.json
+          # --slurpfile, not --argjson "$(<tmp.json)": the latter passes the whole results file
+          # as a single argv entry, which Linux caps at MAX_ARG_STRLEN (128KB) regardless of the
+          # much larger total ARG_MAX. Once a scan produced more than ~128KB of findings the step
+          # died with "Argument list too long" (exit 126) and failed the job -- despite the
+          # `shell: bash {0}` above intending it to be non-fatal. --slurpfile reads the file
+          # directly, so size is irrelevant; it wraps the file's values in an array, hence [0].
+          jq --slurpfile scanResults tmp.json '.results += $scanResults[0]' tmp-output.json > output.json
+      - name: Send unified results to logging cluster
+        # `shell: bash {0}` drops `-e`, but a step still fails when its LAST command does,
+        # and curl was the last command -- so a repo without these secrets failed the whole
+        # Bandit job on a reporting problem, contradicting the intent stated right here.
+        # Neither this repo nor the production repo defines them, so this failed every run.
+        # Stay non-fatal, but say so rather than reporting nothing silently.
+        shell: bash {0} # don't fail the job if the logging fails
+        env:
+          ENDPOINT: ${{ secrets.N8N_PRODSEC_ACTIONS_ENDPOINT }}
+          TOKEN: ${{ secrets.N8N_PRODSEC_ACTIONS_TOKEN }}
+        run: |
+          if [ -z "${ENDPOINT:-}" ]; then
+            echo "::warning title=Bandit results not reported::N8N_PRODSEC_ACTIONS_ENDPOINT is not set on this repository, so the scan results were not sent to the logging cluster. The scan itself ran and its findings are in the job log."
+            exit 0
+          fi
+          curl -sS -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -d @./output.json \
+            "$ENDPOINT" \
+            || echo "::warning title=Bandit results not reported::the POST to the logging cluster failed; the scan itself still ran."

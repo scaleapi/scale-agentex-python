@@ -1,0 +1,16 @@
+name: TruffleHog Bypass Handler
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  bypass:
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/trufflehog-bypass')
+    uses: scaleapi/required-actions/.github/workflows/trufflehog-bypass-handler.yml@main
+    permissions:
+      pull-requests: write
+      contents: read
+      actions: write
