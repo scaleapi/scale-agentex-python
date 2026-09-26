@@ -169,6 +169,21 @@ jobs:
           CLAUDE_LIVE_TESTS: ${{ contains(matrix.tutorial, 'claude_code') && '1' || '' }}
           CODEX_LIVE_TESTS: ${{ contains(matrix.tutorial, 'codex') && '1' || '' }}
           HEALTH_CHECK_PORT: 8080 # Use non-privileged port for temporal worker health checks
+          # The tutorials' TEST clients pass base_url explicitly, but the AGENTS do not: the
+          # ADK builds Agentex()/AsyncAgentex() with no arguments, so they fall back to
+          # ENVIRONMENTS["production"] in the generated _client.py. That default used to be
+          # http://localhost:5003, which made these tests pass by accident -- and is a real
+          # bug in the published package (agentex-client 0.28.1 ships
+          # "production": "http://localhost:5003", pointing every caller of Agentex() at
+          # their own machine). This trunk corrects it to the real production URL, so pin the
+          # local server explicitly here rather than depending on a default that should never
+          # have been a dev address. Agents are plain subprocesses of run_agent_test.sh and
+          # inherit this.
+          #
+          # Name matters: the SDK reads AGENTEX_BASE_URL. The AGENTEX_API_BASE_URL set on the
+          # command line below is a different variable, read only by the tutorials' own test
+          # files, and never reaches the SDK.
+          AGENTEX_BASE_URL: http://localhost:5003
         run: |
           echo "Testing tutorial: ${{ matrix.tutorial }}"
           AGENTEX_API_BASE_URL="http://localhost:5003" \
