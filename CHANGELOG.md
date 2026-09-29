@@ -12,6 +12,23 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## [0.28.2](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.28.1...agentex-client-v0.28.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* align the base-URL test with this trunk, and stop Bandit failing on reporting ([bc1a463](https://github.com/scaleapi/scale-agentex-python/commit/bc1a4636a572699f6ee582c7f5ec4a9678f71b5c))
+* **ci:** fetch the Bandit scan's PR head by SHA so fork PRs are scanned ([a71d304](https://github.com/scaleapi/scale-agentex-python/commit/a71d30494919b45ec31768592b72857054e13e8e))
+* **ci:** fetch the Bandit scan's PR head by SHA so fork PRs are scanned ([8d64a73](https://github.com/scaleapi/scale-agentex-python/commit/8d64a739e25d5eaf0d4781e8adb0759fd01379bf))
+* **ci:** pin the tutorial agents to the local server explicitly ([74394c5](https://github.com/scaleapi/scale-agentex-python/commit/74394c54533bbd41a305a6c81eb08800a2d94799))
+* **stlc:** restore the custom-code tree a stale seal anchor reverted ([73ea73e](https://github.com/scaleapi/scale-agentex-python/commit/73ea73eab019f2121a15dc595fc5b0a155fbfafa))
+
+
+### Chores
+
+* **release:** point release-please config at the stock schema ([90387d2](https://github.com/scaleapi/scale-agentex-python/commit/90387d275ba419ce5d8a2ccbfbda455c80a4708d))
+* **stlc:** back-sync the 0.28.1 release from production ([9ae1fa1](https://github.com/scaleapi/scale-agentex-python/commit/9ae1fa12fefdcaaf0f2c455cc23e2579858fb2ee))
+
 ## 0.28.1 (2026-09-22)
 
 Full Changelog: [agentex-client-v0.28.0...agentex-client-v0.28.1](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.28.0...agentex-client-v0.28.1)

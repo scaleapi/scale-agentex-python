@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.28.2](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.1...agentex-sdk-v0.28.2) (2026-09-29)
+
+
+### Bug Fixes
+
+* **stlc:** restore the custom-code tree a stale seal anchor reverted ([73ea73e](https://github.com/scaleapi/scale-agentex-python/commit/73ea73eab019f2121a15dc595fc5b0a155fbfafa))
+
+
+### Chores
+
+* **stlc:** back-sync the 0.28.1 release from production ([9ae1fa1](https://github.com/scaleapi/scale-agentex-python/commit/9ae1fa12fefdcaaf0f2c455cc23e2579858fb2ee))
+
 ## 0.28.1 (2026-09-22)
 
 Full Changelog: [agentex-sdk-v0.28.0...agentex-sdk-v0.28.1](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.0...agentex-sdk-v0.28.1)
