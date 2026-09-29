@@ -26,9 +26,25 @@ jobs:
           bandit --recursive --aggregate file . -f json -o baseline.json || true
       - name: Checkout feature branch
         shell: bash
+        # Fetch the pull request's head COMMIT, not its branch name. The checkout above selected
+        # the base branch, so `origin` is the base repository -- a fork's head branch exists only
+        # in the contributor's fork, and `git fetch origin $GITHUB_HEAD_REF` failed there with
+        # "couldn't find remote ref" before the scan could run. GitHub serves every pull
+        # request's head commit from the base repository (it publishes refs/pull/<n>/head), the
+        # same mechanism actions/checkout uses, so fetching by SHA works for forked and
+        # same-repository pull requests alike.
+        #
+        # By SHA rather than refs/pull/<n>/head: the ref moves if the author pushes while this
+        # runs, whereas the SHA pins the scan to exactly the commit the event fired for.
+        #
+        # Deliberately NOT a second actions/checkout: its default `clean: true` runs
+        # `git clean -ffdx`, which deletes the untracked baseline.json the previous step just
+        # wrote, so the comparison scan would run with no baseline and nothing would flag it.
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          git fetch origin $GITHUB_HEAD_REF
-          git checkout $GITHUB_HEAD_REF
+          git fetch --depth=1 origin "$HEAD_SHA"
+          git checkout --detach "$HEAD_SHA"
       - name: Run Scan off of baseline
         shell: bash
         run: |
