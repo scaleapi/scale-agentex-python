@@ -10,6 +10,16 @@ on:
       - labeled
       - unlabeled
 
+env:
+  # This repo's own SDK automation App's bot, exempt from both checks below.
+  #
+  # Matched by the bot user's numeric ID, not its login. A GitHub App bot's login
+  # follows the App's name, so renaming the App renamed its bot and silently broke
+  # the previous login-based entry. Worse, the old name was then free to register,
+  # so any App that took it would have inherited the exemption. A user ID never
+  # changes and is never reused.
+  SDK_AUTOMATION_BOT_ID: '333044712'
+
 jobs:
   validate-pr-title:
     name: Validate PR title (Conventional Commits)
@@ -19,22 +29,28 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_ID: ${{ github.event.pull_request.user.id }}
         run: |
           # Exempt automated PRs (Stainless codegen, release-please, dependabot, etc.).
           # These bots may not always emit Conventional-Commits-formatted titles
           # (dependabot's default "Bump foo from 1.0 to 1.1" doesn't match) and we
           # don't want their PRs blocked by this check. Mirrors validate-pr-base.
           #
-          # agentex-sdk-sync[bot] is this repo's own SDK automation. release-please
-          # runs here as a CLI under that App rather than as the release-please[bot]
-          # GitHub App, so its release pull requests are authored by
-          # agentex-sdk-sync[bot] and the entry above never matched them. Their
-          # titles come from release-please's configured pull-request-title-pattern,
-          # "release: <version>", which is not a Conventional Commits type and cannot
-          # be changed without also changing the string release-please parses back
-          # when it cuts the release. The same App opens the promote pull requests.
+          # This repo's own SDK automation App is exempt too, matched by ID through
+          # SDK_AUTOMATION_BOT_ID at the top of this file. release-please runs here as
+          # a CLI under that App rather than as the release-please[bot] GitHub App, so
+          # its release pull requests are authored by the App's bot and the list below
+          # never matched them. Their titles come from release-please's configured
+          # pull-request-title-pattern, which is not always a Conventional Commits type
+          # and cannot be changed without also changing the string release-please
+          # parses back when it cuts the release. The same App opens the promote pull
+          # requests.
+          if [ "$PR_AUTHOR_ID" = "$SDK_AUTOMATION_BOT_ID" ]; then
+            echo "PR is from this repo's SDK automation ($PR_AUTHOR); skipping title check."
+            exit 0
+          fi
           case "$PR_AUTHOR" in
-            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\]|agentex-sdk-sync\[bot\])
+            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\])
               echo "PR is from automation ($PR_AUTHOR); skipping title check."
               exit 0
               ;;
@@ -74,6 +90,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_ID: ${{ github.event.pull_request.user.id }}
           PR_BASE: ${{ github.event.pull_request.base.ref }}
           HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'target-main') }}
         run: |
@@ -101,8 +118,13 @@ jobs:
           fi
 
           # Exempt automated PRs (must mirror validate-pr-title's list).
+          if [ "$PR_AUTHOR_ID" = "$SDK_AUTOMATION_BOT_ID" ]; then
+            delete_comment
+            echo "PR is from this repo's SDK automation ($PR_AUTHOR); allowing PR targeting main."
+            exit 0
+          fi
           case "$PR_AUTHOR" in
-            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\]|agentex-sdk-sync\[bot\])
+            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\])
               delete_comment
               echo "PR is from automation ($PR_AUTHOR); allowing PR targeting main."
               exit 0
