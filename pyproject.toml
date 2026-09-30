@@ -2,9 +2,11 @@
 # This is the Stainless-generated REST client. The hand-authored ADK
 # overlay (formerly `src/agentex/lib/*`) now lives in `adk/` and ships
 # as the sibling `agentex-sdk` package — see `adk/pyproject.toml`.
+# Keep `description` as generated: codegen rewrites `version` on every release,
+# and a hand edit on the line next to it conflicts each time.
 name = "agentex-client"
 version = "0.28.2"
-description = "The official Python REST client for the Agentex API"
+description = "The official Python library for the agentex API"
 dynamic = ["readme"]
 license = "Apache-2.0"
 authors = [
