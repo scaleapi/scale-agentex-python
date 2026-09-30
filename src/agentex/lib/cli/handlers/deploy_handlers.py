@@ -26,6 +26,11 @@ console = Console()
 
 TEMPORAL_WORKER_KEY = "temporal-worker"
 DEFAULT_HELM_CHART_VERSION = "0.1.9"
+CHART_IDENTITY_ENV_PATHS = {
+    EnvVarKeys.AGENT_NAME.value: ("agent", "name"),
+    EnvVarKeys.WORKFLOW_NAME.value: ("workflow", "name"),
+    EnvVarKeys.WORKFLOW_TASK_QUEUE.value: ("workflow", "taskQueue"),
+}
 
 
 class InputDeployOverrides(BaseModel):
@@ -236,6 +241,65 @@ def convert_env_vars_dict_to_list(env_vars: dict[str, str]) -> list[dict[str, st
     return [{"name": key, "value": value} for key, value in env_vars.items()]
 
 
+def _chart_identity_names(env_vars: Any) -> set[str]:
+    if not isinstance(env_vars, list):
+        return set()
+    return {
+        str(env_var["name"])
+        for env_var in env_vars
+        if isinstance(env_var, dict) and env_var.get("name") in CHART_IDENTITY_ENV_PATHS
+    }
+
+
+def _normalize_chart_identity_env(
+    helm_values: dict[str, Any],
+    env_vars: dict[str, str],
+    secret_env_vars: list[dict[str, str]],
+) -> None:
+    """Move legacy identity env values into the chart globals that render them."""
+    global_values = helm_values.get("global")
+    if not isinstance(global_values, dict):
+        raise DeploymentError("helm_overrides.global must be a mapping")
+
+    temporal_worker_values = helm_values.get(TEMPORAL_WORKER_KEY, {})
+    if not isinstance(temporal_worker_values, dict):
+        raise DeploymentError(f"helm_overrides.{TEMPORAL_WORKER_KEY} must be a mapping")
+
+    secret_identity_names = sorted(
+        _chart_identity_names(secret_env_vars)
+        | _chart_identity_names(helm_values.get("secretEnvVars"))
+        | _chart_identity_names(global_values.get("secretEnvVars"))
+        | _chart_identity_names(temporal_worker_values.get("secretEnvVars"))
+    )
+    if secret_identity_names:
+        names = ", ".join(secret_identity_names)
+        raise DeploymentError(
+            f"Chart-owned identity variables cannot come from credentials: {names}. "
+            "Configure them under helm_overrides.global instead."
+        )
+
+    unsupported_plain_identity_names = sorted(
+        _chart_identity_names(global_values.get("env")) | _chart_identity_names(temporal_worker_values.get("env"))
+    )
+    if unsupported_plain_identity_names:
+        names = ", ".join(unsupported_plain_identity_names)
+        raise DeploymentError(
+            f"Chart-owned identity variables cannot be set in global.env or {TEMPORAL_WORKER_KEY}.env: {names}. "
+            "Configure them under helm_overrides.global instead."
+        )
+
+    for env_name, (group_name, value_name) in CHART_IDENTITY_ENV_PATHS.items():
+        group = global_values.get(group_name)
+        if group is not None and not isinstance(group, dict):
+            raise DeploymentError(f"helm_overrides.global.{group_name} must be a mapping")
+
+        if env_name in env_vars:
+            if group is None:
+                group = {}
+                global_values[group_name] = group
+            group[value_name] = env_vars.pop(env_name)
+
+
 def add_acp_command_to_helm_values(helm_values: dict[str, Any], manifest: AgentManifest, manifest_path: str) -> None:
     """Add dynamic ACP command to helm values based on manifest configuration"""
     try:
@@ -389,12 +453,15 @@ def merge_deployment_configs(
             _deep_merge(helm_values, agent_env_config.helm_overrides)
         logger.info(f"After-merge helm values: {helm_values}")
 
+    _normalize_chart_identity_env(helm_values, all_env_vars, secret_env_vars)
     _stamp_agent_version(helm_values, set(all_env_vars) | {var["name"] for var in secret_env_vars})
 
     # Set final environment variables
     # Environment variable precedence: manifest -> environments.yaml -> secrets (highest)
     if all_env_vars:
         helm_values["env"] = convert_env_vars_dict_to_list(all_env_vars)
+    else:
+        helm_values.pop("env", None)
 
     if secret_env_vars:
         helm_values["secretEnvVars"] = secret_env_vars
