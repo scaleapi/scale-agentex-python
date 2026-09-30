@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.3](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.2...agentex-sdk-v0.28.3) (2026-09-30)
+
+
+### Chores
+
+* **agentex-sdk:** Synchronize agentex versions
+
 ## [0.28.2](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.1...agentex-sdk-v0.28.2) (2026-09-29)
 
 
