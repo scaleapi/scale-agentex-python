@@ -39,19 +39,31 @@ release pipeline working, contributions need to follow the branch model and comm
 
 ### Branch model
 
-- Always open PRs against the `next` branch — not `main`. Stainless watches `next` to produce SDK
-  builds and the automated version-bump PR.
+- Open PRs against `main`, the only integration branch. There is no `next` branch any more, and no
+  label is needed.
 - Typical flow:
-  1. Pull the latest `next` locally and branch off it.
-  2. Make and push your changes, then open a PR targeting `next`.
-  3. Get the PR reviewed and merged into `next`.
-  4. Stainless will open (or update) a release PR bumping the version — review and merge that PR
-     to ship to `main`/PyPI. A new release PR will not be cut while a previous one is still open,
-     so unblock pending release PRs before expecting a new one.
-- Do not merge generated code directly into `next` via PR. Let the generator produce those changes.
-- The `Validate PR base branch` CI check fails on PRs targeting `main` from non-automation accounts
-  and posts a comment with resolution steps. If you genuinely need to PR directly to `main` (e.g. an
-  urgent hotfix), add the `target-main` label to bypass the check.
+  1. Pull the latest `main` locally and branch off it.
+  2. Make and push your changes, then open a PR targeting `main`.
+  3. Get the PR reviewed and merged into `main`.
+  4. release-please keeps a release PR open on `main` that bumps the version and changelog. Merging
+     that PR cuts the release and publishes it to PyPI.
+- Most of the SDK is generated from the API spec. Changes to the API surface belong in the spec in
+  [scaleapi/scale-agentex](https://github.com/scaleapi/scale-agentex) (`agentex/openapi.yaml`), not
+  in generated files, where hand edits are replayed onto every regeneration and can conflict with
+  it. Hand-written code lives in `src/agentex/lib/` and `examples/`, which the generator never
+  modifies.
+
+#### For maintainers
+
+- Promote PRs (`chore: promote staging … to production`) open as drafts. Approve them, but never
+  mark them ready for review or merge them; once their checks are green, re-run the promote
+  workflow, which fast-forwards `main`.
+- Merge a human PR into `main` only while staging `main` is an ancestor of production `main` and no
+  codegen run is in flight, then run the back-sync workflow (`stlc-sync.yml` in
+  scaleapi/scale-agentex).
+- Promote, then release, in one sitting.
+- See the runbook at the top of `.github/workflows/stlc-promote.yml` in scaleapi/scale-agentex for
+  details.
 
 ### Conventional commits
 

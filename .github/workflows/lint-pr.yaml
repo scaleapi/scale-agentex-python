@@ -7,11 +7,9 @@ on:
       - edited
       - synchronize
       - reopened
-      - labeled
-      - unlabeled
 
 env:
-  # This repo's own SDK automation App's bot, exempt from both checks below.
+  # This repo's own SDK automation App's bot, exempt from the title check below.
   #
   # Matched by the bot user's numeric ID, not its login. A GitHub App bot's login
   # follows the App's name, so renaming the App renamed its bot and silently broke
@@ -19,6 +17,9 @@ env:
   # so any App that took it would have inherited the exemption. A user ID never
   # changes and is never reused.
   SDK_AUTOMATION_BOT_ID: '333044712'
+  # The release App's bot, which opens the release-please pull requests. Exempt
+  # from the title check too, and matched by ID for the same reasons.
+  RELEASE_BOT_ID: '335733747'
 
 jobs:
   validate-pr-title:
@@ -34,19 +35,19 @@ jobs:
           # Exempt automated PRs (Stainless codegen, release-please, dependabot, etc.).
           # These bots may not always emit Conventional-Commits-formatted titles
           # (dependabot's default "Bump foo from 1.0 to 1.1" doesn't match) and we
-          # don't want their PRs blocked by this check. Mirrors validate-pr-base.
+          # don't want their PRs blocked by this check.
           #
-          # This repo's own SDK automation App is exempt too, matched by ID through
-          # SDK_AUTOMATION_BOT_ID at the top of this file. release-please runs here as
-          # a CLI under that App rather than as the release-please[bot] GitHub App, so
-          # its release pull requests are authored by the App's bot and the list below
-          # never matched them. Their titles come from release-please's configured
-          # pull-request-title-pattern, which is not always a Conventional Commits type
-          # and cannot be changed without also changing the string release-please
-          # parses back when it cuts the release. The same App opens the promote pull
-          # requests.
-          if [ "$PR_AUTHOR_ID" = "$SDK_AUTOMATION_BOT_ID" ]; then
-            echo "PR is from this repo's SDK automation ($PR_AUTHOR); skipping title check."
+          # This repo's own automation Apps are exempt too, matched by ID through
+          # SDK_AUTOMATION_BOT_ID and RELEASE_BOT_ID at the top of this file. The SDK
+          # automation App opens the promote pull requests. release-please runs here as
+          # a CLI under the release App rather than as the release-please[bot] GitHub
+          # App, so its release pull requests are authored by that App's bot and the
+          # list below never matched them. Their titles come from release-please's
+          # configured pull-request-title-pattern, which is not always a Conventional
+          # Commits type and cannot be changed without also changing the string
+          # release-please parses back when it cuts the release.
+          if [ "$PR_AUTHOR_ID" = "$SDK_AUTOMATION_BOT_ID" ] || [ "$PR_AUTHOR_ID" = "$RELEASE_BOT_ID" ]; then
+            echo "PR is from this repo's own automation ($PR_AUTHOR); skipping title check."
             exit 0
           fi
           case "$PR_AUTHOR" in
@@ -76,100 +77,4 @@ jobs:
             echo "    fix(client): handle empty response"
             echo "    chore!: drop python 3.11 support"
           } >&2
-          exit 1
-
-  validate-pr-base:
-    name: Validate PR base branch
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Validate base branch and manage PR comment
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-          PR_AUTHOR_ID: ${{ github.event.pull_request.user.id }}
-          PR_BASE: ${{ github.event.pull_request.base.ref }}
-          HAS_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'target-main') }}
-        run: |
-          MARKER='<!-- lint-pr-validate-base -->'
-
-          # Look up an existing marker comment so we can update/delete it.
-          # --paginate handles PRs with >30 comments. If the lookup fails
-          # (transient API error, fork PR token without read scope), continue
-          # with no existing_id so we still emit the failure annotation.
-          existing_id=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
-            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" 2>/dev/null \
-            | head -n1) || existing_id=""
-
-          delete_comment() {
-            if [ -n "$existing_id" ]; then
-              gh api -X DELETE "repos/$REPO/issues/comments/$existing_id" >/dev/null 2>&1 || true
-            fi
-          }
-
-          # PR doesn't target main — nothing to enforce.
-          if [ "$PR_BASE" != "main" ]; then
-            delete_comment
-            echo "PR base is '$PR_BASE'; check passes."
-            exit 0
-          fi
-
-          # Exempt automated PRs (must mirror validate-pr-title's list).
-          if [ "$PR_AUTHOR_ID" = "$SDK_AUTOMATION_BOT_ID" ]; then
-            delete_comment
-            echo "PR is from this repo's SDK automation ($PR_AUTHOR); allowing PR targeting main."
-            exit 0
-          fi
-          case "$PR_AUTHOR" in
-            stainless-app|stainless-app\[bot\]|release-please\[bot\]|github-actions\[bot\]|dependabot\[bot\])
-              delete_comment
-              echo "PR is from automation ($PR_AUTHOR); allowing PR targeting main."
-              exit 0
-              ;;
-          esac
-
-          # Per-PR opt-out via label.
-          if [ "$HAS_LABEL" = "true" ]; then
-            delete_comment
-            echo "Found 'target-main' label; allowing PR targeting main."
-            exit 0
-          fi
-
-          # Failure path: try to post or update an explanatory comment.
-          # The write may fail on fork PRs (GITHUB_TOKEN has read-only scope
-          # upstream) or due to transient API errors. Guard each gh call so
-          # the ::error annotation and exit 1 still run regardless.
-          body_file=$(mktemp)
-          {
-            echo "$MARKER"
-            echo
-            echo "**This PR is targeting \`main\`, but PRs should target the \`next\` branch by default.**"
-            echo
-            echo "The \`main\` branch is reserved for release-please and Stainless automation. To resolve, pick one of:"
-            echo
-            echo "- **Re-target the PR to \`next\`** (recommended). On the PR page, click **Edit** next to the title and change the base branch to \`next\`."
-            echo "- **Add the \`target-main\` label** if this is an intentional exception (e.g. an urgent hotfix). The check will re-run and pass."
-            echo
-            echo "See \`CONTRIBUTING.md\` for the full branch model."
-          } > "$body_file"
-
-          comment_status="ok"
-          if [ -n "$existing_id" ]; then
-            gh api -X PATCH "repos/$REPO/issues/comments/$existing_id" \
-              -F body=@"$body_file" >/dev/null 2>&1 || comment_status="failed"
-            [ "$comment_status" = "ok" ] && echo "Updated existing PR comment ($existing_id)."
-          else
-            gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$body_file" >/dev/null 2>&1 || comment_status="failed"
-            [ "$comment_status" = "ok" ] && echo "Posted new PR comment."
-          fi
-
-          if [ "$comment_status" = "failed" ]; then
-            echo "::warning title=Could not write PR comment::Likely a fork PR (no upstream write scope) or a transient API error. The check still fails — see the next annotation for resolution steps."
-          fi
-
-          # ::error must be on stdout to surface as an annotation.
-          echo "::error title=PR should target 'next'::Re-target to 'next' or add the 'target-main' label. See the PR comment for full details."
           exit 1

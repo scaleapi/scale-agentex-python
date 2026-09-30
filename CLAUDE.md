@@ -4,13 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Contribution workflow
 
-- This repository is a Stainless-generated SDK. Open PRs against the `next` branch (not `main`).
-  Stainless watches `next` and release-please opens release PRs from `next` → `main`.
+- This repository is a Stainless-generated SDK. Open PRs against `main`; there is no `next` branch
+  any more, and no label is needed. Merging the release-please PR publishes the release to PyPI.
 - PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/) — the
   `Validate PR title (Conventional Commits)` CI check enforces this on every PR.
-- The `Validate PR base branch` CI check fails on PRs targeting `main` from non-automation accounts
-  and posts a comment with resolution steps. Add the `target-main` label only for genuine
-  exceptions (e.g. an urgent hotfix).
+- Most of the SDK is generated, so API-surface changes belong in the API spec in
+  scaleapi/scale-agentex (`agentex/openapi.yaml`), not in generated files. Hand-written code lives
+  in `src/agentex/lib/` and `examples/`.
+- For maintainers: promote PRs open as drafts; approve them, never mark them ready or merge them,
+  then, once checks are green, re-run the promote workflow. Merge a human PR into `main` only while
+  staging `main` is an ancestor of production `main` and no codegen run is in flight, then run the
+  back-sync (`stlc-sync.yml` in scaleapi/scale-agentex). Promote, then release, in one sitting. The
+  runbook is at the top of `.github/workflows/stlc-promote.yml` in scaleapi/scale-agentex.
 - See `CONTRIBUTING.md` for the full workflow.
 
 ## Development Commands
