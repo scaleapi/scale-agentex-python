@@ -125,6 +125,35 @@ class TestChartIdentityEnvironment:
         assert set(env_by_name).isdisjoint({"AGENT_NAME", "WORKFLOW_NAME", "WORKFLOW_TASK_QUEUE"})
         assert values["temporal-worker"]["env"] == values["env"]
 
+    def test_environment_globals_override_legacy_manifest_identity(self):
+        values = _merge(
+            _manifest(
+                env={
+                    "AGENT_NAME": "manifest-agent",
+                    "WORKFLOW_NAME": "manifest-workflow",
+                    "WORKFLOW_TASK_QUEUE": "manifest-queue",
+                },
+                temporal=True,
+            ),
+            _env_config(
+                {
+                    "global": {
+                        "agent": {"name": "environment-agent"},
+                        "workflow": {"name": "environment-workflow", "taskQueue": "environment-queue"},
+                    }
+                }
+            ),
+        )
+
+        assert values["global"]["agent"]["name"] == "environment-agent"
+        assert values["global"]["workflow"] == {
+            "name": "environment-workflow",
+            "taskQueue": "environment-queue",
+        }
+        identity_names = {"AGENT_NAME", "WORKFLOW_NAME", "WORKFLOW_TASK_QUEUE"}
+        assert identity_names.isdisjoint(item["name"] for item in values["env"])
+        assert identity_names.isdisjoint(item["name"] for item in values["temporal-worker"]["env"])
+
     def test_identity_credentials_are_rejected(self):
         credential = CredentialMapping(
             env_var_name="AGENT_NAME",
@@ -176,12 +205,13 @@ class TestChartIdentityEnvironment:
             )
 
     @pytest.mark.parametrize("group_name", ["agent", "workflow"])
-    def test_identity_global_groups_must_be_mappings(self, group_name: str):
+    @pytest.mark.parametrize("group_value", [None, "invalid"])
+    def test_identity_global_groups_must_be_mappings(self, group_name: str, group_value: Any):
         with pytest.raises(
             DeploymentError,
             match=rf"helm_overrides\.global\.{group_name} must be a mapping",
         ):
             _merge(
                 _manifest(temporal=True),
-                _env_config({"global": {group_name: "invalid"}}),
+                _env_config({"global": {group_name: group_value}}),
             )

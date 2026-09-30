@@ -255,6 +255,8 @@ def _normalize_chart_identity_env(
     helm_values: dict[str, Any],
     env_vars: dict[str, str],
     secret_env_vars: list[dict[str, str]],
+    environment_identity_env_names: set[str],
+    explicit_global_identity_names: set[str],
 ) -> None:
     """Move legacy identity env values into the chart globals that render them."""
     global_values = helm_values.get("global")
@@ -290,14 +292,16 @@ def _normalize_chart_identity_env(
 
     for env_name, (group_name, value_name) in CHART_IDENTITY_ENV_PATHS.items():
         group = global_values.get(group_name)
-        if group is not None and not isinstance(group, dict):
+        if group_name in global_values and not isinstance(group, dict):
             raise DeploymentError(f"helm_overrides.global.{group_name} must be a mapping")
 
         if env_name in env_vars:
             if group is None:
                 group = {}
                 global_values[group_name] = group
-            group[value_name] = env_vars.pop(env_name)
+            legacy_value = env_vars.pop(env_name)
+            if env_name in environment_identity_env_names or env_name not in explicit_global_identity_names:
+                group[value_name] = legacy_value
 
 
 def add_acp_command_to_helm_values(helm_values: dict[str, Any], manifest: AgentManifest, manifest_path: str) -> None:
@@ -388,6 +392,8 @@ def merge_deployment_configs(
     # Priority: manifest -> environments.yaml -> secrets (highest)
     all_env_vars: dict[str, str] = {}
     secret_env_vars: list[dict[str, str]] = []
+    environment_identity_env_names: set[str] = set()
+    explicit_global_identity_names: set[str] = set()
 
     # Start with agent_config env vars from manifest
     if agent_config.env:
@@ -403,6 +409,17 @@ def merge_deployment_configs(
                 if isinstance(env_var, dict) and "name" in env_var and "value" in env_var:
                     env_override_dict[str(env_var["name"])] = str(env_var["value"])
             all_env_vars.update(env_override_dict)
+            environment_identity_env_names = set(env_override_dict) & CHART_IDENTITY_ENV_PATHS.keys()
+
+    if agent_env_config and agent_env_config.helm_overrides:
+        global_overrides = agent_env_config.helm_overrides.get("global")
+        if isinstance(global_overrides, dict):
+            explicit_global_identity_names = {
+                env_name
+                for env_name, (group_name, value_name) in CHART_IDENTITY_ENV_PATHS.items()
+                if isinstance(global_overrides.get(group_name), dict)
+                and value_name in global_overrides[group_name]
+            }
 
     # Handle credentials and check for conflicts
     if agent_config.credentials:
@@ -453,7 +470,13 @@ def merge_deployment_configs(
             _deep_merge(helm_values, agent_env_config.helm_overrides)
         logger.info(f"After-merge helm values: {helm_values}")
 
-    _normalize_chart_identity_env(helm_values, all_env_vars, secret_env_vars)
+    _normalize_chart_identity_env(
+        helm_values,
+        all_env_vars,
+        secret_env_vars,
+        environment_identity_env_names,
+        explicit_global_identity_names,
+    )
     _stamp_agent_version(helm_values, set(all_env_vars) | {var["name"] for var in secret_env_vars})
 
     # Set final environment variables
