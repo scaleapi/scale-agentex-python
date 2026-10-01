@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, AsyncGenerator, cast
 
 from agentex.types.text_content import TextContent
 from agentex.types.task_message_delta import TextDelta
@@ -135,6 +135,7 @@ class TestTools:
         ]
         out = await _collect(convert_gemini_cli_to_agentex_events(_aiter(events)))
         full = [e for e in out if isinstance(e, StreamTaskMessageFull)][0]
+        assert isinstance(full.content, ToolResponseContent)
         assert full.content.content == {"result": "denied", "is_error": True}
 
     async def test_missing_tool_id_gets_a_synthetic_one(self):
@@ -233,7 +234,7 @@ class TestCallbacks:
             async def aclose(self) -> None:
                 closed["v"] = True
 
-        gen = convert_gemini_cli_to_agentex_events(_Src())
+        gen = cast(AsyncGenerator[Any, None], convert_gemini_cli_to_agentex_events(_Src()))
         await gen.__anext__()
         await gen.aclose()
         assert closed["v"] is True

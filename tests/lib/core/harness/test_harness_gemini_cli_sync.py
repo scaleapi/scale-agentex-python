@@ -65,6 +65,7 @@ class TestSyncYieldEventOrder:
         kinds = [type(e).__name__ for e in out]
         assert kinds.index("StreamTaskMessageFull") > kinds.index("StreamTaskMessageStart")
         req = [e for e in out if isinstance(e, StreamTaskMessageStart) and isinstance(e.content, ToolRequestContent)][0]
+        assert isinstance(req.content, ToolRequestContent)
         res = [e for e in out if isinstance(e, StreamTaskMessageFull)][0]
         assert isinstance(res.content, ToolResponseContent)
         assert req.content.tool_call_id == res.content.tool_call_id == "call-1"
@@ -97,8 +98,8 @@ class TestSyncYieldEventOrder:
             },
         ]
         out, turn = await _run_yield_turn(events)
-        errors = [e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, TextContent)]
-        assert [e.content.content for e in errors] == ["Error: Gemini CLI turn failed: Reached max session turns"]
+        errors = [e.content.content for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, TextContent)]
+        assert errors == ["Error: Gemini CLI turn failed: Reached max session turns"]
         starts = {e.index for e in out if isinstance(e, StreamTaskMessageStart)}
         dones = {e.index for e in out if isinstance(e, StreamTaskMessageDone)}
         assert starts == dones
