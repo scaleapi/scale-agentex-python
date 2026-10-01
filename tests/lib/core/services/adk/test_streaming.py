@@ -23,6 +23,7 @@ from agentex.types.task_message_delta import (
     ReasoningSummaryDelta,
 )
 from agentex.types.task_message_update import (
+    StreamTaskMessageDone,
     StreamTaskMessageFull,
     StreamTaskMessageDelta,
 )
@@ -62,7 +63,8 @@ def _reasoning_summary(tm: TaskMessage, idx: int, s: str) -> StreamTaskMessageDe
     )
 
 
-async def _make_context(streaming_mode: str) -> tuple[StreamingTaskMessageContext, MagicMock, TaskMessage]:
+def _make_unopened_context(streaming_mode: str) -> tuple[StreamingTaskMessageContext, MagicMock, TaskMessage]:
+    """Wired-up context that has not been opened yet, for ``async with`` tests."""
     tm = TaskMessage(
         id="m1",
         task_id="t1",
@@ -81,6 +83,11 @@ async def _make_context(streaming_mode: str) -> tuple[StreamingTaskMessageContex
         streaming_service=svc,
         streaming_mode=streaming_mode,  # type: ignore[arg-type]
     )
+    return ctx, svc, tm
+
+
+async def _make_context(streaming_mode: str) -> tuple[StreamingTaskMessageContext, MagicMock, TaskMessage]:
+    ctx, svc, tm = _make_unopened_context(streaming_mode)
     await ctx.open()
     return ctx, svc, tm
 
@@ -597,3 +604,60 @@ class TestFullMessageClosesBuffer:
         assert any(isinstance(u, StreamTaskMessageDelta) for u in published[:-1]), (
             "expected the buffered deltas to be published before the Full"
         )
+
+
+class TestContextDoesNotSuppressErrors:
+    """``__aexit__`` returned ``close()``'s TaskMessage, which is truthy, so an
+    exception raised inside ``async with`` was swallowed: the caller carried on
+    past the block, the half-written message was persisted DONE, and a Temporal
+    activity saw a success and never retried."""
+
+    @pytest.mark.asyncio
+    async def test_exception_inside_context_propagates(self) -> None:
+        ctx, _svc, tm = _make_unopened_context("off")
+
+        with pytest.raises(RuntimeError, match="model blew up"):
+            async with ctx as entered:
+                await entered.stream_update(_text(tm, "partial"))
+                raise RuntimeError("model blew up")
+
+    @pytest.mark.asyncio
+    async def test_context_is_still_closed_when_body_raises(self) -> None:
+        """Not suppressing must not mean leaking: DONE is still published and
+        persisted so consumers and the buffer ticker are not left hanging."""
+        ctx, svc, _tm = _make_unopened_context("off")
+
+        with pytest.raises(RuntimeError):
+            async with ctx:
+                raise RuntimeError("model blew up")
+
+        assert ctx._is_closed
+        published = [c.args[0] for c in svc.stream_update.await_args_list]
+        assert isinstance(published[-1], StreamTaskMessageDone)
+        update_kwargs = ctx._agentex_client.messages.update.call_args.kwargs
+        assert update_kwargs["streaming_status"] == "DONE"
+
+
+class TestExplicitDonePublishesOnce:
+    """An explicit ``StreamTaskMessageDone`` used to be published by
+    ``stream_update`` and then published a second time by the ``close()`` it
+    triggers, putting two DONE frames on the stream. Routing the terminal
+    publish through ``close()`` also keeps buffered deltas ahead of the DONE."""
+
+    @pytest.mark.asyncio
+    async def test_explicit_done_publishes_exactly_one_done(self) -> None:
+        ctx, svc, tm = await _make_context("coalesced")
+        await ctx.stream_update(_text(tm, "hello"))
+
+        await ctx.stream_update(StreamTaskMessageDone(parent_task_message=tm, type="done"))
+
+        published = [c.args[0] for c in svc.stream_update.await_args_list]
+        dones = [u for u in published if isinstance(u, StreamTaskMessageDone)]
+        assert len(dones) == 1, f"expected exactly one DONE publish, got {len(dones)}"
+        assert published[-1] is dones[0], (
+            f"DONE must be the terminal publish; saw trailing {type(published[-1]).__name__} after it"
+        )
+        assert ctx._agentex_client.messages.update.call_count == 1
+        update_kwargs = ctx._agentex_client.messages.update.call_args.kwargs
+        assert update_kwargs["content"]["content"] == "hello"
+        assert update_kwargs["streaming_status"] == "DONE"
