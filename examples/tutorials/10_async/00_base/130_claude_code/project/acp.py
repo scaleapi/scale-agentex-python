@@ -33,6 +33,9 @@ from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_proce
 
 logger = make_logger(__name__)
 
+STDOUT_LINE_LIMIT = 8 * 1024 * 1024
+TERMINATE_TIMEOUT_SECONDS = 5.0
+
 add_tracing_processor_config(
     SGPTracingProcessorConfig(
         sgp_api_key=os.environ.get("SGP_API_KEY", ""),
@@ -52,6 +55,11 @@ async def _spawn_claude(prompt: str) -> AsyncIterator[str]:
 
     Injectable seam: tests monkeypatch this with a fake async iterator of
     pre-recorded lines so no real CLI invocation is needed offline.
+
+    Lines up to ``STDOUT_LINE_LIMIT`` are read whole: a ``tool_result`` that
+    echoes a file is a single stream-json line, often past asyncio's 64 KiB
+    default. If the consumer stops early, the CLI gets SIGTERM and, after
+    ``TERMINATE_TIMEOUT_SECONDS``, SIGKILL, so cancellation cannot hang.
     """
     proc = await asyncio.create_subprocess_exec(
         "claude",
@@ -62,6 +70,7 @@ async def _spawn_claude(prompt: str) -> AsyncIterator[str]:
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        limit=STDOUT_LINE_LIMIT,
     )
     assert proc.stdout is not None
     assert proc.stdin is not None
@@ -109,7 +118,14 @@ async def _spawn_claude(prompt: str) -> AsyncIterator[str]:
                 proc.terminate()
             except ProcessLookupError:
                 pass
-            await proc.wait()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=TERMINATE_TIMEOUT_SECONDS)
+            except TimeoutError:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
 
 
 @acp.on_task_create
