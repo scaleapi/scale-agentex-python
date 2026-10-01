@@ -4,7 +4,7 @@ Subprocess spawning (and any other I/O) must run inside a Temporal *activity*,
 not in workflow code. Temporal runs workflow + signal-handler bodies on a
 deterministic sandbox event loop that does not implement ``subprocess_exec``
 (or threads / sockets), so spawning the CLI directly in the signal handler
-raises ``NotImplementedError``. This activity runs the Gemini CLI CLI, drives
+raises ``NotImplementedError``. This activity runs the Gemini CLI, drives
 the ``GeminiCliTurn`` through ``UnifiedEmitter.auto_send_turn`` (the async
 Redis push path), and returns the turn result to the workflow.
 
@@ -28,6 +28,9 @@ from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import BaseModel
 
 logger = make_logger(__name__)
+
+STDOUT_LINE_LIMIT = 8 * 1024 * 1024
+TERMINATE_TIMEOUT_SECONDS = 5.0
 
 RUN_GEMINI_CLI_TURN_ACTIVITY = "run_gemini_cli_turn"
 
@@ -58,6 +61,11 @@ async def _spawn_gemini(prompt: str, session_id: str | None = None) -> AsyncIter
 
     Injectable seam: tests can monkeypatch this with a fake async iterator so no
     real CLI invocation is needed offline.
+
+    Lines up to ``STDOUT_LINE_LIMIT`` are read whole: a ``tool_result`` that
+    echoes a file is a single stream-json line, often past asyncio's 64 KiB
+    default. If the consumer stops early, the CLI gets SIGTERM and, after
+    ``TERMINATE_TIMEOUT_SECONDS``, SIGKILL, so cancellation cannot hang.
     """
     # The prompt goes in via ``-p`` (argv). Stdin is closed on purpose: in
     # non-interactive mode the CLI reads stdin to EOF and appends it to the
@@ -79,6 +87,7 @@ async def _spawn_gemini(prompt: str, session_id: str | None = None) -> AsyncIter
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        limit=STDOUT_LINE_LIMIT,
     )
     assert proc.stdout is not None
 
@@ -136,7 +145,14 @@ async def _spawn_gemini(prompt: str, session_id: str | None = None) -> AsyncIter
                 proc.terminate()
             except ProcessLookupError:
                 pass
-            await proc.wait()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=TERMINATE_TIMEOUT_SECONDS)
+            except TimeoutError:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
 
 
 @activity.defn(name=RUN_GEMINI_CLI_TURN_ACTIVITY)

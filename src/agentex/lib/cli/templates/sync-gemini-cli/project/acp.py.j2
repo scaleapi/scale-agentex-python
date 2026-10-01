@@ -35,6 +35,9 @@ from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_proce
 
 logger = make_logger(__name__)
 
+STDOUT_LINE_LIMIT = 8 * 1024 * 1024
+TERMINATE_TIMEOUT_SECONDS = 5.0
+
 add_tracing_processor_config(
     SGPTracingProcessorConfig(
         sgp_api_key=os.environ.get("SGP_API_KEY", ""),
@@ -51,6 +54,11 @@ async def _spawn_gemini(prompt: str) -> AsyncIterator[str]:
 
     This is a seam: tests can replace it with a fake async iterator of
     pre-recorded lines so no real CLI invocation is needed offline.
+
+    Lines up to ``STDOUT_LINE_LIMIT`` are read whole: a ``tool_result`` that
+    echoes a file is a single stream-json line, often past asyncio's 64 KiB
+    default. If the consumer stops early, the CLI gets SIGTERM and, after
+    ``TERMINATE_TIMEOUT_SECONDS``, SIGKILL, so cancellation cannot hang.
     """
     # The prompt goes in via ``-p`` (argv). Stdin is closed on purpose: in
     # non-interactive mode the CLI reads stdin to EOF and appends it to the
@@ -66,6 +74,7 @@ async def _spawn_gemini(prompt: str) -> AsyncIterator[str]:
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        limit=STDOUT_LINE_LIMIT,
     )
     assert proc.stdout is not None
 
@@ -122,7 +131,14 @@ async def _spawn_gemini(prompt: str) -> AsyncIterator[str]:
                 proc.terminate()
             except ProcessLookupError:
                 pass
-            await proc.wait()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=TERMINATE_TIMEOUT_SECONDS)
+            except TimeoutError:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
 
 
 @acp.on_message_send

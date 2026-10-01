@@ -1,6 +1,6 @@
 # {{ agent_name }} - AgentEx Sync Gemini CLI Agent
 
-This template builds a **synchronous** agent that drives the **Gemini CLI CLI**
+This template builds a **synchronous** agent that drives the **Gemini CLI**
 through the unified harness surface on AgentEx:
 - Spawns `gemini -p "<prompt>" --output-format stream-json` as a local subprocess
 - Wraps the CLI's stdout stream in a `GeminiCliTurn`
@@ -40,7 +40,7 @@ agentex agents run --manifest manifest.yaml
 
 ### Sync ACP with the harness
 The sync ACP model uses HTTP request/response. The `@acp.on_message_send`
-handler spawns the Gemini CLI CLI and yields the harness events back to the
+handler spawns the Gemini CLI and yields the harness events back to the
 client as they arrive.
 
 ### The unified harness surface

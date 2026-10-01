@@ -100,7 +100,7 @@ agent:
     - env_var_name: REDIS_URL
       secret_name: redis-url-secret
       secret_key: url
-    # The Gemini CLI CLI spawned in project/activities.py authenticates with
+    # The Gemini CLI spawned in project/activities.py authenticates with
     # GEMINI_API_KEY; without it every turn fails with a CLI auth error.
     - env_var_name: GEMINI_API_KEY
       secret_name: gemini-api-key

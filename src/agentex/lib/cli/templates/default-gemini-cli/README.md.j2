@@ -1,7 +1,7 @@
 # {{ agent_name }} - AgentEx Async Gemini CLI Agent
 
 This template builds an **asynchronous** (non-Temporal) agent that drives the
-**Gemini CLI CLI** through the unified harness surface on AgentEx:
+**Gemini CLI** through the unified harness surface on AgentEx:
 - Spawns `gemini -p "<prompt>" --output-format stream-json` as a local subprocess
 - Wraps the CLI's stdout stream in a `GeminiCliTurn`
 - Delivers canonical `StreamTaskMessage*` events via `UnifiedEmitter.auto_send_turn`
@@ -40,7 +40,7 @@ agentex agents run --manifest manifest.yaml
 
 ### Async ACP with the harness
 The async ACP model streams events over Redis instead of an HTTP response. The
-`@acp.on_task_event_send` handler spawns the Gemini CLI CLI and pushes the
+`@acp.on_task_event_send` handler spawns the Gemini CLI and pushes the
 harness events to the task stream.
 
 ### The unified harness surface

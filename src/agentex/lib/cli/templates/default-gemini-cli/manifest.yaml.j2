@@ -76,7 +76,7 @@ agent:
   # Maps Kubernetes secrets to environment variables
   # Common credentials include:
   credentials:
-    # The Gemini CLI CLI authenticates with GEMINI_API_KEY (LITELLM_API_KEY
+    # The Gemini CLI authenticates with GEMINI_API_KEY (LITELLM_API_KEY
     # is not read by the `gemini` subprocess this agent spawns).
     - env_var_name: GEMINI_API_KEY
       secret_name: gemini-api-key

@@ -3,7 +3,7 @@
 Run as a separate long-lived process alongside the ACP HTTP server. The
 worker polls Temporal for workflow + activity tasks and executes them.
 
-The Gemini CLI CLI subprocess runs in the ``run_gemini_cli_turn`` activity
+The Gemini CLI subprocess runs in the ``run_gemini_cli_turn`` activity
 (registered below alongside the built-in Agentex activities), because
 subprocess I/O is not permitted on the Temporal workflow event loop.
 """
