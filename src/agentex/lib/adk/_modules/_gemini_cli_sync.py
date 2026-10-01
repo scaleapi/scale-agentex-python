@@ -31,11 +31,17 @@ tool_result
     ``is_error`` is set for error results.
 
 error
-    Logged (``severity`` + ``message``). Nothing is emitted.
+    Logged (``severity`` + ``message``). A ``severity == "error"`` event also
+    closes any open text slot and is delivered as Full(TextContent) carrying
+    the message, the same shape the Codex tap uses for its ``error`` events.
+    Warnings are only logged.
 
 result
-    Closes any open text slot, then fires ``on_result`` with the raw event so
-    the caller can read ``stats`` (tokens, duration, tool calls).
+    Closes any open text slot. A failed turn (``status == "error"``) is
+    delivered as Full(TextContent) carrying ``error.message``, so an auth
+    failure or turn limit reaches the caller instead of looking like an empty
+    success. Then fires ``on_result`` with the raw event so the caller can read
+    ``stats`` (tokens, duration, tool calls).
 
 Reference: ``packages/core/src/output/types.ts`` in google-gemini/gemini-cli.
 """
@@ -64,6 +70,15 @@ _MAX_RESULT_LENGTH = 4000
 
 def _truncate(text: str) -> str:
     return str(text)[:_MAX_RESULT_LENGTH]
+
+
+def _error_full(message: str, index: int) -> StreamTaskMessageFull:
+    """A one-shot TextContent message that surfaces a CLI error to the caller."""
+    return StreamTaskMessageFull(
+        type="full",
+        index=index,
+        content=TextContent(type="text", author="agent", content=f"Error: {message}", format="plain"),
+    )
 
 
 async def convert_gemini_cli_to_agentex_events(
@@ -253,16 +268,25 @@ async def _convert_gemini_cli_impl(
                 await on_init(evt)
 
         elif evt_type == "error":
-            logger.warning(
-                "gemini-cli: %s: %s",
-                evt.get("severity", "error"),
-                str(evt.get("message", ""))[:300],
-            )
+            severity = evt.get("severity", "error")
+            message = str(evt.get("message", ""))
+            logger.warning("gemini-cli: %s: %s", severity, message[:300])
+            if severity == "error":
+                done = _close_text()
+                if done is not None:
+                    yield done
+                yield _error_full(_truncate(message or "gemini CLI error"), next_index)
+                next_index += 1
 
         elif evt_type == "result":
             done = _close_text()
             if done is not None:
                 yield done
+            if evt.get("status") == "error":
+                error = evt.get("error") or {}
+                message = error.get("message", "") if isinstance(error, dict) else str(error)
+                yield _error_full(_truncate(f"Gemini CLI turn failed: {message or 'unknown error'}"), next_index)
+                next_index += 1
             if on_result is not None:
                 await on_result(evt)
 

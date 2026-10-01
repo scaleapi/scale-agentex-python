@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, AsyncIterator
 
+from agentex.types.text_content import TextContent
 from agentex.lib.core.harness.tracer import SpanTracer
 from agentex.lib.core.harness.emitter import UnifiedEmitter
 from agentex.types.task_message_update import (
@@ -83,6 +84,25 @@ class TestSyncYieldEventOrder:
         usage = turn.usage()
         assert usage.input_tokens == 5 and usage.output_tokens == 3 and usage.num_tool_calls == 1
         assert usage.model == "gemini-2.5-flash"
+
+    async def test_failed_turn_reaches_the_caller(self) -> None:
+        events = [
+            {"type": "init", "session_id": "s", "model": "gemini-2.5-flash"},
+            {"type": "message", "role": "assistant", "content": "Working", "delta": True},
+            {
+                "type": "result",
+                "status": "error",
+                "error": {"type": "FatalTurnLimitedError", "message": "Reached max session turns"},
+                "stats": {"input_tokens": 7, "output_tokens": 1},
+            },
+        ]
+        out, turn = await _run_yield_turn(events)
+        errors = [e for e in out if isinstance(e, StreamTaskMessageFull) and isinstance(e.content, TextContent)]
+        assert [e.content.content for e in errors] == ["Error: Gemini CLI turn failed: Reached max session turns"]
+        starts = {e.index for e in out if isinstance(e, StreamTaskMessageStart)}
+        dones = {e.index for e in out if isinstance(e, StreamTaskMessageDone)}
+        assert starts == dones
+        assert turn.usage().input_tokens == 7
 
 
 class TestSyncYieldSpanDerivation:

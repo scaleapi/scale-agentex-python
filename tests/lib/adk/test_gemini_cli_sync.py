@@ -162,13 +162,60 @@ class TestCallbacks:
         assert seen["init"]["session_id"] == "sess-1"
         assert seen["result"]["stats"]["total_tokens"] == 3
 
-    async def test_error_events_emit_nothing(self):
+    async def test_warning_events_emit_nothing(self):
         out = await _collect(
             convert_gemini_cli_to_agentex_events(
                 _aiter([{"type": "error", "severity": "warning", "message": "slow"}, _result()])
             )
         )
         assert out == []
+
+    async def test_error_events_close_the_open_slot_and_are_delivered(self):
+        out = await _collect(
+            convert_gemini_cli_to_agentex_events(
+                _aiter(
+                    [
+                        _delta("partial"),
+                        {"type": "error", "severity": "error", "message": "Maximum session turns exceeded"},
+                        _result(),
+                    ]
+                )
+            )
+        )
+        assert [type(e) for e in out] == [
+            StreamTaskMessageStart,
+            StreamTaskMessageDelta,
+            StreamTaskMessageDone,
+            StreamTaskMessageFull,
+        ]
+        error = out[3]
+        assert isinstance(error.content, TextContent)
+        assert error.content.content == "Error: Maximum session turns exceeded"
+        assert error.index != out[0].index
+
+    async def test_failed_result_is_delivered_and_still_reported(self):
+        seen: dict[str, Any] = {}
+
+        async def on_result(evt: dict[str, Any]) -> None:
+            seen["result"] = evt
+
+        failed = {
+            "type": "result",
+            "timestamp": "t",
+            "status": "error",
+            "error": {"type": "FatalAuthenticationError", "message": "Please set an Auth method"},
+            "stats": {"total_tokens": 0},
+        }
+        out = await _collect(convert_gemini_cli_to_agentex_events(_aiter([_init(), failed]), on_result=on_result))
+        assert len(out) == 1
+        assert isinstance(out[0], StreamTaskMessageFull)
+        assert isinstance(out[0].content, TextContent)
+        assert out[0].content.content == "Error: Gemini CLI turn failed: Please set an Auth method"
+        assert seen["result"]["status"] == "error"
+
+    async def test_failed_result_without_a_message_still_says_it_failed(self):
+        out = await _collect(convert_gemini_cli_to_agentex_events(_aiter([{"type": "result", "status": "error"}])))
+        assert out[0].content.content == "Error: Gemini CLI turn failed: unknown error"
 
     async def test_closing_the_generator_closes_the_source(self):
         closed = {"v": False}
