@@ -24,10 +24,23 @@ def _manager() -> TracingProcessorManager:
     return manager
 
 
-def _finishes(target: Any, timeout: float = 5.0) -> bool:
-    thread = threading.Thread(target=target, daemon=True)
+REGISTRATION_DEADLINE_SECONDS = 5.0
+
+
+def _finishes(target: Any, timeout: float = REGISTRATION_DEADLINE_SECONDS) -> bool:
+    errors: list[BaseException] = []
+
+    def _run() -> None:
+        try:
+            target()
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     thread.join(timeout)
+    if errors:
+        raise errors[0]
     return not thread.is_alive()
 
 
