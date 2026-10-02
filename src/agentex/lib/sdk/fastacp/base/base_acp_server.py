@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 import asyncio
 import inspect
+import contextlib
 from typing import Any
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -434,6 +435,11 @@ class BaseACPServer(FastAPI):
                     error=JSONRPCError(code=-32603, message=str(e)).model_dump(),
                 )
                 yield f"{error_response.model_dump_json()}\n"
+            finally:
+                aclose = getattr(async_gen, "aclose", None)
+                if aclose is not None:
+                    with contextlib.suppress(Exception):
+                        await aclose()
 
         return StreamingResponse(
             generate_json_rpc_stream(),
