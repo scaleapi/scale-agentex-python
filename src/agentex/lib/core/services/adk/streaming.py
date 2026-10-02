@@ -439,6 +439,10 @@ class StreamingTaskMessageContext:
 
     async def close(self) -> TaskMessage:
         """Close the streaming context."""
+        return await self._finish()
+
+    async def _finish(self, done_index: int | None = None) -> TaskMessage:
+        """Drain the buffer, publish one DONE carrying ``done_index``, and persist."""
         if not self.task_message:
             raise ValueError("Context not properly initialized - no task message")
 
@@ -455,6 +459,7 @@ class StreamingTaskMessageContext:
         done_event = StreamTaskMessageDone(
             parent_task_message=self.task_message,
             type="done",
+            index=done_index,
         )
         await self._streaming_service.stream_update(done_event)
 
@@ -511,7 +516,7 @@ class StreamingTaskMessageContext:
                 return update
 
         if isinstance(update, StreamTaskMessageDone):
-            await self.close()
+            await self._finish(update.index)
             return update
 
         # A Full ends the stream and supersedes buffered deltas. Drain and stop

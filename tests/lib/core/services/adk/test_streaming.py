@@ -661,3 +661,14 @@ class TestExplicitDonePublishesOnce:
         update_kwargs = ctx._agentex_client.messages.update.call_args.kwargs
         assert update_kwargs["content"]["content"] == "hello"
         assert update_kwargs["streaming_status"] == "DONE"
+
+    @pytest.mark.asyncio
+    async def test_explicit_done_keeps_the_callers_index(self) -> None:
+        ctx, svc, tm = await _make_context("coalesced")
+        await ctx.stream_update(_text(tm, "hello"))
+
+        await ctx.stream_update(StreamTaskMessageDone(parent_task_message=tm, type="done", index=3))
+
+        published = [c.args[0] for c in svc.stream_update.await_args_list]
+        dones = [u for u in published if isinstance(u, StreamTaskMessageDone)]
+        assert [d.index for d in dones] == [3]
