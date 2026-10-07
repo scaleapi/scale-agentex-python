@@ -36,6 +36,8 @@ _MAX_TASKS = 10_000
 _attrs_by_task: OrderedDict[str, dict[str, Any]] = OrderedDict()
 # Attrs captured when a span starts, so a later registry change cannot alter a span still queued for export.
 _attrs_by_span: OrderedDict[str, dict[str, Any]] = OrderedDict()
+# Spans pinned with no attrs live apart so a flood of plain spans cannot evict an eval span's pinned ids.
+_plain_spans: OrderedDict[str, None] = OrderedDict()
 _lock = threading.Lock()
 
 
@@ -83,24 +85,29 @@ def _lookup(span: Span) -> dict[str, Any]:
 def capture_for_span(span: Span) -> None:
     """Pin the span's attrs at start, empty included, so an eval task registered later cannot claim it."""
     with _lock:
-        _attrs_by_span[span.id] = _lookup(span)
-        while len(_attrs_by_span) > _MAX_TASKS:
-            _attrs_by_span.popitem(last=False)
+        attrs = _lookup(span)
+        store: OrderedDict[str, Any] = _attrs_by_span if attrs else _plain_spans
+        store[span.id] = attrs or None
+        while len(store) > _MAX_TASKS:
+            store.popitem(last=False)
 
 
 def release_span(span_id: str) -> None:
-    if _attrs_by_span:
+    if _attrs_by_span or _plain_spans:
         with _lock:
             _attrs_by_span.pop(span_id, None)
+            _plain_spans.pop(span_id, None)
 
 
 def attrs_for_span(span: Span) -> dict[str, Any]:
     """Attrs captured at span start, else those of the task found by ``span.task_id`` then ``span.trace_id``."""
-    if not _attrs_by_task and not _attrs_by_span:
+    if not _attrs_by_task and not _attrs_by_span and not _plain_spans:
         return {}
     with _lock:
         if span.id in _attrs_by_span:
             return dict(_attrs_by_span[span.id])
+        if span.id in _plain_spans:
+            return {}
         return _lookup(span)
 
 
@@ -109,3 +116,4 @@ def clear() -> None:
     with _lock:
         _attrs_by_task.clear()
         _attrs_by_span.clear()
+        _plain_spans.clear()

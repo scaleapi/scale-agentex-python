@@ -201,6 +201,17 @@ class TestQueuedSpans:
         assert sgp_evals.attrs_for_span(spans[0]) == {}
         assert sgp_evals.attrs_for_span(spans[2]) == EXPECTED_ATTRS
 
+    def test_plain_spans_cannot_evict_an_eval_span_capture(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        eval_span = _span(data={})
+        sgp_evals.capture_for_span(eval_span)
+        sgp_evals.unregister_task("task-1")
+        with patch.object(sgp_evals, "_MAX_TASKS", 2):
+            for _ in range(5):
+                sgp_evals.capture_for_span(_span(data={}))
+
+        assert sgp_evals.attrs_for_span(eval_span) == EXPECTED_ATTRS
+
     def test_sync_trace_start_span_captures_ids(self) -> None:
         sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
         span = Trace(processors=[], client=Mock(), trace_id="task-1").start_span(name="s")
