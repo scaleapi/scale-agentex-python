@@ -83,7 +83,8 @@ def _sgp_metadata(span: Span) -> Any:
     leak like that today. Left as-is: changing five long-shipped fields is not
     this change's business.)
     """
-    extra: dict[str, Any] = dict(sgp_evals.attrs_for_span(span))
+    eval_attrs = sgp_evals.attrs_for_span(span)
+    extra: dict[str, Any] = dict(eval_attrs)
     commit_sha = code_revision.commit_sha()
     if commit_sha is not None:
         extra[code_revision.COMMIT_SHA_KEY] = commit_sha
@@ -91,8 +92,10 @@ def _sgp_metadata(span: Span) -> Any:
         return span.data
     if isinstance(span.data, dict):
         return {**span.data, **extra}
-    # List-shaped data is an accepted `data` shape and has nowhere to put a
-    # metadata key; leave it untouched rather than dropping the caller's data.
+    # List-shaped data has nowhere to put a key. Eval spans must stay searchable by run and row,
+    # so their list moves under "data". Otherwise it is left untouched rather than reshaped.
+    if eval_attrs and isinstance(span.data, list):
+        return {**extra, "data": span.data}
     return span.data
 
 

@@ -275,7 +275,7 @@ class AgentexWorker:
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
             # Temporal inherits client tracing before these business interceptors.
-            interceptors=[*self.interceptors, SGPEvalsInterceptor()],
+            interceptors=[SGPEvalsInterceptor(), *self.interceptors],
         )
 
         logger.info(f"Starting workers for task queue: {self.task_queue}")

@@ -98,6 +98,15 @@ class TestSGPMetadata:
         assert _sgp_metadata(_span(trace_id="task-2", data={"k": 1})) == {"k": 1}
         assert _sgp_metadata(_span(trace_id="task-3", data={"k": 1})) == {"k": 1}
 
+    def test_eval_span_with_list_data_keeps_list_and_gains_the_ids(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        assert _sgp_metadata(_span(data=[{"a": 1}])) == {**EXPECTED_ATTRS, "data": [{"a": 1}]}
+
+    def test_task_that_stops_being_an_eval_task_stops_being_stamped(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        sgp_evals.register_task_metadata("task-1", {"team": "x"})
+        assert _sgp_metadata(_span(data={"k": 1})) == {"k": 1}
+
     def test_registry_is_bounded(self) -> None:
         with patch.object(sgp_evals, "_MAX_TASKS", 2):
             for i in range(3):

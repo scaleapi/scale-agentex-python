@@ -52,6 +52,9 @@ def register_task_metadata(task_id: str, task_metadata: Any) -> dict[str, Any] |
     attrs = span_attrs_from_task_metadata(task_metadata)
     if attrs is not None:
         register_task(task_id, attrs)
+    elif _attrs_by_task:
+        with _lock:
+            _attrs_by_task.pop(task_id, None)
     return attrs
 
 
