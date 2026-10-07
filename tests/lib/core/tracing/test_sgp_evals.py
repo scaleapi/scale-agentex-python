@@ -11,10 +11,11 @@ from __future__ import annotations
 import uuid
 from typing import Any
 from datetime import UTC, datetime
+from contextlib import ExitStack
 from unittest.mock import Mock, AsyncMock, patch
 
 import pytest
-from temporalio.worker import StartActivityInput
+from temporalio.worker import StartActivityInput, StartLocalActivityInput
 
 from agentex.types.span import Span
 from agentex.types.task import Task
@@ -24,6 +25,7 @@ from agentex.lib.core.tracing import sgp_evals, sgp_evals_interceptor as interce
 from agentex.types.task_message_content import TextContent
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
 from agentex.lib.core.clients.temporal.types import ConflictWorkflowPolicy
+from agentex.lib.core.temporal.workers.worker import AgentexWorker
 from agentex.lib.core.temporal.services.temporal_task_service import TemporalTaskService
 from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
 
@@ -226,3 +228,33 @@ class TestTemporal:
             interceptor._WorkflowOutbound(next_outbound).start_activity(start_input)
 
         assert sent["headers"] == {}
+
+    def test_local_activities_get_the_header_too(self) -> None:
+        sent: dict[str, Any] = {}
+        next_outbound = Mock()
+        next_outbound.start_local_activity = lambda input: sent.update(headers=input.headers)
+        start_input = Mock(spec=StartLocalActivityInput, headers={})
+
+        with patch.object(interceptor.workflow, "memo_value", return_value=EXPECTED_ATTRS):
+            interceptor._WorkflowOutbound(next_outbound).start_local_activity(start_input)
+
+        assert interceptor.ATTRS_HEADER in sent["headers"]
+
+    async def test_worker_runs_with_the_interceptor_ahead_of_agent_interceptors(self) -> None:
+        agent_interceptor = interceptor.SGPEvalsInterceptor()
+        module = "agentex.lib.core.temporal.workers.worker"
+        with ExitStack() as stack:
+            stack.enter_context(patch(f"{module}.EnvironmentVariables"))
+            stack.enter_context(patch(f"{module}.init_sgp_obs"))
+            for name in ("shutdown_sgp_obs", "shutdown_default_span_queue", "shutdown_sync_tracing_processors", "get_temporal_client"):
+                stack.enter_context(patch(f"{module}.{name}", new=AsyncMock()))
+            worker_cls = stack.enter_context(patch(f"{module}.Worker"))
+            worker_cls.return_value.run = AsyncMock()
+            worker = AgentexWorker(task_queue="q", interceptors=[agent_interceptor])
+            stack.enter_context(patch.object(worker, "start_health_check_server", new=AsyncMock()))
+            stack.enter_context(patch.object(worker, "_register_agent", new=AsyncMock()))
+            await worker.run(activities=[], workflow=object)
+
+        interceptors = worker_cls.call_args.kwargs["interceptors"]
+        assert isinstance(interceptors[0], interceptor.SGPEvalsInterceptor)
+        assert interceptors[1:] == [agent_interceptor]

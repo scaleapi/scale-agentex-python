@@ -16,6 +16,7 @@ from temporalio.worker import (
     Interceptor,
     StartActivityInput,
     ExecuteActivityInput,
+    StartLocalActivityInput,
     ActivityInboundInterceptor,
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
@@ -47,13 +48,22 @@ class _WorkflowInbound(WorkflowInboundInterceptor):
         super().init(_WorkflowOutbound(outbound))
 
 
+def _add_attrs_header(input: StartActivityInput | StartLocalActivityInput) -> None:
+    attrs = workflow.memo_value(MEMO_KEY, default=None)
+    if isinstance(attrs, dict) and attrs:
+        input.headers = {**input.headers, ATTRS_HEADER: _converter.to_payload(attrs)}
+
+
 class _WorkflowOutbound(WorkflowOutboundInterceptor):
     @override
     def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle[Any]:
-        attrs = workflow.memo_value(MEMO_KEY, default=None)
-        if isinstance(attrs, dict) and attrs:
-            input.headers = {**input.headers, ATTRS_HEADER: _converter.to_payload(attrs)}
+        _add_attrs_header(input)
         return super().start_activity(input)
+
+    @override
+    def start_local_activity(self, input: StartLocalActivityInput) -> workflow.ActivityHandle[Any]:
+        _add_attrs_header(input)
+        return super().start_local_activity(input)
 
 
 class _ActivityInbound(ActivityInboundInterceptor):
