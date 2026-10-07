@@ -29,7 +29,11 @@ from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
 from agentex.lib.core.clients.temporal.types import ConflictWorkflowPolicy
 from agentex.lib.core.temporal.workers.worker import AgentexWorker
 from agentex.lib.core.temporal.services.temporal_task_service import TemporalTaskService
-from agentex.lib.core.tracing.processors.sgp_tracing_processor import SGPSyncTracingProcessor, _sgp_metadata
+from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
+    SGPSyncTracingProcessor,
+    SGPAsyncTracingProcessor,
+    _sgp_metadata,
+)
 
 EVAL_METADATA = {
     "sgp_evals": "generation-unit",
@@ -148,6 +152,34 @@ class TestQueuedSpans:
         sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
 
         assert _sgp_metadata(span) == {"k": 1}
+
+    def test_plain_span_started_with_an_empty_registry_is_not_stamped_later(self) -> None:
+        span = _span(trace_id="task-1", data={"k": 1})
+        sgp_evals.capture_for_span(span)
+
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+
+        assert _sgp_metadata(span) == {"k": 1}
+
+    async def test_async_processor_keeps_the_capture_when_the_upload_fails(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        span = _span(data={})
+        sgp_evals.capture_for_span(span)
+        span.end_time = datetime.now(UTC)
+        module = "agentex.lib.core.tracing.processors.sgp_tracing_processor"
+        with patch(f"{module}.tracing.init"), patch(f"{module}.EnvironmentVariables"):
+            processor = SGPAsyncTracingProcessor(SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id=""))
+        client = Mock()
+        client.spans.upsert_batch = AsyncMock(side_effect=[RuntimeError("boom"), None])
+        with patch.object(processor, "_get_client", return_value=client):
+            with pytest.raises(RuntimeError):
+                await processor.on_spans_end([span])
+            sgp_evals.unregister_task("task-1")
+            assert sgp_evals.attrs_for_span(span) == EXPECTED_ATTRS
+
+            await processor.on_spans_end([span])
+
+        assert sgp_evals.attrs_for_span(span) == {}
 
     def test_release_drops_the_capture(self) -> None:
         sgp_evals.register_task_metadata("task-1", EVAL_METADATA)

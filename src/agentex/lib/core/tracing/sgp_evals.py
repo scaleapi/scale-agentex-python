@@ -81,9 +81,7 @@ def _lookup(span: Span) -> dict[str, Any]:
 
 
 def capture_for_span(span: Span) -> None:
-    """Pin the span's attrs at start. No-op while no eval task is registered in this process."""
-    if not _attrs_by_task:
-        return
+    """Pin the span's attrs at start, empty included, so an eval task registered later cannot claim it."""
     with _lock:
         _attrs_by_span[span.id] = _lookup(span)
         while len(_attrs_by_span) > _MAX_TASKS:

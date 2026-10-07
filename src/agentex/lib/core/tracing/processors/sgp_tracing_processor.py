@@ -256,9 +256,11 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         for span in spans:
             sgp_span = _build_sgp_span(span, self.env_vars)
             sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
-            sgp_evals.release_span(span.id)
             sgp_spans.append(sgp_span)
         await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
+        # Released only after the upload so a queue retry rebuilds the span with the same ids.
+        for span in spans:
+            sgp_evals.release_span(span.id)
         _metrics.record_export_success(
             event_type="end", span_count=len(spans), processor="sgp"
         )
