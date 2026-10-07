@@ -10,6 +10,7 @@ from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
 from agentex.protocol.acp import SendEventParams, CreateTaskParams, InterruptTaskParams
+from agentex.lib.core.tracing import sgp_evals
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.clients.temporal.types import WorkflowState, ConflictWorkflowPolicy
 from agentex.lib.core.temporal.types.workflow import SignalName
@@ -91,6 +92,9 @@ class TemporalTaskService:
         execution_timeout = timedelta(seconds=timeout_seconds) if timeout_seconds and timeout_seconds > 0 else None
         # USE_EXISTING makes task/create idempotent
         # If same task ID is already running Temporal returns a handle to the existing run instead of raising WorkflowAlreadyStarted
+        # Eval tasks carry their span attrs in the memo so the worker can stamp them.
+        eval_attrs = sgp_evals.span_attrs_from_task_metadata(task.task_metadata)
+        memo_kwargs: dict[str, Any] = {"memo": {sgp_evals.MEMO_KEY: eval_attrs}} if eval_attrs else {}
         with _acp_dispatch_span("acp.task_create", task_id=task.id):
             return await self._temporal_client.start_workflow(
                 workflow=self._env_vars.WORKFLOW_NAME,
@@ -103,6 +107,7 @@ class TemporalTaskService:
                 task_queue=self._env_vars.WORKFLOW_TASK_QUEUE,
                 execution_timeout=execution_timeout,
                 conflict_policy=ConflictWorkflowPolicy.USE_EXISTING,
+                **memo_kwargs,
             )
 
     async def get_state(self, task_id: str) -> WorkflowState:

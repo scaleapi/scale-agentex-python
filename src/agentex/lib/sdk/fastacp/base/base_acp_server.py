@@ -24,6 +24,7 @@ from agentex.protocol.acp import (
     SendMessageParams,
     InterruptTaskParams,
 )
+from agentex.lib.core.tracing import sgp_evals
 from agentex.lib.utils.logging import make_logger, ctx_var_request_id
 from agentex.protocol.json_rpc import JSONRPCError, JSONRPCRequest, JSONRPCResponse
 from agentex.lib.utils.model_utils import BaseModel
@@ -350,6 +351,10 @@ class BaseACPServer(FastAPI):
             if custom_headers:
                 params_data["request"] = {"headers": custom_headers}
             params = params_model.model_validate(params_data)
+
+            task = getattr(params, "task", None)
+            if task is not None:
+                sgp_evals.register_task_metadata(task.id, task.task_metadata)
 
             if method in RPC_SYNC_METHODS:
                 handler = self._handlers[method]
