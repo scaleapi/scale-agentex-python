@@ -24,7 +24,7 @@ from temporalio.worker import (
 from temporalio.converter import default
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.core.tracing.sgp_evals import MEMO_KEY, register_task
+from agentex.lib.core.tracing.sgp_evals import MEMO_KEY, register_task, unregister_task
 
 logger = make_logger(__name__)
 
@@ -72,7 +72,10 @@ class _ActivityInbound(ActivityInboundInterceptor):
         payload = input.headers.get(ATTRS_HEADER)
         # The workflow id is the task id (see TemporalTaskService.submit_task).
         task_id = activity.info().workflow_id
-        if payload is not None and task_id:
+        if task_id and payload is None:
+            # A reused workflow id must not inherit a previous eval run's ids.
+            unregister_task(task_id)
+        elif task_id and payload is not None:
             try:
                 register_task(task_id, _converter.from_payload(payload, dict))
             except Exception:

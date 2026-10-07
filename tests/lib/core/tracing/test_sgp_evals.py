@@ -218,6 +218,15 @@ class TestTemporal:
 
         assert sgp_evals.attrs_for_span(_span(trace_id="task-1")) == EXPECTED_ATTRS
 
+    async def test_plain_activity_does_not_inherit_a_reused_workflow_ids_eval_attrs(self) -> None:
+        sgp_evals.register_task("task-1", EXPECTED_ATTRS)
+        inbound_next = Mock()
+        inbound_next.execute_activity = AsyncMock(return_value="ok")
+        with patch.object(interceptor.activity, "info", return_value=Mock(workflow_id="task-1")):
+            await interceptor._ActivityInbound(inbound_next).execute_activity(Mock(headers={}))
+
+        assert sgp_evals.attrs_for_span(_span(trace_id="task-1")) == {}
+
     def test_workflow_without_memo_adds_no_header(self) -> None:
         sent: dict[str, Any] = {}
         next_outbound = Mock()
