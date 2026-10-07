@@ -22,12 +22,14 @@ from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.protocol.acp import RPCMethod, CreateTaskParams, SendMessageParams
 from agentex.lib.core.tracing import sgp_evals, sgp_evals_interceptor as interceptor
+from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.core.tracing.trace import Trace, AsyncTrace
 from agentex.types.task_message_content import TextContent
 from agentex.lib.sdk.fastacp.impl.sync_acp import SyncACP
 from agentex.lib.core.clients.temporal.types import ConflictWorkflowPolicy
 from agentex.lib.core.temporal.workers.worker import AgentexWorker
 from agentex.lib.core.temporal.services.temporal_task_service import TemporalTaskService
-from agentex.lib.core.tracing.processors.sgp_tracing_processor import _sgp_metadata
+from agentex.lib.core.tracing.processors.sgp_tracing_processor import SGPSyncTracingProcessor, _sgp_metadata
 
 EVAL_METADATA = {
     "sgp_evals": "generation-unit",
@@ -115,6 +117,89 @@ class TestSGPMetadata:
                 sgp_evals.register_task_metadata(f"t{i}", EVAL_METADATA)
         assert sgp_evals.attrs_for_span(_span(trace_id="t0")) == {}
         assert sgp_evals.attrs_for_span(_span(trace_id="t2")) == EXPECTED_ATTRS
+
+
+class TestQueuedSpans:
+    """A span keeps the ids its task had when it started, even if the task id is reused before export."""
+
+    def test_captured_ids_survive_the_task_being_unregistered(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        span = _span(data={})
+        sgp_evals.capture_for_span(span)
+
+        sgp_evals.unregister_task("task-1")
+
+        assert _sgp_metadata(span) == EXPECTED_ATTRS
+
+    def test_captured_ids_survive_a_new_run_taking_the_task_id(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        span = _span(data={})
+        sgp_evals.capture_for_span(span)
+
+        sgp_evals.register_task("task-1", {"sgp_evals_row_id": "row-99"})
+
+        assert _sgp_metadata(span) == EXPECTED_ATTRS
+
+    def test_plain_span_is_not_stamped_by_a_run_registered_after_it_started(self) -> None:
+        sgp_evals.register_task_metadata("other", EVAL_METADATA)
+        span = _span(trace_id="task-1", data={"k": 1})
+        sgp_evals.capture_for_span(span)
+
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+
+        assert _sgp_metadata(span) == {"k": 1}
+
+    def test_release_drops_the_capture(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        span = _span(data={})
+        sgp_evals.capture_for_span(span)
+        sgp_evals.release_span(span.id)
+        sgp_evals.unregister_task("task-1")
+
+        assert sgp_evals.attrs_for_span(span) == {}
+
+    def test_captures_are_bounded(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        spans = [_span(data={}) for _ in range(3)]
+        with patch.object(sgp_evals, "_MAX_TASKS", 2):
+            for span in spans:
+                sgp_evals.capture_for_span(span)
+        sgp_evals.unregister_task("task-1")
+
+        assert sgp_evals.attrs_for_span(spans[0]) == {}
+        assert sgp_evals.attrs_for_span(spans[2]) == EXPECTED_ATTRS
+
+    def test_sync_trace_start_span_captures_ids(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        span = Trace(processors=[], client=Mock(), trace_id="task-1").start_span(name="s")
+
+        sgp_evals.unregister_task("task-1")
+        span.data = {}
+
+        assert _sgp_metadata(span) == EXPECTED_ATTRS
+
+    async def test_async_trace_start_span_captures_ids(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        span = await AsyncTrace(processors=[], client=Mock(), trace_id="task-1", span_queue=Mock()).start_span(name="s")
+
+        sgp_evals.unregister_task("task-1")
+        span.data = {}
+
+        assert _sgp_metadata(span) == EXPECTED_ATTRS
+
+    def test_sgp_processor_releases_the_capture_when_the_span_ends(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        span = _span(data={})
+        sgp_evals.capture_for_span(span)
+        span.end_time = datetime.now(UTC)
+        module = "agentex.lib.core.tracing.processors.sgp_tracing_processor"
+        with patch(f"{module}.tracing.init"), patch(f"{module}.EnvironmentVariables"):
+            processor = SGPSyncTracingProcessor(SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id=""))
+        with patch(f"{module}._build_sgp_span", return_value=Mock()):
+            processor.on_span_end(span)
+        sgp_evals.unregister_task("task-1")
+
+        assert sgp_evals.attrs_for_span(span) == {}
 
 
 class TestAcpServer:

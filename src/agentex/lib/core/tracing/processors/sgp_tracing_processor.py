@@ -154,6 +154,7 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
     def on_span_end(self, span: Span) -> None:
         sgp_span = _build_sgp_span(span, self.env_vars)
         sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
+        sgp_evals.release_span(span.id)
         sgp_span.flush(blocking=False)
 
     @override
@@ -255,6 +256,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
         for span in spans:
             sgp_span = _build_sgp_span(span, self.env_vars)
             sgp_span.end_time = span.end_time.isoformat()  # type: ignore[union-attr]
+            sgp_evals.release_span(span.id)
             sgp_spans.append(sgp_span)
         await client.spans.upsert_batch(items=[s.to_request_params() for s in sgp_spans])
         _metrics.record_export_success(

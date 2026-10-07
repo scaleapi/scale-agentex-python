@@ -15,7 +15,15 @@ from collections import OrderedDict
 
 from agentex.types.span import Span
 
-__all__ = ("MEMO_KEY", "register_task", "register_task_metadata", "span_attrs_from_task_metadata", "attrs_for_span")
+__all__ = (
+    "MEMO_KEY",
+    "register_task",
+    "register_task_metadata",
+    "span_attrs_from_task_metadata",
+    "attrs_for_span",
+    "capture_for_span",
+    "release_span",
+)
 
 TASK_METADATA_MARKER = "sgp_evals"
 SPAN_KEY_PREFIX = "sgp_evals_"
@@ -26,6 +34,8 @@ MEMO_KEY = "sgp_evals_span_attrs"
 # Only eval tasks are stored, so this stays tiny. The LRU bound caps a long-lived agent process.
 _MAX_TASKS = 10_000
 _attrs_by_task: OrderedDict[str, dict[str, Any]] = OrderedDict()
+# Attrs captured when a span starts, so a later registry change cannot alter a span still queued for export.
+_attrs_by_span: OrderedDict[str, dict[str, Any]] = OrderedDict()
 _lock = threading.Lock()
 
 
@@ -63,18 +73,41 @@ def unregister_task(task_id: str) -> None:
             _attrs_by_task.pop(task_id, None)
 
 
-def attrs_for_span(span: Span) -> dict[str, Any]:
-    """Attrs for the task a span belongs to, found by ``span.task_id`` then ``span.trace_id``."""
+def _lookup(span: Span) -> dict[str, Any]:
+    for key in (span.task_id, span.trace_id):
+        if key and key in _attrs_by_task:
+            return dict(_attrs_by_task[key])
+    return {}
+
+
+def capture_for_span(span: Span) -> None:
+    """Pin the span's attrs at start. No-op while no eval task is registered in this process."""
     if not _attrs_by_task:
+        return
+    with _lock:
+        _attrs_by_span[span.id] = _lookup(span)
+        while len(_attrs_by_span) > _MAX_TASKS:
+            _attrs_by_span.popitem(last=False)
+
+
+def release_span(span_id: str) -> None:
+    if _attrs_by_span:
+        with _lock:
+            _attrs_by_span.pop(span_id, None)
+
+
+def attrs_for_span(span: Span) -> dict[str, Any]:
+    """Attrs captured at span start, else those of the task found by ``span.task_id`` then ``span.trace_id``."""
+    if not _attrs_by_task and not _attrs_by_span:
         return {}
     with _lock:
-        for key in (span.task_id, span.trace_id):
-            if key and key in _attrs_by_task:
-                return dict(_attrs_by_task[key])
-    return {}
+        if span.id in _attrs_by_span:
+            return dict(_attrs_by_span[span.id])
+        return _lookup(span)
 
 
 def clear() -> None:
     """Reset the registry (test isolation)."""
     with _lock:
         _attrs_by_task.clear()
+        _attrs_by_span.clear()
