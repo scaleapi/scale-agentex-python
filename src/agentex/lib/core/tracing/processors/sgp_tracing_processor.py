@@ -11,7 +11,7 @@ from scale_gp_beta.lib.tracing import create_span, flush_queue
 from scale_gp_beta.lib.tracing.span import Span as SGPSpan
 
 from agentex.types.span import Span
-from agentex.lib.core.tracing import code_revision
+from agentex.lib.core.tracing import sgp_evals, code_revision
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.core.observability import tracing_metrics_recording as _metrics
@@ -71,7 +71,7 @@ def _add_source_to_span(span: Span, env_vars: EnvironmentVariables) -> None:
 
 
 def _sgp_metadata(span: Span) -> Any:
-    """Metadata for the SGP write: ``span.data`` plus the opt-in commit SHA.
+    """Metadata for the SGP write: ``span.data`` plus the opt-in commit SHA and evals run/row ids.
 
     Returns a COPY rather than mutating ``span``. ``trace.py`` hands the same
     Span instance to every registered processor, so anything written onto
@@ -83,11 +83,14 @@ def _sgp_metadata(span: Span) -> Any:
     leak like that today. Left as-is: changing five long-shipped fields is not
     this change's business.)
     """
+    extra: dict[str, Any] = dict(sgp_evals.attrs_for_span(span))
     commit_sha = code_revision.commit_sha()
-    if commit_sha is None:
+    if commit_sha is not None:
+        extra[code_revision.COMMIT_SHA_KEY] = commit_sha
+    if not extra:
         return span.data
     if isinstance(span.data, dict):
-        return {**span.data, code_revision.COMMIT_SHA_KEY: commit_sha}
+        return {**span.data, **extra}
     # List-shaped data is an accepted `data` shape and has nowhere to put a
     # metadata key; leave it untouched rather than dropping the caller's data.
     return span.data
