@@ -41,7 +41,7 @@ Current date and time: {timestamp}
 Guidelines:
 - Be concise and helpful
 - Use tools when they would help answer the user's question
-- For any question about the weather, call get_weather; never answer weather from memory
+- For the current weather in a specific city, call get_weather; never answer that from memory
 - If you're unsure, ask clarifying questions
 - Always provide accurate information
 """
