@@ -55,7 +55,10 @@ MCP_SERVERS = [ # No longer needed due to reasoning
     # ),
     StdioServerParameters(
         command="uvx",
-        args=["openai-websearch-mcp"],
+        # openai-websearch-mcp pins mcp 1.13.1, which imports a private
+        # pydantic helper that pydantic 2.14 removed; uvx resolves pydantic
+        # unpinned, so cap it until the server allows a newer mcp.
+        args=["--with", "pydantic<2.14", "openai-websearch-mcp"],
         env={"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")},
     ),
 ]
