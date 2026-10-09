@@ -24,6 +24,7 @@ import pytest
 import pytest_asyncio
 from test_utils.async_utils import (
     stream_agent_response,
+    wait_for_state_messages,
     send_event_and_poll_yielding,
 )
 
@@ -122,11 +123,7 @@ class TestNonStreamingEvents:
         assert agent_response_found, "Agent response not found"
 
         # assert the state has been updated
-        await asyncio.sleep(1)  # wait for state to be updated
-        states = await client.states.list(agent_id=agent_id, task_id=task.id)
-        assert len(states) == 1
-        state = states[0].state
-        messages = state.get("messages", [])
+        messages = await wait_for_state_messages(client, agent_id, task.id, expected_count=3)
 
         assert isinstance(messages, list)
         assert len(messages) == 3
@@ -205,11 +202,7 @@ class TestStreamingEvents:
         assert delta_messages_found, "Delta messages not found in stream (streaming response expected)"
 
         # Verify the state has been updated
-        await asyncio.sleep(1)  # wait for state to be updated
-        states = await client.states.list(agent_id=agent_id, task_id=task.id)
-        assert len(states) == 1
-        state: dict[str, object] = states[0].state
-        messages = state.get("messages", [])
+        messages = await wait_for_state_messages(client, agent_id, task.id, expected_count=3)
 
         assert isinstance(messages, list)
         assert len(messages) == 3

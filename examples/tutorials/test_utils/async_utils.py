@@ -156,6 +156,42 @@ async def poll_messages(
         await asyncio.sleep(sleep_interval)
 
 
+async def wait_for_state_messages(
+    client: AsyncAgentex,
+    agent_id: str,
+    task_id: str,
+    expected_count: int,
+    timeout: float = 30,
+    sleep_interval: float = 0.5,
+) -> list:
+    """
+    Poll the task state until its "messages" list reaches expected_count.
+
+    Agents typically send their reply before they persist the turn to task state,
+    so reading the state right after the reply arrives can see the previous turn.
+
+    Args:
+        client: AgentEx client instance
+        agent_id: The agent ID
+        task_id: The task ID
+        expected_count: Number of state messages to wait for
+        timeout: Maximum seconds to poll (default: 30)
+        sleep_interval: Seconds to sleep between polls (default: 0.5)
+
+    Returns:
+        The state's "messages" list from the last poll. Callers assert on it, so a
+        state that never reaches expected_count still fails with the real length.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        states = await client.states.list(agent_id=agent_id, task_id=task_id)
+        assert len(states) == 1, f"Expected exactly one state, got {len(states)}"
+        messages = states[0].state.get("messages", [])
+        if len(messages) >= expected_count or time.monotonic() >= deadline:
+            return messages
+        await asyncio.sleep(sleep_interval)
+
+
 async def send_event_and_stream(
     client: AsyncAgentex,
     agent_id: str,
