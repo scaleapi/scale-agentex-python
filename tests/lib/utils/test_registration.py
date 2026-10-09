@@ -58,6 +58,7 @@ def test_deployment_id_and_agent_card_still_reported():
 @pytest.fixture
 def registration_env(monkeypatch):
     for name in ("AGENT_ID", "AGENT_NAME", "AGENT_API_KEY"):
+        monkeypatch.setenv(name, "")
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(registration, "refreshed_environment_variables", None, raising=False)
     return _env(AGENTEX_BASE_URL="https://agentex.example.test/")
@@ -111,7 +112,7 @@ async def test_registration_accepts_returned_key(registration_env, respx_mock, c
 
 
 @pytest.mark.parametrize("status", [401, 403])
-async def test_rejected_registration_never_retries_anonymously(
+async def test_registration_retries_preserve_configured_headers(
     registration_env, respx_mock, retry_sleep, caplog, status
 ):
     key = "configured-agent-key"
