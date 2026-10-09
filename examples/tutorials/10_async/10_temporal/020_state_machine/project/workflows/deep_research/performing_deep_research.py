@@ -18,7 +18,10 @@ logger = make_logger(__name__)
 # resolves ``mcp`` unpinned there, ignoring the version this project pins, so without
 # this constraint every server dies at import and the agent silently makes zero tool
 # calls. Drop the pin once the servers support mcp 2.x.
-_MCP_PIN = ["--with", "mcp<2"]
+# pydantic is capped for the same reason: openai-websearch-mcp pins mcp 1.13.1,
+# which imports a private pydantic helper that pydantic 2.14 removed. Drop the
+# cap once that server allows a newer mcp.
+_MCP_PIN = ["--with", "mcp<2", "--with", "pydantic<2.14"]
 
 MCP_SERVERS = [
     StdioServerParameters(

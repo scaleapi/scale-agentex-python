@@ -54,7 +54,12 @@ MCP_SERVERS = [
         args=["-y", "@modelcontextprotocol/server-sequential-thinking"],
     ),
     StdioServerParameters(
-        command="uvx", args=["openai-websearch-mcp"], env={"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")}
+        # openai-websearch-mcp pins mcp 1.13.1, which imports a private
+        # pydantic helper that pydantic 2.14 removed; uvx resolves pydantic
+        # unpinned, so cap it until the server allows a newer mcp.
+        command="uvx",
+        args=["--with", "pydantic<2.14", "openai-websearch-mcp"],
+        env={"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")},
     ),
 ]
 
