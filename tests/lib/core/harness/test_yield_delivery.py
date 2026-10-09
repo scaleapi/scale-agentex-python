@@ -76,3 +76,30 @@ async def test_flush_runs_on_early_close():
     await gen.aclose()  # triggers the finally -> flush()
     assert fake.started_names == ["Bash"]
     assert fake.ended_outputs == [None]  # flush closed the unpaired span (incomplete, no output)
+
+
+@pytest.mark.asyncio
+async def test_source_closed_when_consumer_closes_early():
+    """Closing the delivery generator must close the upstream event source.
+
+    A client disconnect (or any early break) closes the generator handed to the
+    caller. The source is pinned by the turn object, so if it is left suspended
+    at a yield the tap's finally never runs and the CLI subprocess leaks. No
+    gc.collect() here: the source stays referenced for the whole test.
+    """
+    closed: list[bool] = []
+
+    async def _recording_source():
+        try:
+            yield StreamTaskMessageDone(type="done", index=0)
+            yield StreamTaskMessageDone(type="done", index=1)
+        finally:
+            closed.append(True)
+
+    source = _recording_source()
+    gen = yield_events(source, tracer=None)
+    first = await gen.__anext__()
+    await gen.aclose()
+
+    assert first.index == 0
+    assert closed == [True]
