@@ -1,0 +1,57 @@
+# syntax=docker/dockerfile:1.3
+FROM python:3.12-slim
+COPY --from=ghcr.io/astral-sh/uv:0.6.4 /uv /uvx /bin/
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    htop \
+    vim \
+    curl \
+    tar \
+    python3-dev \
+    postgresql-client \
+    build-essential \
+    libpq-dev \
+    gcc \
+    cmake \
+    netcat-openbsd \
+    nodejs \
+    npm \ 
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install the Gemini CLI: the agent shells out to `gemini` on every turn,
+# so the binary must be present in the runtime image.
+RUN npm install -g @google/gemini-cli
+
+RUN uv pip install --system --upgrade pip setuptools wheel
+
+ENV UV_HTTP_TIMEOUT=1000
+
+# Copy just the requirements file to optimize caching
+COPY {{ project_path_from_build_root }}/requirements.txt /app/{{ project_path_from_build_root }}/requirements.txt
+
+WORKDIR /app/{{ project_path_from_build_root }}
+
+# Optional private index for Scale-internal packages such as sgp-obs, injected by the
+# control-plane broker. Inert unless the secret is present.
+#
+# This variant installs from requirements.txt, so there is no pyproject.toml for uv to
+# read a named index out of; the credentialed URL is used directly and is deliberately
+# NOT decoded. See PRIVATE_INDEX.md in the agentex-sdk CLI templates directory.
+#
+# Install the required Python packages
+RUN --mount=type=secret,id=codeartifact-pip-conf,required=false \
+    if [ -s /run/secrets/codeartifact-pip-conf ]; then \
+      export UV_DEFAULT_INDEX="$(sed -n 's#^[[:space:]]*index-url[[:space:]]*=[[:space:]]*##p' /run/secrets/codeartifact-pip-conf | head -1)"; \
+    fi; \
+    uv pip install --system -r requirements.txt
+
+# Copy the project code
+COPY {{ project_path_from_build_root }}/project /app/{{ project_path_from_build_root }}/project
+
+# Set environment variables
+ENV PYTHONPATH=/app
+
+# Run the agent using uvicorn
+CMD ["uvicorn", "project.acp:acp", "--host", "0.0.0.0", "--port", "8000"]
