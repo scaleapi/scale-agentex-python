@@ -21,6 +21,8 @@ RUN apt-get update && apt-get install -y \
 RUN uv pip install --system --upgrade pip setuptools wheel
 
 ENV UV_HTTP_TIMEOUT=1000
+# Fewer parallel PyPI downloads, so the slow emulated arm64 build drops fewer connections.
+ENV UV_CONCURRENT_DOWNLOADS=4
 
 # Copy pyproject.toml and README.md to install dependencies
 COPY 10_async/00_base/110_pydantic_ai/pyproject.toml /app/110_pydantic_ai/pyproject.toml
@@ -37,8 +39,15 @@ COPY 10_async/00_base/110_pydantic_ai/tests /app/110_pydantic_ai/tests
 # Copy shared test utilities
 COPY test_utils /app/test_utils
 
-# Install the required Python packages with dev dependencies
-RUN uv pip install --system .[dev] pytest-asyncio httpx
+# Install the required Python packages with dev dependencies.
+# Retried because PyPI downloads sometimes drop mid-stream, and this uv
+# version doesn't retry that error itself.
+RUN for attempt in 1 2 3; do \
+        uv pip install --system .[dev] pytest-asyncio httpx && exit 0; \
+        echo "uv pip install failed (attempt $attempt of 3)"; \
+        [ "$attempt" -lt 3 ] && sleep $((attempt * 10)); \
+    done; \
+    exit 1
 
 # Set environment variables
 ENV PYTHONPATH=/app
