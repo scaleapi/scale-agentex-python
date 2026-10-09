@@ -12,12 +12,13 @@ from agentex.lib.core.tracing.code_revision import is_git_object_name
 
 logger = make_logger(__name__)
 
+
 def get_auth_principal(env_vars: EnvironmentVariables):
     if not env_vars.AUTH_PRINCIPAL_B64:
         return None
 
     try:
-        decoded_str = base64.b64decode(env_vars.AUTH_PRINCIPAL_B64).decode('utf-8')
+        decoded_str = base64.b64decode(env_vars.AUTH_PRINCIPAL_B64).decode("utf-8")
         return json.loads(decoded_str)
     except Exception:
         return None
@@ -53,10 +54,7 @@ async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
     # Build the agent's own URL
     full_acp_url = f"{env_vars.ACP_URL.rstrip('/')}:{env_vars.ACP_PORT}"
 
-    description = (
-        env_vars.AGENT_DESCRIPTION
-        or f"Generic description for agent: {env_vars.AGENT_NAME}"
-    )
+    description = env_vars.AGENT_DESCRIPTION or f"Generic description for agent: {env_vars.AGENT_NAME}"
 
     registration_metadata = build_registration_metadata(env_vars, agent_card)
 
@@ -77,6 +75,7 @@ async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
 
     # Make the registration request
     registration_url = f"{env_vars.AGENTEX_BASE_URL.rstrip('/')}/agents/register"
+    registration_headers = {"x-agent-api-key": env_vars.AGENT_API_KEY} if env_vars.AGENT_API_KEY else {}
     # Retry logic with configurable attempts and delay
     max_retries = 3
     base_delay = 5  # seconds
@@ -87,46 +86,43 @@ async def register_agent(env_vars: EnvironmentVariables, agent_card=None):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    registration_url, json=registration_data, timeout=30.0
+                    registration_url, json=registration_data, headers=registration_headers, timeout=30.0
                 )
                 if response.status_code == 200:
                     agent = response.json()
                     agent_id, agent_name = agent["id"], agent["name"]
-                    agent_api_key = agent["agent_api_key"]
+                    returned_key = agent.get("agent_api_key")
+                    if returned_key is not None and not isinstance(returned_key, str):
+                        raise ValueError("Unexpected API key type in registration response")
+                    agent_api_key = returned_key or env_vars.AGENT_API_KEY
 
                     os.environ["AGENT_ID"] = agent_id
                     os.environ["AGENT_NAME"] = agent_name
-                    os.environ["AGENT_API_KEY"] = agent_api_key
                     env_vars.AGENT_ID = agent_id
                     env_vars.AGENT_NAME = agent_name
-                    env_vars.AGENT_API_KEY = agent_api_key
+                    if agent_api_key:
+                        os.environ["AGENT_API_KEY"] = agent_api_key
+                        env_vars.AGENT_API_KEY = agent_api_key
                     global refreshed_environment_variables
                     refreshed_environment_variables = env_vars
                     logger.info(
-                        f"Successfully registered agent '{env_vars.AGENT_NAME}' with Agentex server with acp_url: {full_acp_url}. Registration data: {registration_data}"
+                        f"Successfully registered agent '{env_vars.AGENT_NAME}' with Agentex server with acp_url: {full_acp_url}."
                     )
                     return  # Success, exit the retry loop
                 else:
-                    error_msg = f"Failed to register agent. Status: {response.status_code}, Response: {response.text}"
+                    error_msg = f"Failed to register agent. Status: {response.status_code}"
                     logger.error(error_msg)
-                    last_exception = Exception(
-                        f"Failed to startup agent: {response.text}"
-                    )
+                    last_exception = RuntimeError(error_msg)
 
         except Exception as e:
-            logger.error(
-                f"Exception during agent registration attempt {attempt + 1}: {e}"
-            )
-            last_exception = e
+            logger.error(f"Exception during agent registration attempt {attempt + 1}: {type(e).__name__}")
+            # Transport errors and response bodies may contain request credentials.
+            last_exception = RuntimeError(f"Failed to register agent ({type(e).__name__})")
         attempt += 1
         if attempt < max_retries:
             delay = (attempt) * base_delay  # 5, 10, 15 seconds
-            logger.info(
-                f"Retrying in {delay} seconds... (attempt {attempt}/{max_retries})"
-            )
+            logger.info(f"Retrying in {delay} seconds... (attempt {attempt}/{max_retries})")
             await asyncio.sleep(delay)
 
     # If we get here, all retries failed
-    raise last_exception or Exception(
-        f"Failed to register agent after {max_retries} attempts"
-    )
+    raise last_exception or Exception(f"Failed to register agent after {max_retries} attempts")
