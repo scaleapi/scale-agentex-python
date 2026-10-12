@@ -15,7 +15,7 @@ from contextlib import ExitStack
 from unittest.mock import Mock, AsyncMock, patch
 
 import pytest
-from temporalio.worker import StartActivityInput, StartLocalActivityInput
+from temporalio.worker import StartActivityInput, StartChildWorkflowInput, StartLocalActivityInput
 
 from agentex.types.span import Span
 from agentex.types.task import Task
@@ -51,8 +51,25 @@ EXPECTED_ATTRS = {
 @pytest.fixture(autouse=True)
 def _clean_registry():
     sgp_evals.clear()
-    yield
+    with patch.object(sgp_evals, "_capture_enabled", True):
+        yield
     sgp_evals.clear()
+
+
+def _in_workflow(memo: dict[str, Any], workflow_id: str = "task-1") -> ExitStack:
+    stack = ExitStack()
+    stack.enter_context(
+        patch.object(interceptor.workflow, "memo_value", side_effect=lambda key, default=None: memo.get(key, default))
+    )
+    stack.enter_context(patch.object(interceptor.workflow, "info", return_value=Mock(workflow_id=workflow_id)))
+    return stack
+
+
+async def _run_activity(headers: dict[str, Any], workflow_id: str) -> None:
+    inbound_next = Mock()
+    inbound_next.execute_activity = AsyncMock(return_value="ok")
+    with patch.object(interceptor.activity, "info", return_value=Mock(workflow_id=workflow_id)):
+        await interceptor._ActivityInbound(inbound_next).execute_activity(Mock(headers=headers))
 
 
 def _span(trace_id: str = "task-1", task_id: str | None = None, data: Any = None) -> Span:
@@ -244,6 +261,24 @@ class TestQueuedSpans:
 
         assert sgp_evals.attrs_for_span(span) == {}
 
+    def test_spans_are_not_pinned_until_an_sgp_processor_exists(self) -> None:
+        module = "agentex.lib.core.tracing.processors.sgp_tracing_processor"
+        with patch.object(sgp_evals, "_capture_enabled", False):
+            Trace(processors=[], client=Mock(), trace_id="task-1").start_span(name="s")
+            assert not sgp_evals._plain_spans
+
+            with patch(f"{module}.tracing.init"), patch(f"{module}.EnvironmentVariables"):
+                SGPSyncTracingProcessor(SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id=""))
+            Trace(processors=[], client=Mock(), trace_id="task-1").start_span(name="s")
+            assert len(sgp_evals._plain_spans) == 1
+
+    def test_async_sgp_processor_enables_pinning(self) -> None:
+        module = "agentex.lib.core.tracing.processors.sgp_tracing_processor"
+        with patch.object(sgp_evals, "_capture_enabled", False):
+            with patch(f"{module}.EnvironmentVariables"):
+                SGPAsyncTracingProcessor(SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id=""))
+            assert sgp_evals._capture_enabled
+
 
 class TestAcpServer:
     """Sync and async (base) agents: the ACP server sees the task and spans are emitted in-process."""
@@ -334,15 +369,10 @@ class TestTemporal:
         outbound = interceptor._WorkflowOutbound(next_outbound)
         start_input = Mock(spec=StartActivityInput, headers={})
 
-        with patch.object(interceptor.workflow, "memo_value", return_value=EXPECTED_ATTRS):
+        with _in_workflow({sgp_evals.MEMO_KEY: EXPECTED_ATTRS}):
             outbound.start_activity(start_input)
 
-        inbound_next = Mock()
-        inbound_next.execute_activity = AsyncMock(return_value="ok")
-        inbound = interceptor._ActivityInbound(inbound_next)
-        info = Mock(workflow_id="task-1")
-        with patch.object(interceptor.activity, "info", return_value=info):
-            await inbound.execute_activity(Mock(headers=sent["headers"]))
+        await _run_activity(sent["headers"], workflow_id="task-1")
 
         assert sgp_evals.attrs_for_span(_span(trace_id="task-1")) == EXPECTED_ATTRS
 
@@ -361,7 +391,7 @@ class TestTemporal:
         next_outbound.start_activity = lambda input: sent.update(headers=input.headers)
         start_input = Mock(spec=StartActivityInput, headers={})
 
-        with patch.object(interceptor.workflow, "memo_value", return_value=None):
+        with _in_workflow({}):
             interceptor._WorkflowOutbound(next_outbound).start_activity(start_input)
 
         assert sent["headers"] == {}
@@ -372,10 +402,56 @@ class TestTemporal:
         next_outbound.start_local_activity = lambda input: sent.update(headers=input.headers)
         start_input = Mock(spec=StartLocalActivityInput, headers={})
 
-        with patch.object(interceptor.workflow, "memo_value", return_value=EXPECTED_ATTRS):
+        with _in_workflow({sgp_evals.MEMO_KEY: EXPECTED_ATTRS}):
             interceptor._WorkflowOutbound(next_outbound).start_local_activity(start_input)
 
         assert interceptor.ATTRS_HEADER in sent["headers"]
+
+    async def test_child_workflow_gets_the_attrs_and_task_id_in_its_memo(self) -> None:
+        sent: dict[str, Any] = {}
+        next_outbound = Mock()
+        next_outbound.start_child_workflow = AsyncMock(side_effect=lambda input: sent.update(memo=input.memo))
+        start_input = Mock(spec=StartChildWorkflowInput, memo={"caller": "kept"})
+
+        with _in_workflow({sgp_evals.MEMO_KEY: EXPECTED_ATTRS}, workflow_id="task-1"):
+            await interceptor._WorkflowOutbound(next_outbound).start_child_workflow(start_input)
+
+        assert sent["memo"] == {
+            "caller": "kept",
+            sgp_evals.MEMO_KEY: EXPECTED_ATTRS,
+            interceptor.TASK_ID_MEMO_KEY: "task-1",
+        }
+
+    async def test_non_eval_child_workflow_memo_is_untouched(self) -> None:
+        sent: dict[str, Any] = {}
+        next_outbound = Mock()
+        next_outbound.start_child_workflow = AsyncMock(side_effect=lambda input: sent.update(memo=input.memo))
+        start_input = Mock(spec=StartChildWorkflowInput, memo=None)
+
+        with _in_workflow({}):
+            await interceptor._WorkflowOutbound(next_outbound).start_child_workflow(start_input)
+
+        assert sent["memo"] is None
+
+    async def test_child_workflow_activity_stamps_spans_of_the_parent_task(self) -> None:
+        sent: dict[str, Any] = {}
+        next_outbound = Mock()
+        next_outbound.start_activity = lambda input: sent.update(headers=input.headers)
+        child_memo = {sgp_evals.MEMO_KEY: EXPECTED_ATTRS, interceptor.TASK_ID_MEMO_KEY: "task-1"}
+
+        with _in_workflow(child_memo, workflow_id="child-wf"):
+            interceptor._WorkflowOutbound(next_outbound).start_activity(Mock(spec=StartActivityInput, headers={}))
+        await _run_activity(sent["headers"], workflow_id="child-wf")
+
+        assert sgp_evals.attrs_for_span(_span(trace_id="task-1")) == EXPECTED_ATTRS
+        assert sgp_evals.attrs_for_span(_span(trace_id="child-wf")) == {}
+
+    async def test_header_without_task_id_registers_under_the_workflow_id(self) -> None:
+        headers = {interceptor.ATTRS_HEADER: interceptor._converter.to_payload(EXPECTED_ATTRS)}
+
+        await _run_activity(headers, workflow_id="task-1")
+
+        assert sgp_evals.attrs_for_span(_span(trace_id="task-1")) == EXPECTED_ATTRS
 
     async def test_worker_runs_with_the_interceptor_ahead_of_agent_interceptors(self) -> None:
         agent_interceptor = interceptor.SGPEvalsInterceptor()

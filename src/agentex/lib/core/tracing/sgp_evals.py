@@ -21,6 +21,7 @@ __all__ = (
     "register_task_metadata",
     "span_attrs_from_task_metadata",
     "attrs_for_span",
+    "enable_capture",
     "capture_for_span",
     "release_span",
 )
@@ -39,6 +40,8 @@ _attrs_by_span: OrderedDict[str, dict[str, Any]] = OrderedDict()
 # Spans pinned with no attrs live apart so a flood of plain spans cannot evict an eval span's pinned ids.
 _plain_spans: OrderedDict[str, None] = OrderedDict()
 _lock = threading.Lock()
+# Only the SGP processor reads the pins, so a process without one never takes the lock per span.
+_capture_enabled = False
 
 
 def span_attrs_from_task_metadata(task_metadata: Any) -> dict[str, Any] | None:
@@ -82,8 +85,15 @@ def _lookup(span: Span) -> dict[str, Any]:
     return {}
 
 
+def enable_capture() -> None:
+    global _capture_enabled
+    _capture_enabled = True
+
+
 def capture_for_span(span: Span) -> None:
     """Pin the span's attrs at start, empty included, so an eval task registered later cannot claim it."""
+    if not _capture_enabled:
+        return
     with _lock:
         attrs = _lookup(span)
         store: OrderedDict[str, Any] = _attrs_by_span if attrs else _plain_spans

@@ -135,6 +135,7 @@ class SGPSyncTracingProcessor(SyncTracingProcessor):
             disabled=disabled,
         )
         self.env_vars = EnvironmentVariables.refresh()
+        sgp_evals.enable_capture()
         logger.info(
             "SGP tracing span-start upsert %s (%s)",
             "disabled — end-only ingest" if _skip_span_start_enabled() else "enabled",
@@ -177,6 +178,7 @@ class SGPAsyncTracingProcessor(AsyncTracingProcessor):
             asyncio.AbstractEventLoop, AsyncSGPClient
         ] = weakref.WeakKeyDictionary()
         self.env_vars = EnvironmentVariables.refresh()
+        sgp_evals.enable_capture()
         logger.info(
             "SGP tracing span-start upsert %s (%s)",
             "disabled — end-only ingest" if _skip_span_start_enabled() else "enabled",
