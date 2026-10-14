@@ -26,7 +26,7 @@ from temporalio.worker import (
 from temporalio.converter import default
 
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.core.tracing.sgp_evals import MEMO_KEY, register_task, unregister_task
+from agentex.lib.core.tracing.sgp_evals import MEMO_KEY, unregister_task, register_workflow_task
 
 logger = make_logger(__name__)
 
@@ -106,7 +106,7 @@ class _ActivityInbound(ActivityInboundInterceptor):
                 if task_id_payload is not None:
                     task_id = _converter.from_payload(task_id_payload, str)
                 if task_id:
-                    register_task(task_id, _converter.from_payload(payload, dict))
+                    register_workflow_task(task_id, _converter.from_payload(payload, dict))
             except Exception:
                 logger.warning("failed to read sgp evals span attrs from activity headers", exc_info=True)
         return await super().execute_activity(input)

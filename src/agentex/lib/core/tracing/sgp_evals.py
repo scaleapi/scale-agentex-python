@@ -19,6 +19,7 @@ from agentex.types.span import Span
 __all__ = (
     "MEMO_KEY",
     "register_task",
+    "register_workflow_task",
     "register_task_metadata",
     "span_attrs_from_task_metadata",
     "attrs_for_span",
@@ -42,6 +43,7 @@ _attrs_by_span: OrderedDict[str, dict[str, Any]] = OrderedDict()
 # Spans pinned with no attrs live apart so a flood of plain spans cannot evict an eval span's pinned ids.
 _plain_spans: OrderedDict[str, None] = OrderedDict()
 _lock = threading.Lock()
+_WHOLE_WORKFLOW = datetime.min.replace(tzinfo=UTC)
 # Only the SGP processor reads the pins, so a process without one never takes the lock per span.
 _capture_enabled = False
 
@@ -56,15 +58,22 @@ def span_attrs_from_task_metadata(task_metadata: Any) -> dict[str, Any] | None:
     return attrs or None
 
 
-def register_task(task_id: str, attrs: dict[str, Any]) -> None:
+def register_task(task_id: str, attrs: dict[str, Any], effective_from: datetime | None = None) -> None:
     with _lock:
+        since = effective_from or datetime.now(UTC)
         current = _attrs_by_task.get(task_id)
         # Every event re-registers the same attrs, which must not move their start past the task's earlier spans.
-        if current is None or current[0] != attrs:
-            _attrs_by_task[task_id] = (attrs, datetime.now(UTC))
+        if current is not None and current[0] == attrs:
+            since = min(since, current[1])
+        _attrs_by_task[task_id] = (attrs, since)
         _attrs_by_task.move_to_end(task_id)
         while len(_attrs_by_task) > _MAX_TASKS:
             _attrs_by_task.popitem(last=False)
+
+
+def register_workflow_task(task_id: str, attrs: dict[str, Any]) -> None:
+    """Register ids read from a workflow memo, which also cover spans the workflow started before this worker saw it."""
+    register_task(task_id, attrs, effective_from=_WHOLE_WORKFLOW)
 
 
 def register_task_metadata(task_id: str, task_metadata: Any) -> dict[str, Any] | None:
@@ -128,7 +137,7 @@ def attrs_for_span(span: Span) -> dict[str, Any]:
             return dict(_attrs_by_span[span.id])
         if span.id in _plain_spans:
             return {}
-        # Unpinned (started before an SGP processor existed, or evicted): skip attrs registered after it started.
+        # Unpinned (started on another worker, before an SGP processor existed, or evicted).
         return _lookup(span, _aware(span.start_time))
 
 

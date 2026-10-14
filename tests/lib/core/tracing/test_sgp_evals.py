@@ -480,6 +480,15 @@ class TestTemporal:
 
         assert sgp_evals.attrs_for_span(_span(trace_id="task-1")) == EXPECTED_ATTRS
 
+    async def test_span_started_on_another_worker_keeps_its_ids_at_end(self) -> None:
+        span = _span(data={})
+        span.start_time -= timedelta(seconds=1)
+        headers = {interceptor.ATTRS_HEADER: interceptor._converter.to_payload(EXPECTED_ATTRS)}
+
+        await _run_activity(headers, workflow_id="task-1")
+
+        assert _sgp_metadata(span) == EXPECTED_ATTRS
+
     async def test_worker_runs_with_the_interceptor_ahead_of_agent_interceptors(self) -> None:
         agent_interceptor = interceptor.SGPEvalsInterceptor()
         module = "agentex.lib.core.temporal.workers.worker"
