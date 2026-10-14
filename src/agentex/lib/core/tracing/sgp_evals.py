@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import threading
 from typing import Any
+from datetime import UTC, datetime
 from collections import OrderedDict
 
 from agentex.types.span import Span
@@ -34,7 +35,8 @@ MEMO_KEY = "sgp_evals_span_attrs"
 
 # Only eval tasks are stored, so this stays tiny. The LRU bound caps a long-lived agent process.
 _MAX_TASKS = 10_000
-_attrs_by_task: OrderedDict[str, dict[str, Any]] = OrderedDict()
+# Each task's attrs with when they took effect, so an unpinned span only gets attrs its task had at its start.
+_attrs_by_task: OrderedDict[str, tuple[dict[str, Any], datetime]] = OrderedDict()
 # Attrs captured when a span starts, so a later registry change cannot alter a span still queued for export.
 _attrs_by_span: OrderedDict[str, dict[str, Any]] = OrderedDict()
 # Spans pinned with no attrs live apart so a flood of plain spans cannot evict an eval span's pinned ids.
@@ -56,7 +58,10 @@ def span_attrs_from_task_metadata(task_metadata: Any) -> dict[str, Any] | None:
 
 def register_task(task_id: str, attrs: dict[str, Any]) -> None:
     with _lock:
-        _attrs_by_task[task_id] = attrs
+        current = _attrs_by_task.get(task_id)
+        # Every event re-registers the same attrs, which must not move their start past the task's earlier spans.
+        if current is None or current[0] != attrs:
+            _attrs_by_task[task_id] = (attrs, datetime.now(UTC))
         _attrs_by_task.move_to_end(task_id)
         while len(_attrs_by_task) > _MAX_TASKS:
             _attrs_by_task.popitem(last=False)
@@ -78,11 +83,16 @@ def unregister_task(task_id: str) -> None:
             _attrs_by_task.pop(task_id, None)
 
 
-def _lookup(span: Span) -> dict[str, Any]:
+def _lookup(span: Span, started_at: datetime | None = None) -> dict[str, Any]:
     for key in (span.task_id, span.trace_id):
-        if key and key in _attrs_by_task:
-            return dict(_attrs_by_task[key])
+        entry = _attrs_by_task.get(key) if key else None
+        if entry is not None and (started_at is None or entry[1] <= started_at):
+            return dict(entry[0])
     return {}
+
+
+def _aware(moment: datetime) -> datetime:
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
 
 
 def enable_capture() -> None:
@@ -110,7 +120,7 @@ def release_span(span_id: str) -> None:
 
 
 def attrs_for_span(span: Span) -> dict[str, Any]:
-    """Attrs captured at span start, else those of the task found by ``span.task_id`` then ``span.trace_id``."""
+    """Attrs captured at span start, else those its task (``span.task_id`` then ``span.trace_id``) had at its start."""
     if not _attrs_by_task and not _attrs_by_span and not _plain_spans:
         return {}
     with _lock:
@@ -118,7 +128,8 @@ def attrs_for_span(span: Span) -> dict[str, Any]:
             return dict(_attrs_by_span[span.id])
         if span.id in _plain_spans:
             return {}
-        return _lookup(span)
+        # Unpinned (started before an SGP processor existed, or evicted): skip attrs registered after it started.
+        return _lookup(span, _aware(span.start_time))
 
 
 def clear() -> None:

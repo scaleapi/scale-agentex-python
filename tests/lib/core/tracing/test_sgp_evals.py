@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from contextlib import ExitStack
 from unittest.mock import Mock, AsyncMock, patch
 
@@ -271,6 +271,33 @@ class TestQueuedSpans:
                 SGPSyncTracingProcessor(SGPTracingProcessorConfig(sgp_api_key="", sgp_account_id=""))
             Trace(processors=[], client=Mock(), trace_id="task-1").start_span(name="s")
             assert len(sgp_evals._plain_spans) == 1
+
+    def test_plain_span_started_before_pinning_is_not_stamped_by_a_later_run(self) -> None:
+        with patch.object(sgp_evals, "_capture_enabled", False):
+            span = Trace(processors=[], client=Mock(), trace_id="task-1").start_span(name="s")
+        span.start_time -= timedelta(seconds=1)
+        span.data = {"k": 1}
+
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+
+        assert _sgp_metadata(span) == {"k": 1}
+
+    def test_eval_span_started_before_pinning_keeps_its_ids_across_re_registration(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        with patch.object(sgp_evals, "_capture_enabled", False):
+            span = Trace(processors=[], client=Mock(), trace_id="task-1").start_span(name="s")
+        span.data = {}
+
+        sgp_evals.register_task_metadata("task-1", dict(EVAL_METADATA))
+
+        assert _sgp_metadata(span) == EXPECTED_ATTRS
+
+    def test_unpinned_span_with_a_naive_start_time_is_compared_as_utc(self) -> None:
+        sgp_evals.register_task_metadata("task-1", EVAL_METADATA)
+        span = _span(data={})
+        span.start_time = datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=1)
+
+        assert _sgp_metadata(span) == EXPECTED_ATTRS
 
     def test_async_sgp_processor_enables_pinning(self) -> None:
         module = "agentex.lib.core.tracing.processors.sgp_tracing_processor"
