@@ -19,6 +19,8 @@ logger = make_logger(__name__)
 # this constraint every server dies at import and the agent silently makes zero tool
 # calls. Drop the pin once the servers support mcp 2.x.
 _MCP_PIN = ["--with", "mcp<2"]
+# mcp 1.13.1, pinned by openai-websearch-mcp, imports a pydantic internal that 2.14 removed.
+_WEBSEARCH_PIN = ["--with", "pydantic<2.14"]
 
 MCP_SERVERS = [
     StdioServerParameters(
@@ -27,7 +29,7 @@ MCP_SERVERS = [
     ),
     StdioServerParameters(
         command="uvx",
-        args=[*_MCP_PIN, "openai-websearch-mcp"],
+        args=[*_MCP_PIN, *_WEBSEARCH_PIN, "openai-websearch-mcp"],
         env={
             "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")
         }

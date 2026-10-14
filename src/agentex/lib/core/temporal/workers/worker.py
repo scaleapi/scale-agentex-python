@@ -34,6 +34,7 @@ from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.tracing.span_queue import shutdown_default_span_queue
 from agentex.lib.core.compat.version_guard import assert_backend_compatible
 from agentex.lib.core.observability.sgp_obs_setup import init_sgp_obs, shutdown_sgp_obs
+from agentex.lib.core.tracing.sgp_evals_interceptor import SGPEvalsInterceptor
 from agentex.lib.core.tracing.tracing_processor_manager import shutdown_sync_tracing_processors
 
 logger = make_logger(__name__)
@@ -274,7 +275,7 @@ class AgentexWorker:
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
             # Temporal inherits client tracing before these business interceptors.
-            interceptors=self.interceptors,
+            interceptors=[SGPEvalsInterceptor(), *self.interceptors],
         )
 
         logger.info(f"Starting workers for task queue: {self.task_queue}")

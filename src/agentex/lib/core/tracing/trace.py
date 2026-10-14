@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from agentex import Agentex, AsyncAgentex
 from agentex.types.span import Span
+from agentex.lib.core.tracing import sgp_evals
 from agentex.lib.utils.logging import make_logger
 from agentex.lib.utils.model_utils import recursive_model_dump
 from agentex.lib.core.tracing.obs_ids import obs_correlation, warn_on_backend_drift
@@ -293,6 +294,7 @@ class Trace:
         if obs_handle is not None:
             _register_obs_handle(span.id, obs_handle)
 
+        sgp_evals.capture_for_span(span)
         for processor in self.processors:
             _run_on_span_start(processor, span)
 
@@ -456,6 +458,8 @@ class AsyncTrace:
         )
         if obs_handle is not None:
             _register_obs_handle(span.id, obs_handle)
+
+        sgp_evals.capture_for_span(span)
 
         # Enqueueing the START event must not crash the app path either (same
         # principle as _run_on_span_start): swallow so start_span still returns
