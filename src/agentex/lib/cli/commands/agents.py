@@ -351,6 +351,18 @@ def deploy(
         False, "--use-latest-chart", help="Fetch and use the latest Helm chart version from OCI registry"
     ),
     interactive: bool = typer.Option(True, "--interactive/--no-interactive", help="Enable interactive prompts"),
+    agent_key: bool = typer.Option(
+        False,
+        "--agent-key/--no-agent-key",
+        help="Register the agent with Agentex and deliver its server-issued key to the pods through a "
+        "managed Kubernetes Secret. Requires AGENTEX_BASE_URL and Agentex credentials.",
+    ),
+    replace_agent_key: bool = typer.Option(
+        False,
+        "--replace-agent-key",
+        help="One-time migration for an agent that already has a key but no stored Secret: replaces the "
+        "key, which breaks the running pods until this rollout completes. Requires --agent-key.",
+    ),
 ):
     """Deploy an agent to a Kubernetes cluster using Helm"""
 
@@ -407,6 +419,12 @@ def deploy(
             console.print(f"  Image Tag: {tag}")
         if use_latest_chart:
             console.print("  Chart Version: [cyan]latest (will be fetched)[/cyan]")
+        if agent_key:
+            console.print("  Agent key: [cyan]managed Secret[/cyan]")
+        if replace_agent_key:
+            console.print(
+                "  [yellow]Agent key will be REPLACED: running pods lose access until the rollout completes[/yellow]"
+            )
 
         if interactive:
             proceed = questionary.confirm("Proceed with deployment?").ask()
@@ -433,6 +451,8 @@ def deploy(
             deploy_overrides=deploy_overrides,
             environment_name=environment,
             use_latest_chart=use_latest_chart,
+            agent_key=agent_key,
+            replace_agent_key=replace_agent_key,
         )
 
         # Use the already loaded manifest object

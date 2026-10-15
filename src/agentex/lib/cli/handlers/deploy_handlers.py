@@ -10,6 +10,7 @@ import yaml
 from pydantic import Field, BaseModel
 from rich.console import Console
 
+from agentex import Agentex
 from agentex.lib.utils.logging import make_logger
 from agentex.config.agent_config import AgentConfig
 from agentex.config.agent_manifest import AgentManifest
@@ -20,6 +21,11 @@ from agentex.lib.environment_variables import EnvVarKeys
 from agentex.lib.cli.utils.kubectl_utils import check_and_switch_cluster_context
 from agentex.lib.sdk.config.agent_manifest import load_agent_manifest
 from agentex.lib.sdk.config.environment_config import load_environments_config_from_manifest_dir
+from agentex.lib.cli.handlers.agent_key_handlers import (
+    bootstrap_agent_api_key,
+    inject_agent_api_key_secret_ref,
+    reject_reserved_agent_api_key_values,
+)
 
 logger = make_logger(__name__)
 console = Console()
@@ -454,6 +460,8 @@ def deploy_agent(
     deploy_overrides: InputDeployOverrides,
     environment_name: str | None = None,
     use_latest_chart: bool = False,
+    agent_key: bool = False,
+    replace_agent_key: bool = False,
 ) -> None:
     """Deploy an agent using helm
 
@@ -464,7 +472,14 @@ def deploy_agent(
         deploy_overrides: Image repository/tag overrides
         environment_name: Environment name from environments.yaml
         use_latest_chart: If True, fetch and use the latest chart version from OCI registry (OCI mode only)
+        agent_key: If True, deliver the server-issued agent key through a managed Kubernetes Secret
+        replace_agent_key: If True, replace an existing unreadable agent key (one-time migration)
     """
+    if replace_agent_key and not agent_key:
+        raise DeploymentError("--replace-agent-key requires --agent-key")
+    if agent_key and not os.environ.get("AGENTEX_BASE_URL"):
+        # Agentex() would otherwise fall back to its built-in default and issue the key there.
+        raise DeploymentError("--agent-key requires AGENTEX_BASE_URL to point at the target Agentex server")
 
     # Validate prerequisites
     if not check_helm_installed():
@@ -519,6 +534,19 @@ def deploy_agent(
 
     # Merge configurations
     helm_values = merge_deployment_configs(manifest, agent_env_config, deploy_overrides, manifest_path)
+
+    if agent_key:
+        # Validate caller configuration before any key is issued, and finish key delivery
+        # before Helm mutates the release.
+        reject_reserved_agent_api_key_values(helm_values)
+        secret_name = bootstrap_agent_api_key(
+            agentex_client=Agentex(),
+            manifest=manifest,
+            namespace=namespace,
+            context=cluster_name,
+            replace_existing_key=replace_agent_key,
+        )
+        inject_agent_api_key_secret_ref(helm_values, secret_name)
 
     # Create values file
     values_file = create_helm_values_file(helm_values)
