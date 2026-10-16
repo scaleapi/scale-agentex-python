@@ -25,7 +25,7 @@ logger = make_logger(__name__)
 console = Console()
 
 TEMPORAL_WORKER_KEY = "temporal-worker"
-DEFAULT_HELM_CHART_VERSION = "0.1.9"
+DEFAULT_HELM_CHART_VERSION = "0.6.0"
 
 
 class InputDeployOverrides(BaseModel):
