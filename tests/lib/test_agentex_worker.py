@@ -135,6 +135,7 @@ class TestAgentexWorkerAgentCard:
         env.ACP_PORT = 8000
         env.AGENT_DESCRIPTION = "test description"
         env.AGENT_NAME = "test-agent"
+        env.AGENT_API_KEY = None
         env.ACP_TYPE = "agentic"
         env.AUTH_PRINCIPAL_B64 = None
         env.AGENTEX_DEPLOYMENT_ID = None
@@ -145,7 +146,7 @@ class TestAgentexWorkerAgentCard:
         return env
 
     @staticmethod
-    def _httpx_client_mock(captured_payloads):
+    def _httpx_client_mock(captured_payloads, captured_headers):
         response = MagicMock()
         response.status_code = 200
         response.json.return_value = {
@@ -154,8 +155,9 @@ class TestAgentexWorkerAgentCard:
             "agent_api_key": "api-key",
         }
 
-        async def post(url, json=None, timeout=None):  # noqa: ARG001
+        async def post(url, json=None, headers=None, timeout=None):  # noqa: ARG001
             captured_payloads.append(json)
+            captured_headers.append(headers)
             return response
 
         client = MagicMock()
@@ -227,7 +229,8 @@ class TestAgentexWorkerAgentCard:
 
         mock_register.assert_awaited_once_with(env, agent_card=card)
 
-    async def test_worker_and_fastacp_paths_serialize_the_same_card_shape(self):
+    @pytest.mark.parametrize("configured_key", [None, "configured-agent-key"])
+    async def test_worker_and_fastacp_paths_serialize_the_same_card_shape(self, configured_key):
         """The worker path and the FastACP/BaseACPServer lifespan path hand the
         same card to register_agent, so the registration payload's
         registration_metadata.agent_card is identical."""
@@ -238,6 +241,7 @@ class TestAgentexWorkerAgentCard:
         card = AgentCard(metadata={"permits_capable": True, "region": "us"})
 
         worker_payloads = []
+        worker_headers = []
         worker = AgentexWorker(
             task_queue="test-queue", health_check_port=8080, agent_card=card
         )
@@ -248,12 +252,14 @@ class TestAgentexWorkerAgentCard:
             "agentex.lib.core.temporal.workers.worker.EnvironmentVariables"
         ) as mock_env_cls, patch(
             "agentex.lib.utils.registration.httpx.AsyncClient",
-            new=self._httpx_client_mock(worker_payloads),
+            new=self._httpx_client_mock(worker_payloads, worker_headers),
         ):
             mock_env_cls.refresh.return_value = self._env_vars_mock()
+            mock_env_cls.refresh.return_value.AGENT_API_KEY = configured_key
             await worker._register_agent()
 
         acp_payloads = []
+        acp_headers = []
         server = BaseACPServer.create()
         server._agent_card = card
         lifespan = server.get_lifespan_function()
@@ -267,9 +273,10 @@ class TestAgentexWorkerAgentCard:
             new=AsyncMock(),
         ), patch(
             "agentex.lib.utils.registration.httpx.AsyncClient",
-            new=self._httpx_client_mock(acp_payloads),
+            new=self._httpx_client_mock(acp_payloads, acp_headers),
         ):
             mock_env_cls.refresh.return_value = self._env_vars_mock()
+            mock_env_cls.refresh.return_value.AGENT_API_KEY = configured_key
             async with lifespan(MagicMock()):
                 pass
 
@@ -278,6 +285,8 @@ class TestAgentexWorkerAgentCard:
         worker_card = worker_payloads[0]["registration_metadata"]["agent_card"]
         acp_card = acp_payloads[0]["registration_metadata"]["agent_card"]
         assert worker_card == acp_card == card.model_dump()
+        expected_headers = {"x-agent-api-key": configured_key} if configured_key else {}
+        assert worker_headers == acp_headers == [expected_headers]
 
 
 class TestGetTemporalClientMetricsConfig:
