@@ -184,6 +184,10 @@ jobs:
           # command line below is a different variable, read only by the tutorials' own test
           # files, and never reaches the SDK.
           AGENTEX_BASE_URL: http://localhost:5003
+          # `agentex agents run` listens on 127.0.0.1 by default. The AgentEx server container
+          # dials agents at host.docker.internal, which host-gateway maps to the Docker bridge,
+          # not loopback, so agents here must listen on every interface.
+          AGENTEX_AGENT_HOST: 0.0.0.0
         run: |
           echo "Testing tutorial: ${{ matrix.tutorial }}"
           AGENTEX_API_BASE_URL="http://localhost:5003" \

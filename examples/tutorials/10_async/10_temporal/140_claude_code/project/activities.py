@@ -14,8 +14,12 @@ provide a fake that yields pre-recorded stdout lines so no real CLI runs.
 
 from __future__ import annotations
 
+import os
 import asyncio
+import hashlib
+import tempfile
 from typing import Any, AsyncIterator
+from pathlib import Path
 from datetime import datetime
 
 from temporalio import activity
@@ -48,7 +52,34 @@ class RunClaudeCodeTurnResult(BaseModel):
     session_id: str | None = None
 
 
-async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIterator[str]:
+# Whoever can reach this agent's ACP writes the prompt, so the CLI gets read-only
+# tools, denies anything that would need approval (such as reads outside its
+# working directory), and ignores the developer's own Claude Code settings,
+# hooks, plugins and MCP servers. Widen this only if every caller is trusted.
+CLAUDE_POLICY_ARGS = (
+    "--tools", "Read,Glob,Grep",
+    "--permission-mode", "dontAsk",
+    "--setting-sources", "",
+    "--strict-mcp-config",
+)
+# The only variables the CLI sees; USER lets it find a macOS keychain login.
+CLAUDE_ENV_KEYS = ("ANTHROPIC_API_KEY", "PATH", "HOME", "USER")
+CLAUDE_WORKDIR_ROOT = Path(tempfile.gettempdir()) / "agentex-claude-code"
+
+
+def _claude_workdir(task_id: str) -> Path:
+    """Per-task scratch directory for the CLI, outside this project (which holds .env).
+
+    Stable across turns: the CLI files sessions by working directory, so
+    ``-r <session_id>`` only finds the previous turn from the same directory.
+    """
+    # Hashed because the task id comes from the request and must not steer the path.
+    workdir = CLAUDE_WORKDIR_ROOT / hashlib.sha256(task_id.encode()).hexdigest()[:32]
+    workdir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return workdir
+
+
+async def _spawn_claude(prompt: str, task_id: str, session_id: str | None = None) -> AsyncIterator[str]:
     """Spawn ``claude -p --output-format stream-json`` locally and yield stdout lines.
 
     Pass ``session_id`` to resume a previous Claude Code session (multi-turn
@@ -63,12 +94,15 @@ async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIter
         "--output-format",
         "stream-json",
         "--verbose",
+        *CLAUDE_POLICY_ARGS,
     ]
     if session_id:
         cmd.extend(["-r", session_id])
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
+        cwd=_claude_workdir(task_id),
+        env={key: os.environ[key] for key in CLAUDE_ENV_KEYS if key in os.environ},
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -133,7 +167,7 @@ async def run_claude_code_turn(params: RunClaudeCodeTurnParams) -> dict[str, Any
         trace_id=params.trace_id,
         parent_span_id=params.parent_span_id,
     )
-    turn = ClaudeCodeTurn(_spawn_claude(params.prompt, session_id=params.session_id))
+    turn = ClaudeCodeTurn(_spawn_claude(params.prompt, params.task_id, session_id=params.session_id))
     result = await emitter.auto_send_turn(turn, created_at=params.created_at)
 
     return RunClaudeCodeTurnResult(final_text=result.final_text, session_id=turn.session_id).model_dump()

@@ -68,6 +68,12 @@ asyncio.run(main())
 
 Functionality between the synchronous and asynchronous clients is otherwise identical.
 
+## Running agents locally
+
+`agentex agents run --manifest manifest.yaml` serves the agent on `127.0.0.1`, because the local server has no
+authentication. If the AgentEx server reaches your agent from a Linux container through `host-gateway`, or from another
+machine, pass `--host 0.0.0.0` or set `AGENTEX_AGENT_HOST=0.0.0.0`. Anyone who can reach that port can then call the agent.
+
 ## Debugging
 
 AgentEx provides built-in debugging support for **temporal projects** during local development.

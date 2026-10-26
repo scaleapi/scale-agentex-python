@@ -24,6 +24,9 @@ from agentex.lib.cli.handlers.cleanup_handlers import cleanup_agent_workflows, s
 logger = make_logger(__name__)
 console = Console()
 
+# The local ACP has no authentication, so it listens on loopback unless told otherwise.
+DEFAULT_ACP_HOST = "127.0.0.1"
+
 # How many consecutive unreadable lines to skip before giving up on the stream.
 # Skipping is only known-safe for the limit-overrun case; this bounds the damage
 # if some other error repeats without consuming anything.
@@ -194,7 +197,7 @@ async def start_temporal_worker_with_reload(
 
 
 async def start_acp_server(
-    acp_path: Path, port: int, env: dict[str, str], manifest_dir: Path
+    acp_path: Path, port: int, env: dict[str, str], manifest_dir: Path, host: str = DEFAULT_ACP_HOST
 ) -> asyncio.subprocess.Process:
     """Start the ACP server process"""
     # Use file path relative to manifest directory if possible
@@ -211,10 +214,10 @@ async def start_acp_server(
         "--port",
         str(port),
         "--host",
-        "0.0.0.0",
+        host,
     ]
 
-    console.print(f"[blue]Starting ACP server from {acp_path} on port {port}...[/blue]")
+    console.print(f"[blue]Starting ACP server from {acp_path} on {host}:{port}...[/blue]")
     return await asyncio.create_subprocess_exec(
         *cmd,
         cwd=manifest_dir,  # Always use manifest directory as CWD for consistency
@@ -305,7 +308,9 @@ async def stream_process_output(process: asyncio.subprocess.Process, prefix: str
         )
 
 
-async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
+async def run_agent(
+    manifest_path: str, debug_config: "DebugConfig | None" = None, host: str = DEFAULT_ACP_HOST
+):
     """Run an agent locally from the given manifest"""
 
     # Validate manifest exists
@@ -349,11 +354,11 @@ async def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = Non
         manifest_dir = Path(manifest_path).parent
         if debug_config and debug_config.should_debug_acp():
             acp_process = await start_acp_server_debug(
-                file_paths["acp"], manifest.local_development.agent.port, agent_env, debug_config  # type: ignore[union-attr]
+                file_paths["acp"], manifest.local_development.agent.port, agent_env, debug_config, host  # type: ignore[union-attr]
             )
         else:
             acp_process = await start_acp_server(
-                file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir  # type: ignore[union-attr]
+                file_paths["acp"], manifest.local_development.agent.port, agent_env, manifest_dir, host  # type: ignore[union-attr]
             )
         process_manager.add_process(acp_process)
 

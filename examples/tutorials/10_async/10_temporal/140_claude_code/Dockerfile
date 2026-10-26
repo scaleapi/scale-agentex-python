@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN uv pip install --system --upgrade pip setuptools wheel
 
-RUN npm install -g @anthropic-ai/claude-code || true
+RUN npm install -g @anthropic-ai/claude-code@2.1.142 || true
 
 ENV UV_HTTP_TIMEOUT=1000
 

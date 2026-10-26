@@ -8,7 +8,7 @@ from python_on_whales import DockerException, docker
 
 from agentex.lib.cli.debug import DebugConfig
 from agentex.lib.utils.logging import make_logger
-from agentex.lib.cli.handlers.run_handlers import RunError, run_agent as _run_agent
+from agentex.lib.cli.handlers.run_handlers import DEFAULT_ACP_HOST, RunError, run_agent as _run_agent
 from agentex.lib.sdk.config.agent_manifest import BuildContextManager, load_agent_manifest, build_context_manager
 
 logger = make_logger(__name__)
@@ -138,7 +138,7 @@ def build_agent(
     return image_name
 
 
-def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
+def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None, host: str = DEFAULT_ACP_HOST):
     """Run an agent locally from the given manifest"""
     import sys
     import signal
@@ -164,7 +164,7 @@ def run_agent(manifest_path: str, debug_config: "DebugConfig | None" = None):
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
-        asyncio.run(_run_agent(manifest_path, debug_config))
+        asyncio.run(_run_agent(manifest_path, debug_config, host))
     except KeyboardInterrupt:
         logger.info("Shutdown completed.")
         sys.exit(0)

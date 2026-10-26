@@ -22,7 +22,9 @@ RUN apt-get update && apt-get install -y \
 
 # Install the Claude Code CLI: the agent shells out to `claude` on every turn,
 # so the binary must be present in the runtime image.
-RUN npm install -g @anthropic-ai/claude-code
+# Pinned: the spawn passes policy flags (--tools, --permission-mode dontAsk) that
+# this version supports. Bump it with CLAUDE_CODE_VERSION in the tutorials CI.
+RUN npm install -g @anthropic-ai/claude-code@2.1.142
 
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy

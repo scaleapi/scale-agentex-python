@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import os
 import asyncio
+import hashlib
+import tempfile
 from typing import AsyncIterator
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -46,8 +49,30 @@ acp = FastACP.create(
     config=AsyncACPConfig(type="base"),
 )
 
+# Whoever can reach this ACP writes the prompt, so the CLI gets read-only tools,
+# denies anything that would need approval (such as reads outside its working
+# directory), and ignores the developer's own Claude Code settings, hooks,
+# plugins and MCP servers. Widen this only if every caller is trusted.
+CLAUDE_POLICY_ARGS = (
+    "--tools", "Read,Glob,Grep",
+    "--permission-mode", "dontAsk",
+    "--setting-sources", "",
+    "--strict-mcp-config",
+)
+# The only variables the CLI sees; USER lets it find a macOS keychain login.
+CLAUDE_ENV_KEYS = ("ANTHROPIC_API_KEY", "PATH", "HOME", "USER")
+CLAUDE_WORKDIR_ROOT = Path(tempfile.gettempdir()) / "agentex-claude-code"
 
-async def _spawn_claude(prompt: str) -> AsyncIterator[str]:
+
+def _claude_workdir(task_id: str) -> Path:
+    """Per-task scratch directory for the CLI, outside this project (which holds .env)."""
+    # Hashed because the task id comes from the request and must not steer the path.
+    workdir = CLAUDE_WORKDIR_ROOT / hashlib.sha256(task_id.encode()).hexdigest()[:32]
+    workdir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return workdir
+
+
+async def _spawn_claude(prompt: str, task_id: str) -> AsyncIterator[str]:
     """Spawn ``claude -p --output-format stream-json`` locally and yield stdout lines.
 
     Injectable seam: tests monkeypatch this with a fake async iterator of
@@ -59,6 +84,9 @@ async def _spawn_claude(prompt: str) -> AsyncIterator[str]:
         "--output-format",
         "stream-json",
         "--verbose",
+        *CLAUDE_POLICY_ARGS,
+        cwd=_claude_workdir(task_id),
+        env={key: os.environ[key] for key in CLAUDE_ENV_KEYS if key in os.environ},
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -138,7 +166,7 @@ async def handle_task_event_send(params: SendEventParams):
             trace_id=task_id,
             parent_span_id=turn_span.id if turn_span else None,
         )
-        turn = ClaudeCodeTurn(_spawn_claude(prompt))
+        turn = ClaudeCodeTurn(_spawn_claude(prompt, task_id))
         result = await emitter.auto_send_turn(turn)
         if turn_span:
             turn_span.output = {"final_text": result.final_text}

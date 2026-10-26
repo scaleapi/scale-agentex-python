@@ -72,10 +72,11 @@ async def start_temporal_worker_debug(
 
 
 async def start_acp_server_debug(
-    acp_path: Path, 
-    port: int, 
+    acp_path: Path,
+    port: int,
     env: Dict[str, str],
-    debug_config: DebugConfig
+    debug_config: DebugConfig,
+    host: str = "127.0.0.1",
 ):
     """Start ACP server with debug support"""
     
@@ -103,7 +104,7 @@ async def start_acp_server_debug(
         "--port",
         str(port),
         "--host",
-        "0.0.0.0",
+        host,
         # Note: No --reload flag when debugging
     ]
 

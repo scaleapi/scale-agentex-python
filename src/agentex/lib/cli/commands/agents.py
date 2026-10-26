@@ -22,6 +22,7 @@ from agentex.lib.cli.utils.kubectl_utils import (
     validate_namespace,
     check_and_switch_cluster_context,
 )
+from agentex.lib.cli.handlers.run_handlers import DEFAULT_ACP_HOST
 from agentex.lib.sdk.config.agent_manifest import load_agent_manifest
 from agentex.lib.cli.handlers.agent_handlers import (
     run_agent,
@@ -277,6 +278,13 @@ def run(
     debug_acp: bool = typer.Option(False, help="Enable debug mode for ACP server only"),
     debug_port: int = typer.Option(5678, help="Port for remote debugging (worker uses this, ACP uses port+1)"),
     wait_for_debugger: bool = typer.Option(False, help="Wait for debugger to attach before starting"),
+    host: str = typer.Option(
+        DEFAULT_ACP_HOST,
+        envvar="AGENTEX_AGENT_HOST",
+        help="Interface the local ACP server listens on. It has no authentication, so use 0.0.0.0 only when "
+        "something off this machine must reach it, such as an agentex server in a Linux container that "
+        "dials host.docker.internal through host-gateway.",
+    ),
 ) -> None:
     """
     Run an agent locally from the given manifest.
@@ -326,7 +334,7 @@ def run(
             console.print("[yellow]⏳ Processes will wait for debugger attachment[/yellow]")
 
     try:
-        run_agent(manifest_path=manifest, debug_config=debug_config)
+        run_agent(manifest_path=manifest, debug_config=debug_config, host=host)
     except Exception as e:
         typer.echo(f"Error running agent: {str(e)}", err=True)
         logger.exception("Error running agent")

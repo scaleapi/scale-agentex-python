@@ -61,7 +61,11 @@ delivers them.
 
 ### 1. Customize the subprocess
 Edit `_spawn_claude` in `project/activities.py` to change the CLI flags, working
-directory, or how the prompt is delivered.
+directory, or how the prompt is delivered. Whoever can reach the agent writes
+the prompt, so by default the CLI gets only read-only tools (`CLAUDE_POLICY_ARGS`),
+runs in a per-task scratch directory outside this project, and sees only the
+variables in `CLAUDE_ENV_KEYS` (add, say, `ANTHROPIC_BASE_URL` or `HTTPS_PROXY`
+there if your setup needs them). Loosen the rest only if every caller is trusted.
 
 ### 2. Configure Credentials
 Set your credentials via `manifest.yaml`, an exported environment variable, or a
@@ -71,3 +75,8 @@ Set your credentials via `manifest.yaml`, an exported environment variable, or a
 ```bash
 export ENVIRONMENT=development && agentex agents run --manifest manifest.yaml
 ```
+
+The agent listens on `127.0.0.1`. If the AgentEx server reaches it from a Linux
+container through `host-gateway`, add `--host 0.0.0.0` (or set
+`AGENTEX_AGENT_HOST=0.0.0.0`); anyone who can reach that port can then send it
+prompts.
