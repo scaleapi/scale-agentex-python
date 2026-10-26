@@ -79,7 +79,8 @@ spans stay safe to emit. Recognized token keys: `input_tokens`/`prompt_tokens`,
 Offline failure checks read attributes the agent declares on its spans. Build them from one
 spec instead of hand-writing keys. The spec validates its values on construction, and each
 attribute lands in span metadata as a flat `sgp.agent.*` key holding a native JSON value (a
-list stays a list and a step budget stays an integer).
+list stays a list and a step budget stays an integer). The output schema is the exception and
+is written as a JSON string, because the span store would spread a schema object into many paths.
 
 ```python
 import dataclasses

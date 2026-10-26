@@ -1,13 +1,13 @@
 """Span attributes the offline failure checks read, written and validated from one spec.
 
 The SGP processor ships ``span.data`` verbatim as span metadata, so each attribute is a flat
-dotted key holding a native JSON value, never a JSON string or a nested object.
+dotted key holding a native JSON value. The output schema is written as JSON text instead, since
+the span store would spread a schema object into many paths whose keys can collide.
 """
 
 from __future__ import annotations
 
 import re
-import copy
 import json
 from typing import Any, Literal, Callable
 from dataclasses import field, dataclass
@@ -160,7 +160,9 @@ class FailureCheckSpec:
             if self.verification is None
             else [{"step": rule.step, "verifies": rule.verifies} for rule in self.verification],
             ESCALATION_CHANNELS_KEY: _listed(self.escalation_channels),
-            OUTPUT_SCHEMA_KEY: None if self.output_schema is None else copy.deepcopy(self.output_schema),
+            OUTPUT_SCHEMA_KEY: None
+            if self.output_schema is None
+            else json.dumps(self.output_schema, separators=(",", ":")),
             QUOTE_ARGUMENTS_KEY: _listed(self.quote_arguments),
             PROMPT_VERSION_KEY: self.prompt_version,
         }

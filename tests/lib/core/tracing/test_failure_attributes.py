@@ -53,13 +53,13 @@ CONTRACT = [
         "sgp.agent.escalation_channels",
         ["send_email.to", "page_oncall.team"],
     ),
-    ("output_schema", SCHEMA, "sgp.agent.output_schema", SCHEMA),
     ("quote_arguments", ["cite.quote"], "sgp.agent.quote_arguments", ["cite.quote"]),
     ("prompt_version", "v3", "sgp.agent.prompt_version", "v3"),
 ]
 
-FULL_SPEC = {field: value for field, value, _, _ in CONTRACT}
-FULL_ATTRIBUTES = {key: expected for _, _, key, expected in CONTRACT}
+SCHEMA_KEY = "sgp.agent.output_schema"
+FULL_SPEC = {**{field: value for field, value, _, _ in CONTRACT}, "output_schema": SCHEMA}
+NATIVE_ATTRIBUTES = {key: expected for _, _, key, expected in CONTRACT}
 
 
 class TestRootSpanAttributes:
@@ -69,8 +69,16 @@ class TestRootSpanAttributes:
         assert attributes == {key: expected}
         assert type(attributes[key]) is type(expected)
 
+    def test_output_schema_is_written_as_json_text_that_decodes_to_the_schema(self):
+        attributes = FailureCheckSpec(output_schema=SCHEMA).attributes()
+        assert list(attributes) == [SCHEMA_KEY]
+        assert type(attributes[SCHEMA_KEY]) is str
+        assert json.loads(attributes[SCHEMA_KEY]) == SCHEMA
+
     def test_all_attributes_render_together_without_colliding(self):
-        assert FailureCheckSpec(**FULL_SPEC).attributes() == FULL_ATTRIBUTES
+        attributes = FailureCheckSpec(**FULL_SPEC).attributes()
+        assert json.loads(attributes.pop(SCHEMA_KEY)) == SCHEMA
+        assert attributes == NATIVE_ATTRIBUTES
 
     def test_every_field_is_optional_and_undeclared_ones_are_absent(self):
         assert FailureCheckSpec().attributes() == {}
@@ -107,14 +115,11 @@ class TestRootSpanAttributes:
 
         outputs.append("sneaky")
         schema["properties"]["a"]["type"] = "number"
-        rendered = spec.attributes()
-        rendered["sgp.agent.required_outputs"].append("sneaky")
-        rendered["sgp.agent.output_schema"]["properties"]["a"]["type"] = "number"
+        spec.attributes()["sgp.agent.required_outputs"].append("sneaky")
 
-        assert spec.attributes() == {
-            "sgp.agent.required_outputs": ["answer"],
-            "sgp.agent.output_schema": {"type": "object", "properties": {"a": {"type": "string"}}},
-        }
+        again = spec.attributes()
+        assert again["sgp.agent.required_outputs"] == ["answer"]
+        assert json.loads(again[SCHEMA_KEY]) == {"type": "object", "properties": {"a": {"type": "string"}}}
 
     def test_replace_adds_the_stop_reason_known_only_at_the_end(self):
         spec = FailureCheckSpec(required_outputs=["answer"])
@@ -238,7 +243,8 @@ class TestRootSpanValidation:
             FailureCheckSpec(output_schema={"default": deep})
 
     def test_an_empty_schema_is_a_json_object(self):
-        assert FailureCheckSpec(output_schema={}).attributes() == {"sgp.agent.output_schema": {}}
+        attributes = FailureCheckSpec(output_schema={}).attributes()
+        assert json.loads(attributes[SCHEMA_KEY]) == {}
 
 
 class TestVerificationRule:
@@ -302,7 +308,7 @@ AGENT_ENV = MagicMock(ACP_TYPE="async", AGENT_NAME="pilot-agent", AGENT_ID="agen
 CONFIG = SGPTracingProcessorConfig(sgp_api_key="test-key", sgp_account_id="test-account")
 
 SPEC_KWARGS = {field: value for field, value in FULL_SPEC.items() if field != "stop_reason"}
-EXPECTED_ROOT = {**FULL_ATTRIBUTES, "sgp.agent.stop_reason": "budget_exhausted"}
+EXPECTED_ROOT = {**NATIVE_ATTRIBUTES, "sgp.agent.stop_reason": "budget_exhausted"}
 
 
 def _offline_create_span(created: list[Any]):
@@ -319,7 +325,10 @@ def _assert_attributes_landed_in_sgp_metadata(items: list[dict[str, Any]]) -> No
     assert sorted(by_name) == ["agent", "answer", "escalate", "verify"]
 
     root = by_name["agent"]["metadata"]
-    assert {key: value for key, value in root.items() if key.startswith("sgp.agent.")} == EXPECTED_ROOT
+    declared = {key: value for key, value in root.items() if key.startswith("sgp.agent.")}
+    assert type(declared[SCHEMA_KEY]) is str
+    assert json.loads(declared.pop(SCHEMA_KEY)) == SCHEMA
+    assert declared == EXPECTED_ROOT
     assert "sgp" not in root
     assert root["__agent_version__"] == "sha-abc1234"
 
