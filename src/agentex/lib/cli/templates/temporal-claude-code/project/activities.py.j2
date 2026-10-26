@@ -15,6 +15,7 @@ can provide a fake that yields pre-recorded stdout lines so no real CLI runs.
 from __future__ import annotations
 
 import os
+import stat
 import asyncio
 import hashlib
 import tempfile
@@ -74,9 +75,14 @@ def _claude_workdir(task_id: str) -> Path:
     Stable across turns: the CLI files sessions by working directory, so
     ``-r <session_id>`` only finds the previous turn from the same directory.
     """
+    CLAUDE_WORKDIR_ROOT.mkdir(mode=0o700, exist_ok=True)
+    root = CLAUDE_WORKDIR_ROOT.lstat()
+    # The temp dir can be shared (Linux /tmp): refuse a root another account made or linked.
+    if hasattr(os, "getuid") and (not stat.S_ISDIR(root.st_mode) or root.st_uid != os.getuid() or root.st_mode & 0o077):
+        raise RuntimeError(f"{CLAUDE_WORKDIR_ROOT} is not a private directory owned by this user")
     # Hashed because the task id comes from the request and must not steer the path.
     workdir = CLAUDE_WORKDIR_ROOT / hashlib.sha256(task_id.encode()).hexdigest()[:32]
-    workdir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    workdir.mkdir(mode=0o700, exist_ok=True)
     return workdir
 
 

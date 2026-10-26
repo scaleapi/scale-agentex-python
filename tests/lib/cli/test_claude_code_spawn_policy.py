@@ -10,6 +10,7 @@ registers global tracing config) against a stub ``claude`` on PATH.
 
 from __future__ import annotations
 
+import os
 import sys
 import json
 import subprocess
@@ -58,7 +59,7 @@ print('{{"type": "result", "result": "ok"}}')
 """
 
 
-def _spawn(tmp_path: Path, template_type: TemplateType, calls: list) -> tuple[Path, Path, list[dict]]:
+def _run(tmp_path: Path, template_type: TemplateType, calls: list) -> subprocess.CompletedProcess[str]:
     """Render the template and run its _spawn_claude once per (task_id, kwargs) in calls."""
     project_dir = _render_project(tmp_path, template_type)
     (project_dir / ".env").write_text("DOTENV_SECRET=CANARY-dotenv\n")
@@ -67,7 +68,7 @@ def _spawn(tmp_path: Path, template_type: TemplateType, calls: list) -> tuple[Pa
     stub.write_text(STUB_CLAUDE.format(python=sys.executable))
     stub.chmod(0o755)
     tmp_dir = tmp_path / "tmp"
-    tmp_dir.mkdir()
+    tmp_dir.mkdir(exist_ok=True)
     env = {
         "PATH": f"{stub.parent}:/usr/bin:/bin",
         "HOME": str(tmp_path),
@@ -80,7 +81,7 @@ def _spawn(tmp_path: Path, template_type: TemplateType, calls: list) -> tuple[Pa
         "ACP_URL": "http://localhost",
     }
     # cwd = the project directory, as under `agentex agents run`.
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, "-c", DRIVER, SPAWN_MODULES[template_type], json.dumps(calls)],
         cwd=project_dir,
         env=env,
@@ -89,8 +90,12 @@ def _spawn(tmp_path: Path, template_type: TemplateType, calls: list) -> tuple[Pa
         timeout=120,
         check=False,
     )
+
+
+def _spawn(tmp_path: Path, template_type: TemplateType, calls: list) -> tuple[Path, Path, list[dict]]:
+    result = _run(tmp_path, template_type, calls)
     assert result.returncode == 0, result.stderr
-    return project_dir, tmp_dir.resolve(), json.loads(result.stdout.strip().splitlines()[-1])
+    return tmp_path / "my_agent", (tmp_path / "tmp").resolve(), json.loads(result.stdout.strip().splitlines()[-1])
 
 
 @pytest.mark.parametrize("template_type", list(SPAWN_MODULES))
@@ -120,6 +125,27 @@ def test_claude_runs_with_policy_scratch_dir_and_minimal_env(tmp_path: Path, tem
     env = first["env"]
     assert set(env) == {"ANTHROPIC_API_KEY", "PATH", "HOME", "USER"}
     assert "CANARY" not in json.dumps(spawns)
+
+
+@pytest.mark.skipif(not hasattr(os, "getuid"), reason="the shared-temp-dir check is POSIX-only")
+@pytest.mark.parametrize("planted", ["link", "world-writable"])
+@pytest.mark.parametrize("template_type", list(SPAWN_MODULES))
+def test_refuses_a_scratch_root_another_account_could_control(
+    tmp_path: Path, template_type: TemplateType, planted: str
+):
+    # What another account could leave in a shared /tmp before the agent first runs.
+    root = tmp_path / "tmp" / "agentex-claude-code"
+    root.parent.mkdir()
+    if planted == "link":
+        root.symlink_to(tmp_path / "my_agent")
+    else:
+        root.mkdir()
+        root.chmod(0o777)
+
+    result = _run(tmp_path, template_type, [["task-1", {}]])
+
+    assert result.returncode != 0
+    assert "is not a private directory owned by this user" in result.stderr
 
 
 def test_temporal_resume_keeps_the_task_workdir(tmp_path: Path):
