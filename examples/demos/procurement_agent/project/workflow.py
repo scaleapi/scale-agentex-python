@@ -148,7 +148,7 @@ class ProcurementAgentWorkflow(BaseWorkflow):
     @workflow.run
     @override
     async def on_task_create(self, params: CreateTaskParams) -> str:
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         self._state = StateModel(input_list=[], turn_number=0)
 

@@ -166,7 +166,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        logger.info(f"Received task message instruction: {params}")
+        logger.info(f"Received task message instruction for task {params.task.id}, event {params.event.id}")
 
         if not params.event.content:
             return
@@ -259,7 +259,7 @@ class At010AgentChatWorkflow(BaseWorkflow):
     @workflow.run
     @override
     async def on_task_create(self, params: CreateTaskParams) -> None:
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         # 1. Initialize the state. You can either do this here or in the __init__ method.
         # This function is triggered whenever a client creates a task for this agent.

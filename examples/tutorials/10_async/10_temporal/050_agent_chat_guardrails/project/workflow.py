@@ -453,7 +453,7 @@ class At050AgentChatGuardrailsWorkflow(BaseWorkflow):
     @workflow.run
     @override
     async def on_task_create(self, params: CreateTaskParams) -> None:
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         # 1. Initialize the state. You can either do this here or in the
         # __init__ method. This function is triggered whenever a client

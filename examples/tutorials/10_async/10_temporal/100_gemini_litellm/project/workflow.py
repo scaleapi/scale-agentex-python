@@ -112,7 +112,7 @@ class At100GeminiLitellmWorkflow(BaseWorkflow):
         - The agent interface remains identical to OpenAI examples
         - Temporal durability works the same way regardless of model provider
         """
-        logger.info(f"Received task message instruction: {params}")
+        logger.info(f"Received task message instruction for task {params.task.id}, event {params.event.id}")
 
         if self._state is None:
             raise ValueError("State is not initialized")
@@ -198,7 +198,7 @@ class At100GeminiLitellmWorkflow(BaseWorkflow):
         This method runs when the workflow starts and keeps the agent conversation alive.
         The pattern is identical to other tutorials - only the model provider changes.
         """
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         # Initialize the conversation state
         self._state = StateModel(

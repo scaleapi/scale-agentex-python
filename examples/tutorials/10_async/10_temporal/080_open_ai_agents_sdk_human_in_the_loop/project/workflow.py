@@ -114,7 +114,7 @@ class At080OpenAiAgentsSdkHumanInTheLoopWorkflow(BaseWorkflow):
         When the agent needs human approval, it calls wait_for_confirmation which spawns
         a child workflow that waits for external signals before continuing.
         """
-        logger.info(f"Received task message instruction: {params}")
+        logger.info(f"Received task message instruction for task {params.task.id}, event {params.event.id}")
 
         if self._state is None:
             raise ValueError("State is not initialized")
@@ -214,7 +214,7 @@ class At080OpenAiAgentsSdkHumanInTheLoopWorkflow(BaseWorkflow):
         Handles both automated decisions and human approval workflows durably.
         To approve waiting actions: temporal workflow signal --workflow-id="child-workflow-id" --name="fulfill_order_signal" --input=true
         """
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         # Initialize the conversation state with an empty history
         self._state = StateModel(

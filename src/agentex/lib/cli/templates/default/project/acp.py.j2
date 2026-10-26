@@ -24,9 +24,9 @@ acp = FastACP.create(
 # It's a good place to initialize any state or resources needed for the task.
 @acp.on_task_event_send
 async def handle_task_event_send(params: SendEventParams):
-    # For this tutorial, we log the parameters sent to the handler 
-    # so you can see where and how messages within a long running task are handled
-    logger.info(f"Received task event send rpc: {params}")
+    # For this tutorial, we log the task and event ids so you can see where and how
+    # messages within a long running task are handled
+    logger.info(f"Received task event send rpc for task {params.task.id}, event {params.event.id}")
         
     # 1. Echo back the client's message to show it in the UI. This is not done by default so the agent developer has full control over what is shown to the user.
     await adk.messages.create(task_id=params.task.id, content=params.event.content)
@@ -43,14 +43,12 @@ async def handle_task_event_send(params: SendEventParams):
 
 @acp.on_task_cancel
 async def handle_task_canceled(params: CancelTaskParams):
-    # For this tutorial, we print the parameters sent to the handler 
-    # so you can see where and how task cancellation is handled
-    logger.info(f"Received task cancel rpc: {params}")
+    # For this tutorial, we log the task id so you can see where and how task cancellation is handled
+    logger.info(f"Received task cancel rpc for task {params.task.id}")
 
 @acp.on_task_create
 async def handle_task_create(params: CreateTaskParams):
-    # For this tutorial, we log the parameters sent to the handler 
-    # so you can see where and how task creation is handled
+    # For this tutorial, we log the task id so you can see where and how task creation is handled
 
     # Here is where you can initialize any state or resources needed for the task.
-    logger.info(f"Received task create rpc: {params}")
+    logger.info(f"Received task create rpc for task {params.task.id}")

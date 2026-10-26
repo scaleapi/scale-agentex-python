@@ -105,7 +105,7 @@ class {{ workflow_class }}(BaseWorkflow):
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        logger.info(f"Received task message instruction: {params}")
+        logger.info(f"Received task message instruction for task {params.task.id}, event {params.event.id}")
 
         content = params.event.content
         if not isinstance(content, TextContent):
@@ -170,7 +170,7 @@ class {{ workflow_class }}(BaseWorkflow):
 
     @workflow.run
     async def on_task_create(self, params: CreateTaskParams) -> str:
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         # Acknowledge that the task has been created
         await adk.messages.create(

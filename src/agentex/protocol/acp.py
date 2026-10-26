@@ -40,6 +40,7 @@ class CreateTaskParams(BaseModel):
     request: dict[str, Any] | None = Field(
         default=None,
         description="Additional request context including headers forwarded to this agent",
+        repr=False,  # forwarded headers can carry end-user credentials; keep them out of str() and logs
     )
 
 
@@ -66,6 +67,7 @@ class SendMessageParams(BaseModel):
     request: dict[str, Any] | None = Field(
         default=None,
         description="Additional request context including headers forwarded to this agent",
+        repr=False,  # forwarded headers can carry end-user credentials; keep them out of str() and logs
     )
 
 
@@ -85,6 +87,7 @@ class SendEventParams(BaseModel):
     request: dict[str, Any] | None = Field(
         default=None,
         description="Additional request context including headers forwarded to this agent",
+        repr=False,  # forwarded headers can carry end-user credentials; keep them out of str() and logs
     )
 
 
@@ -102,6 +105,7 @@ class CancelTaskParams(BaseModel):
     request: dict[str, Any] | None = Field(
         default=None,
         description="Additional request context including headers forwarded to this agent",
+        repr=False,  # forwarded headers can carry end-user credentials; keep them out of str() and logs
     )
 
 
@@ -124,6 +128,7 @@ class InterruptTaskParams(BaseModel):
     request: dict[str, Any] | None = Field(
         default=None,
         description="Additional request context including headers forwarded to this agent",
+        repr=False,  # forwarded headers can carry end-user credentials; keep them out of str() and logs
     )
 
 

@@ -94,7 +94,7 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
     @workflow.run
     @override
     async def on_task_create(self, params: CreateTaskParams) -> None:
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
         
         self._state = StateModel()
         await adk.messages.create(

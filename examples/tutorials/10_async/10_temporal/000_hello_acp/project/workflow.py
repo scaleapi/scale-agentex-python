@@ -33,7 +33,7 @@ class At000HelloAcpWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        logger.info(f"Received task message instruction: {params}")
+        logger.info(f"Received task message instruction for task {params.task.id}, event {params.event.id}")
 
         # 2. Echo back the client's message to show it in the UI. This is not done by default so the agent developer has full control over what is shown to the user.
         await adk.messages.create(task_id=params.task.id, content=params.event.content)
@@ -51,7 +51,7 @@ class At000HelloAcpWorkflow(BaseWorkflow):
     @workflow.run
     @override
     async def on_task_create(self, params: CreateTaskParams) -> None:
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         # 1. Acknowledge that the task has been created. Gate this one-time prologue
         # on is_continued_run(): run_until_complete below recycles the workflow via

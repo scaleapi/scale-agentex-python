@@ -118,7 +118,7 @@ class At060OpenAiAgentsSdkHelloWorldWorkflow(BaseWorkflow):
         - If the LLM call fails, Temporal automatically retries it
         - The entire conversation is durable and survives process restarts
         """
-        logger.info(f"Received task message instruction: {params}")
+        logger.info(f"Received task message instruction for task {params.task.id}, event {params.event.id}")
 
         if self._state is None:
             raise ValueError("State is not initialized")
@@ -253,7 +253,7 @@ class At060OpenAiAgentsSdkHelloWorldWorkflow(BaseWorkflow):
         - Can resume from exact point of failure without losing context
         - Scales to handle millions of concurrent agent conversations
         """
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         # ============================================================================
         # WORKFLOW INITIALIZATION: Initialize State

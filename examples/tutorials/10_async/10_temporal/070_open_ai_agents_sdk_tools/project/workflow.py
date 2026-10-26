@@ -127,7 +127,7 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        logger.info(f"Received task message instruction: {params}")
+        logger.info(f"Received task message instruction for task {params.task.id}, event {params.event.id}")
 
         if self._state is None:
             raise ValueError("State is not initialized")
@@ -329,7 +329,7 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
 
     @workflow.run
     async def on_task_create(self, params: CreateTaskParams) -> str:
-        logger.info(f"Received task create params: {params}")
+        logger.info(f"Received task create for task {params.task.id}")
 
         # Initialize the conversation state with an empty history
         self._state = StateModel(
