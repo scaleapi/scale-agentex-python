@@ -44,6 +44,7 @@ OUTPUT_SCHEMA_KEY = "sgp.agent.output_schema"
 QUOTE_ARGUMENTS_KEY = "sgp.agent.quote_arguments"
 PROMPT_VERSION_KEY = "sgp.agent.prompt_version"
 
+# Exactly one dot: OpenAI tool names cannot contain dots, so this is a tool and one top-level argument.
 _TOOL_ARGUMENT_RE = re.compile(r"[^.\s]+\.[^.\s]+")
 _VERIFICATION_RESULTS: tuple[str, ...] = ("pass", "fail")
 
@@ -72,7 +73,8 @@ def _tool_arguments(values: object, what: str) -> tuple[str, ...]:
     items = _unique_texts(values, what)
     for item in items:
         if _TOOL_ARGUMENT_RE.fullmatch(item) is None:
-            raise ValueError(f"{what} entry must look like tool.argument, got {item!r}")
+            hint = ", nested argument paths are not supported" if item.count(".") > 1 else ""
+            raise ValueError(f"{what} entry must look like tool.argument{hint}, got {item!r}")
     return items
 
 

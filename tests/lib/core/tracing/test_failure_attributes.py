@@ -218,6 +218,20 @@ class TestRootSpanValidation:
             FailureCheckSpec(**{field: value})
         assert str(raised.value).startswith(f"{field} ")
 
+    @pytest.mark.parametrize("field", ["escalation_channels", "quote_arguments"])
+    @pytest.mark.parametrize("path", ["send_email.to.cc", "a.b.c.d"])
+    def test_nested_argument_paths_are_rejected_and_the_error_says_so(self, field, path):
+        with pytest.raises(ValueError, match="nested argument paths are not supported") as raised:
+            FailureCheckSpec(**{field: [path]})
+        assert str(raised.value).startswith(f"{field} entry must look like tool.argument")
+        assert repr(path) in str(raised.value)
+
+    @pytest.mark.parametrize("path", ["send_email", ".to", "send_email.", "send email.to"])
+    def test_a_path_that_is_not_nested_is_not_blamed_on_nesting(self, path):
+        with pytest.raises(ValueError, match="must look like tool.argument") as raised:
+            FailureCheckSpec(escalation_channels=[path])
+        assert "nested" not in str(raised.value)
+
     @pytest.mark.parametrize(
         ("value", "message"),
         [
