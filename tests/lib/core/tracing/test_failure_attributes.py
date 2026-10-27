@@ -152,8 +152,9 @@ class TestRootSpanValidation:
         ],
     )
     def test_required_outputs(self, kwargs, message):
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(ValueError, match=message) as raised:
             FailureCheckSpec(**kwargs)
+        assert str(raised.value).startswith("required_outputs ")
 
     @pytest.mark.parametrize("value", [0, -3, True, False, 2.5, "5", [5]])
     def test_step_budget_must_be_a_positive_integer(self, value):
@@ -187,8 +188,9 @@ class TestRootSpanValidation:
         ],
     )
     def test_verification(self, value, message):
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(ValueError, match=message) as raised:
             FailureCheckSpec(verification=value)
+        assert str(raised.value).startswith("verification ")
 
     def test_one_step_may_verify_several_things_and_one_thing_have_several_verifiers(self):
         rules = [VerificationRule("check", "a"), VerificationRule("check", "b"), VerificationRule("recheck", "a")]
@@ -210,8 +212,9 @@ class TestRootSpanValidation:
         ],
     )
     def test_tool_argument_paths(self, field, value, message):
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(ValueError, match=message) as raised:
             FailureCheckSpec(**{field: value})
+        assert str(raised.value).startswith(f"{field} ")
 
     @pytest.mark.parametrize(
         ("value", "message"),
@@ -226,8 +229,9 @@ class TestRootSpanValidation:
         ],
     )
     def test_output_schema_must_be_a_json_object(self, value, message):
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(ValueError, match=message) as raised:
             FailureCheckSpec(output_schema=value)
+        assert str(raised.value).startswith("output_schema ")
 
     def test_a_circular_schema_is_rejected(self):
         schema: dict[str, Any] = {"type": "object"}
@@ -263,11 +267,20 @@ class TestRootSpanValidation:
 
 class TestVerificationRule:
     @pytest.mark.parametrize(
-        ("step", "verifies"), [("", "a"), ("a", ""), (" ", "a"), ("a", None), (None, "a"), (" a", "b")]
+        ("step", "verifies", "named"),
+        [
+            ("", "a", "verification step"),
+            ("a", "", "verification verifies"),
+            (" ", "a", "verification step"),
+            ("a", None, "verification verifies"),
+            (None, "a", "verification step"),
+            (" a", "b", "verification step"),
+        ],
     )
-    def test_both_names_must_be_non_empty_strings(self, step, verifies):
-        with pytest.raises(ValueError):
+    def test_both_names_must_be_non_empty_strings(self, step, verifies, named):
+        with pytest.raises(ValueError) as raised:
             VerificationRule(step, verifies)
+        assert str(raised.value).startswith(f"{named} ")
 
     def test_rules_are_frozen(self):
         rule = VerificationRule("check", "answer")
