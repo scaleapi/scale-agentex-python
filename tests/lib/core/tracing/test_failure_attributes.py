@@ -329,8 +329,9 @@ class TestPerSpanAttributes:
 
     @pytest.mark.parametrize("value", ["", "  ", None, 3, " span-1"])
     def test_escalates_rejects_bad_span_ids(self, value):
-        with pytest.raises(ValueError, match="verification span id"):
+        with pytest.raises(ValueError, match="verification span id") as raised:
             escalates(value)
+        assert str(raised.value).startswith("escalates ")
 
     def test_results_merge_into_a_span_data_dict(self):
         data = {"note": "kept", **output_name("answer")}

@@ -186,4 +186,4 @@ def verification_result(result: Literal["pass", "fail"]) -> dict[str, str]:
 
 def escalates(verification_span_id: str) -> dict[str, str]:
     """Data for an escalation span, naming the verification span it escalates."""
-    return {ESCALATES_KEY: _text(verification_span_id, "verification span id")}
+    return {ESCALATES_KEY: _text(verification_span_id, "escalates verification span id")}
