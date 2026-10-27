@@ -96,12 +96,15 @@ async with adk.tracing.span(trace_id=task.id, name="agent", data=spec.attributes
     ...
     # The stop reason is only known at the end.
     done = dataclasses.replace(spec, stop_reason="completed")
-    root.data = {**(root.data or {}), **done.attributes()}
+    if root:
+        root.data = {**(root.data or {}), **done.attributes()}
 ```
 
 A span that produces a required output, runs a verification or escalates one carries a single
 attribute, passed as its `data`: `adk.failure_attributes.output_name("answer")`,
-`verification_result("pass")` (or `"fail"`) and `escalates(verify_span.id)`.
+`verification_result("pass")` (or `"fail"`) and `escalates(verify_span.id)`. The span
+`adk.tracing.span` yields is `None` when `trace_id` is empty or the span fails to start, so
+guard it before reading `.data` or `.id`.
 
 The SGP export adds `__agent_version__` when `AGENT_VERSION` is set, and `__commit_sha__` when the
 process starts with `AGENT_COMMIT_SHA` set to a valid git SHA, so only `prompt_version` is yours to
