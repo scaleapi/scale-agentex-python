@@ -135,6 +135,8 @@ class TestRootSpanAttributes:
 
 
 class TestRootSpanValidation:
+    NESTING_DEPTH_PAST_RECURSION_LIMIT = 200_000
+
     @pytest.mark.parametrize(
         ("kwargs", "message"),
         [
@@ -241,7 +243,7 @@ class TestRootSpanValidation:
 
     def test_a_pathologically_deep_schema_is_rejected(self):
         deep: list[Any] = []
-        for _ in range(200_000):
+        for _ in range(self.NESTING_DEPTH_PAST_RECURSION_LIMIT):
             deep = [deep]
         with pytest.raises(ValueError, match="must be JSON serializable"):
             FailureCheckSpec(output_schema={"default": deep})
