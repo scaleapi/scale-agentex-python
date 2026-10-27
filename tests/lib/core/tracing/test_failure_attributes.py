@@ -242,6 +242,20 @@ class TestRootSpanValidation:
         with pytest.raises(ValueError, match="must be JSON serializable"):
             FailureCheckSpec(output_schema={"default": deep})
 
+    @pytest.mark.parametrize(
+        "edit", [float("nan"), float("inf"), {"a", "b"}, object()], ids=["nan", "inf", "set", "object"]
+    )
+    def test_a_schema_edited_after_construction_fails_the_way_construction_does(self, edit):
+        with pytest.raises(ValueError) as at_construction:
+            FailureCheckSpec(output_schema={"edited": edit})
+
+        spec = FailureCheckSpec(output_schema={"edited": 0})
+        assert spec.output_schema is not None
+        spec.output_schema["edited"] = edit
+        with pytest.raises(ValueError) as at_render:
+            spec.attributes()
+        assert str(at_render.value) == str(at_construction.value)
+
     def test_an_empty_schema_is_a_json_object(self):
         attributes = FailureCheckSpec(output_schema={}).attributes()
         assert json.loads(attributes[SCHEMA_KEY]) == {}

@@ -160,9 +160,10 @@ class FailureCheckSpec:
             if self.verification is None
             else [{"step": rule.step, "verifies": rule.verifies} for rule in self.verification],
             ESCALATION_CHANNELS_KEY: _listed(self.escalation_channels),
+            # The stored dict can be edited after construction, so check it again before writing it.
             OUTPUT_SCHEMA_KEY: None
             if self.output_schema is None
-            else json.dumps(self.output_schema, separators=(",", ":")),
+            else json.dumps(_json_object(self.output_schema, "output_schema"), separators=(",", ":")),
             QUOTE_ARGUMENTS_KEY: _listed(self.quote_arguments),
             PROMPT_VERSION_KEY: self.prompt_version,
         }
