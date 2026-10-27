@@ -249,6 +249,35 @@ class TestRootSpanValidation:
             FailureCheckSpec(output_schema=value)
         assert str(raised.value).startswith("output_schema ")
 
+    @pytest.mark.parametrize(
+        "schema",
+        [
+            {1: "a"},
+            {1: "a", "1": "b"},
+            {True: "a"},
+            {None: "a"},
+            {1.5: "a"},
+            {"properties": {2: {"type": "string"}}},
+            {"anyOf": [{"properties": {3: {}}}]},
+        ],
+        ids=["int", "int-collides-with-str", "bool", "none", "float", "nested", "nested-in-list"],
+    )
+    def test_output_schema_keys_must_be_strings(self, schema):
+        with pytest.raises(ValueError, match="keys must be strings") as raised:
+            FailureCheckSpec(output_schema=schema)
+        assert str(raised.value).startswith("output_schema ")
+
+    def test_a_non_string_key_added_after_construction_fails_the_way_construction_does(self):
+        with pytest.raises(ValueError) as at_construction:
+            FailureCheckSpec(output_schema={1: "a"})
+
+        spec = FailureCheckSpec(output_schema={"type": "object"})
+        assert spec.output_schema is not None
+        spec.output_schema[1] = "a"
+        with pytest.raises(ValueError) as at_render:
+            spec.attributes()
+        assert str(at_render.value) == str(at_construction.value)
+
     def test_a_circular_schema_is_rejected(self):
         schema: dict[str, Any] = {"type": "object"}
         schema["self"] = schema

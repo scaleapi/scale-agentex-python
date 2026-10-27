@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import json
-from typing import Any, Literal, Callable
+from typing import Any, Literal, Callable, cast
 from dataclasses import field, dataclass
 from collections.abc import Sequence
 
@@ -84,9 +84,31 @@ def _step_budget(value: object) -> int:
     return value
 
 
+def _require_string_keys(value: object, what: str) -> None:
+    # Iterative, so a very deep schema is rejected by the encoder in _json_object instead of overflowing the stack here.
+    pending: list[object] = [value]
+    seen: set[int] = set()
+    while pending:
+        node = pending.pop()
+        if isinstance(node, dict):
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            for key, child in cast("dict[object, object]", node).items():
+                if not isinstance(key, str):
+                    raise ValueError(f"{what} keys must be strings, got {key!r}")
+                pending.append(child)
+        elif isinstance(node, list | tuple):
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            pending.extend(cast("Sequence[object]", node))
+
+
 def _json_object(value: object, what: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{what} must be a JSON object (a dict), got {type(value).__name__}")
+    _require_string_keys(value, what)
     try:
         return json.loads(json.dumps(value, allow_nan=False))
     except (TypeError, ValueError, RecursionError) as exc:
