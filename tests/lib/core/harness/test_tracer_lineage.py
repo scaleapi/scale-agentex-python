@@ -11,7 +11,7 @@ from agentex.lib.core.tracing.lineage import (
     register_tool_sources,
 )
 
-from ._fakes import FakeTracing
+from ._fakes import FakeTracing, tool_marker
 
 
 @pytest.fixture(autouse=True)
@@ -51,3 +51,17 @@ async def test_unregistered_tool_and_reasoning_spans_carry_no_refs():
 
     for span in fake.ended_spans:
         assert not (isinstance(span.data, dict) and LINEAGE_REFS_KEY in span.data)
+
+
+@pytest.mark.asyncio
+async def test_tool_span_keeps_the_tool_marker_beside_the_refs():
+    register_tool_sources("query_guidance", refs=[DataSourceRef("databricks://ey-tax", "guidance.rulings")])
+    fake = FakeTracing()
+    tracer = SpanTracer(trace_id="t1", parent_span_id="p1", tracing=fake)
+
+    await tracer.handle(OpenSpan(key="c1", kind="tool", name="query_guidance", input={}))
+    await tracer.handle(CloseSpan(key="c1", output={"ok": True}, is_complete=True))
+
+    (span,) = fake.ended_spans
+    assert {key: span.data[key] for key in tool_marker("query_guidance")} == tool_marker("query_guidance")
+    assert [ref["name"] for ref in span.data[LINEAGE_REFS_KEY]] == ["guidance.rulings"]
