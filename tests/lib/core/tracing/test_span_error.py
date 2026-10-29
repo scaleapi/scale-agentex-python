@@ -32,7 +32,6 @@ FAILED_STATUSES = {"ERROR", "CANCELED"}
 
 
 def _sgp_status(span: Span) -> str:
-    """The status the span is written to SGP with."""
     from agentex.lib.core.tracing.processors.sgp_tracing_processor import _build_sgp_span
 
     def create(**kwargs: Any) -> Any:
