@@ -24,6 +24,8 @@ from agentex.lib.core.adapters.llm.adapter_litellm import LiteLLMGateway
 
 logger = logging.make_logger(__name__)
 
+_REQUEST_MODEL_KEY = "gen_ai.request.model"
+
 
 def _stream_kwargs_with_usage(llm_config: LLMConfig) -> dict:
     """Completion kwargs with usage reporting enabled on the final stream chunk.
@@ -63,6 +65,7 @@ class LiteLLMService:
             parent_id=parent_span_id,
             name="chat_completion",
             input=llm_config.model_dump(),
+            data={_REQUEST_MODEL_KEY: llm_config.model},
         ) as span:
             heartbeat_if_in_workflow("chat completion")
             if self.llm_gateway is None:
@@ -104,6 +107,7 @@ class LiteLLMService:
             parent_id=parent_span_id,
             name="chat_completion_auto_send",
             input=llm_config.model_dump(),
+            data={_REQUEST_MODEL_KEY: llm_config.model},
         ) as span:
             heartbeat_if_in_workflow("chat completion auto send")
 
@@ -174,6 +178,7 @@ class LiteLLMService:
             parent_id=parent_span_id,
             name="chat_completion_stream",
             input=completion_kwargs,
+            data={_REQUEST_MODEL_KEY: llm_config.model},
         ) as span:
             # Direct streaming outside temporal - yield each chunk as it comes
             chunks: list[Completion] = []
@@ -217,6 +222,7 @@ class LiteLLMService:
             parent_id=parent_span_id,
             name="chat_completion_stream_auto_send",
             input=completion_kwargs,
+            data={_REQUEST_MODEL_KEY: llm_config.model},
         ) as span:
             # Use streaming context manager
             async with self.streaming_service.streaming_task_message_context(
