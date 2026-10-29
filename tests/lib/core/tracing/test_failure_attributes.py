@@ -353,13 +353,22 @@ class TestPerSpanAttributes:
 
     def test_escalates(self):
         assert escalates("3f2c1a9e-0000-4000-8000-000000000001") == {
-            "sgp.agent.escalates": "3f2c1a9e-0000-4000-8000-000000000001"
+            "sgp.agent.escalates": ["3f2c1a9e-0000-4000-8000-000000000001"]
         }
+
+    def test_one_escalation_names_every_failure_it_escalates(self):
+        assert escalates("verify-1", "verify-2") == {"sgp.agent.escalates": ["verify-1", "verify-2"]}
 
     @pytest.mark.parametrize("value", ["", "  ", None, 3, " span-1"])
     def test_escalates_rejects_bad_span_ids(self, value):
         with pytest.raises(ValueError, match="verification span id") as raised:
-            escalates(value)
+            escalates("verify-1", value)
+        assert str(raised.value).startswith("escalates ")
+
+    @pytest.mark.parametrize("ids", [(), ("verify-1", "verify-1")])
+    def test_escalates_rejects_no_or_repeated_span_ids(self, ids):
+        with pytest.raises(ValueError, match="verification span id") as raised:
+            escalates(*ids)
         assert str(raised.value).startswith("escalates ")
 
     def test_results_merge_into_a_span_data_dict(self):
@@ -395,7 +404,7 @@ def _offline_create_span(created: list[Any]):
 
 def _assert_attributes_landed_in_sgp_metadata(items: list[dict[str, Any]]) -> None:
     by_name = {item["name"]: item for item in items}
-    assert sorted(by_name) == ["agent", "answer", "escalate", "verify"]
+    assert sorted(by_name) == ["agent", "answer", "escalate", "recheck", "verify"]
 
     root = by_name["agent"]["metadata"]
     declared = {key: value for key, value in root.items() if key.startswith("sgp.agent.")}
@@ -406,8 +415,11 @@ def _assert_attributes_landed_in_sgp_metadata(items: list[dict[str, Any]]) -> No
     assert root["__agent_version__"] == "sha-abc1234"
 
     assert by_name["answer"]["metadata"]["sgp.agent.output_name"] == "answer"
-    assert by_name["verify"]["metadata"]["sgp.agent.verification_result"] == "fail"
-    assert by_name["escalate"]["metadata"]["sgp.agent.escalates"] == by_name["verify"]["id"]
+    for verify in ("verify", "recheck"):
+        assert by_name[verify]["metadata"]["sgp.agent.verification_result"] == "fail"
+    # The check reads a list of span ids, so one escalation covers both failures.
+    escalated = [by_name["verify"]["id"], by_name["recheck"]["id"]]
+    assert by_name["escalate"]["metadata"]["sgp.agent.escalates"] == escalated
 
     for item in items:
         assert json.loads(json.dumps(item["metadata"])) == item["metadata"]
@@ -434,7 +446,9 @@ class TestRealSpanPath:
                     pass
                 async with trace.span(name="verify", parent_id=root.id, data=verification_result("fail")) as verify:
                     pass
-                async with trace.span(name="escalate", parent_id=root.id, data=escalates(verify.id)):
+                async with trace.span(name="recheck", parent_id=root.id, data=verification_result("fail")) as recheck:
+                    pass
+                async with trace.span(name="escalate", parent_id=root.id, data=escalates(verify.id, recheck.id)):
                     pass
                 stopped = dataclasses.replace(spec, stop_reason="budget_exhausted")
                 assert isinstance(root.data, dict)
@@ -463,7 +477,9 @@ class TestRealSpanPath:
                     pass
                 with trace.span(name="verify", parent_id=root.id, data=verification_result("fail")) as verify:
                     pass
-                with trace.span(name="escalate", parent_id=root.id, data=escalates(verify.id)):
+                with trace.span(name="recheck", parent_id=root.id, data=verification_result("fail")) as recheck:
+                    pass
+                with trace.span(name="escalate", parent_id=root.id, data=escalates(verify.id, recheck.id)):
                     pass
                 stopped = dataclasses.replace(spec, stop_reason="budget_exhausted")
                 assert isinstance(root.data, dict)

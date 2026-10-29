@@ -206,6 +206,8 @@ def verification_result(result: Literal["pass", "fail"]) -> dict[str, str]:
     return {VERIFICATION_RESULT_KEY: result}
 
 
-def escalates(verification_span_id: str) -> dict[str, str]:
-    """Data for an escalation span, naming the verification span it escalates."""
-    return {ESCALATES_KEY: _text(verification_span_id, "escalates verification span id")}
+def escalates(*verification_span_ids: str) -> dict[str, list[str]]:
+    """Data for an escalation span, naming every verification span it escalates."""
+    if not verification_span_ids:
+        raise ValueError("escalates needs at least one verification span id")
+    return {ESCALATES_KEY: list(_unique_texts(verification_span_ids, "escalates verification span id"))}

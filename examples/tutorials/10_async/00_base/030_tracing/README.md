@@ -102,7 +102,8 @@ async with adk.tracing.span(trace_id=task.id, name="agent", data=spec.attributes
 
 A span that produces a required output, runs a verification or escalates one carries a single
 attribute, passed as its `data`: `adk.failure_attributes.output_name("answer")`,
-`verification_result("pass")` (or `"fail"`) and `escalates(verify_span.id)`. The span
+`verification_result("pass")` (or `"fail"`) and `escalates(verify_span.id)`, which takes several
+span ids when one escalation covers several failures. The span
 `adk.tracing.span` yields is `None` when `trace_id` is empty or the span fails to start, so
 guard it before reading `.data` or `.id`.
 
