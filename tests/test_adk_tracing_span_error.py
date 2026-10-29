@@ -17,13 +17,29 @@ the CM never recorded the exception. These tests assert that:
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+import asyncio
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from scale_gp_beta.lib.tracing import create_span as sgp_create_span
 
 from agentex.types.span import Span
 from agentex.lib.adk._modules.tracing import TracingModule
 from agentex.lib.core.tracing.span_error import get_span_error
+from agentex.lib.core.tracing.processors.sgp_tracing_processor import _build_sgp_span
+
+# The failure checks read a span with either status as failed.
+FAILED_STATUSES = {"ERROR", "CANCELED"}
+
+
+def _sgp_status(span: Span) -> str:
+    def create(**kwargs: Any) -> Any:
+        return sgp_create_span(**kwargs, queue_manager=MagicMock())
+
+    env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
+    with patch("agentex.lib.core.tracing.processors.sgp_tracing_processor.create_span", side_effect=create):
+        return _build_sgp_span(span, env).status
 
 
 def _make_module() -> tuple[TracingModule, Span, AsyncMock]:
@@ -91,6 +107,26 @@ async def test_span_obs_failure_does_not_shadow_app_exception(monkeypatch: pytes
 
     # The span still gets closed despite the obs hiccup.
     end_span.assert_awaited_once()
+
+
+async def test_span_cancelled_mid_call_is_persisted_as_failed() -> None:
+    module, span, end_span = _make_module()
+    entered = asyncio.Event()
+
+    async def step() -> None:
+        async with module.span(trace_id="trace-1", name="step"):
+            entered.set()
+            await asyncio.Event().wait()
+
+    task = asyncio.create_task(step())
+    await entered.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    end_span.assert_awaited_once()
+    persisted_span = end_span.await_args.kwargs["span"]
+    assert _sgp_status(persisted_span) in FAILED_STATUSES
 
 
 async def test_span_noop_when_trace_id_falsy() -> None:

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import uuid
+import asyncio
 from typing import Any
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 from scale_gp_beta.lib.tracing import (
+    create_span as sgp_create_span,
     PlatformError as SGPPlatformError,
     ApplicationError as SGPApplicationError,
     CategorizedError as SGPCategorizedError,
@@ -24,6 +26,21 @@ from agentex.lib.core.tracing.span_error import (
 )
 
 PROCESSOR_MODULE = "agentex.lib.core.tracing.processors.sgp_tracing_processor"
+
+# The failure checks read a span with either status as failed.
+FAILED_STATUSES = {"ERROR", "CANCELED"}
+
+
+def _sgp_status(span: Span) -> str:
+    """The status the span is written to SGP with."""
+    from agentex.lib.core.tracing.processors.sgp_tracing_processor import _build_sgp_span
+
+    def create(**kwargs: Any) -> Any:
+        return sgp_create_span(**kwargs, queue_manager=MagicMock())
+
+    env = MagicMock(ACP_TYPE=None, AGENT_NAME=None, AGENT_ID=None, AGENT_VERSION=None)
+    with patch(f"{PROCESSOR_MODULE}.create_span", side_effect=create):
+        return _build_sgp_span(span, env).status
 
 
 def _make_span(data=None) -> Span:
@@ -150,6 +167,34 @@ class TestContextManagerCapture:
             "message": "kaboom",
             "category": "unknown",
         }
+
+    @pytest.mark.asyncio
+    async def test_async_span_cancelled_mid_call_reads_failed(self):
+        trace = AsyncTrace(processors=[], client=MagicMock(), trace_id="t1")
+        captured = {}
+        entered = asyncio.Event()
+
+        async def call() -> None:
+            async with trace.span("op") as span:
+                captured["span"] = span
+                entered.set()
+                await asyncio.Event().wait()
+
+        task = asyncio.create_task(call())
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert _sgp_status(captured["span"]) in FAILED_STATUSES
+
+    def test_sync_span_interrupted_mid_call_reads_failed(self):
+        trace = Trace(processors=[], client=MagicMock(), trace_id="t1")
+        captured = {}
+        with pytest.raises(KeyboardInterrupt):
+            with trace.span("op") as span:
+                captured["span"] = span
+                raise KeyboardInterrupt
+        assert _sgp_status(captured["span"]) in FAILED_STATUSES
 
 
 # ---------------------------------------------------------------------------
