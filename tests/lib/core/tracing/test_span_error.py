@@ -8,10 +8,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from scale_gp_beta.lib.tracing import (
-    create_span as sgp_create_span,
     PlatformError as SGPPlatformError,
     ApplicationError as SGPApplicationError,
     CategorizedError as SGPCategorizedError,
+    create_span as sgp_create_span,
 )
 
 from agentex.types.span import Span
