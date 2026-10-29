@@ -107,6 +107,10 @@ span ids when one escalation covers several failures. The span
 `adk.tracing.span` yields is `None` when `trace_id` is empty or the span fails to start, so
 guard it before reading `.data` or `.id`.
 
+An OpenTelemetry producer passes any of these dicts through `failure_attributes.otel_attributes`
+before setting them on a span, and names an OpenTelemetry span to `escalates` as
+`failure_attributes.otel_span_id(span)`.
+
 The SGP export adds `__agent_version__` when `AGENT_VERSION` is set, and `__commit_sha__` when the
 process starts with `AGENT_COMMIT_SHA` set to a valid git SHA, so only `prompt_version` is yours to
 declare.

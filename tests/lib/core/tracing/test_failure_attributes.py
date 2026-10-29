@@ -11,7 +11,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from opentelemetry.trace import SpanContext, NonRecordingSpan
+from opentelemetry.sdk.trace import TracerProvider
 from scale_gp_beta.lib.tracing import create_span as sgp_create_span
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from agentex.lib import adk
 from agentex.lib.types.tracing import SGPTracingProcessorConfig
@@ -22,6 +26,8 @@ from agentex.lib.core.tracing.failure_attributes import (
     VerificationRule,
     escalates,
     output_name,
+    otel_span_id,
+    otel_attributes,
     verification_result,
 )
 from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
@@ -376,6 +382,65 @@ class TestPerSpanAttributes:
         assert data == {"note": "kept", "sgp.agent.output_name": "answer"}
 
 
+class TestOpenTelemetryAdapter:
+    def test_attributes_reach_an_exported_otel_span_without_loss(self):
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        tracer = provider.get_tracer("test")
+
+        with tracer.start_as_current_span(
+            "agent", attributes=otel_attributes(FailureCheckSpec(**FULL_SPEC).attributes())
+        ):
+            with tracer.start_as_current_span(
+                "verify", attributes=otel_attributes(verification_result("fail"))
+            ) as verify:
+                pass
+            with tracer.start_as_current_span(
+                "recheck", attributes=otel_attributes(verification_result("fail"))
+            ) as recheck:
+                pass
+            escalated = escalates(otel_span_id(verify), otel_span_id(recheck))
+            with tracer.start_as_current_span("escalate", attributes=otel_attributes(escalated)):
+                pass
+
+        by_name = {span.name: dict(span.attributes or {}) for span in exporter.get_finished_spans()}
+        root = {key: list(value) if isinstance(value, tuple) else value for key, value in by_name["agent"].items()}
+        assert json.loads(root.pop(SCHEMA_KEY)) == SCHEMA
+        assert json.loads(root.pop("sgp.agent.verification")) == [{"step": "run_tests", "verifies": "apply_patch"}]
+        assert root == {key: value for key, value in NATIVE_ATTRIBUTES.items() if key != "sgp.agent.verification"}
+        assert by_name["verify"] == {"sgp.agent.verification_result": "fail"}
+        ids = [format(span.context.span_id, "016x") for span in exporter.get_finished_spans() if span.name != "agent"]
+        assert list(by_name["escalate"]["sgp.agent.escalates"]) == ids[:2]
+
+    def test_the_span_id_is_the_otlp_span_id_as_16_lowercase_hex_digits(self):
+        span = NonRecordingSpan(SpanContext(trace_id=1, span_id=0xAB, is_remote=False))
+        assert otel_span_id(span) == "00000000000000ab"
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("text", "text"),
+            (3, 3),
+            (True, True),
+            (["a", "b"], ["a", "b"]),
+            ((), []),
+            ([1, "a"], '[1,"a"]'),
+            ([True, 1], "[true,1]"),
+            ({"a": [1]}, '{"a":[1]}'),
+        ],
+    )
+    def test_values_otel_cannot_carry_become_json_text(self, value, expected):
+        converted = otel_attributes({"k": value})["k"]
+        assert converted == expected
+        assert type(converted) is type(expected)
+
+    @pytest.mark.parametrize("value", [None, object(), {"a": float("nan")}, [{"a": {1, 2}}]])
+    def test_a_value_with_no_otel_form_is_refused(self, value):
+        with pytest.raises(ValueError, match="^k "):
+            otel_attributes({"k": value})
+
+
 class TestExports:
     def test_adk_exposes_the_helper(self):
         assert adk.FailureCheckSpec is FailureCheckSpec
@@ -383,6 +448,7 @@ class TestExports:
         assert adk.failure_attributes.output_name is output_name
         assert adk.failure_attributes.verification_result is verification_result
         assert adk.failure_attributes.escalates is escalates
+        assert adk.failure_attributes.otel_attributes is otel_attributes
         assert {"failure_attributes", "FailureCheckSpec", "VerificationRule"} <= set(adk.__all__)
 
 

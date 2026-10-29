@@ -3,15 +3,18 @@
 The SGP processor ships ``span.data`` verbatim as span metadata, so each attribute is a flat
 dotted key holding a native JSON value. The output schema is written as JSON text instead, since
 the span store would spread a schema object into many paths whose keys can collide.
+
+An OpenTelemetry span carries only scalars and lists of one scalar type, so ``otel_attributes`` writes any
+other value as JSON text, which the checks also read. This module does not import OpenTelemetry.
 """
 
 from __future__ import annotations
 
 import re
 import json
-from typing import Any, Literal, Callable, cast
+from typing import Any, Literal, Callable, Protocol, cast
 from dataclasses import field, dataclass
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 __all__ = (
     "REQUIRED_OUTPUTS_KEY",
@@ -30,6 +33,8 @@ __all__ = (
     "output_name",
     "verification_result",
     "escalates",
+    "otel_attributes",
+    "otel_span_id",
 )
 
 REQUIRED_OUTPUTS_KEY = "sgp.agent.required_outputs"
@@ -211,3 +216,41 @@ def escalates(*verification_span_ids: str) -> dict[str, list[str]]:
     if not verification_span_ids:
         raise ValueError("escalates needs at least one verification span id")
     return {ESCALATES_KEY: list(_unique_texts(verification_span_ids, "escalates verification span id"))}
+
+
+_OTEL_SCALARS: frozenset[type] = frozenset({str, bool, int, float})
+
+
+def _otel_value(key: str, value: object) -> Any:
+    if type(value) in _OTEL_SCALARS:
+        return value
+    if isinstance(value, list | tuple):
+        items = cast("Sequence[object]", value)
+        kinds = {type(item) for item in items}
+        if len(kinds) <= 1 and kinds <= _OTEL_SCALARS:
+            return list(items)
+    elif not isinstance(value, dict):
+        raise ValueError(f"{key} has no OpenTelemetry attribute form, got {type(value).__name__}")
+    try:
+        return json.dumps(value, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ValueError(f"{key} must be JSON serializable: {exc}") from exc
+
+
+def otel_attributes(attributes: Mapping[str, Any]) -> dict[str, Any]:
+    """These helpers' data as OpenTelemetry span attributes, with objects and mixed lists as JSON text."""
+    return {key: _otel_value(key, value) for key, value in attributes.items()}
+
+
+class _OTelSpanContext(Protocol):
+    @property
+    def span_id(self) -> int: ...
+
+
+class _OTelSpan(Protocol):
+    def get_span_context(self) -> _OTelSpanContext: ...
+
+
+def otel_span_id(span: _OTelSpan) -> str:
+    """The id the span store gives an OpenTelemetry span, which ``escalates`` takes."""
+    return format(span.get_span_context().span_id, "016x")
