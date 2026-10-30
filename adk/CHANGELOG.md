@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.5](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.4...agentex-sdk-v0.28.5) (2026-10-30)
+
+
+### Bug Fixes
+
+* **deps:** cap temporalio below 1.35 ([#556](https://github.com/scaleapi/scale-agentex-python/issues/556)) ([4cb3032](https://github.com/scaleapi/scale-agentex-python/commit/4cb3032301418af0cd7c2d45ce073d0985cfc241))
+
 ## [0.28.4](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.3...agentex-sdk-v0.28.4) (2026-10-16)
 
 
