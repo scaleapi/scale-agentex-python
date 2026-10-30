@@ -53,9 +53,19 @@ class UnifiedEmitter:
             self.tracer = None
 
     async def yield_turn(self, turn: HarnessTurn) -> AsyncGenerator[StreamTaskMessage, None]:
-        """Sync HTTP ACP delivery: forward events, trace as side effect."""
-        async for event in yield_events(turn.events, tracer=self.tracer):
-            yield event
+        """Sync HTTP ACP delivery: forward events, trace as side effect.
+
+        The finally closes the delivery generator, which closes the turn's event
+        source in turn, so a consumer that stops early (client disconnect) tears
+        the tap down here rather than leaving it to async-generator finalization,
+        which never runs promptly while the turn still pins its generator.
+        """
+        delivery = yield_events(turn.events, tracer=self.tracer)
+        try:
+            async for event in delivery:
+                yield event
+        finally:
+            await delivery.aclose()
 
     async def auto_send_turn(self, turn: HarnessTurn, created_at: datetime | None = None) -> TurnResult:
         """Async/temporal delivery: push to the task stream, return TurnResult.
