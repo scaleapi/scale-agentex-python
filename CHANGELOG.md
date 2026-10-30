@@ -12,6 +12,13 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## [0.28.6](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.28.5...agentex-client-v0.28.6) (2026-10-30)
+
+
+### Chores
+
+* **release:** keep uv.lock in sync with release versions ([#558](https://github.com/scaleapi/scale-agentex-python/issues/558)) ([9ef0707](https://github.com/scaleapi/scale-agentex-python/commit/9ef070741ff6f6e3e8cbb160fb9b63d4c9bb6d9d))
+
 ## [0.28.5](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.28.4...agentex-client-v0.28.5) (2026-10-30)
 
 
