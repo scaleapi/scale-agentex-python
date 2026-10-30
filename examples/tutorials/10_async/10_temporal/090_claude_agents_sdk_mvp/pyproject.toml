@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "agentex-sdk>=0.6.0",
     "claude-agent-sdk>=0.1.0",
-    "temporalio>=1.18.2",
+    "temporalio>=1.26.0,<1.35",
     "anthropic>=0.40.0",
 ]
 
