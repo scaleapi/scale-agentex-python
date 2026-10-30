@@ -36,6 +36,10 @@ from agentex.lib.core.tracing import lineage
 from agentex.lib.core.tracing import code_revision
 from agentex.lib.core.tracing.lineage import DataSourceRef, data_sources
 
+# Span attributes the offline failure checks read, implemented in core.tracing
+from agentex.lib.core.tracing import failure_attributes
+from agentex.lib.core.tracing.failure_attributes import FailureCheckSpec, VerificationRule
+
 # Unified harness surface (AGX1-375)
 from agentex.lib.core.harness import (
     UnifiedEmitter,
@@ -79,6 +83,10 @@ __all__ = [
     "code_revision",
     "DataSourceRef",
     "data_sources",
+    # Failure-check span attributes
+    "failure_attributes",
+    "FailureCheckSpec",
+    "VerificationRule",
     # Checkpointing / LangGraph
     "create_checkpointer",
     "stream_langgraph_events",

@@ -180,3 +180,31 @@ class TestTemporalStreamingModel:
             "cached_input_tokens": 0,
             "reasoning_tokens": 0,
         }
+
+    async def test_streaming_model_span_names_its_model(self, tracing_contextvars):
+        completed = ResponseCompletedEvent.model_construct(
+            type="response.completed",
+            response=Response.model_construct(output=[], usage=None),
+        )
+        fake_tracer = FakeTracer()
+        openai_client = MagicMock()
+        openai_client.responses.create = AsyncMock(return_value=FakeStream([completed]))
+
+        with patch.object(tsm, "create_async_agentex_client", return_value=MagicMock()):
+            with patch.object(tsm, "AsyncTracer", return_value=fake_tracer):
+                model = tsm.TemporalStreamingModel(model_name="gpt-4o-mini", openai_client=openai_client)
+
+        await model.get_response(
+            system_instructions=None,
+            input="hello",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        # The failure checks read gen_ai.request.model as the model a call was made to.
+        span = fake_tracer.trace_obj.spans[0]
+        assert isinstance(span.data, dict)
+        assert span.data["gen_ai.request.model"] == "gpt-4o-mini"

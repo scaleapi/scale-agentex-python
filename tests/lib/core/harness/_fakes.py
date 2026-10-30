@@ -20,6 +20,11 @@ from __future__ import annotations
 from typing import Any
 
 
+def tool_marker(tool: str) -> dict[str, str]:
+    """The span data the offline failure checks read to recognise a tool call."""
+    return {"gen_ai.operation.name": "execute_tool", "gen_ai.tool.name": tool}
+
+
 class FakeSpan:
     def __init__(self, name: str) -> None:
         self.name = name

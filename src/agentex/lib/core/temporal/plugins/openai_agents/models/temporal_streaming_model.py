@@ -143,6 +143,7 @@ _HOSTED_TOOL_TYPES = frozenset(
 
 # Cap on the rendered hosted-tool result string (UI / trace readability).
 _HOSTED_TOOL_RESULT_CAP = 2000
+_REQUEST_MODEL_KEY = "gen_ai.request.model"
 
 
 def _coerce_args(raw: Any) -> dict[str, Any]:
@@ -652,6 +653,7 @@ class TemporalStreamingModel(Model):
                 "tools_count": len(tools) if tools else 0,
                 "handoffs_count": len(handoffs) if handoffs else 0,
             },
+            data={_REQUEST_MODEL_KEY: self.model_name},
         ) as span:
             # Always use Responses API for streaming
             if not task_id:
