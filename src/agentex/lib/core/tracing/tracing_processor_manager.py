@@ -4,7 +4,7 @@ import asyncio
 import logging
 import threading
 from typing import TYPE_CHECKING
-from threading import Lock
+from threading import RLock
 
 from agentex.lib.types.tracing import TracingProcessorConfig
 from agentex.lib.core.tracing.processors.sgp_tracing_processor import (
@@ -36,7 +36,7 @@ class TracingProcessorManager:
         # Cache for processors
         self.sync_processors: list[SyncTracingProcessor] = []
         self.async_processors: list[AsyncTracingProcessor] = []
-        self.lock = Lock()
+        self.lock = RLock()
         self._agentex_registered = False
 
     def _ensure_agentex_registered(self):
