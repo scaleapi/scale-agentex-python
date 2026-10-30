@@ -478,3 +478,35 @@ async def test_auto_send_created_at_forwarded():
     await auto_send(_gen(events), task_id="task1", tracer=None, streaming=streaming, created_at=dt)
 
     assert all(ts == dt for ts in streaming.recorded_created_at)
+
+
+@pytest.mark.asyncio
+async def test_auto_send_heartbeats_per_event_inside_an_activity():
+    """A long streamed turn must keep heartbeating, or a short heartbeat_timeout
+    times out an activity that is still delivering messages."""
+    from temporalio import activity
+    from temporalio.testing import ActivityEnvironment
+
+    streaming = _FakeStreaming()
+    events = [
+        StreamTaskMessageStart(type="start", index=0, content=TextContent(type="text", author="agent", content="")),
+        StreamTaskMessageDelta(type="delta", index=0, delta=TextDelta(type="text", text_delta="a")),
+        StreamTaskMessageDelta(type="delta", index=0, delta=TextDelta(type="text", text_delta="b")),
+        StreamTaskMessageDone(type="done", index=0),
+    ]
+    beats: list[tuple[object, ...]] = []
+
+    @activity.defn(name="deliver_turn")
+    async def deliver_turn() -> None:
+        async def _source():
+            for e in events:
+                yield e
+
+        await auto_send(_source(), task_id="task1", tracer=None, streaming=streaming)
+
+    env = ActivityEnvironment()
+    env.on_heartbeat = lambda *details: beats.append(details)
+    await env.run(deliver_turn)
+
+    assert len(beats) == len(events)
+
