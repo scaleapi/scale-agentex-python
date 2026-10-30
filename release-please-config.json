@@ -3,11 +3,23 @@
     ".": {
       "component": "agentex-client",
       "extra-files": [
-        "src/agentex/_version.py"
+        "src/agentex/_version.py",
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.name=='agentex-client' || @.name.value=='agentex-client')].version"
+        }
       ]
     },
     "adk": {
-      "component": "agentex-sdk"
+      "component": "agentex-sdk",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name=='agentex-sdk' || @.name.value=='agentex-sdk')].version"
+        }
+      ]
     }
   },
   "plugins": [
