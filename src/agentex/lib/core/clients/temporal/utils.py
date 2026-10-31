@@ -10,6 +10,7 @@ from temporalio.converter import PayloadCodec, DataConverter
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 from agentex.lib.core.tracing.temporal import temporal_tracing_interceptors
+from agentex.lib.core.clients.temporal.auth import connect_temporal_client
 
 # class DateTimeJSONEncoder(AdvancedJSONEncoder):
 #     def default(self, o: Any) -> Any:
@@ -151,10 +152,7 @@ async def get_temporal_client(
             dc = dataclasses.replace(dc, payload_codec=payload_codec)
         connect_kwargs["data_converter"] = dc
 
-    if not metrics_url:
-        client = await Client.connect(**connect_kwargs)
-    else:
+    if metrics_url:
         runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(url=metrics_url)))
         connect_kwargs["runtime"] = runtime
-        client = await Client.connect(**connect_kwargs)
-    return client
+    return await connect_temporal_client(connect_kwargs)

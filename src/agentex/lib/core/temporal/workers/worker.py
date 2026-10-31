@@ -33,6 +33,7 @@ from agentex.lib.core.tracing.temporal import temporal_tracing_interceptors
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.tracing.span_queue import shutdown_default_span_queue
 from agentex.lib.core.compat.version_guard import assert_backend_compatible
+from agentex.lib.core.clients.temporal.auth import connect_temporal_client
 from agentex.lib.core.observability.sgp_obs_setup import init_sgp_obs, shutdown_sgp_obs
 from agentex.lib.core.tracing.tracing_processor_manager import shutdown_sync_tracing_processors
 
@@ -147,22 +148,23 @@ async def get_temporal_client(
             dc = dataclasses.replace(dc, payload_codec=payload_codec)
         connect_kwargs["data_converter"] = dc
 
-    if not metrics_url:
-        client = await Client.connect(**connect_kwargs)
-    else:
-        runtime = Runtime(telemetry=TelemetryConfig(metrics=OpenTelemetryConfig(
-            url=metrics_url,
-            headers=metrics_headers or {},
-            http=metrics_use_http,
-            metric_temporality=(
-                OpenTelemetryMetricTemporality.DELTA
-                if metrics_temporality_delta
-                else OpenTelemetryMetricTemporality.CUMULATIVE
-            ),
-        )))
+    if metrics_url:
+        runtime = Runtime(
+            telemetry=TelemetryConfig(
+                metrics=OpenTelemetryConfig(
+                    url=metrics_url,
+                    headers=metrics_headers or {},
+                    http=metrics_use_http,
+                    metric_temporality=(
+                        OpenTelemetryMetricTemporality.DELTA
+                        if metrics_temporality_delta
+                        else OpenTelemetryMetricTemporality.CUMULATIVE
+                    ),
+                )
+            )
+        )
         connect_kwargs["runtime"] = runtime
-        client = await Client.connect(**connect_kwargs)
-    return client
+    return await connect_temporal_client(connect_kwargs)
 
 
 class AgentexWorker:
