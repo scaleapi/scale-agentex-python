@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from temporalio.client import TLSConfig
+from temporalio.service import TLSConfig
 from azure.core.credentials import AccessToken
 
 from agentex.lib.core.clients.temporal.auth import (
