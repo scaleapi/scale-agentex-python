@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -92,6 +93,25 @@ async def test_connect_expired_initial_token_blocks_startup(monkeypatch):
                     await connect_temporal_client({"target_host": "temporal:7233"})
 
     connect.assert_not_awaited()
+    assert credential.closed is True
+
+
+async def test_connect_cancelled_startup_closes_credential(monkeypatch):
+    monkeypatch.setenv("TEMPORAL_AUTH_SCOPE", _SCOPE)
+    credential = FakeCredential(AccessToken(_INITIAL, 2_000))
+
+    with patch(
+        "agentex.lib.core.clients.temporal.auth.WorkloadIdentityCredential",
+        return_value=credential,
+    ):
+        with patch(
+            "agentex.lib.core.clients.temporal.auth.Client.connect",
+            new=AsyncMock(side_effect=asyncio.CancelledError),
+        ):
+            with patch("agentex.lib.core.clients.temporal.auth.time.time", return_value=1_000):
+                with pytest.raises(asyncio.CancelledError):
+                    await connect_temporal_client({"target_host": "temporal:7233"})
+
     assert credential.closed is True
 
 

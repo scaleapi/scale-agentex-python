@@ -98,7 +98,7 @@ async def connect_temporal_client(connect_options: dict[str, Any]) -> Client:
         if authenticated_options.get("tls") is None:
             authenticated_options["tls"] = False
         client = await Client.connect(api_key=token.token, **authenticated_options)
-    except Exception:
+    except (Exception, asyncio.CancelledError):
         await credential.close()
         raise
 
