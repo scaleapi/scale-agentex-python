@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.6](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.5...agentex-sdk-v0.28.6) (2026-11-02)
+
+
+### Features
+
+* **temporal:** add workload identity authentication ([#562](https://github.com/scaleapi/scale-agentex-python/issues/562)) ([02e58d0](https://github.com/scaleapi/scale-agentex-python/commit/02e58d073c329e8afb1eb8fc13a7153bcd345608))
+
 ## [0.28.5](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.4...agentex-sdk-v0.28.5) (2026-10-30)
 
 
