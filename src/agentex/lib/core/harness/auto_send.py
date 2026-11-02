@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any, AsyncIterator
 from datetime import datetime
 
@@ -46,7 +47,13 @@ async def auto_send(
     Index-keyed routing: each Start(index=i) opens a context stored in
     ctx_map[i]; Delta(index=i) routes to ctx_map.get(i); Done(index=i) closes
     and removes ctx_map[i]. Events with index is None are skipped. The finally
-    block closes all remaining open contexts.
+    block closes all remaining open contexts, then closes `events` itself (when
+    it exposes `aclose`) so delivery stopping early — cancelled while awaiting
+    the backend rather than the source — tears the tap down instead of leaving it
+    suspended at a yield: the turn object pins its event generator, so GC does
+    not rescue it and the harness subprocess leaks. Closing an exhausted
+    generator is a no-op, and a failure there is suppressed so it cannot mask the
+    original exception.
 
     final_text last-segment semantics: a new Start(TextContent) resets
     final_text_parts so that multi-step turns return the LAST text segment.
@@ -148,9 +155,15 @@ async def auto_send(
                     pass
 
     finally:
-        await _close_all()
-        if deriver is not None and tracer is not None:
-            for signal in deriver.flush():
-                await tracer.handle(signal)
+        try:
+            await _close_all()
+            if deriver is not None and tracer is not None:
+                for signal in deriver.flush():
+                    await tracer.handle(signal)
+        finally:
+            aclose = getattr(events, "aclose", None)
+            if aclose is not None:
+                with contextlib.suppress(Exception):
+                    await aclose()
 
     return TurnResult(final_text="".join(final_text_parts), usage=usage or TurnUsage())
