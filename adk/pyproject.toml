@@ -34,6 +34,7 @@ dependencies = [
     "uvicorn>=0.31.1",
     "aiohttp>=3.10.10,<4",
     # Temporal workflows
+    "azure-identity>=1.16.1,<2.0.0",
     "temporalio>=1.26.0,<1.35",
     "cloudpickle>=3.1.1",
     # Async streaming infra
