@@ -27,6 +27,9 @@ from agentex.lib.utils.model_utils import BaseModel
 
 logger = make_logger(__name__)
 
+STDOUT_LINE_LIMIT = 8 * 1024 * 1024
+TERMINATE_TIMEOUT_SECONDS = 5.0
+
 RUN_CLAUDE_CODE_TURN_ACTIVITY = "run_claude_code_turn"
 
 
@@ -56,6 +59,11 @@ async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIter
 
     Injectable seam: tests monkeypatch this with a fake async iterator so no
     real CLI invocation is needed offline.
+
+    Lines up to ``STDOUT_LINE_LIMIT`` are read whole: a ``tool_result`` that
+    echoes a file is a single stream-json line, often past asyncio's 64 KiB
+    default. If the consumer stops early, the CLI gets SIGTERM and, after
+    ``TERMINATE_TIMEOUT_SECONDS``, SIGKILL, so cancellation cannot hang.
     """
     cmd = [
         "claude",
@@ -72,6 +80,7 @@ async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIter
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        limit=STDOUT_LINE_LIMIT,
     )
     assert proc.stdout is not None
     assert proc.stdin is not None
@@ -119,7 +128,14 @@ async def _spawn_claude(prompt: str, session_id: str | None = None) -> AsyncIter
                 proc.terminate()
             except ProcessLookupError:
                 pass
-            await proc.wait()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=TERMINATE_TIMEOUT_SECONDS)
+            except TimeoutError:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
 
 
 @activity.defn(name=RUN_CLAUDE_CODE_TURN_ACTIVITY)
