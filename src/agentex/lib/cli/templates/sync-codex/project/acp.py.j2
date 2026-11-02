@@ -34,7 +34,7 @@ import agentex.lib.adk as adk
 from agentex.lib.adk import CodexTurn
 from agentex.lib.types.acp import SendMessageParams
 from agentex.lib.core.harness import UnifiedEmitter
-from agentex.lib.types.tracing import SGPTracingProcessorConfig
+from agentex.lib.types.tracing import SGPTracingProcessorConfig, AgentexTracingProcessorConfig
 from agentex.lib.utils.logging import make_logger
 from agentex.types.text_content import TextContent
 from agentex.lib.sdk.fastacp.fastacp import FastACP
@@ -43,6 +43,12 @@ from agentex.types.task_message_content import TaskMessageContent
 from agentex.lib.core.tracing.tracing_processor_manager import add_tracing_processor_config
 
 logger = make_logger(__name__)
+
+# Local Agentex backend: spans appear in the developer UI's traces tab. Skipped
+# when AGENTEX_BASE_URL is explicitly empty (the runtime then treats the backend
+# as disabled and skips agent registration too).
+if os.environ.get("AGENTEX_BASE_URL", "http://localhost:5003"):
+    add_tracing_processor_config(AgentexTracingProcessorConfig())
 
 add_tracing_processor_config(
     SGPTracingProcessorConfig(
