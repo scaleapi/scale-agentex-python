@@ -84,13 +84,18 @@ class TestJsonFormatter:
         assert "dd.env" not in payload
 
     def test_with_ddtrace_adds_trace_ids(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        pytest.importorskip("ddtrace")
+        ddtrace = pytest.importorskip("ddtrace")
         monkeypatch.setattr(agentex_logging, "_is_datadog_configured", True)
 
-        payload = _format(agentex_logging.CustomJSONFormatter())
+        # Inside a real span, so the log must carry that span's ids, not placeholders.
+        with ddtrace.tracer.trace("agentex.test"):
+            expected = ddtrace.tracer.get_log_correlation_context()
+            payload = _format(agentex_logging.CustomJSONFormatter())
 
-        assert "dd.trace_id" in payload
-        assert "dd.span_id" in payload
+        assert expected["dd.trace_id"] not in (None, 0, "0")
+        assert expected["dd.span_id"] not in (None, 0, "0")
+        assert payload["dd.trace_id"] == expected["dd.trace_id"]
+        assert payload["dd.span_id"] == expected["dd.span_id"]
 
 
 class TestObsHelpersWithoutDdtrace:
