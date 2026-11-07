@@ -1179,6 +1179,10 @@ class TemporalStreamingModel(Model):
                             cached_tokens=getattr(
                                 captured_usage.input_tokens_details, "cached_tokens", 0
                             ),
+                            cache_write_tokens=getattr(
+                                captured_usage.input_tokens_details, "cache_write_tokens", 0
+                            )
+                            or 0,
                         ),
                         output_tokens_details=OutputTokensDetails(
                             reasoning_tokens=getattr(
@@ -1191,7 +1195,7 @@ class TemporalStreamingModel(Model):
                         input_tokens=0,
                         output_tokens=0,
                         total_tokens=0,
-                        input_tokens_details=InputTokensDetails(cached_tokens=0),
+                        input_tokens_details=InputTokensDetails(cached_tokens=0, cache_write_tokens=0),
                         output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
                     )
 
