@@ -107,7 +107,7 @@ class TestTemporalStreamingModel:
             input_tokens=120,
             output_tokens=80,
             total_tokens=200,
-            input_tokens_details=InputTokensDetails(cached_tokens=30),
+            input_tokens_details=InputTokensDetails(cached_tokens=30, cache_write_tokens=0),
             output_tokens_details=OutputTokensDetails(reasoning_tokens=40),
         )
         completed = ResponseCompletedEvent.model_construct(
