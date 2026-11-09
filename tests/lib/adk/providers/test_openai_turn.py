@@ -44,7 +44,7 @@ def test_usage_mapping_full():
     usage = Usage(
         requests=3,
         input_tokens=100,
-        input_tokens_details=InputTokensDetails(cached_tokens=20),
+        input_tokens_details=InputTokensDetails(cached_tokens=20, cache_write_tokens=0),
         output_tokens=50,
         output_tokens_details=OutputTokensDetails(reasoning_tokens=10),
         total_tokens=150,
@@ -80,7 +80,7 @@ def test_usage_mapping_real_zeros_are_preserved():
     usage = Usage(
         requests=1,
         input_tokens=0,
-        input_tokens_details=InputTokensDetails(cached_tokens=0),
+        input_tokens_details=InputTokensDetails(cached_tokens=0, cache_write_tokens=0),
         output_tokens=0,
         output_tokens_details=OutputTokensDetails(reasoning_tokens=0),
         total_tokens=0,
@@ -126,7 +126,7 @@ def test_aggregate_usage_multiple():
     u1 = Usage(
         requests=1,
         input_tokens=10,
-        input_tokens_details=InputTokensDetails(cached_tokens=2),
+        input_tokens_details=InputTokensDetails(cached_tokens=2, cache_write_tokens=0),
         output_tokens=5,
         output_tokens_details=OutputTokensDetails(reasoning_tokens=1),
         total_tokens=15,
@@ -134,7 +134,7 @@ def test_aggregate_usage_multiple():
     u2 = Usage(
         requests=2,
         input_tokens=20,
-        input_tokens_details=InputTokensDetails(cached_tokens=3),
+        input_tokens_details=InputTokensDetails(cached_tokens=3, cache_write_tokens=0),
         output_tokens=7,
         output_tokens_details=OutputTokensDetails(reasoning_tokens=4),
         total_tokens=27,

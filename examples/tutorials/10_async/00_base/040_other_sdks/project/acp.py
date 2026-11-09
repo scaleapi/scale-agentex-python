@@ -236,6 +236,8 @@ async def run_openai_agent_with_custom_streaming(
             agent = Agent(
                 name=agent_name,
                 instructions=agent_instructions,
+                # Pin the model: openai-agents' implicit default changes between releases.
+                model="gpt-4.1",
                 mcp_servers=servers,
             )
 

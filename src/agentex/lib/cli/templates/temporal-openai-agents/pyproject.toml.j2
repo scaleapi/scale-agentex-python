@@ -10,8 +10,8 @@ requires-python = ">=3.12"
 dependencies = [
     "agentex-sdk",
     "scale-gp",
-    "temporalio>=1.26.0,<1.35",
-    "openai-agents>=0.4.2",
+    "temporalio[openai-agents]>=1.35.0,<2",
+    "openai-agents>=0.20,<0.23",
 ]
 
 [project.optional-dependencies]

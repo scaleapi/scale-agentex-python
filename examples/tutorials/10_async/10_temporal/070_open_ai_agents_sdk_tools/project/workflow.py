@@ -197,6 +197,8 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
         weather_agent = Agent(
             name="Weather Assistant",
             instructions="You are a helpful weather agent. Use the get_weather tool to get the weather for a given city.",
+            # Pin the model: openai-agents' implicit default changes between releases.
+            model="gpt-4.1",
             tools=[
                 # activity_as_tool() converts a Temporal activity into an agent tool
                 # The get_weather activity will be executed with durability guarantees

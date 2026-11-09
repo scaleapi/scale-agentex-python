@@ -178,6 +178,8 @@ class At080OpenAiAgentsSdkHumanInTheLoopWorkflow(BaseWorkflow):
         confirm_order_agent = Agent(
             name="Confirm Order",
             instructions="You are a helpful confirm order agent. When a user asks you to confirm an order, use the wait_for_confirmation tool to wait for confirmation.",
+            # Pin the model: openai-agents' implicit default changes between releases.
+            model="gpt-4.1",
             tools=[
                 wait_for_confirmation,
             ],

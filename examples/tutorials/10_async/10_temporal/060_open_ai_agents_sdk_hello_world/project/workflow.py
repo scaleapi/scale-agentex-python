@@ -163,6 +163,8 @@ class At060OpenAiAgentsSdkHelloWorldWorkflow(BaseWorkflow):
                 name="Haiku Assistant",
                 instructions="You are a friendly assistant who always responds in the form of a haiku. "
                 "Each response should be exactly 3 lines following the 5-7-5 syllable pattern.",
+                # Pin the model: openai-agents' implicit default changes between releases.
+                model="gpt-4.1",
             )
 
             # ============================================================================
