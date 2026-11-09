@@ -23,7 +23,7 @@ import pytest
 
 from agentex.types.span import Span
 from agentex.lib.adk._modules.tracing import TracingModule
-from agentex.lib.core.tracing.span_error import get_span_error
+from agentex.lib.core.tracing.span_error import ERROR_CLASSIFIER_VERSION, get_span_error
 
 
 def _make_module() -> tuple[TracingModule, Span, AsyncMock]:
@@ -51,7 +51,10 @@ async def test_span_records_error_and_reraises() -> None:
     assert error == {
         "type": "ValueError",
         "message": "boom",
-        "category": "unknown",
+        "category": "application",
+        "category_source": "stack_trace",
+        "classifier_version": ERROR_CLASSIFIER_VERSION,
+        "category_reason": "stack_rule:unowned_absolute_source",
     }
 
     # end_span still ran (finally) and saw the span with the error already set,
@@ -61,7 +64,10 @@ async def test_span_records_error_and_reraises() -> None:
     assert get_span_error(persisted_span) == {
         "type": "ValueError",
         "message": "boom",
-        "category": "unknown",
+        "category": "application",
+        "category_source": "stack_trace",
+        "classifier_version": ERROR_CLASSIFIER_VERSION,
+        "category_reason": "stack_rule:unowned_absolute_source",
     }
 
 
@@ -115,6 +121,9 @@ async def test_turn_span_records_error_and_reraises() -> None:
     assert get_span_error(span) == {
         "type": "ValueError",
         "message": "boom",
-        "category": "unknown",
+        "category": "application",
+        "category_source": "stack_trace",
+        "classifier_version": ERROR_CLASSIFIER_VERSION,
+        "category_reason": "stack_rule:unowned_absolute_source",
     }
     end_span.assert_awaited_once()
