@@ -107,7 +107,7 @@ class TestTemporalStreamingModel:
             input_tokens=120,
             output_tokens=80,
             total_tokens=200,
-            input_tokens_details=InputTokensDetails(cached_tokens=30, cache_write_tokens=0),
+            input_tokens_details=InputTokensDetails(cached_tokens=30, cache_write_tokens=15),
             output_tokens_details=OutputTokensDetails(reasoning_tokens=40),
         )
         completed = ResponseCompletedEvent.model_construct(
@@ -138,12 +138,59 @@ class TestTemporalStreamingModel:
         assert response.usage.output_tokens == 80
         assert response.usage.total_tokens == 200
         assert response.usage.input_tokens_details.cached_tokens == 30
+        assert response.usage.input_tokens_details.cache_write_tokens == 15
         assert response.usage.output_tokens_details.reasoning_tokens == 40
 
         # And on the span output for billing
         assert len(fake_tracer.trace_obj.spans) == 1
         span = fake_tracer.trace_obj.spans[0]
         assert _output_dict(span)["usage"] == EXPECTED_USAGE_BLOB
+
+    @pytest.mark.parametrize(
+        "input_tokens_details",
+        [
+            # Older payloads that predate the field
+            InputTokensDetails.model_construct(cached_tokens=30),
+            # Field present but null
+            InputTokensDetails.model_construct(cached_tokens=30, cache_write_tokens=None),
+        ],
+        ids=["missing", "none"],
+    )
+    async def test_streaming_model_defaults_cache_write_tokens_to_zero(
+        self, tracing_contextvars, input_tokens_details
+    ):
+        usage = ResponseUsage.model_construct(
+            input_tokens=120,
+            output_tokens=80,
+            total_tokens=200,
+            input_tokens_details=input_tokens_details,
+            output_tokens_details=OutputTokensDetails(reasoning_tokens=40),
+        )
+        completed = ResponseCompletedEvent.model_construct(
+            type="response.completed",
+            response=Response.model_construct(output=[], usage=usage),
+        )
+
+        fake_tracer = FakeTracer()
+        openai_client = MagicMock()
+        openai_client.responses.create = AsyncMock(return_value=FakeStream([completed]))
+
+        with patch.object(tsm, "create_async_agentex_client", return_value=MagicMock()):
+            with patch.object(tsm, "AsyncTracer", return_value=fake_tracer):
+                model = tsm.TemporalStreamingModel(model_name="gpt-4o", openai_client=openai_client)
+
+        response = await model.get_response(
+            system_instructions=None,
+            input="hello",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=None,
+        )
+
+        assert response.usage.input_tokens_details.cached_tokens == 30
+        assert response.usage.input_tokens_details.cache_write_tokens == 0
 
     async def test_streaming_model_writes_zero_usage_when_api_reports_none(self, tracing_contextvars):
         completed = ResponseCompletedEvent.model_construct(
