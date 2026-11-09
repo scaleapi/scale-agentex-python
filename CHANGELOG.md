@@ -12,6 +12,18 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## [0.28.7](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.28.6...agentex-client-v0.28.7) (2026-11-09)
+
+
+### Bug Fixes
+
+* **deps:** allow temporalio 1.35 and openai-agents 0.20 ([#567](https://github.com/scaleapi/scale-agentex-python/issues/567)) ([d36969a](https://github.com/scaleapi/scale-agentex-python/commit/d36969a0fe2c5649d861f6dc3fe6a5519d737e78))
+
+
+### Chores
+
+* **release:** remove the 0.28.6 release pin ([#564](https://github.com/scaleapi/scale-agentex-python/issues/564)) ([e866df1](https://github.com/scaleapi/scale-agentex-python/commit/e866df19e8a5c192b45b29bffbb2cf1a74a10089))
+
 ## [0.28.6](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.28.5...agentex-client-v0.28.6) (2026-11-02)
 
 
