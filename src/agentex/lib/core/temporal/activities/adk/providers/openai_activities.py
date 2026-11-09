@@ -417,7 +417,13 @@ class ModelSettings(BaseModelWithTraceParams):
     extra_args: dict[str, Any] | None = None
 
     def to_oai_model_settings(self) -> OAIModelSettings:
-        return OAIModelSettings(**self.model_dump(exclude=["trace_id", "parent_span_id"]))
+        settings = self.model_dump(exclude={"trace_id", "parent_span_id"})
+        if self.reasoning is not None:
+            # model_dump() writes every unset Reasoning field as an explicit None.
+            # openai >= 2.45 added Reasoning.mode/context/generate_summary, and the
+            # Responses API rejects {"mode": null}. Keep only the fields that are set.
+            settings["reasoning"] = Reasoning(**self.reasoning.model_dump(exclude_none=True))
+        return OAIModelSettings(**settings)
 
 
 class RunAgentParams(BaseModelWithTraceParams):

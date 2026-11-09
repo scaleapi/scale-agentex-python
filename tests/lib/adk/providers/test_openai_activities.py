@@ -841,3 +841,36 @@ class TestOpenAIActivities:
         }
         defaults.update(overrides)
         return defaults
+
+
+def test_model_settings_reasoning_omits_unset_fields_after_temporal_roundtrip():
+    """Unset Reasoning fields must not reach OpenAI as explicit nulls.
+
+    openai >= 2.45 added Reasoning.mode/context/generate_summary. The Responses
+    API rejects {"reasoning": {"mode": null}} with a 400, which broke the
+    010_agent_chat tutorial once ModelSettings crossed a Temporal activity.
+    """
+    from openai.types.shared import Reasoning
+    from temporalio.contrib.pydantic import pydantic_data_converter
+
+    from agentex.lib.core.temporal.activities.adk.providers.openai_activities import ModelSettings
+
+    settings = ModelSettings(reasoning=Reasoning(effort="medium", summary="detailed"), temperature=0.2)
+    converter = pydantic_data_converter.payload_converter
+    settings = converter.from_payloads(converter.to_payloads([settings]), [ModelSettings])[0]
+
+    oai_settings = settings.to_oai_model_settings()
+
+    assert oai_settings.reasoning is not None
+    # The OpenAI client serializes request models with exclude_unset.
+    assert oai_settings.reasoning.model_dump(exclude_unset=True) == {"effort": "medium", "summary": "detailed"}
+    assert oai_settings.temperature == 0.2
+
+
+def test_model_settings_without_reasoning_is_unchanged():
+    from agentex.lib.core.temporal.activities.adk.providers.openai_activities import ModelSettings
+
+    oai_settings = ModelSettings(temperature=0.5).to_oai_model_settings()
+
+    assert oai_settings.reasoning is None
+    assert oai_settings.temperature == 0.5
