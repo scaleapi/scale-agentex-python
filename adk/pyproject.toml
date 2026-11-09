@@ -40,17 +40,19 @@ dependencies = [
     # is now a shim that re-exports it. The SDK imports that module in every
     # Temporal worker, so the standalone package is a hard dependency.
     "temporalio>=1.35.0,<2",
-    "temporalio-openai-agents>=1.0.0,<2",
+    "temporalio-openai-agents>=1.0.0,<1.1",
     "cloudpickle>=3.1.1",
     # Async streaming infra
     "redis>=5.2.0,<8",
     # LLM provider integrations
     "litellm>=1.83.7,<2",
     # temporalio-openai-agents 1.0 needs openai-agents 0.20.x (openai 2.45+);
-    # 1.1 needs openai-agents 0.22.x (openai 3.x).
-    "openai-agents>=0.20,<0.23",
+    # 1.1 needs openai-agents 0.22.x (openai 3.x). Stay on the 1.0 / 0.20 /
+    # openai 2.x set: it's what uv.lock and the test suite cover. A fresh
+    # install that picked 0.22 + openai 3 broke the 010_agent_chat tutorial.
+    "openai-agents>=0.20,<0.21",
     # litellm now supports openai 2.x (issue #13711 resolved: https://github.com/BerriAI/litellm/issues/13711)
-    "openai>=2.45,<4",
+    "openai>=2.45,<3",
     "claude-agent-sdk>=0.1.0",
     "pydantic-ai-slim>=1.0,<2",
     "langgraph-checkpoint>=2.0.0",
