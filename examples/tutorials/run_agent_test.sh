@@ -315,6 +315,12 @@ run_test() {
         if [ $exit_code -eq 0 ]; then
             break
         else
+            # Print the agent log after the first failure. Five slow retries can
+            # hit the job timeout before the workflow's "Print agent logs" step runs.
+            if [ $retry_count -eq 0 ] && [[ -f "/tmp/agentex-${name}.log" ]]; then
+                echo -e "${YELLOW}📋 Agent log after first failed attempt (last 300 lines):${NC}"
+                tail -300 "/tmp/agentex-${name}.log"
+            fi
             retry_count=$((retry_count + 1))
             if [ $retry_count -lt $max_retries ]; then
                 sleep 5
