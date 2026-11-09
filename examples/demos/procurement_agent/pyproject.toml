@@ -9,8 +9,8 @@ description = "An Agentex agent that manages procurement for building constructi
 requires-python = ">=3.12"
 dependencies = [
     "agentex-sdk>=0.6.5",
-    "openai-agents>=0.20,<0.23",
-    "temporalio[openai-agents]>=1.35.0,<2",
+    "openai-agents>=0.14.3,<0.23",
+    "temporalio>=1.26.0,<2",
     "scale-gp",
     "aiosqlite",
     "pytest-html>=4.2.0",

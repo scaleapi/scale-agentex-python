@@ -144,8 +144,13 @@ start_agent() {
             return 1
         fi
 
-        # Pass both wheels so the local heavy resolves its slim dep locally
-        uv run --with "$heavy_wheel" --with "$slim_wheel" agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
+        # Resolve the tutorial and both local wheels in ONE pass. Plain
+        # `uv run --with` first resolves the tutorial's own deps against PyPI's
+        # released agentex-sdk, then overlays the local wheel without re-applying
+        # the tutorial's extras (e.g. temporalio[langgraph]). That breaks whenever
+        # the local SDK moves a shared dep (temporalio 1.35 split its plugins into
+        # temporalio-openai-agents / temporalio-langgraph).
+        uv run --no-project --with "$heavy_wheel" --with "$slim_wheel" --with-editable . agentex agents run --manifest "$manifest_path" > "$logfile" 2>&1 &
     else
         uv run agentex agents run --manifest manifest.yaml > "$logfile" 2>&1 &
     fi
@@ -290,7 +295,8 @@ run_test() {
             echo -e "${RED}❌ BUILD_CLI=true but a wheel is missing (heavy='${heavy_wheel}' slim='${slim_wheel}'); refusing to test against the pre-installed SDK${NC}"
             return 1
         fi
-        pytest_cmd=("uv" "run" "--with" "$heavy_wheel" "--with" "$slim_wheel" "--with" "pytest" "--with" "pytest-asyncio" "pytest")
+        # Same single-pass resolution as the agent start (see start_agent).
+        pytest_cmd=("uv" "run" "--no-project" "--with" "$heavy_wheel" "--with" "$slim_wheel" "--with-editable" "." "--with" "pytest" "--with" "pytest-asyncio" "pytest")
     fi
 
     local max_retries=5
