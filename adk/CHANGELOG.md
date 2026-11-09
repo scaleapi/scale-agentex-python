@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.7](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.6...agentex-sdk-v0.28.7) (2026-11-09)
+
+
+### Bug Fixes
+
+* **deps:** allow temporalio 1.35 and openai-agents 0.20 ([#567](https://github.com/scaleapi/scale-agentex-python/issues/567)) ([d36969a](https://github.com/scaleapi/scale-agentex-python/commit/d36969a0fe2c5649d861f6dc3fe6a5519d737e78))
+
 ## [0.28.6](https://github.com/scaleapi/scale-agentex-python/compare/agentex-sdk-v0.28.5...agentex-sdk-v0.28.6) (2026-11-02)
 
 
