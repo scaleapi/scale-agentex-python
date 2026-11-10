@@ -1,31 +1,62 @@
 """Drive an agent turn from an inbound webhook, inside a forward-route handler.
 
-The Agentex server already exposes a webhook ingress: a request to
+The Agentex server exposes a webhook ingress: a request to
 ``/agents/forward/name/{agent}/{path}`` is signature-verified (GitHub ``sha256=`` /
 Slack ``v0:`` HMAC via the agent's registered keys) and proxied to the agent's own
 HTTP route. This helper is what that route handler calls to turn the inbound payload
 into an agent turn — without each agent re-implementing payload shaping, config
 resolution, session continuity, and reply handling.
 
+**That ingress verification does not travel with the request.** The route below is an
+ordinary FastAPI route on an app bound to ``0.0.0.0:8000``, so any peer that can reach
+the pod port can POST the same body straight to it, and FastACP adds no authentication
+to agent-defined routes. Reaching this route is therefore NOT evidence that the
+signature was ever checked. The control plane does forward the source's own signature
+headers, so the route re-verifies them here — ``handle_webhook`` refuses to drive a
+turn without that proof (VULN-3137).
+
 Typical use inside an agent::
 
-    from fastapi import Request
-    from agentex.lib.sdk.utils.webhooks import handle_webhook
+    import json
+    import os
+
+    from fastapi import HTTPException, Request
+    from agentex.lib.sdk.utils.webhooks import (
+        WebhookVerification,
+        WebhookSignatureError,
+        handle_webhook,
+    )
 
 
     @acp.post("/github-pr")
     async def github_pr(request: Request):
-        body = await request.json()
-        result = await handle_webhook(
-            agent_name="my-agent",
-            payload=body,
-            acp_type="sync",
-            shaper="github_pr",
-            params_source="https://<host>/public/v5/agent_configs/<id>/resolve",
-            params_source_headers={"x-api-key": ..., "x-selected-account-id": ...},
-            wait=True,
-        )
+        # RAW bytes: the HMAC covers what GitHub signed, and a re-serialised dict
+        # produces different bytes that can never verify.
+        raw = await request.body()
+        try:
+            result = await handle_webhook(
+                agent_name="my-agent",
+                payload=json.loads(raw),
+                verify=WebhookVerification(
+                    source="github",
+                    secret=os.environ["GITHUB_WEBHOOK_SECRET"],
+                    body=raw,
+                    headers=request.headers,
+                ),
+                acp_type="sync",
+                shaper="github_pr",
+                params_source="https://<host>/public/v5/agent_configs/<id>/resolve",
+                params_source_headers={"x-api-key": ..., "x-selected-account-id": ...},
+                wait=True,
+            )
+        except WebhookSignatureError:
+            raise HTTPException(status_code=403, detail="bad webhook signature") from None
         return {"task_id": result.task_id, "reply": result.reply}
+
+``GITHUB_WEBHOOK_SECRET`` is the signing secret shown once when the trigger was
+registered (``POST /agents/{name}/webhook-triggers``); give it to the agent the same
+way as any other secret. Verifying also makes session continuity safe: the task name
+is keyed with that secret, so only a holder can name an existing conversation.
 
 Config-by-id: pass ``params_source`` pointing at the platform's config-resolve
 endpoint; the resolved params (e.g. system_prompt / harness / model / tools) are
@@ -34,6 +65,7 @@ forwarded opaquely to ``task/create``. Or pass inline ``params`` for a one-off.
 
 from __future__ import annotations
 
+import hmac
 import json
 import hashlib
 from typing import Any, Literal
@@ -43,6 +75,11 @@ from collections.abc import Mapping, Callable, Awaitable
 from agentex.lib import adk
 from agentex.lib.utils.logging import make_logger
 from agentex.types.task_message_content import TextContent
+from agentex.lib.sdk.utils.webhook_signatures import (
+    WebhookSource as WebhookSource,
+    WebhookVerification as WebhookVerification,
+    WebhookSignatureError as WebhookSignatureError,
+)
 
 logger = make_logger(__name__)
 
@@ -69,11 +106,26 @@ class WebhookResult:
 # --------------------------------------------------------------------------- shaping
 
 
-def session_key(agent_name: str, channel: str, peer_id: str) -> str:
+def session_key(agent_name: str, channel: str, peer_id: str, *, secret: str | None = None) -> str:
     """Stable per-conversation task name → reused for get-or-create on task/create, so
-    repeat events from the same source fold into one task instead of spawning new ones."""
+    repeat events from the same source fold into one task instead of spawning new ones.
+
+    ``task/create`` is get-or-create BY NAME, so this name decides which existing
+    conversation a turn joins. Unkeyed it is computable from public data (a repo name
+    and a PR number), which let an unverified caller name — and read the reply from —
+    somebody else's conversation (VULN-3137). ``secret`` keys the digest with the
+    webhook's shared secret, so the name can only be derived by someone who already
+    holds it, and two installations watching the same repository stay separate.
+
+    Passing no ``secret`` keeps an unkeyed (but no longer SHA-1) name, for callers that
+    verified provenance themselves and have no secret to hand.
+    """
     basis = peer_id or "main"
-    digest = hashlib.sha1(f"{agent_name}:{channel}:{basis}".encode()).hexdigest()[:16]
+    material = f"{agent_name}:{channel}:{basis}".encode()
+    if secret:
+        digest = hmac.new(secret.encode("utf-8"), material, hashlib.sha256).hexdigest()[:16]
+    else:
+        digest = hashlib.sha256(material).hexdigest()[:16]
     return f"wh-{channel}-{digest}"
 
 
@@ -258,9 +310,13 @@ async def handle_webhook(
     extra_task_metadata: dict[str, str] | None = None,
     wait: bool = False,
     fetch: ParamsFetcher | None = None,
+    verify: WebhookVerification | None = None,
+    trust_caller: bool = False,
 ) -> WebhookResult:
     """Drive an agent turn from a webhook payload, agent-side, via the ADK client.
 
+    - Proves provenance FIRST: ``verify`` carries the raw body, headers and shared
+      secret, and nothing else runs until its signature checks out.
     - Shapes the payload (generic or GitHub PR) into a prompt + conversation scope.
     - Resolves task params: inline ``params``, or fetched from ``params_source``
       (config-by-id). The platform never interprets params — they're forwarded to the
@@ -268,7 +324,35 @@ async def handle_webhook(
     - Get-or-creates a task keyed on a stable session key, so repeat events fold in.
     - Sends the turn (sync → message/send returns the reply inline; async → event/send,
       with optional ``wait`` to poll for the reply).
+
+    Provenance is mandatory (VULN-3137). The route this runs in is served on the
+    agent's own public listener, so "it reached my route" is not evidence that the
+    control plane's signature-verifying ingress let it through. Pass ``verify`` with
+    the raw request bytes, or — only if the route proved provenance by some other
+    means — pass ``trust_caller=True`` to say so explicitly. With neither, this
+    raises :class:`WebhookSignatureError` rather than driving a turn.
+
+    Raises:
+        WebhookSignatureError: no provenance was established, or the signature failed.
+        WebhookError: the turn could not be driven (e.g. params resolution failed).
     """
+    if verify is not None:
+        verify.check()
+        session_secret: str | None = verify.secret
+    elif trust_caller:
+        # The route says it established provenance itself. Nothing to key the session
+        # name with, so it falls back to an unkeyed name.
+        session_secret = None
+    else:
+        raise WebhookSignatureError(
+            "handle_webhook refuses to drive a turn without provenance: pass "
+            "verify=WebhookVerification(source=..., secret=..., body=<raw request "
+            "bytes>, headers=request.headers), or trust_caller=True if this route "
+            "has already proved the request came from the webhook source. The "
+            "agent's HTTP route is reachable directly, so an unverified payload can "
+            "name and read back any existing webhook conversation (VULN-3137)."
+        )
+
     channel = channel or shaper
     if shaper == "github_pr":
         text, derived_peer, sender = shape_github_pr(payload)
@@ -292,7 +376,7 @@ async def handle_webhook(
         for key, value in extra_task_metadata.items():
             task_metadata.setdefault(key, str(value))
 
-    name = session_key(agent_name, channel, peer_id or "")
+    name = session_key(agent_name, channel, peer_id or "", secret=session_secret)
     # task/create carries only name/params (CreateTaskParams has no task_metadata field),
     # so we create first, then stamp task_metadata via a follow-up update below.
     task = await adk.acp.create_task(

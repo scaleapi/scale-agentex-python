@@ -1,7 +1,14 @@
-"""Unit tests for the SDK webhook helper (agentex.lib.sdk.utils.webhooks)."""
+"""Unit tests for the SDK webhook helper (agentex.lib.sdk.utils.webhooks).
+
+The turn-driving tests pass ``trust_caller=True`` because provenance is not what they
+are about; ``TestProvenance`` covers the signature gate itself.
+"""
 
 from __future__ import annotations
 
+import hmac
+import json
+import hashlib
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -15,6 +22,12 @@ from agentex.lib.sdk.utils.webhooks import (
     render_generic,
     shape_github_pr,
     resolve_remote_params,
+)
+from agentex.lib.sdk.utils.webhook_signatures import (
+    WebhookVerification,
+    WebhookSignatureError,
+    verify_slack_signature,
+    verify_github_signature,
 )
 
 
@@ -146,6 +159,7 @@ class TestHandleWebhook:
             shaper="github_pr",
             params_source="https://h/v5/agent_configs/cfg-9/resolve",
             fetch=fake_resolve,
+            trust_caller=True,
         )
 
         assert result.reply == "Looks good — ship it."
@@ -168,6 +182,7 @@ class TestHandleWebhook:
             payload={"text": "hi"},
             acp_type="sync",
             params={"system_prompt": "inline"},
+            trust_caller=True,
         )
         assert result.reply == "Looks good — ship it."
         assert self.created["params"] == {"system_prompt": "inline"}
@@ -182,6 +197,7 @@ class TestHandleWebhook:
             shaper="github_pr",
             params_source="https://h/resolve",
             fetch=fake_resolve,
+            trust_caller=True,
         )
         assert result.task_metadata["channel"] == "github_pr"
 
@@ -201,6 +217,7 @@ class TestHandleWebhook:
             shaper="github_pr",
             params_source="https://h/resolve",
             fetch=fake_resolve,
+            trust_caller=True,
         )
 
         stamped_metadata = self.stamped["task_metadata"]
@@ -209,7 +226,9 @@ class TestHandleWebhook:
         assert stamped_metadata["channel"] == "github_pr"
 
     async def test_async_without_wait_sends_event_and_returns_no_reply(self):
-        result = await handle_webhook(agent_name="a", payload={"text": "go"}, acp_type="async", wait=False)
+        result = await handle_webhook(
+            agent_name="a", payload={"text": "go"}, acp_type="async", wait=False, trust_caller=True
+        )
         assert result.reply is None
         self.send_event.assert_awaited_once()
 
@@ -265,3 +284,122 @@ class TestAwaitReplyIgnoresStalePriorReply:
             quiescence_s=0.0,
         )
         assert reply == "NEW reply"
+
+
+class TestProvenance:
+    """VULN-3137: the route is reachable directly, so a payload is not evidence."""
+
+    def test_github_signature_round_trips(self):
+        body = b'{"zen":"be awesome"}'
+        sig = "sha256=" + hmac.new(b"s3cret", body, hashlib.sha256).hexdigest()
+        # Does not raise.
+        verify_github_signature("s3cret", body, {"X-Hub-Signature-256": sig})
+
+    @pytest.mark.parametrize(
+        ("label", "headers"),
+        [
+            ("absent", {}),
+            ("empty", {"X-Hub-Signature-256": ""}),
+            ("wrong-digest", {"X-Hub-Signature-256": "sha256=" + "a" * 64}),
+            ("unprefixed", {"X-Hub-Signature-256": "a" * 64}),
+        ],
+    )
+    def test_github_signature_rejected(self, label, headers):
+        with pytest.raises(WebhookSignatureError):
+            verify_github_signature("s3cret", b"{}", headers)
+
+    def test_github_signature_is_over_the_raw_bytes(self):
+        """A re-serialised dict is different bytes and must not verify.
+
+        This is why handle_webhook takes the raw body rather than signing the parsed
+        payload: json.dumps(json.loads(x)) != x in general.
+        """
+        raw = b'{"a": 1,  "b": 2}'
+        sig = "sha256=" + hmac.new(b"k", raw, hashlib.sha256).hexdigest()
+        reserialised = json.dumps(json.loads(raw)).encode()
+        assert reserialised != raw
+        verify_github_signature("k", raw, {"X-Hub-Signature-256": sig})
+        with pytest.raises(WebhookSignatureError):
+            verify_github_signature("k", reserialised, {"X-Hub-Signature-256": sig})
+
+    def test_slack_signature_round_trips_and_checks_freshness(self):
+        body = b"token=x&team_id=T1"
+        ts = "1700000000"
+        basis = b"v0:" + ts.encode() + b":" + body
+        sig = "v0=" + hmac.new(b"s3cret", basis, hashlib.sha256).hexdigest()
+        headers = {"X-Slack-Signature": sig, "X-Slack-Request-Timestamp": ts}
+
+        verify_slack_signature("s3cret", body, headers, now=1700000030)
+
+        # Same signature, replayed well outside the window.
+        with pytest.raises(WebhookSignatureError, match="more than"):
+            verify_slack_signature("s3cret", body, headers, now=1700000000 + 3600)
+        # ... and a future-dated timestamp is refused too.
+        with pytest.raises(WebhookSignatureError, match="more than"):
+            verify_slack_signature("s3cret", body, headers, now=1700000000 - 3600)
+
+    def test_an_empty_secret_never_verifies(self):
+        body = b"{}"
+        sig = "sha256=" + hmac.new(b"", body, hashlib.sha256).hexdigest()
+        with pytest.raises(WebhookSignatureError, match="No webhook secret"):
+            verify_github_signature("", body, {"X-Hub-Signature-256": sig})
+
+    def test_headers_are_matched_case_insensitively(self):
+        body = b"{}"
+        sig = "sha256=" + hmac.new(b"k", body, hashlib.sha256).hexdigest()
+        verify_github_signature("k", body, {"x-hub-signature-256": sig})
+        verify_github_signature("k", body, {"X-HUB-SIGNATURE-256": sig})
+
+
+class TestHandleWebhookProvenance:
+    @pytest.fixture(autouse=True)
+    def _never_reached(self, monkeypatch):
+        """Any ADK call at all means the gate let an unverified payload through."""
+        boom = AsyncMock(side_effect=AssertionError("handle_webhook drove a turn"))
+        monkeypatch.setattr(adk.acp, "create_task", boom)
+        monkeypatch.setattr(adk.acp, "send_message", boom)
+        monkeypatch.setattr(adk.acp, "send_event", boom)
+        monkeypatch.setattr(adk.tasks, "update", boom)
+
+    async def test_an_unverified_payload_drives_no_turn(self):
+        """The finding's direct POST: a well-formed body and nothing else."""
+        with pytest.raises(WebhookSignatureError, match="without provenance"):
+            await handle_webhook(agent_name="golden-agent", payload=_pr_payload(), shaper="github_pr")
+
+    async def test_a_forged_signature_drives_no_turn(self):
+        raw = json.dumps(_pr_payload()).encode()
+        with pytest.raises(WebhookSignatureError, match="Invalid"):
+            await handle_webhook(
+                agent_name="golden-agent",
+                payload=_pr_payload(),
+                shaper="github_pr",
+                verify=WebhookVerification(
+                    source="github",
+                    secret="the-real-secret",
+                    body=raw,
+                    headers={"X-Hub-Signature-256": "sha256=" + "a" * 64},
+                ),
+            )
+
+
+class TestSessionBinding:
+    """VULN-3137 criterion 2: naming a conversation requires the secret."""
+
+    def test_an_unverified_caller_cannot_compute_a_verified_tasks_name(self):
+        # Public data: repo name and PR number.
+        peer = "acme/widgets#42"
+        guessed = session_key("golden-agent", "github_pr", peer)
+        real = session_key("golden-agent", "github_pr", peer, secret="the-real-secret")
+        assert guessed != real, "the task name must not be derivable from public data"
+
+    def test_two_installations_watching_one_repo_stay_separate(self):
+        peer = "acme/widgets#42"
+        a = session_key("golden-agent", "github_pr", peer, secret="secret-a")
+        b = session_key("golden-agent", "github_pr", peer, secret="secret-b")
+        assert a != b
+
+    def test_the_same_secret_still_folds_repeat_events(self):
+        peer = "acme/widgets#42"
+        first = session_key("golden-agent", "github_pr", peer, secret="s")
+        second = session_key("golden-agent", "github_pr", peer, secret="s")
+        assert first == second and first.startswith("wh-github_pr-")
