@@ -35,6 +35,7 @@ from agentex.lib.core.tracing.span_queue import shutdown_default_span_queue
 from agentex.lib.core.compat.version_guard import assert_backend_compatible
 from agentex.lib.core.clients.temporal.auth import connect_temporal_client
 from agentex.lib.core.observability.sgp_obs_setup import init_sgp_obs, shutdown_sgp_obs
+from agentex.lib.core.temporal.workers.signal_errors import SignalHandlerErrorInterceptor
 from agentex.lib.core.tracing.tracing_processor_manager import shutdown_sync_tracing_processors
 
 logger = make_logger(__name__)
@@ -184,6 +185,7 @@ class AgentexWorker:
         metrics_use_http: bool = False,
         metrics_temporality_delta: bool = False,
         agent_card: Any | None = None,
+        drop_signals_on_handler_error: bool = True,
     ):
         self.task_queue = task_queue
         self.activity_handles = []
@@ -203,6 +205,11 @@ class AgentexWorker:
         self.payload_codec = payload_codec
         self.data_converter = data_converter
         self.agent_card = agent_card
+        # True installs SignalHandlerErrorInterceptor: a signal whose handler raises an unexpected exception is
+        # logged and dropped, instead of failing the workflow task on every retry and wedging the workflow.
+        # Turning it off (or rolling back to an SDK without it) while workflows that already dropped a signal
+        # are open makes their replay raise again and wedges them; see SignalHandlerErrorInterceptor.
+        self.drop_signals_on_handler_error = drop_signals_on_handler_error
 
     @overload
     async def run(
@@ -245,6 +252,15 @@ class AgentexWorker:
         # Validate interceptors if any are provided
         if self.interceptors:
             _validate_interceptors(self.interceptors)
+        interceptors = list(self.interceptors)
+        if self.drop_signals_on_handler_error and not any(
+            isinstance(interceptor, SignalHandlerErrorInterceptor) for interceptor in interceptors
+        ):
+            # First of the worker's own interceptors, so it wraps the caller's: they still see a signal handler's
+            # exception (and can raise an ApplicationError to fail the workflow on purpose) before it is dropped.
+            # The client's TracingInterceptor is prepended ahead of all of these by Temporal; it records only
+            # FailureErrors on signal spans, and those are re-raised, so traces are unchanged.
+            interceptors.insert(0, SignalHandlerErrorInterceptor())
 
         temporal_client = await get_temporal_client(
             temporal_address=os.environ.get("TEMPORAL_ADDRESS", "localhost:7233"),
@@ -276,7 +292,7 @@ class AgentexWorker:
             build_id=str(uuid.uuid4()),
             debug_mode=debug_enabled,  # Disable deadlock detection in debug mode
             # Temporal inherits client tracing before these business interceptors.
-            interceptors=self.interceptors,
+            interceptors=interceptors,
         )
 
         logger.info(f"Starting workers for task queue: {self.task_queue}")
