@@ -17,6 +17,7 @@ from azure.core.credentials import AccessToken
 logger = logging.getLogger(__name__)
 
 _AUTH_SCOPE_ENV = "TEMPORAL_AUTH_SCOPE"
+_NAMESPACE_ENV = "TEMPORAL_NAMESPACE"
 _REFRESH_MARGIN_SECONDS = 300
 _MIN_REFRESH_DELAY_SECONDS = 30
 _RETRY_DELAY_SECONDS = 30
@@ -85,6 +86,10 @@ _ACTIVE_SESSIONS: set[TemporalTokenSession] = set()
 
 async def connect_temporal_client(connect_options: dict[str, Any]) -> Client:
     """Connect anonymously by default, or with renewable Workload Identity."""
+    namespace = os.environ.get(_NAMESPACE_ENV)
+    if namespace and "namespace" not in connect_options:
+        connect_options = {**connect_options, "namespace": namespace}
+
     scope = os.environ.get(_AUTH_SCOPE_ENV)
     if not scope:
         return await Client.connect(**connect_options)
