@@ -32,7 +32,7 @@ from agentex import AsyncAgentex
 from agentex.types.task import Task
 from agentex.types.agent import Agent
 from agentex.types.event import Event
-from agentex.lib.types.acp import SendEventParams
+from agentex.protocol.acp import SendEventParams
 from agentex.types.data_content import DataContent
 from agentex.types.text_content import TextContent
 from agentex.types.reasoning_content import ReasoningContent

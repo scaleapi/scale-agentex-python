@@ -1,9 +1,10 @@
 """Pytest setup for this tutorial's tests.
 
 ``project.workflow`` reads environment variables when it is imported, so the offline tests need them set and
-this tutorial's ``project`` package importable. Both are arranged here for this tutorial's tests only, and any
+this tutorial's ``project`` package importable. Both are arranged here for this tutorial's tests only. Any
 ``project`` package already imported (another tutorial's, in a session that collects several) is cleared before
-and after them.
+and after them, and so is the SDK's cached ``EnvironmentVariables``, so this tutorial's workflow reads its own
+values.
 """
 
 from __future__ import annotations
@@ -36,6 +37,8 @@ def _tutorial_environment() -> Iterator[None]:
             if not os.environ.get(name):
                 patch.setenv(name, value)
         patch.syspath_prepend(TUTORIAL_DIR)
+        # EnvironmentVariables.refresh() keeps the first values it reads for the whole process.
+        patch.setattr("agentex.lib.environment_variables.refreshed_environment_variables", None)
         _forget_project_modules()
         try:
             yield
