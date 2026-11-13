@@ -46,6 +46,16 @@ _TRACE_TIMEOUT = timedelta(seconds=5)
 _MAX_SPAN_OUTPUT_CHARS = 2000
 
 
+def _result_text(result: Any) -> str:
+    """The failure checks decode a result as JSON, so ``str`` is only the fallback when it cannot be serialized."""
+    if isinstance(result, str):
+        return result
+    try:
+        return json.dumps(result)
+    except (TypeError, ValueError):
+        return str(result)
+
+
 def _get_adk() -> Any:
     """Lazily import the adk facade for workflow-safe tracing.
 
@@ -355,7 +365,7 @@ class TemporalStreamingHooks(LLMMetricsHooks):
         if span is None or not self.trace_id:
             return
         try:
-            span.output = {"result": str(result)[:_MAX_SPAN_OUTPUT_CHARS]}
+            span.output = {"result": _result_text(result)[:_MAX_SPAN_OUTPUT_CHARS]}
             await _get_adk().tracing.end_span(
                 trace_id=self.trace_id,
                 span=span,

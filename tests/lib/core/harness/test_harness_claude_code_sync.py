@@ -51,7 +51,7 @@ from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._claude_code_turn import ClaudeCodeTurn
 
-from ._fakes import FakeTracing
+from ._fakes import FakeTracing, tool_marker
 
 # ---------------------------------------------------------------------------
 # Native claude-code envelope fixtures (copied from the turn + conformance tests)
@@ -242,6 +242,25 @@ class TestSyncYieldSpanDerivation:
         name, output = fake_tracing.ended[0]
         assert name == "Read"
         assert "72F" in str(output)
+
+    async def test_successful_tool_span_is_marked_as_a_tool_call(self) -> None:
+        fake_tracing = FakeTracing()
+        await _run_yield_turn(
+            _tool_then_text_envelopes(),
+            trace_id="trace1",
+            parent_span_id="parent-span",
+            fake_tracing=fake_tracing,
+        )
+        (tool_span,) = fake_tracing.ended_spans
+        assert tool_span.data == tool_marker("Read")
+
+    async def test_failed_tool_span_is_marked_as_a_tool_call(self) -> None:
+        envelopes = _tool_then_text_envelopes()
+        envelopes[1]["message"]["content"][0]["is_error"] = True
+        fake_tracing = FakeTracing()
+        await _run_yield_turn(envelopes, trace_id="trace1", parent_span_id="parent-span", fake_tracing=fake_tracing)
+        (tool_span,) = fake_tracing.ended_spans
+        assert tool_span.data == tool_marker("Read")
 
     async def test_reasoning_span_for_thinking_block(self) -> None:
         """A thinking block opens and closes a reasoning span."""

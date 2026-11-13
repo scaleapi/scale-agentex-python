@@ -74,6 +74,47 @@ spans stay safe to emit. Recognized token keys: `input_tokens`/`prompt_tokens`,
 `output_tokens`/`completion_tokens`, `cached_input_tokens`/`cached_tokens`,
 `reasoning_tokens`; cost is `cost_usd`.
 
+## Failure-Check Attributes
+
+Offline failure checks read attributes the agent declares on its spans. Build them from one
+spec instead of hand-writing keys. The spec validates its values on construction, and each
+attribute lands in span metadata as a flat `sgp.agent.*` key holding a native JSON value (a
+list stays a list and a step budget stays an integer). The output schema is the exception and
+is written as a JSON string, because the span store would spread a schema object into many paths.
+
+```python
+import dataclasses
+
+spec = adk.FailureCheckSpec(
+    required_outputs=["answer"],
+    step_budget=20,
+    verification=[adk.VerificationRule(step="check_answer", verifies="answer")],
+    escalation_channels=["send_email.to"],
+    prompt_version="2026-10-26",
+)
+async with adk.tracing.span(trace_id=task.id, name="agent", data=spec.attributes()) as root:
+    ...
+    # The stop reason is only known at the end.
+    done = dataclasses.replace(spec, stop_reason="completed")
+    if root:
+        root.data = {**(root.data or {}), **done.attributes()}
+```
+
+A span that produces a required output, runs a verification or escalates one carries a single
+attribute, passed as its `data`: `adk.failure_attributes.output_name("answer")`,
+`verification_result("pass")` (or `"fail"`) and `escalates(verify_span.id)`, which takes several
+span ids when one escalation covers several failures. The span
+`adk.tracing.span` yields is `None` when `trace_id` is empty or the span fails to start, so
+guard it before reading `.data` or `.id`.
+
+An OpenTelemetry producer passes any of these dicts through `failure_attributes.otel_attributes`
+before setting them on a span, and names an OpenTelemetry span to `escalates` as
+`failure_attributes.otel_span_id(span)`.
+
+The SGP export adds `__agent_version__` when `AGENT_VERSION` is set, and `__commit_sha__` when the
+process starts with `AGENT_COMMIT_SHA` set to a valid git SHA, so only `prompt_version` is yours to
+declare.
+
 ## When to Use
 - Debugging complex agent behaviors
 - Performance optimization and bottleneck identification

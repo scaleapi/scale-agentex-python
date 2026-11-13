@@ -26,6 +26,10 @@ except Exception:  # ddtrace may be absent in some envs; fall back to stdlib
 
     logger = logging.getLogger(__name__)
 
+_OPERATION_NAME_KEY = "gen_ai.operation.name"
+_TOOL_NAME_KEY = "gen_ai.tool.name"
+_EXECUTE_TOOL = "execute_tool"
+
 
 def _as_span_payload(value: Any, *, key: str) -> Any:
     """Coerce a span input/output payload into a dict.
@@ -92,10 +96,12 @@ class SpanTracer:
                 )
                 if span is not None:
                     if signal.kind == "tool":
+                        data = span.data if isinstance(span.data, dict) else {}
                         refs = resolve_refs(signal.name, signal.input if isinstance(signal.input, dict) else {})
                         if refs:
-                            data = span.data if isinstance(span.data, dict) else {}
-                            span.data = merge_refs_into_data(data, refs)
+                            data = merge_refs_into_data(data, refs)
+                        # A successful call reports no is_error, so the failure checks recognise a tool by these keys.
+                        span.data = {**data, _OPERATION_NAME_KEY: _EXECUTE_TOOL, _TOOL_NAME_KEY: signal.name}
                     self._open[signal.key] = span
             elif isinstance(signal, CloseSpan):
                 span = self._open.pop(signal.key, None)

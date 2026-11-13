@@ -42,6 +42,7 @@ class FakeTrace:
             trace_id="trace-1",
             parent_id=parent_id,
             input=input,
+            data=data,
         )
         self.spans.append(span)
         yield span
@@ -217,3 +218,34 @@ class TestChatCompletionStreamAutoSend:
         )
 
         assert "usage" not in _output_dict(tracer.trace_obj.spans[0])
+
+
+class TestModelIdOnSpans:
+    """The failure checks read ``gen_ai.request.model`` as the model a call was made to."""
+
+    async def test_every_completion_span_names_its_model(self):
+        completion = Completion(
+            choices=[Choice(index=0, message=AssistantMessage(content="Hi"), finish_reason="stop")],
+        )
+        gateway = _stream_gateway([_delta_chunk("Hi", role="assistant")], {})
+        gateway.acompletion = AsyncMock(return_value=completion)
+        service, tracer = _make_service(gateway)
+        model = "openai/gpt-4o-mini"
+
+        await service.chat_completion(llm_config=LLMConfig(model=model, messages=[]), trace_id="trace-1")
+        await service.chat_completion_auto_send(
+            task_id="task-1", llm_config=LLMConfig(model=model, messages=[]), trace_id="trace-1"
+        )
+        async for _ in service.chat_completion_stream(
+            llm_config=LLMConfig(model=model, messages=[], stream=True), trace_id="trace-1"
+        ):
+            pass
+        await service.chat_completion_stream_auto_send(
+            task_id="task-1", llm_config=LLMConfig(model=model, messages=[], stream=True), trace_id="trace-1"
+        )
+
+        spans = tracer.trace_obj.spans
+        assert len(spans) == 4
+        for span in spans:
+            assert isinstance(span.data, dict)
+            assert span.data["gen_ai.request.model"] == model
