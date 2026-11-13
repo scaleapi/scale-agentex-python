@@ -47,9 +47,13 @@ class RetryCredential:
         self.closed = True
 
 
+@pytest.fixture(autouse=True)
+def _clear_temporal_namespace(monkeypatch):
+    monkeypatch.delenv("TEMPORAL_NAMESPACE", raising=False)
+
+
 async def test_connect_without_scope_preserves_legacy_path(monkeypatch):
     monkeypatch.delenv("TEMPORAL_AUTH_SCOPE", raising=False)
-    monkeypatch.delenv("TEMPORAL_NAMESPACE", raising=False)
     client = MagicMock()
 
     with patch("agentex.lib.core.clients.temporal.auth.WorkloadIdentityCredential") as credential:
