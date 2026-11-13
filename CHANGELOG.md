@@ -12,6 +12,13 @@
 
 * **tracing:** emit OTel metrics for async span queue depth, batch drain, and SGP export success/failure (HTTP status labels). Disable SDK-side recording with ``AGENTEX_TRACING_METRICS=0``.
 
+## [0.28.8](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.28.7...agentex-client-v0.28.8) (2026-11-13)
+
+
+### Bug Fixes
+
+* **temporal:** connect to the namespace in TEMPORAL_NAMESPACE ([#570](https://github.com/scaleapi/scale-agentex-python/issues/570)) ([d843a1f](https://github.com/scaleapi/scale-agentex-python/commit/d843a1fe47b3c471a5a4ea5ce1aa4d719a44704f))
+
 ## [0.28.7](https://github.com/scaleapi/scale-agentex-python/compare/agentex-client-v0.28.6...agentex-client-v0.28.7) (2026-11-09)
 
 
