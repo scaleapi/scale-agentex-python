@@ -47,6 +47,11 @@ class RetryCredential:
         self.closed = True
 
 
+@pytest.fixture(autouse=True)
+def _clear_temporal_namespace(monkeypatch):
+    monkeypatch.delenv("TEMPORAL_NAMESPACE", raising=False)
+
+
 async def test_connect_without_scope_preserves_legacy_path(monkeypatch):
     monkeypatch.delenv("TEMPORAL_AUTH_SCOPE", raising=False)
     client = MagicMock()
@@ -61,6 +66,42 @@ async def test_connect_without_scope_preserves_legacy_path(monkeypatch):
     assert result is client
     credential.assert_not_called()
     connect.assert_awaited_once_with(target_host="temporal:7233")
+
+
+@pytest.mark.parametrize("scope", [None, _SCOPE])
+async def test_connect_uses_namespace_from_environment(monkeypatch, scope):
+    if scope is None:
+        monkeypatch.delenv("TEMPORAL_AUTH_SCOPE", raising=False)
+    else:
+        monkeypatch.setenv("TEMPORAL_AUTH_SCOPE", scope)
+    monkeypatch.setenv("TEMPORAL_NAMESPACE", "tenant-a")
+
+    with patch(
+        "agentex.lib.core.clients.temporal.auth.WorkloadIdentityCredential",
+        return_value=FakeCredential(AccessToken(_INITIAL, 2_000)),
+    ):
+        with patch(
+            "agentex.lib.core.clients.temporal.auth.Client.connect",
+            new=AsyncMock(return_value=MagicMock()),
+        ) as connect:
+            with patch("agentex.lib.core.clients.temporal.auth.time.time", return_value=1_000):
+                with patch.object(TemporalTokenSession, "start"):
+                    await connect_temporal_client({"target_host": "temporal:7233"})
+
+    assert connect.await_args.kwargs["namespace"] == "tenant-a"
+
+
+async def test_connect_keeps_explicit_namespace(monkeypatch):
+    monkeypatch.delenv("TEMPORAL_AUTH_SCOPE", raising=False)
+    monkeypatch.setenv("TEMPORAL_NAMESPACE", "tenant-a")
+
+    with patch(
+        "agentex.lib.core.clients.temporal.auth.Client.connect",
+        new=AsyncMock(return_value=MagicMock()),
+    ) as connect:
+        await connect_temporal_client({"target_host": "temporal:7233", "namespace": "tenant-b"})
+
+    connect.assert_awaited_once_with(target_host="temporal:7233", namespace="tenant-b")
 
 
 async def test_connect_initial_token_failure_blocks_startup(monkeypatch):
