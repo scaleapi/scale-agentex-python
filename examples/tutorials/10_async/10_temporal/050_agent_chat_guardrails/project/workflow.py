@@ -359,21 +359,35 @@ class At050AgentChatGuardrailsWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        if not params.event.content:
+        # Skip events this agent can't handle instead of raising: an exception here
+        # fails the workflow task, and Temporal replays the signal forever, wedging the
+        # task. Content can be missing, a non-text type, or not written by the user.
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)",
+                params.task.id,
+                getattr(content, "type", None),
+            )
             return
-        if params.event.content.type != "text":
-            raise ValueError(f"Expected text message, got {params.event.content.type}")
 
-        if params.event.content.author != "user":
-            raise ValueError(f"Expected user message, got {params.event.content.author}")
+        if content.author != "user":
+            logger.warning(
+                "Ignoring non-user event for task %s (author=%s)",
+                params.task.id,
+                content.author,
+            )
+            return
 
-        if self._state is None:
-            raise ValueError("State is not initialized")
+        # A signal can arrive before on_task_create has initialised the state (e.g.
+        # with signal-with-start): wait for it rather than drop the user's message.
+        while self._state is None:
+            await workflow.wait_condition(lambda: self._state is not None)
 
         # Increment the turn number
         self._state.turn_number += 1
         # Add the new user message to the message history
-        self._state.input_list.append({"role": "user", "content": params.event.content.content})
+        self._state.input_list.append({"role": "user", "content": content.content})
 
         async with adk.tracing.span(
             trace_id=params.task.id,
@@ -386,7 +400,7 @@ class At050AgentChatGuardrailsWorkflow(BaseWorkflow):
             await adk.messages.create(
                 task_id=params.task.id,
                 trace_id=params.task.id,
-                content=params.event.content,
+                content=content,
                 parent_span_id=span.id if span else None,
             )
 

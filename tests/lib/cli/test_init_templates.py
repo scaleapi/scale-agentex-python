@@ -5,7 +5,8 @@ These render the Jinja templates the way the CLI does and assert that:
 - every template type's declared project files exist and render,
 - rendered Python parses (catches `.j2` syntax/templating regressions),
 - the agent-specific context (names, workflow class) is substituted in,
-- the Temporal + LangGraph template is fully wired (enum, file map, root files).
+- the Temporal + LangGraph template is fully wired (enum, file map, root files),
+- the base Temporal template's signal handler never raises on caller input.
 
 The Temporal + LangGraph template is the focus, but the parametrized smoke
 test covers every template so a broken `.j2` anywhere is caught early.
@@ -14,15 +15,29 @@ test covers every template so a broken `.j2` anywhere is caught early.
 from __future__ import annotations
 
 import ast
+import importlib.util
+from typing import Any
 from pathlib import Path
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from agentex.lib import environment_variables
+from agentex.types.task import Task
+from agentex.types.agent import Agent
+from agentex.types.event import Event
+from agentex.protocol.acp import SendEventParams
+from agentex.types.data_content import DataContent
+from agentex.types.text_content import TextContent
 from agentex.lib.cli.commands.init import (
     TemplateType,
     get_project_context,
     create_project_structure,
 )
+from agentex.types.reasoning_content import ReasoningContent
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_response_content import ToolResponseContent
 
 
 def _context(template_type: TemplateType, use_uv: bool = True) -> dict:
@@ -137,3 +152,83 @@ class TestTemporalLangGraphTemplate:
         requirements = (project_dir / "requirements.txt").read_text()
         assert "temporalio[langgraph]>=1.27.0" in requirements
         assert "langchain-openai" in requirements
+
+
+def _send_event_params(content: Any) -> SendEventParams:
+    """Real ``SendEventParams``, as the ACP delivers an ``event/send`` to the workflow signal."""
+    now = datetime.now(timezone.utc)
+    return SendEventParams(
+        agent=Agent(id="agent-1", acp_type="async", name="my-agent", description="", created_at=now, updated_at=now),
+        task=Task(id="task-1"),
+        event=Event(id="event-1", agent_id="agent-1", task_id="task-1", sequence_id=1, content=content),
+    )
+
+
+class TestTemporalTemplateSignalHandler:
+    """The base Temporal template's signal handler must never raise on caller input.
+
+    An exception raised from a signal handler fails the workflow task, and Temporal
+    retries it (replaying the same signal) forever. These tests load the rendered
+    ``workflow.py`` and call the handler directly, with ``adk.messages`` mocked.
+    """
+
+    @staticmethod
+    def _rendered_workflow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Any, Any]:
+        """Return a workflow instance from the rendered template, and the ``adk.messages`` it uses."""
+        project_dir = _render_project(tmp_path, TemplateType.TEMPORAL)
+        # The rendered module reads these at import time through a process-wide cache,
+        # reset here; monkeypatch restores the cache and the variables afterwards.
+        monkeypatch.setenv("AGENT_NAME", "my-agent")
+        monkeypatch.setenv("ACP_URL", "http://localhost:8000")
+        monkeypatch.setenv("WORKFLOW_NAME", "my-agent")
+        monkeypatch.setattr(environment_variables, "refreshed_environment_variables", None)
+
+        spec = importlib.util.spec_from_file_location(
+            "rendered_temporal_workflow", project_dir / "project" / "workflow.py"
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        # Build the instance without Temporal: skip __init__ and set what it would set.
+        wf = module.MyAgentWorkflow.__new__(module.MyAgentWorkflow)
+        wf.display_name = "my-agent"
+        wf._complete_task = False
+        return wf, module.adk.messages
+
+    async def test_event_without_content_is_ignored(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        wf, messages = self._rendered_workflow(tmp_path, monkeypatch)
+        with patch.object(messages, "create", new=AsyncMock()) as create:
+            await wf.on_task_event_send(_send_event_params(None))
+
+        create.assert_not_awaited()
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            pytest.param(TextContent(author="user", content="Hello!"), id="text"),
+            pytest.param(DataContent(author="user", data={}), id="data"),
+            pytest.param(ReasoningContent(author="user", summary=["thinking"], type="reasoning"), id="reasoning"),
+            pytest.param(
+                ToolRequestContent(author="user", name="get_weather", tool_call_id="call-1", arguments={}),
+                id="tool-request",
+            ),
+            pytest.param(
+                ToolResponseContent(author="user", name="get_weather", tool_call_id="call-1", content={"k": "v"}),
+                id="tool-response-dict",
+            ),
+            pytest.param(
+                ToolResponseContent(author="user", name="get_weather", tool_call_id="call-1", content=[1, 2]),
+                id="tool-response-list",
+            ),
+        ],
+    )
+    async def test_event_is_echoed_then_answered(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: Any):
+        wf, messages = self._rendered_workflow(tmp_path, monkeypatch)
+        with patch.object(messages, "create", new=AsyncMock()) as create:
+            await wf.on_task_event_send(_send_event_params(content))
+
+        assert create.await_count == 2
+        echo, reply = create.await_args_list
+        assert echo.kwargs == {"task_id": "task-1", "content": content}
+        assert reply.kwargs["content"].author == "agent"

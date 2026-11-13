@@ -127,10 +127,22 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
+        # Skip events this agent can't handle instead of raising: an exception here fails
+        # the workflow task, and Temporal replays the signal forever, wedging the task.
+        # Content can be missing or a non-text type (data, tool request/response, ...).
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
+            return
+
         logger.info(f"Received task message instruction: {params}")
 
-        if self._state is None:
-            raise ValueError("State is not initialized")
+        # A signal can arrive before on_task_create has initialised state (e.g. with
+        # signal-with-start): wait for it rather than raising.
+        while self._state is None:
+            await workflow.wait_condition(lambda: self._state is not None)
 
         # Increment turn number for tracing
         self._state.turn_number += 1
@@ -139,11 +151,11 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
         self._trace_id = params.task.id
 
         # Add the user message to conversation history
-        self._state.input_list.append({"role": "user", "content": params.event.content.content})
+        self._state.input_list.append({"role": "user", "content": content.content})
 
         # Echo back the client's message to show it in the UI. This is not done by default
         # so the agent developer has full control over what is shown to the user.
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        await adk.messages.create(task_id=params.task.id, content=content)
 
         # ============================================================================
         # OpenAI Agents SDK + Temporal Integration: Two Patterns for Tool Creation
@@ -272,7 +284,8 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
                         self._state.input_list.append(msg)
 
             # Set span output for tracing - include full state
-            span.output = self._state.model_dump()
+            if span:
+                span.output = self._state.model_dump()
 
         # ============================================================================
         # PATTERN 2: Multiple Activities Within Tools
@@ -309,7 +322,7 @@ class At070OpenAiAgentsSdkToolsWorkflow(BaseWorkflow):
         # # Run the agent - when it calls move_money tool, it will create TWO activities:
         # # 1. withdraw_money activity
         # # 2. deposit_money activity (only after withdraw succeeds)
-        # result = await Runner.run(money_mover_agent, params.event.content.content)
+        # result = await Runner.run(money_mover_agent, content.content)
 
         # ============================================================================
         # PATTERN COMPARISON SUMMARY:

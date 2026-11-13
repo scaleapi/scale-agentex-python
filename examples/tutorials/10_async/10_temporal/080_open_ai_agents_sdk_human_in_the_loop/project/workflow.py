@@ -114,10 +114,22 @@ class At080OpenAiAgentsSdkHumanInTheLoopWorkflow(BaseWorkflow):
         When the agent needs human approval, it calls wait_for_confirmation which spawns
         a child workflow that waits for external signals before continuing.
         """
+        # Skip events this agent can't handle instead of raising: an exception here fails
+        # the workflow task, and Temporal replays the signal forever, wedging the task.
+        # Content can be missing or a non-text type (data, tool request/response, ...).
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
+            return
+
         logger.info(f"Received task message instruction: {params}")
 
-        if self._state is None:
-            raise ValueError("State is not initialized")
+        # A signal can arrive before on_task_create has initialised state (e.g. with
+        # signal-with-start): wait for it rather than raising.
+        while self._state is None:
+            await workflow.wait_condition(lambda: self._state is not None)
 
         # Increment turn number for tracing
         self._state.turn_number += 1
@@ -126,10 +138,10 @@ class At080OpenAiAgentsSdkHumanInTheLoopWorkflow(BaseWorkflow):
         self._trace_id = params.task.id
 
         # Add the user message to conversation history
-        self._state.input_list.append({"role": "user", "content": params.event.content.content})
+        self._state.input_list.append({"role": "user", "content": content.content})
 
         # Echo user message back to UI
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        await adk.messages.create(task_id=params.task.id, content=content)
 
         # ============================================================================
         # STREAMING SETUP: Store task_id for the Interceptor
@@ -206,7 +218,8 @@ class At080OpenAiAgentsSdkHumanInTheLoopWorkflow(BaseWorkflow):
                         self._state.input_list.append(msg)
 
             # Set span output for tracing - include full state
-            span.output = self._state.model_dump()
+            if span:
+                span.output = self._state.model_dump()
 
     @workflow.run
     async def on_task_create(self, params: CreateTaskParams) -> str:

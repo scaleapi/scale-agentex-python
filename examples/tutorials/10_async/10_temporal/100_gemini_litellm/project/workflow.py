@@ -112,10 +112,21 @@ class At100GeminiLitellmWorkflow(BaseWorkflow):
         - The agent interface remains identical to OpenAI examples
         - Temporal durability works the same way regardless of model provider
         """
+        # Validate before any side effect, and return instead of raising: an
+        # exception here fails the workflow task, and Temporal retries it forever.
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
+            return
+
         logger.info(f"Received task message instruction: {params}")
 
-        if self._state is None:
-            raise ValueError("State is not initialized")
+        # A signal can be delivered before on_task_create initialises the state
+        # (e.g. with signal-with-start), so wait for it rather than drop the message.
+        while self._state is None:
+            await workflow.wait_condition(lambda: self._state is not None)
 
         # Increment turn number for tracing
         self._state.turn_number += 1
@@ -124,12 +135,12 @@ class At100GeminiLitellmWorkflow(BaseWorkflow):
         self._trace_id = params.task.id
 
         # Add the user message to conversation history
-        self._state.input_list.append({"role": "user", "content": params.event.content.content})
+        self._state.input_list.append({"role": "user", "content": content.content})
 
         # ============================================================================
         # STEP 1: Echo User Message
         # ============================================================================
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        await adk.messages.create(task_id=params.task.id, content=content)
 
         # ============================================================================
         # STEP 2: Wrap execution in tracing span
@@ -182,7 +193,8 @@ class At100GeminiLitellmWorkflow(BaseWorkflow):
                         self._state.input_list.append(msg)
 
             # Set span output for tracing
-            span.output = self._state.model_dump()
+            if span:
+                span.output = self._state.model_dump()
 
             # Send the response to the user
             await adk.messages.create(

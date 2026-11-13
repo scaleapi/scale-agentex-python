@@ -16,6 +16,7 @@ from project.custom_activites import (
     CompleteWorkflowActivityParams,
 )
 from agentex.lib.utils.logging import make_logger
+from agentex.types.data_content import DataContent
 from agentex.types.text_content import TextContent
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.lib.core.temporal.types.workflow import SignalName
@@ -54,26 +55,35 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
         self._incoming_queue: asyncio.Queue[Any] = asyncio.Queue()
         self._processing_tasks: List[asyncio.Task[Any]] = []
         self._batch_size = BATCH_SIZE
-        self._state: StateModel
+        # None until on_task_create runs: a signal can be handled before that (e.g. with
+        # signal-with-start), so the handler below must not assume the state exists.
+        self._state: StateModel | None = None
 
 
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
-        if params.event.content is None:
+        # Skip events this agent can't handle instead of raising: an exception here fails
+        # the workflow task, and Temporal replays the signal forever, wedging the task.
+        # Text events are queued for batch processing; data events control the queue.
+        content = params.event.content
+        if not isinstance(content, (TextContent, DataContent)):
+            logger.warning(
+                "Ignoring unsupported event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
             return
         
-        if params.event.content.type == "text":
+        if isinstance(content, TextContent):
             if self._incoming_queue.qsize() >= MAX_QUEUE_DEPTH:
                 logger.warning(f"Queue is at max depth of {MAX_QUEUE_DEPTH}. Dropping event.")
                 if self._state:
                     self._state.total_events_dropped += 1
             else:
-                await self._incoming_queue.put(params.event.content)
+                await self._incoming_queue.put(content)
             return
 
-        elif params.event.content.type == "data":
-            received_data = params.event.content.data
+        else:  # DataContent: controls the queue
+            received_data = content.data
             try:
                 received_data = IncomingEventData.model_validate(received_data)
             except Exception as e:
@@ -87,8 +97,6 @@ class At030CustomActivitiesWorkflow(BaseWorkflow):
                 await BatchProcessingUtils.handle_task_cancellation(self._processing_tasks, params.task.id)
             else:
                 logger.info(f"Received IncomingEventData: {received_data} with no known action.")
-        else:
-            logger.info(f"Received event: {params.event.content} with no action.")
         
 
     @workflow.run

@@ -81,24 +81,33 @@ class HarnessPydanticAiWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """Handle a new user message: echo it, then run the agent durably."""
+        # Validate before any side effect, and return instead of raising: an
+        # exception here fails the workflow task, and Temporal retries it forever.
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
+            return
+
         logger.info(f"Received task event: {params.task.id}")
         self._turn_number += 1
 
         # Echo the user's message so it shows up in the UI as a chat bubble.
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        await adk.messages.create(task_id=params.task.id, content=content)
 
         async with adk.tracing.span(
             trace_id=params.task.id,
             task_id=params.task.id,
             name=f"Turn {self._turn_number}",
-            input={"message": params.event.content.content},
+            input={"message": content.content},
         ) as span:
             # temporal_agent.run() schedules a model activity, per-tool
             # activities, and the event_stream_handler activity (which pushes
             # deltas through the unified surface). Passing ``message_history``
             # makes the run remember prior turns.
             result = await temporal_agent.run(
-                params.event.content.content,
+                content.content,
                 message_history=self._message_history,
                 deps=TaskDeps(
                     task_id=params.task.id,

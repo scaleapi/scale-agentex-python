@@ -19,6 +19,9 @@ To run these tests:
 3. Ensure OPENAI_API_KEY is set in the environment
 4. Run: pytest test_agent.py -v
 
+The workflow's signal handler is also unit-tested offline (TestOfflineSignalHandler);
+those tests need no running agent, Temporal, network or API key.
+
 Configuration:
 - AGENTEX_API_BASE_URL: Base URL for the AgentEx server (default: http://localhost:5003)
 - AGENT_NAME: Name of the agent to test (default: at010-agent-chat)
@@ -27,6 +30,11 @@ Configuration:
 import os
 import uuid
 import asyncio
+from types import SimpleNamespace
+from typing import Any
+from datetime import datetime, timezone
+from contextlib import contextmanager
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -37,9 +45,17 @@ from test_utils.async_utils import (
 
 from agentex import AsyncAgentex
 from agentex.types import TaskMessage, TextContent
+from agentex.types.task import Task
+from agentex.types.agent import Agent
+from agentex.types.event import Event
+from agentex.lib.types.acp import SendEventParams
+from agentex.types.data_content import DataContent
 from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
 from agentex.types.agent_rpc_result import StreamTaskMessageDone, StreamTaskMessageFull
+from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.text_content_param import TextContentParam
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_response_content import ToolResponseContent
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -271,6 +287,142 @@ class TestStreamingEvents:
 
         assert user_message_found, "User message not found in stream"
         assert agent_response_found, "Agent response not found in stream"
+
+
+# ---------------------------------------------------------------------------
+# Offline signal-handler tests (no running agent, Temporal, network or API key)
+# ---------------------------------------------------------------------------
+
+TASK_ID = "task-offline-1"
+USER_TEXT = TextContent(author="user", content="What is 2 + 2?")
+
+
+def _send_event_params(content: Any) -> SendEventParams:
+    """Real ``SendEventParams``, as the ACP delivers an ``event/send`` to the workflow signal."""
+    now = datetime.now(timezone.utc)
+    return SendEventParams(
+        agent=Agent(id="agent-1", acp_type="async", name=AGENT_NAME, description="", created_at=now, updated_at=now),
+        task=Task(id=TASK_ID),
+        event=Event(id="event-1", agent_id="agent-1", task_id=TASK_ID, sequence_id=1, content=content),
+    )
+
+
+# Event content a caller can send that this handler must not process: Event.content is
+# optional, only TextContent carries text, and the agent only answers user messages.
+IGNORED_CONTENTS = [
+    pytest.param(None, id="no-content"),
+    pytest.param(DataContent(author="user", data={}), id="data"),
+    pytest.param(ReasoningContent(author="user", summary=["thinking"], type="reasoning"), id="reasoning"),
+    pytest.param(
+        ToolRequestContent(author="user", name="calculator", tool_call_id="call-1", arguments={"a": 1}),
+        id="tool-request",
+    ),
+    pytest.param(
+        ToolResponseContent(author="user", name="calculator", tool_call_id="call-1", content={"k": "v"}),
+        id="tool-response-dict",
+    ),
+    pytest.param(
+        ToolResponseContent(author="user", name="calculator", tool_call_id="call-1", content=[1, 2]),
+        id="tool-response-list",
+    ),
+    pytest.param(TextContent(author="agent", content="I am not the user"), id="agent-text"),
+]
+
+
+class _FakeSpan:
+    id = "span-offline-1"
+    output: Any = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc_info):
+        return False
+
+
+@contextmanager
+def _mock_adk():
+    """Mock the ``adk`` calls the handler makes, so nothing leaves the process."""
+    run_result = SimpleNamespace(
+        final_input_list=[
+            {"role": "user", "content": USER_TEXT.content},
+            {"role": "assistant", "content": "4"},
+        ]
+    )
+    with patch("project.workflow.adk.messages.create", new=AsyncMock()) as create, patch(
+        "project.workflow.adk.tracing.span", return_value=_FakeSpan()
+    ) as span, patch(
+        "project.workflow.adk.providers.openai.run_agent_streamed_auto_send",
+        new=AsyncMock(return_value=run_result),
+    ) as run_agent:
+        yield create, span, run_agent
+
+
+class TestOfflineSignalHandler:
+    """Unit tests for ``on_task_event_send``, called directly with real ``SendEventParams``."""
+
+    @staticmethod
+    def _workflow():
+        from project.workflow import StateModel, At010AgentChatWorkflow
+
+        # Build the instance without Temporal: skip __init__ and set what it would set,
+        # plus the state on_task_create initialises.
+        wf = At010AgentChatWorkflow.__new__(At010AgentChatWorkflow)
+        wf.display_name = AGENT_NAME
+        wf._complete_task = False
+        wf._state = StateModel(input_list=[], turn_number=0)
+        return wf
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("content", IGNORED_CONTENTS)
+    async def test_unprocessable_event_is_ignored(self, content):
+        """Return without raising (that would wedge the task) and without side effects."""
+        with _mock_adk() as (create, span, run_agent):
+            wf = self._workflow()
+            await wf.on_task_event_send(_send_event_params(content))
+
+        create.assert_not_awaited()
+        span.assert_not_called()
+        run_agent.assert_not_awaited()
+        assert wf._state.turn_number == 0
+        assert wf._state.input_list == []
+
+    @pytest.mark.asyncio
+    async def test_user_text_event_runs_a_turn(self):
+        """A user text event is echoed, added to the history and answered by the agent."""
+        with _mock_adk() as (create, span, run_agent):
+            wf = self._workflow()
+            await wf.on_task_event_send(_send_event_params(USER_TEXT))
+
+        assert wf._state.turn_number == 1
+        span.assert_called_once()
+        # The first message is the echo of the user's own message.
+        assert create.await_args_list[0].kwargs["content"] == USER_TEXT
+        run_agent.assert_awaited_once()
+        assert run_agent.await_args.kwargs["input_list"] == [{"role": "user", "content": USER_TEXT.content}]
+        assert wf._state.input_list == run_agent.return_value.final_input_list
+
+    @pytest.mark.asyncio
+    async def test_event_before_state_is_initialised_waits_for_it(self):
+        """An event handled before on_task_create has run waits for the state, not raises."""
+        from project.workflow import StateModel
+
+        wf = self._workflow()
+        wf._state = None
+
+        async def _wait_condition(condition):
+            assert not condition()
+            wf._state = StateModel(input_list=[], turn_number=0)  # on_task_create runs
+            assert condition()
+
+        with _mock_adk() as (create, _span, _run_agent), patch(
+            "project.workflow.workflow.wait_condition", new=AsyncMock(side_effect=_wait_condition)
+        ) as wait_condition:
+            await wf.on_task_event_send(_send_event_params(USER_TEXT))
+
+        wait_condition.assert_awaited_once()
+        assert wf._state.turn_number == 1
+        assert create.await_args_list[0].kwargs["content"] == USER_TEXT
 
 
 if __name__ == "__main__":

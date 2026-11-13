@@ -75,12 +75,21 @@ class At140ClaudeCodeWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """Handle a user message: spawn Claude Code and push events to the task stream."""
+        # Validate before any side effect, and return instead of raising: an
+        # exception here fails the workflow task, and Temporal retries it forever.
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
+            return
+
         self._turn_number += 1
         task_id = params.task.id
-        prompt = params.event.content.content
+        prompt = content.content
         logger.info("Turn %d for task %s", self._turn_number, task_id)
 
-        await adk.messages.create(task_id=task_id, content=params.event.content)
+        await adk.messages.create(task_id=task_id, content=content)
 
         async with adk.tracing.span(
             trace_id=task_id,

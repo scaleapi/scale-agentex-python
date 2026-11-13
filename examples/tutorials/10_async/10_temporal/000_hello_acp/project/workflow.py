@@ -33,10 +33,18 @@ class At000HelloAcpWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     @override
     async def on_task_event_send(self, params: SendEventParams) -> None:
+        # Skip events this agent can't handle instead of raising: an exception here fails
+        # the workflow task, and Temporal replays the signal forever, wedging the task.
+        # Any content type can be echoed back, but an event can arrive with no content.
+        content = params.event.content
+        if content is None:
+            logger.warning("Ignoring event with no content for task %s", params.task.id)
+            return
+
         logger.info(f"Received task message instruction: {params}")
 
         # 2. Echo back the client's message to show it in the UI. This is not done by default so the agent developer has full control over what is shown to the user.
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        await adk.messages.create(task_id=params.task.id, content=content)
 
         # 3. Send a simple response message.
         # In future tutorials, this is where we'll add more sophisticated response logic.

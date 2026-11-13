@@ -129,21 +129,27 @@ class ProcurementAgentWorkflow(BaseWorkflow):
         First event: Triggers the initial agent workflow execution.
         Subsequent events: Feed the wait_for_human tool's human_queue.
         """
-        if self._state is None:
-            raise ValueError("State is not initialized")
-
-        if params.event.content is None:
+        # Skip events this agent can't handle instead of raising: an exception here fails
+        # the workflow task, and Temporal replays the signal forever, wedging the task.
+        # Any content type can be displayed, but an event can arrive with no content.
+        content = params.event.content
+        if content is None:
             workflow.logger.warning("Received event with no content")
             return
 
+        # A signal can arrive before on_task_create has initialised state (e.g. with
+        # signal-with-start): wait for it rather than drop the user's message.
+        while self._state is None:
+            await workflow.wait_condition(lambda: self._state is not None)
+
         # Display the user's message in the UI
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        await adk.messages.create(task_id=params.task.id, content=content)
 
         # After the first event, all subsequent events are human responses to wait_for_human
         if self._workflow_started:
             # Extract text content and put it in the human_queue for wait_for_human tool
-            if isinstance(params.event.content, TextContent):
-                await self.human_queue.put(params.event.content.content)
+            if isinstance(content, TextContent):
+                await self.human_queue.put(content.content)
 
     @workflow.run
     @override
@@ -386,38 +392,44 @@ class ProcurementAgentWorkflow(BaseWorkflow):
         Receives event strings from external systems with validation.
         Events should be JSON strings with event_type and required fields.
         Example: {"event_type":"Submittal_Approved","item":"Steel Beams"}
+
+        Invalid events are logged and dropped, never raised: an exception in a signal
+        handler fails the workflow task, and Temporal replays the signal forever. The
+        sender never sees the error either way, since signals do not return results.
         """
         # Validate event is not None or empty
         if not event:
             logger.error("Received empty or None event")
-            raise ValueError("Event cannot be empty or None")
+            return
 
         # Validate event is a string
         if not isinstance(event, str):
             logger.error(f"Event must be string, got {type(event)}")
-            raise ValueError(f"Event must be a string, received {type(event).__name__}")
+            return
 
         # Validate event length (prevent DoS)
         if len(event) > 50000:  # 50KB limit
             logger.error(f"Event too large: {len(event)} characters")
-            raise ValueError(f"Event exceeds maximum size (50KB)")
+            return
 
-        # Validate event is valid JSON
+        # Validate event is valid JSON. Catch ValueError, not just its subclass JSONDecodeError: an integer
+        # literal longer than Python's int digit limit raises a plain ValueError, and deeply nested input
+        # raises RecursionError.
         try:
             event_data = json.loads(event)
-        except json.JSONDecodeError as e:
+        except (ValueError, RecursionError) as e:
             logger.error(f"Event is not valid JSON: {e}")
-            raise ValueError(f"Event must be valid JSON: {e}") from e
+            return
 
         # Validate event has required structure
         if not isinstance(event_data, dict):
             logger.error(f"Event JSON must be an object, got {type(event_data)}")
-            raise ValueError("Event must be a JSON object")
+            return
 
         # Validate event_type field exists
         if "event_type" not in event_data:
             logger.error("Event missing 'event_type' field")
-            raise ValueError("Event must contain 'event_type' field")
+            return
 
         # Validate event_type is one of the allowed types
         event_type_str = event_data["event_type"]
@@ -425,10 +437,7 @@ class ProcurementAgentWorkflow(BaseWorkflow):
 
         if event_type_str not in valid_event_types:
             logger.error(f"Invalid event_type: {event_type_str}. Valid types: {valid_event_types}")
-            raise ValueError(
-                f"Invalid event_type '{event_type_str}'. "
-                f"Must be one of: {', '.join(valid_event_types)}"
-            )
+            return
 
         # Validate event structure based on type using Pydantic models
         try:
@@ -448,7 +457,7 @@ class ProcurementAgentWorkflow(BaseWorkflow):
 
         except Exception as e:
             logger.error(f"Event validation failed for {event_type_str}: {e}")
-            raise ValueError(f"Invalid event structure for {event_type_str}: {e}") from e
+            return
 
         logger.info(f"Validated event type: {event_type_str}")
         await self.event_queue.put(event)

@@ -5,6 +5,9 @@ This test suite demonstrates how to test the main AgentEx API functions:
 - Non-streaming event sending and polling
 - Streaming event sending
 
+It also unit-tests the workflow's signal handler offline (TestOfflineSignalHandler),
+which needs no running agent, Temporal or network.
+
 To run these tests:
 1. Make sure the agent is running (via docker-compose or `agentex agents run`)
 2. Set the AGENTEX_API_BASE_URL environment variable if not using default
@@ -19,6 +22,8 @@ import os
 import uuid
 import asyncio
 from typing import Any
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -30,8 +35,17 @@ from test_utils.async_utils import (
 
 from agentex import AsyncAgentex
 from agentex.types import TaskMessage
+from agentex.types.task import Task
+from agentex.types.agent import Agent
+from agentex.types.event import Event
+from agentex.lib.types.acp import SendEventParams
+from agentex.types.data_content import DataContent
+from agentex.types.text_content import TextContent
 from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
+from agentex.types.reasoning_content import ReasoningContent
 from agentex.types.text_content_param import TextContentParam
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_response_content import ToolResponseContent
 
 # Configuration from environment variables
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
@@ -184,6 +198,88 @@ class TestStreamingEvents:
 
         assert user_echo_found, "User message echo not found in stream"
         assert agent_response_found, "Agent response not found in stream"
+
+
+# ---------------------------------------------------------------------------
+# Offline signal-handler tests (no running agent, Temporal or network needed)
+# ---------------------------------------------------------------------------
+
+TASK_ID = "task-offline-1"
+
+
+def _send_event_params(content: Any) -> SendEventParams:
+    """Real ``SendEventParams``, as the ACP delivers an ``event/send`` to the workflow signal."""
+    now = datetime.now(timezone.utc)
+    return SendEventParams(
+        agent=Agent(id="agent-1", acp_type="async", name=AGENT_NAME, description="", created_at=now, updated_at=now),
+        task=Task(id=TASK_ID),
+        event=Event(id="event-1", agent_id="agent-1", task_id=TASK_ID, sequence_id=1, content=content),
+    )
+
+
+# Every content type a caller can send. This handler only echoes the content back, so
+# all of them are valid input: the one thing it cannot echo is an event with no content.
+ECHOED_CONTENTS = [
+    pytest.param(TextContent(author="user", content="Hello!"), id="text"),
+    pytest.param(DataContent(author="user", data={}), id="data"),
+    pytest.param(ReasoningContent(author="user", summary=["thinking"], type="reasoning"), id="reasoning"),
+    pytest.param(
+        ToolRequestContent(author="user", name="get_weather", tool_call_id="call-1", arguments={"city": "Paris"}),
+        id="tool-request",
+    ),
+    pytest.param(
+        ToolResponseContent(author="user", name="get_weather", tool_call_id="call-1", content={"k": "v"}),
+        id="tool-response-dict",
+    ),
+    pytest.param(
+        ToolResponseContent(author="user", name="get_weather", tool_call_id="call-1", content=[1, 2]),
+        id="tool-response-list",
+    ),
+]
+
+
+class TestOfflineSignalHandler:
+    """Unit tests for ``on_task_event_send`` that need no running agent, Temporal or network.
+
+    The handler is called directly with real ``SendEventParams``; ``adk.messages.create``
+    is mocked, so nothing leaves the process.
+    """
+
+    @staticmethod
+    def _workflow():
+        from project.workflow import At000HelloAcpWorkflow
+
+        # Build the instance without Temporal: skip __init__ and set what it would set.
+        wf = At000HelloAcpWorkflow.__new__(At000HelloAcpWorkflow)
+        wf.display_name = AGENT_NAME
+        wf._complete_task = False
+        return wf
+
+    @pytest.mark.asyncio
+    async def test_event_without_content_is_ignored(self):
+        """No content: return without raising (that would wedge the task) and send nothing."""
+        with patch("project.workflow.adk.messages.create", new=AsyncMock()) as create:
+            wf = self._workflow()
+            await wf.on_task_event_send(_send_event_params(None))
+
+        create.assert_not_awaited()
+        assert wf._complete_task is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("content", ECHOED_CONTENTS)
+    async def test_event_is_echoed_then_answered(self, content):
+        """Any content type is echoed back unchanged, then the agent replies."""
+        with patch("project.workflow.adk.messages.create", new=AsyncMock()) as create:
+            wf = self._workflow()
+            await wf.on_task_event_send(_send_event_params(content))
+
+        assert create.await_count == 2
+        echo, reply = create.await_args_list
+        assert echo.kwargs == {"task_id": TASK_ID, "content": content}
+        assert reply.kwargs["task_id"] == TASK_ID
+        assert isinstance(reply.kwargs["content"], TextContent)
+        assert reply.kwargs["content"].author == "agent"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -6,6 +6,12 @@ exercise the unified-surface event_stream_handler end-to-end over the wire.
 Offline coverage of the same wiring (TestModel + fake streaming/tracing) lives
 in the SDK repo under ``tests/lib/core/harness/`` (the pydantic-ai temporal suite).
 
+The offline tests at the end of this file (``TestSignalHandlerOffline``) call the
+workflow's signal handler directly, with its collaborators patched, and need no
+running agent: a user text event runs a turn, and an event the handler cannot
+process (no content, or content that is not text) is ignored without raising
+and without side effects.
+
 To run these tests:
 1. Make sure the agent is running (worker + ACP server)
 2. Set AGENTEX_API_BASE_URL if not using the default
@@ -14,14 +20,27 @@ To run these tests:
 
 import os
 import uuid
+from types import SimpleNamespace
+from typing import Any
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
 from test_utils.async_utils import poll_messages, send_event_and_poll_yielding
 
 from agentex import AsyncAgentex
+from agentex.types.task import Task
+from agentex.types.agent import Agent
+from agentex.types.event import Event
+from agentex.lib.types.acp import SendEventParams
+from agentex.types.data_content import DataContent
 from agentex.types.task_message import TaskMessage
+from agentex.types.text_content import TextContent
 from agentex.types.agent_rpc_params import ParamsCreateTaskRequest
+from agentex.types.reasoning_content import ReasoningContent
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_response_content import ToolResponseContent
 
 AGENTEX_API_BASE_URL = os.environ.get("AGENTEX_API_BASE_URL", "http://localhost:5003")
 AGENT_NAME = os.environ.get("AGENT_NAME", "at110-pydantic-ai")
@@ -107,6 +126,126 @@ class TestNonStreamingEvents:
         assert isinstance(final_text, str) and len(final_text) > 0
         # The get_weather tool always returns "72°F" — the response should mention it.
         assert "72" in final_text, "Expected weather response to mention 72°F"
+
+
+# ---------------------------------------------------------------------------
+# Offline signal-handler tests (no running agent, Temporal or API key needed)
+# ---------------------------------------------------------------------------
+
+TASK_ID = "task-offline"
+
+# Event content a caller can send that the handler cannot process: Event.content
+# is optional, and only TextContent carries a ``content: str``.
+NON_TEXT_CONTENTS = [
+    pytest.param(None, id="no-content"),
+    pytest.param(DataContent(author="user", data={}), id="data"),
+    pytest.param(ReasoningContent(author="user", summary=["thinking"], type="reasoning"), id="reasoning"),
+    pytest.param(
+        ToolRequestContent(author="user", name="get_weather", tool_call_id="call-1", arguments={"city": "Paris"}),
+        id="tool-request",
+    ),
+    pytest.param(
+        ToolResponseContent(author="user", name="get_weather", tool_call_id="call-1", content={"k": "v"}),
+        id="tool-response-dict",
+    ),
+    pytest.param(
+        ToolResponseContent(author="user", name="get_weather", tool_call_id="call-1", content=[1, 2]),
+        id="tool-response-list",
+    ),
+]
+
+
+def _send_event_params(content: Any) -> SendEventParams:
+    """Real ``SendEventParams``, as the ACP delivers an ``event/send`` to the workflow signal."""
+    now = datetime.now(timezone.utc)
+    return SendEventParams(
+        agent=Agent(id="agent-1", acp_type="async", name=AGENT_NAME, description="", created_at=now, updated_at=now),
+        task=Task(id=TASK_ID),
+        event=Event(id="event-1", agent_id="agent-1", task_id=TASK_ID, sequence_id=1, content=content),
+    )
+
+
+class _FakeSpan:
+    id = "span-1"
+    output: Any = None
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        pass
+
+
+@pytest.fixture
+def workflow_module():
+    """``project.workflow``; conftest.py sets the env vars it reads at import time."""
+    import project.workflow
+
+    return project.workflow
+
+
+@pytest.fixture
+def mocks(workflow_module, monkeypatch):
+    """Patch what the signal handler calls, so it runs without Temporal, a model or a server."""
+    run_result = SimpleNamespace(output="It is 72°F.", all_messages=lambda: ["model-request", "model-response"])
+    m = SimpleNamespace(
+        create=AsyncMock(),
+        span=MagicMock(return_value=_FakeSpan()),
+        agent=SimpleNamespace(run=AsyncMock(return_value=run_result)),
+    )
+    monkeypatch.setattr(workflow_module.adk.messages, "create", m.create)
+    monkeypatch.setattr(workflow_module.adk.tracing, "span", m.span)
+    monkeypatch.setattr(workflow_module, "temporal_agent", m.agent)
+    return m
+
+
+def _new_workflow(workflow_module):
+    """A workflow instance with the attributes ``__init__`` sets, built without a Temporal runtime."""
+    wf = workflow_module.HarnessPydanticAiWorkflow.__new__(workflow_module.HarnessPydanticAiWorkflow)
+    wf.display_name = AGENT_NAME
+    wf._complete_task = False
+    wf._turn_number = 0
+    wf._message_history = []
+    return wf
+
+
+class TestSignalHandlerOffline:
+    """The signal handler, called directly with real event payloads."""
+
+    @pytest.mark.asyncio
+    async def test_user_text_event_runs_agent(self, workflow_module, mocks):
+        """A user text event is echoed and run through the agent; the history is carried forward."""
+        wf = _new_workflow(workflow_module)
+        content = TextContent(author="user", content="What is the weather in Paris?")
+
+        await wf.on_task_event_send(_send_event_params(content))
+
+        mocks.create.assert_awaited_once_with(task_id=TASK_ID, content=content)
+        mocks.agent.run.assert_awaited_once()
+        assert mocks.agent.run.await_args.args == ("What is the weather in Paris?",)
+        deps = mocks.agent.run.await_args.kwargs["deps"]
+        assert (deps.task_id, deps.parent_span_id) == (TASK_ID, "span-1")
+        assert wf._turn_number == 1
+        assert wf._message_history == ["model-request", "model-response"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("content", NON_TEXT_CONTENTS)
+    async def test_non_text_event_is_ignored(self, workflow_module, mocks, content):
+        """An event the handler cannot process is ignored: no exception, no side effects.
+
+        An exception raised by a signal handler fails the workflow task, and
+        Temporal retries it forever by replaying the same signal from history, so
+        the task's workflow would never process another event.
+        """
+        wf = _new_workflow(workflow_module)
+
+        await wf.on_task_event_send(_send_event_params(content))
+
+        mocks.create.assert_not_awaited()
+        mocks.span.assert_not_called()
+        mocks.agent.run.assert_not_awaited()
+        assert wf._turn_number == 0
+        assert wf._message_history == []
 
 
 if __name__ == "__main__":

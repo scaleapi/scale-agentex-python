@@ -1,17 +1,44 @@
-"""Add the agent's project root to sys.path so ``import project`` works.
+"""Pytest setup for this tutorial's tests.
 
-Also sets minimal environment variables so FastACP, tracing, and the
-Temporal workflow module can be imported without a running server.
+``project.workflow`` reads environment variables when it is imported, so the offline tests need them set and
+this tutorial's ``project`` package importable. Both are arranged here for this tutorial's tests only, and any
+``project`` package already imported (another tutorial's, in a session that collects several) is cleared before
+and after them.
 """
+
+from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Iterator
 
-sys.path.insert(0, os.path.dirname(__file__))
+import pytest
 
-# AGENT_NAME must match the manifest's agent name: the live test queries the
-# server by this name, and project.workflow reads it at import time.
-os.environ.setdefault("AGENT_NAME", "at150-codex")
-os.environ.setdefault("ACP_URL", "http://localhost:8000")
-os.environ.setdefault("WORKFLOW_NAME", "at150-codex")
-os.environ.setdefault("WORKFLOW_TASK_QUEUE", "at150_codex_queue")
+TUTORIAL_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Values already set in the environment win.
+ENV_DEFAULTS = {
+    "AGENT_NAME": "at150-codex",
+    "ACP_URL": "http://localhost:8000",
+    "WORKFLOW_NAME": "at150-codex",
+    "WORKFLOW_TASK_QUEUE": "at150_codex_queue",
+}
+
+
+def _forget_project_modules() -> None:
+    for name in [name for name in sys.modules if name == "project" or name.startswith("project.")]:
+        del sys.modules[name]
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _tutorial_environment() -> Iterator[None]:
+    with pytest.MonkeyPatch.context() as patch:
+        for name, value in ENV_DEFAULTS.items():
+            if not os.environ.get(name):
+                patch.setenv(name, value)
+        patch.syspath_prepend(TUTORIAL_DIR)
+        _forget_project_modules()
+        try:
+            yield
+        finally:
+            _forget_project_modules()

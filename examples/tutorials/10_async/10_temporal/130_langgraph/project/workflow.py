@@ -49,8 +49,17 @@ class AtHarnessLanggraphWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """Echo the user's message, run the graph, surface the new messages."""
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
-        self._messages.append({"role": "user", "content": params.event.content.content})
+        # Validate before any side effect, and return instead of raising: an
+        # exception here fails the workflow task, and Temporal retries it forever.
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
+            return
+
+        await adk.messages.create(task_id=params.task.id, content=content)
+        self._messages.append({"role": "user", "content": content.content})
 
         compiled = lg_graph(GRAPH_NAME).compile()
         result = await compiled.ainvoke({"messages": self._messages})

@@ -91,10 +91,22 @@ class ClaudeMvpWorkflow(BaseWorkflow):
     async def on_task_event_send(self, params: SendEventParams):
         """Handle user message - run Claude agent"""
 
-        logger.info(f"Received task message: {params.event.content.content[:100]}...")
+        # Skip events this agent can't handle instead of raising: an exception here fails
+        # the workflow task, and Temporal replays the signal forever, wedging the task.
+        # Content can be missing or a non-text type (data, tool request/response, ...).
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
+            return
 
-        if self._state is None:
-            raise ValueError("State is not initialized")
+        logger.info(f"Received task message: {content.content[:100]}...")
+
+        # A signal can arrive before on_task_create has initialised state and created the
+        # workspace (e.g. with signal-with-start): wait for both rather than raising.
+        while self._state is None or self._workspace_path is None:
+            await workflow.wait_condition(lambda: self._state is not None and self._workspace_path is not None)
 
         self._task_id = params.task.id
         self._trace_id = params.task.id
@@ -103,7 +115,7 @@ class ClaudeMvpWorkflow(BaseWorkflow):
         # Echo user message to UI
         await adk.messages.create(
             task_id=params.task.id,
-            content=params.event.content
+            content=content
         )
 
         # Wrap in tracing span - THIS IS REQUIRED for ContextInterceptor to work!
@@ -111,7 +123,7 @@ class ClaudeMvpWorkflow(BaseWorkflow):
             trace_id=params.task.id,
             name=f"Turn {self._state.turn_number}",
             input={
-                "prompt": params.event.content.content,
+                "prompt": content.content,
                 "session_id": self._state.claude_session_id,
             },
         ) as span:
@@ -139,7 +151,7 @@ class ClaudeMvpWorkflow(BaseWorkflow):
                 result = await workflow.execute_activity(
                 run_claude_agent_activity,
                 args=[
-                    params.event.content.content,  # prompt
+                    content.content,               # prompt
                     self._workspace_path,          # workspace
                     ["Read", "Write", "Edit", "Bash", "Grep", "Glob", "Task"],  # allowed tools (Task for subagents!)
                     "acceptEdits",                 # permission mode

@@ -48,9 +48,18 @@ class At020StateMachineWorkflow(BaseWorkflow):
     @override
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
+        # Skip events this agent can't handle instead of raising: an exception here fails
+        # the workflow task, and Temporal replays the signal forever, wedging the task.
+        # Content can be missing or a non-text type (data, tool request/response, ...).
+        message = params.event.content
+        if not isinstance(message, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(message, "type", None)
+            )
+            return
+
         deep_research_data = self.state_machine.get_state_machine_data()
         task = params.task
-        message = params.event.content
 
         # If waiting for user input, handle the message
         if self.state_machine.get_current_state() == DeepResearchState.WAITING_FOR_USER_INPUT:

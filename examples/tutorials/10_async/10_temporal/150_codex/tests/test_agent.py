@@ -9,6 +9,8 @@ OFFLINE unit tests (``TestOfflineCodexWorkflow``):
   - Inject a fake async iterator of pre-recorded codex event lines.
   - Assert the signal handler drives ``UnifiedEmitter.auto_send_turn`` and
     captures the codex thread ID on the workflow instance.
+  - Assert the signal handler ignores events it cannot process (no content, or
+    content that is not text) without raising and without side effects.
   - Always run.
 """
 
@@ -17,13 +19,57 @@ from __future__ import annotations
 import os
 import json
 from typing import Any
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from agentex.types.task import Task
+from agentex.types.agent import Agent
+from agentex.types.event import Event
+from agentex.lib.types.acp import SendEventParams
+from agentex.types.data_content import DataContent
+from agentex.types.text_content import TextContent
+from agentex.types.reasoning_content import ReasoningContent
+from agentex.types.tool_request_content import ToolRequestContent
+from agentex.types.tool_response_content import ToolResponseContent
+
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+TASK_ID = "task-temporal-offline-1"
+
+
+def _send_event_params(content: Any) -> SendEventParams:
+    """Real ``SendEventParams``, as the ACP delivers an ``event/send`` to the workflow signal."""
+    now = datetime.now(timezone.utc)
+    return SendEventParams(
+        agent=Agent(id="agent-1", acp_type="async", name="at150-codex", description="", created_at=now, updated_at=now),
+        task=Task(id=TASK_ID),
+        event=Event(id="event-1", agent_id="agent-1", task_id=TASK_ID, sequence_id=1, content=content),
+    )
+
+
+# Event content a caller can send that the handler cannot process: Event.content
+# is optional, and only TextContent carries a ``content: str``.
+NON_TEXT_CONTENTS = [
+    pytest.param(None, id="no-content"),
+    pytest.param(DataContent(author="user", data={}), id="data"),
+    pytest.param(ReasoningContent(author="user", summary=["thinking"], type="reasoning"), id="reasoning"),
+    pytest.param(
+        ToolRequestContent(author="user", name="get_weather", tool_call_id="call-1", arguments={"city": "Paris"}),
+        id="tool-request",
+    ),
+    pytest.param(
+        ToolResponseContent(author="user", name="get_weather", tool_call_id="call-1", content={"k": "v"}),
+        id="tool-response-dict",
+    ),
+    pytest.param(
+        ToolResponseContent(author="user", name="get_weather", tool_call_id="call-1", content=[1, 2]),
+        id="tool-response-list",
+    ),
+]
 
 SAMPLE_EVENTS: list[dict[str, Any]] = [
     {"type": "thread.started", "thread_id": "thread-temporal-1"},
@@ -128,6 +174,7 @@ class TestOfflineCodexWorkflow:
         """Signal handler runs the turn via execute_activity, increments the turn
         counter, and captures the codex thread ID returned by the activity."""
         captured: dict[str, Any] = {}
+        create = AsyncMock()
 
         async def _fake_execute_activity(_activity, params, **_kw):
             captured["params"] = params
@@ -137,7 +184,7 @@ class TestOfflineCodexWorkflow:
                 "model": "o4-mini",
             }
 
-        with patch("project.workflow.adk.messages.create", new=AsyncMock()), patch(
+        with patch("project.workflow.adk.messages.create", new=create), patch(
             "project.workflow.adk.tracing.span"
         ) as mock_span, patch(
             "project.workflow.workflow.execute_activity", new=_fake_execute_activity
@@ -152,16 +199,45 @@ class TestOfflineCodexWorkflow:
             wf._complete_task = False
             wf._display_name = "test"
 
-            params = MagicMock()
-            params.task.id = "task-temporal-offline-1"
-            params.event.content.content = "say hello temporal"
+            content = TextContent(author="user", content="say hello temporal")
+            await wf.on_task_event_send(_send_event_params(content))
 
-            await wf.on_task_event_send(params)
-
+        create.assert_awaited_once_with(task_id=TASK_ID, content=content)
         assert wf._turn_number == 1
         assert wf._codex_thread_id == "thread-temporal-1"
         assert captured["params"].prompt == "say hello temporal"
         assert captured["params"].thread_id is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("content", NON_TEXT_CONTENTS)
+    async def test_signal_handler_ignores_non_text_event(self, content):
+        """An event the handler cannot process is ignored: no exception, no side effects.
+
+        An exception raised by a signal handler fails the workflow task, and
+        Temporal retries it forever by replaying the same signal from history, so
+        the task's workflow would never process another event.
+        """
+        create = AsyncMock()
+        execute_activity = AsyncMock()
+
+        with patch("project.workflow.adk.messages.create", new=create), patch(
+            "project.workflow.adk.tracing.span"
+        ) as mock_span, patch("project.workflow.workflow.execute_activity", new=execute_activity):
+            from project.workflow import AtHarnessCodexWorkflow
+
+            wf = AtHarnessCodexWorkflow.__new__(AtHarnessCodexWorkflow)
+            wf.display_name = "test"
+            wf._complete_task = False
+            wf._turn_number = 0
+            wf._codex_thread_id = None
+
+            await wf.on_task_event_send(_send_event_params(content))
+
+        create.assert_not_awaited()
+        mock_span.assert_not_called()
+        execute_activity.assert_not_awaited()
+        assert wf._turn_number == 0
+        assert wf._codex_thread_id is None
 
     @pytest.mark.asyncio
     async def test_run_codex_turn_activity_streams_and_returns_thread_id(self):

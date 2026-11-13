@@ -64,23 +64,32 @@ class At140HarnessOpenaiWorkflow(BaseWorkflow):
     @workflow.signal(name=SignalName.RECEIVE_EVENT)
     async def on_task_event_send(self, params: SendEventParams) -> None:
         """Handle a user message: echo it, then run the harness activity durably."""
+        # Validate before any side effect, and return instead of raising: an
+        # exception here fails the workflow task, and Temporal retries it forever.
+        content = params.event.content
+        if not isinstance(content, TextContent):
+            logger.warning(
+                "Ignoring non-text event for task %s (type=%s)", params.task.id, getattr(content, "type", None)
+            )
+            return
+
         logger.info(f"Received task event: {params.task.id}")
         self._turn_number += 1
 
         # Echo the user's message so it shows up in the UI as a chat bubble.
-        await adk.messages.create(task_id=params.task.id, content=params.event.content)
+        await adk.messages.create(task_id=params.task.id, content=content)
 
         async with adk.tracing.span(
             trace_id=params.task.id,
             task_id=params.task.id,
             name=f"Turn {self._turn_number}",
-            input={"message": params.event.content.content},
+            input={"message": content.content},
         ) as span:
             turn_result = await workflow.execute_activity(
                 RUN_AGENT_ACTIVITY,
                 RunHarnessAgentParams(
                     task_id=params.task.id,
-                    user_message=params.event.content.content,
+                    user_message=content.content,
                     input_list=self._messages,
                     trace_id=params.task.id,
                     parent_span_id=span.id if span else None,
