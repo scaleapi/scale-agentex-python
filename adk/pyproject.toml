@@ -57,8 +57,7 @@ dependencies = [
     "scale-gp>=0.1.0a59",
     "scale-gp-beta>=0.5.0",
     "mcp>=1.4.1",
-    # Observability
-    "ddtrace>=3.13.0",
+    # Observability (ddtrace is opt-in via the `datadog` extra below)
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
     "json_log_formatter>=1.1.1",
@@ -78,6 +77,12 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
   "License :: OSI Approved :: Apache Software License",
 ]
+
+[project.optional-dependencies]
+# Some deployments do not allow Datadog software to be installed, so ddtrace is
+# opt-in. Without it, logs skip the dd.trace_id/dd.span_id fields and the
+# dd_only obs helpers return no ids.
+datadog = ["ddtrace>=3.13.0"]
 
 # No `obs` extra, deliberately — do not add one for sgp-obs.
 #
