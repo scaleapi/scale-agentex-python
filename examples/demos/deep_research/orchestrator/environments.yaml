@@ -1,0 +1,27 @@
+# Agent Environment Configuration
+schema_version: "v1"
+environments:
+  dev:
+    auth:
+      principal:
+        user_id: # TODO: Fill in
+        account_id: # TODO: Fill in
+    helm_overrides:
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+      temporal-worker:
+        enabled: true
+        replicaCount: 1
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
