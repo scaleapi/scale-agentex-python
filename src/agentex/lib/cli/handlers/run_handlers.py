@@ -5,6 +5,7 @@ import sys
 import asyncio
 from pathlib import Path
 
+from rich.text import Text
 from rich.panel import Panel
 from rich.console import Console
 
@@ -291,7 +292,7 @@ async def stream_process_output(process: asyncio.subprocess.Process, prefix: str
                 continue
 
             if decoded_line:  # Only print non-empty lines
-                console.print(f"[dim]{prefix}:[/dim] {decoded_line}")
+                console.print(Text.assemble((f"{prefix}:", "dim"), " ", decoded_line))
     except Exception as e:
         # The escalation path, including for the re-raise above. Anything reaching
         # here ends the loop, so the child is now at risk of blocking on a full pipe.
