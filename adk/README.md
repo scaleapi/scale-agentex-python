@@ -20,6 +20,14 @@ pip install agentex-sdk
 
 This automatically pulls in [`agentex-client`](../) (the slim Stainless-generated REST client) so `from agentex import Agentex, AsyncAgentex` works the same as before.
 
+Datadog support is optional. To use it (for example `ddtrace-run`, or `dd.trace_id` / `dd.span_id` in JSON logs), install the `datadog` extra or add `ddtrace` to your own dependencies:
+
+```sh
+pip install 'agentex-sdk[datadog]'
+```
+
+Without it, the SDK does not install or import `ddtrace`. JSON logs still carry `dd.service`, `dd.env` and `dd.version` from `DD_SERVICE`, `DD_ENV` and `DD_VERSION`.
+
 ## When to use this vs `agentex-client`
 
 - **`agentex-sdk`** — you're authoring agents. Pulls everything: ACP server, Temporal, MCP, LLM providers, observability, CLI. ~37 deps.

@@ -22,4 +22,11 @@ from agentex.types import Event  # client surface — ships in agentex-client
 from agentex.resources import states  # client surface that "didn't land" in the incident
 
 print("agentex namespace OK:", Event.__name__, states.__name__)
+
+# ddtrace is opt-in (agentex-sdk[datadog]); a plain install must not pull it in.
+import importlib.util
+assert importlib.util.find_spec("ddtrace") is None, "ddtrace installed without the datadog extra"
+from agentex.lib.utils.logging import make_logger  # top-level ddtrace import used to live here
+
+make_logger("agentex.check_wheel_install").info("logging OK without ddtrace")
 PY
