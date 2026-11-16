@@ -48,6 +48,14 @@ class StateModel(BaseModel):
     turn_number: int
 
 
+def _websearch_env():
+    """Env for the web search MCP server: the OpenAI key, plus OPENAI_BASE_URL when set (for a gateway)."""
+    env = {"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")}
+    if os.environ.get("OPENAI_BASE_URL"):
+        env["OPENAI_BASE_URL"] = os.environ["OPENAI_BASE_URL"]
+    return env
+
+
 MCP_SERVERS = [
     StdioServerParameters(
         command="npx",
@@ -59,7 +67,7 @@ MCP_SERVERS = [
         # unpinned, so cap it until the server allows a newer mcp.
         command="uvx",
         args=["--with", "pydantic<2.14", "openai-websearch-mcp"],
-        env={"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")},
+        env=_websearch_env(),
     ),
 ]
 
