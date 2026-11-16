@@ -55,7 +55,7 @@ from agentex.types.tool_request_content import ToolRequestContent
 from agentex.types.tool_response_content import ToolResponseContent
 from agentex.lib.adk._modules._codex_turn import CodexTurn
 
-from ._fakes import FakeTracing
+from ._fakes import FakeTracing, tool_marker
 
 # ---------------------------------------------------------------------------
 # Native codex event fixtures (copied from the turn + conformance tests)
@@ -224,6 +224,25 @@ class TestSyncYieldSpanDerivation:
         )
         _name, output = fake_tracing.ended[0]
         assert "72F" in str(output)
+
+    async def test_successful_tool_span_is_marked_as_a_tool_call(self) -> None:
+        fake_tracing = FakeTracing()
+        await _run_yield_turn(
+            _tool_then_text_events(),
+            trace_id="trace1",
+            parent_span_id="parent-span",
+            fake_tracing=fake_tracing,
+        )
+        (tool_span,) = fake_tracing.ended_spans
+        assert tool_span.data == tool_marker("bash")
+
+    async def test_failed_tool_span_is_marked_as_a_tool_call(self) -> None:
+        events = _tool_then_text_events()
+        events[3]["item"]["exit_code"] = 1
+        fake_tracing = FakeTracing()
+        await _run_yield_turn(events, trace_id="trace1", parent_span_id="parent-span", fake_tracing=fake_tracing)
+        (tool_span,) = fake_tracing.ended_spans
+        assert tool_span.data == tool_marker("bash")
 
     async def test_reasoning_span_opened_then_done_closed(self) -> None:
         """A codex reasoning item emits Start+Delta+Done: the reasoning span

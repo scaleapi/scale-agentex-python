@@ -371,7 +371,8 @@ class Trace:
         span = self.start_span(name, parent_id, input, data, task_id=task_id)
         try:
             yield span
-        except Exception as exc:
+        except BaseException as exc:
+            # A cancelled call did not succeed, and cancellation is not an Exception.
             set_span_error(span, exc)
             raise
         finally:
@@ -560,7 +561,8 @@ class AsyncTrace:
         span = await self.start_span(name, parent_id, input, data, task_id=task_id)
         try:
             yield span
-        except Exception as exc:
+        except BaseException as exc:
+            # A cancelled call did not succeed, and cancellation is not an Exception.
             set_span_error(span, exc)
             raise
         finally:

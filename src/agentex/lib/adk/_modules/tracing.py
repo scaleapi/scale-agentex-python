@@ -237,7 +237,7 @@ class TracingModule:
         )
         try:
             yield span
-        except Exception as exc:
+        except BaseException as exc:
             # Record the failure on the span so the obs span reflects the error
             # instead of a false green. Agents use THIS context manager (not
             # AsyncTrace.span, which is the only other place set_span_error is
