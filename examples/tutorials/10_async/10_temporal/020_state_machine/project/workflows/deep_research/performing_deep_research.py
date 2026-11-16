@@ -13,6 +13,15 @@ from agentex.lib.sdk.state_machine.state_workflow import StateWorkflow
 
 logger = make_logger(__name__)
 
+
+def _websearch_env():
+    """Env for the web search MCP server: the OpenAI key, plus OPENAI_BASE_URL when set (for a gateway)."""
+    env = {"OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")}
+    if os.environ.get("OPENAI_BASE_URL"):
+        env["OPENAI_BASE_URL"] = os.environ["OPENAI_BASE_URL"]
+    return env
+
+
 # These reference MCP servers still import the mcp 1.x API (``McpError``), which
 # mcp 2.0.0 renamed to ``MCPError``. uvx gives each server its own isolated env and
 # resolves ``mcp`` unpinned there, ignoring the version this project pins, so without
@@ -31,9 +40,7 @@ MCP_SERVERS = [
     StdioServerParameters(
         command="uvx",
         args=[*_MCP_PIN, "openai-websearch-mcp"],
-        env={
-            "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY", "")
-        }
+        env=_websearch_env(),
     ),
     StdioServerParameters(
         command="uvx",

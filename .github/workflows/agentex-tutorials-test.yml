@@ -162,7 +162,13 @@ jobs:
         id: run-test
         working-directory: ./examples/tutorials
         env:
-          OPENAI_API_KEY: ${{ secrets.TUTORIAL_OPENAI_API_KEY }}
+          # OpenAI calls go through an internal gateway that passes the OpenAI API through
+          # unchanged. The key and the gateway URL are both secrets, scoped to this CI.
+          OPENAI_API_KEY: ${{ secrets.TUTORIAL_SMIG_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.TUTORIAL_OPENAI_BASE_URL }}
+          # The OpenAI Agents SDK exports traces to api.openai.com with OPENAI_API_KEY and ignores
+          # OPENAI_BASE_URL, which would send the gateway key to OpenAI. CI doesn't need those traces.
+          OPENAI_AGENTS_DISABLE_TRACING: "1"
           ANTHROPIC_API_KEY: ${{ secrets.TUTORIAL_ANTHROPIC_API_KEY }}
           # Enable the gated live tests only for the matching subprocess-CLI
           # harness tutorial (the CLI is installed for it in the step above).
