@@ -6,6 +6,7 @@ from typing import Any, AsyncIterator
 from datetime import datetime
 
 from agentex.types.text_delta import TextDelta
+from agentex.lib.utils.temporal import heartbeat_if_in_activity
 from agentex.types.text_content import TextContent
 from agentex.lib.core.harness.types import TurnUsage, TurnResult, StreamTaskMessage
 from agentex.lib.core.harness.tracer import SpanTracer
@@ -86,6 +87,7 @@ async def auto_send(
 
     try:
         async for event in events:
+            heartbeat_if_in_activity("auto send")
             if deriver is not None and tracer is not None:
                 for signal in deriver.observe(event):
                     await tracer.handle(signal)
