@@ -137,3 +137,23 @@ class TestTemporalLangGraphTemplate:
         requirements = (project_dir / "requirements.txt").read_text()
         assert "temporalio[langgraph]>=1.27.0" in requirements
         assert "langchain-openai" in requirements
+
+
+_FRAMEWORK_TEMPLATES = [t for t in TemplateType if t not in (TemplateType.DEFAULT, TemplateType.SYNC, TemplateType.TEMPORAL)]
+
+
+@pytest.mark.parametrize("template_type", _FRAMEWORK_TEMPLATES)
+def test_framework_templates_register_local_tracing_processor(tmp_path: Path, template_type: TemplateType):
+    """Every framework template registers the Agentex tracing processor.
+
+    Without it, spans derived by the unified harness only go to the (optional)
+    SGP processor, and the developer UI's traces tab stays empty for a locally
+    scaffolded agent.
+    """
+    project_dir = _render_project(tmp_path, template_type)
+    entrypoints = [p for p in project_dir.rglob("*.py") if p.name in ("acp.py", "workflow.py")]
+    assert entrypoints, f"{template_type.value} has no acp.py/workflow.py"
+    joined = "\n".join(p.read_text() for p in entrypoints)
+    assert "add_tracing_processor_config(AgentexTracingProcessorConfig())" in joined, (
+        f"{template_type.value} does not register AgentexTracingProcessorConfig"
+    )
