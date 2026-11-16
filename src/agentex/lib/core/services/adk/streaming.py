@@ -395,7 +395,14 @@ class StreamingTaskMessageContext:
         return await self.open()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        return await self.close()
+        """Close the context, then let any exception from the body propagate.
+
+        Returning ``close()``'s truthy ``TaskMessage`` here would suppress it,
+        silently persisting a half-written message as DONE and hiding the
+        failure from the caller (and from Temporal's activity retries).
+        """
+        await self.close()
+        return False
 
     async def open(self) -> "StreamingTaskMessageContext":
         self._is_closed = False
@@ -432,6 +439,10 @@ class StreamingTaskMessageContext:
 
     async def close(self) -> TaskMessage:
         """Close the streaming context."""
+        return await self._finish()
+
+    async def _finish(self, done_index: int | None = None) -> TaskMessage:
+        """Drain the buffer, publish one DONE carrying ``done_index``, and persist."""
         if not self.task_message:
             raise ValueError("Context not properly initialized - no task message")
 
@@ -448,6 +459,7 @@ class StreamingTaskMessageContext:
         done_event = StreamTaskMessageDone(
             parent_task_message=self.task_message,
             type="done",
+            index=done_index,
         )
         await self._streaming_service.stream_update(done_event)
 
@@ -484,7 +496,9 @@ class StreamingTaskMessageContext:
 
         ``StreamTaskMessageDone`` and ``StreamTaskMessageFull`` updates always
         publish synchronously regardless of mode so consumers and persistence
-        stay in sync.
+        stay in sync. A Done delegates its publish to ``close()``, which drains
+        the buffer first and emits exactly one DONE; publishing it here as well
+        would put a second DONE on the stream, ahead of the buffered deltas.
         """
         if self._is_closed:
             raise ValueError("Context is already done")
@@ -501,6 +515,10 @@ class StreamingTaskMessageContext:
                 await self._buffer.add(update)
                 return update
 
+        if isinstance(update, StreamTaskMessageDone):
+            await self._finish(update.index)
+            return update
+
         # A Full ends the stream and supersedes buffered deltas. Drain and stop
         # the buffer BEFORE publishing the Full, so leftover deltas land in order
         # (deltas -> Full) instead of trailing the terminal Full as a stale
@@ -511,10 +529,7 @@ class StreamingTaskMessageContext:
 
         result = await self._streaming_service.stream_update(update)
 
-        if isinstance(update, StreamTaskMessageDone):
-            await self.close()
-            return update
-        elif isinstance(update, StreamTaskMessageFull):
+        if isinstance(update, StreamTaskMessageFull):
             await self._agentex_client.messages.update(
                 task_id=self.task_id,
                 message_id=update.parent_task_message.id,  # type: ignore[union-attr]
