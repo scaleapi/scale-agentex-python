@@ -140,3 +140,54 @@ async def test_emitter_auto_send_turn_reads_usage_after_exhaustion():
     result = await emitter.auto_send_turn(turn)
     assert result.usage == real_usage
     assert result.usage.input_tokens == 11 and result.usage.total_tokens == 33
+
+
+class _PinnedTurn:
+    """A turn that pins its event generator, as the real CLI taps do.
+
+    `closed` records that the generator's finally ran (what terminates the CLI
+    subprocess in the scaffolds).
+    """
+
+    def __init__(self, events_list):
+        self._events_list = events_list
+        self.closed: list[bool] = []
+        self._gen = None
+
+    @property
+    def events(self):
+        if self._gen is None:
+            self._gen = self._stream()
+        return self._gen
+
+    async def _stream(self):
+        try:
+            for e in self._events_list:
+                yield e
+        finally:
+            self.closed.append(True)
+
+    def usage(self):
+        return TurnUsage()
+
+
+@pytest.mark.asyncio
+async def test_emitter_yield_turn_closes_source_on_early_close():
+    """Closing the delivery generator must close the turn's event source.
+
+    No gc.collect() and no sleep: the turn keeps the generator referenced, and
+    async-generator finalization is too late for a disconnected client anyway.
+    """
+    events = [
+        StreamTaskMessageStart(type="start", index=0, content=TextContent(type="text", author="agent", content="")),
+        StreamTaskMessageDelta(type="delta", index=0, delta=TextDelta(type="text", text_delta="hi")),
+        StreamTaskMessageDone(type="done", index=0),
+    ]
+    turn = _PinnedTurn(events)
+    emitter = UnifiedEmitter(task_id="t", trace_id=None, parent_span_id=None)
+    gen = emitter.yield_turn(turn)
+    first = await gen.__anext__()
+    await gen.aclose()
+
+    assert first.index == 0
+    assert turn.closed == [True]

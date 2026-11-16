@@ -9,6 +9,8 @@ The fake mirrors the real StreamingTaskMessageContext API exactly:
 This mirrors _langgraph_async.py lines 62-78 and 100-127.
 """
 
+import asyncio
+from typing import override
 from datetime import datetime
 
 import pytest
@@ -478,3 +480,116 @@ async def test_auto_send_created_at_forwarded():
     await auto_send(_gen(events), task_id="task1", tracer=None, streaming=streaming, created_at=dt)
 
     assert all(ts == dt for ts in streaming.recorded_created_at)
+
+
+class _BlockingCtx(_FakeCtx):
+    """A context whose stream_update never returns (a stalled backend).
+
+    Sets `blocked` once stream_update is awaited so the test can cancel exactly
+    while delivery is suspended on the backend rather than on the source.
+    """
+
+    def __init__(self, sink, content_type, initial_content, blocked):
+        super().__init__(sink, content_type, initial_content)
+        self.blocked = blocked
+
+    @override
+    async def stream_update(self, update):
+        self.sink.append(("update", update))
+        self.blocked.set()
+        await asyncio.Event().wait()
+
+
+class _BlockingStreaming(_FakeStreaming):
+    """_FakeStreaming whose contexts block forever inside stream_update."""
+
+    def __init__(self):
+        super().__init__()
+        self.blocked = asyncio.Event()
+
+    @override
+    def streaming_task_message_context(self, task_id, initial_content, streaming_mode="coalesced", created_at=None):
+        ctype = getattr(initial_content, "type", None)
+        self.sink.append(("ctx", ctype))
+        self.recorded_created_at.append(created_at)
+        return _BlockingCtx(self.sink, ctype, initial_content, self.blocked)
+
+
+class _PlainAsyncIterator:
+    """An async iterator with no aclose (the AsyncIterator contract minimum)."""
+
+    def __init__(self, events):
+        self._events = iter(events)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self._events)
+        except StopIteration:
+            raise StopAsyncIteration from None
+
+
+@pytest.mark.asyncio
+async def test_auto_send_closes_source_when_cancelled_mid_delivery():
+    """Cancelling delivery while the backend blocks must close the event source.
+
+    The turn object pins its event generator, so GC cannot rescue it: when
+    auto_send returns with the source still suspended at a yield, the tap's
+    finally never runs and the harness CLI subprocess leaks. The source is held
+    by a local here for the whole test, and nothing calls gc.collect().
+    """
+    streaming = _BlockingStreaming()
+    closed: list[bool] = []
+
+    async def _recording_source():
+        try:
+            yield StreamTaskMessageStart(
+                type="start",
+                index=0,
+                content=TextContent(type="text", author="agent", content=""),
+            )
+            yield StreamTaskMessageDelta(
+                type="delta",
+                index=0,
+                delta=TextDelta(type="text", text_delta="hi"),
+            )
+            yield StreamTaskMessageDone(type="done", index=0)
+        finally:
+            closed.append(True)
+
+    source = _recording_source()
+    task = asyncio.create_task(auto_send(source, task_id="task1", tracer=None, streaming=streaming))
+    await asyncio.wait_for(streaming.blocked.wait(), timeout=5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert closed == [True]
+    assert ("close", "text") in [(s[0], s[1]) for s in streaming.sink]
+
+
+@pytest.mark.asyncio
+async def test_auto_send_accepts_source_without_aclose():
+    """A plain async iterator (no aclose) must deliver exactly as before."""
+    streaming = _FakeStreaming()
+    events = [
+        StreamTaskMessageStart(
+            type="start",
+            index=0,
+            content=TextContent(type="text", author="agent", content=""),
+        ),
+        StreamTaskMessageDelta(
+            type="delta",
+            index=0,
+            delta=TextDelta(type="text", text_delta="Hi"),
+        ),
+        StreamTaskMessageDone(type="done", index=0),
+    ]
+    result = await auto_send(_PlainAsyncIterator(events), task_id="task1", tracer=None, streaming=streaming)
+
+    assert result.final_text == "Hi"
+    kinds = [s[0] for s in streaming.sink]
+    assert kinds.count("open") == 1
+    assert kinds.count("close") == 1
